@@ -36,7 +36,7 @@ def cmd_status(args):
     top_memes = kb.get_top_memes()
     print(f"\n--- Top Memetic Knowledge Rules ({len(top_memes)} active) ---")
     for m in top_memes:
-        print(f"  [{m.fitness_score:4.1f}★] {m.title:<35} ({m.repo})")
+        print(f"  [{m.fitness_score:4.1f}*] {m.title:<35} ({m.repo})")
         print(f"         Rule: {m.rule}")
 
 def cmd_broadcast(args):
