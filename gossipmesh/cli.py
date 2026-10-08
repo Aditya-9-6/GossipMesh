@@ -26,7 +26,7 @@ def cmd_status(args):
         try:
             hb = json.loads(hb_file.read_text(encoding="utf-8"))
             for nid, data in hb.items():
-                print(f"  • {nid:<24} | Last Seen: {data.get('last_seen', 0):.1f} | Clock: {data.get('clock_seq', 0)}")
+                print(f"  * {nid:<24} | Last Seen: {data.get('last_seen', 0):.1f} | Clock: {data.get('clock_seq', 0)}")
         except Exception:
             print("  (No active heartbeats found)")
     else:
