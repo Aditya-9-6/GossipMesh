@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 
 class GossipTopic(str, Enum):
@@ -155,7 +155,7 @@ class GossipNode:
         Runs anti-entropy synchronization: scans the shared ledger for newly
         arrived gossip messages from other peer nodes.
         """
-        new_messages: List[GossipMessage] = []
+        new_messages: list[GossipMessage] = []
         if not self.log_file.exists():
             return new_messages
 
@@ -206,7 +206,7 @@ class GossipNode:
 
     def get_recent_messages(self, topic: GossipTopic | None = None, limit: int = 50) -> list[GossipMessage]:
         """Fetches the latest gossip messages from the ledger."""
-        messages: List[GossipMessage] = []
+        messages: list[GossipMessage] = []
         if not self.log_file.exists():
             return messages
 

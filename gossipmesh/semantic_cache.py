@@ -1,8 +1,6 @@
 import hashlib
 import json
 import math
-import re
-from collections import Counter
 from pathlib import Path
 
 
