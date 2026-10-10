@@ -274,7 +274,7 @@ def main():
     parser = argparse.ArgumentParser(description="DevProxy Autonomous Multi-Agent Daemon")
     parser.add_argument("--workspace", default=".", help="Path to DevProxy repository root")
     parser.add_argument("--once", action="store_true", help="Run once and exit instead of continuous daemon")
-    parser.add_argument("--interval", type=int, default=120, help="Interval in seconds between cycles (default: 120s)")
+    parser.add_argument("--interval", type=int, default=10, help="Interval in seconds between cycles (default: 10s)")
     parser.add_argument("--add-keys", nargs="*", default=[], help="Additional Gemini API keys to add to the round-robin pool")
     args = parser.parse_args()
 

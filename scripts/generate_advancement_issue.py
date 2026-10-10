@@ -109,7 +109,7 @@ def get_existing_issues():
         print(f"[WARN] Failed to fetch issues via gh CLI: {e}")
         return []
 
-def check_freeze_timer(existing_issues, cooldown_minutes=30, force=False):
+def check_freeze_timer(existing_issues, cooldown_minutes=0, force=False):
     """
     Checks if an advancement issue was submitted recently.
     Returns (can_submit: bool, minutes_elapsed: float)
@@ -199,7 +199,7 @@ Output ONLY valid JSON matching this schema:
                     return json.loads(text)
             except urllib.error.HTTPError as e:
                 if e.code == 429:
-                    freeze_sec = 15 * attempt
+                    freeze_sec = 5 * attempt
                     print(f"[FREEZE TIMER] Rate limit encountered on {model}. Backing off for {freeze_sec}s...", flush=True)
                     time.sleep(freeze_sec)
                     continue
@@ -278,7 +278,7 @@ def main():
     manual_diff = os.environ.get("INPUT_DIFFICULTY", "good first issue").strip()
     manual_spec = os.environ.get("INPUT_SPEC", "").strip()
     count = int(os.environ.get("INPUT_COUNT", "1") or "1")
-    cooldown_min = int(os.environ.get("MIN_COOLDOWN_MINUTES", "30"))
+    cooldown_min = int(os.environ.get("MIN_COOLDOWN_MINUTES", "0"))
     force = os.environ.get("FORCE_SUBMIT", "false").lower() in ("true", "1") or ("--force" in sys.argv) or ("-f" in sys.argv)
 
     # If manual submission specified
@@ -331,8 +331,8 @@ def main():
                 created_count += 1
                 save_backlog(workspace, backlog)
                 if created_count < count:
-                    print("[RATE-LIMIT DELAY] Sleeping 12s to protect GitHub secondary rate limit...")
-                    time.sleep(12)
+                    print("[RATE-LIMIT DELAY] Sleeping 1s to protect GitHub secondary rate limit...")
+                    time.sleep(1)
 
     # 3. Pull from curated catalog
     for item in CATALOG:
@@ -343,8 +343,8 @@ def main():
                 existing_titles.add(item["title"])
                 created_count += 1
                 if created_count < count:
-                    print("[RATE-LIMIT DELAY] Sleeping 12s to protect GitHub secondary rate limit...")
-                    time.sleep(12)
+                    print("[RATE-LIMIT DELAY] Sleeping 1s to protect GitHub secondary rate limit...")
+                    time.sleep(1)
 
     # 4. If catalog exhausted and more requested, dynamically generate via Gemini AI
     if created_count < count:
@@ -358,8 +358,8 @@ def main():
                 existing_titles.add(ai_item["title"])
                 created_count += 1
                 if created_count < count:
-                    print("[RATE-LIMIT DELAY] Sleeping 12s to protect GitHub secondary rate limit...")
-                    time.sleep(12)
+                    print("[RATE-LIMIT DELAY] Sleeping 1s to protect GitHub secondary rate limit...")
+                    time.sleep(1)
 
     if created_count == 0:
         print("[OK] No new issues needed or all catalog items already exist.")

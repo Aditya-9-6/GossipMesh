@@ -162,14 +162,14 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL) -> dict:
                 if e.code == 404:
                     break
                 if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
-                    time.sleep(3 * attempt)
+                    time.sleep(1 * attempt)
                     continue
                 break
             except Exception as e:
                 print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
                 last_err = str(e)
                 if attempt < max_attempts:
-                    time.sleep(3 * attempt)
+                    time.sleep(1 * attempt)
                     continue
                 break
 
