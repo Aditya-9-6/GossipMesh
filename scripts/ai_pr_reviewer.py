@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Autonomous PR Validator & Reviewer Agent for DevProxy
+Autonomous PR Validator & Reviewer Agent for GossipMesh
 Enforces strict anti-spaghetti architectural standards, modularity, zero-leak concurrency,
 zero-allocation memory invariants, and high test coverage.
 Outputs structured JSON and Markdown reports with system impact assessment.
@@ -30,7 +30,7 @@ FALLBACK_MODELS = [
     "gemini-3.1-pro-preview",
 ]
 
-REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on DevProxy (a high-performance HTTP/HTTPS proxy and security engine in Go).
+REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance HTTP/HTTPS proxy and security engine in Python).
 
 Your primary mission is to ENFORCE STRICT ARCHITECTURAL STANDARDS AND PREVENT SPAGHETTI CODE as the codebase scales at hyper-speed.
 
@@ -38,19 +38,19 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
 1. Anti-Spaghetti & Modularity:
    - Single Responsibility Principle (SRP): Functions must be focused (<60 LOC), clean, and self-documenting.
    - No spaghetti control flow: Reject deeply nested blocks (>3 levels), massive switch-case god functions, or unstructured goto/fallthrough loops.
-   - Clean Package Boundaries: Preserve encapsulation between `pkg/proxy`, `pkg/analysis`, `pkg/ringbuffer`, `pkg/cert`, `pkg/dashboard`. No circular dependencies or cross-package leakages.
+   - Clean Package Boundaries: Preserve encapsulation between ``gossipmesh/p2p`, `gossipmesh/consensus`, `gossipmesh/agents`, `gossipmesh/core`, `gossipmesh/cli`. No circular dependencies or cross-package leakages.
 2. Concurrency Safety:
-   - Zero data races, proper synchronization via `sync.RWMutex`, `sync.Once`, atomic operations, or channels.
-   - Goroutine lifecycle safety: All launched goroutines must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
-   - Defer hygiene: Mutex unlocks and resource closes must be deferred immediately with zero defer leaks inside hot unbounded loops.
+   - Zero data races, proper synchronization via `asyncio locks, thread locks, atomic operations, or queues.
+   - Async/thread lifecycle safety: All launched threads/tasks must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
+   - Finally/ContextManager hygiene: Mutex unlocks and resource closes must be deferred immediately with zero resource leaks inside hot unbounded loops.
 3. Memory & High Throughput Invariants:
-   - Zero-allocation hot paths: Use `sync.Pool` for byte buffers (`[]byte`). Avoid allocating slices or copying payloads in the proxy stream forwarding path.
-   - Streaming compliance: Read and forward payloads via streaming readers/writers (`io.Reader`, `io.Writer`) without buffering entire multi-megabyte streams in RAM.
+   - Zero-allocation hot paths: Use `object pools for buffers. Avoid allocating large lists or copying payloads in the proxy stream forwarding path.
+   - Streaming compliance: Read and forward payloads via streaming readers/writers (Python streaming APIs) without buffering entire multi-megabyte streams in RAM.
 4. Security & Hardening:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
-5. Go Idiomatic Standards & Test Coverage:
-   - Error wrapping using `%w` and proper sentinel error checking with `errors.Is`/`errors.As`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution (`t.Parallel()`).
+5. Python Idiomatic Standards & Test Coverage:
+   - Error wrapping using `from e` and proper sentinel error checking with `isinstance`.
+   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution .
 
 EVALUATION & VERDICT:
 - If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
@@ -68,7 +68,7 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
   "security_concurrency_audit": "Detailed analysis of data race freedom, goroutine lifecycle, mutex safety, and security posture.",
   "performance_memory_audit": "Evaluation of buffer pooling (sync.Pool), zero-allocation hot paths, and streaming throughput.",
   "test_coverage_audit": "Evaluation of test coverage, edge cases, error conditions, and concurrency tests.",
-  "system_impact": "Detailed assessment of the PR's effect on the DevProxy system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
+  "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
   "action_items": [
     "Specific refactoring step or improvement needed (empty list if APPROVED)"
   ]
@@ -222,7 +222,7 @@ def set_commit_status(head_sha: str, state: str, description: str, context: str 
         print(f"[Warning] Failed to set commit status: {e}", file=sys.stderr)
 
 def main():
-    parser = argparse.ArgumentParser(description="DevProxy Autonomous PR Reviewer & Architectural Gate")
+    parser = argparse.ArgumentParser(description="GossipMesh Autonomous PR Reviewer & Architectural Gate")
     parser.add_argument("--pr-number", required=True, help="GitHub Pull Request Number")
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
     args = parser.parse_args()
@@ -254,7 +254,7 @@ def main():
 
     # Fetch GossipMesh Memetic Knowledge
     kb = MemeticKnowledgeBase()
-    meme_context = kb.format_prompt_context(repo="DevProxy")
+    meme_context = kb.format_prompt_context(repo="GossipMesh")
 
     # Run Red Team Adversarial Audit
     auditor = RedTeamAuditor()
@@ -267,7 +267,7 @@ def main():
             red_team_findings += f"  Attack Vector: {p.attack_vector}\n"
             red_team_findings += f"  Suggested Test:\n{p.exploit_test_stub}\n"
 
-    prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for DevProxy:
+    prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
 {meme_context}
 
@@ -328,7 +328,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
 
-**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to DevProxy's anti-spaghetti, concurrency, and performance invariants!
+**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
 ### 🌐 Architectural System Impact Report
 {system_impact}
