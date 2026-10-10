@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Autonomous PR Validator & Reviewer Agent for DevProxy
+Autonomous PR Validator & Reviewer Agent for GossipMesh
 Enforces strict anti-spaghetti architectural standards, modularity, zero-leak concurrency,
 zero-allocation memory invariants, and high test coverage.
 Outputs structured JSON and Markdown reports with system impact assessment.
@@ -23,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.memetic import MemeticKnowledgeBase
 from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
-from gossipmesh.semantic_cache import SemanticCache
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = [
@@ -32,7 +31,7 @@ FALLBACK_MODELS = [
     "gemini-3.1-pro-preview",
 ]
 
-REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on DevProxy (a high-performance HTTP/HTTPS proxy and security engine in Go).
+REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance HTTP/HTTPS proxy and security engine in Python).
 
 Your primary mission is to ENFORCE STRICT ARCHITECTURAL STANDARDS AND PREVENT SPAGHETTI CODE as the codebase scales at hyper-speed.
 
@@ -40,16 +39,17 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
 1. Anti-Spaghetti & Modularity:
    - Single Responsibility Principle (SRP): Functions must be focused (<60 LOC), clean, and self-documenting.
    - No spaghetti control flow: Reject deeply nested blocks (>3 levels), massive switch-case god functions, or unstructured goto/fallthrough loops.
-   - Clean Package Boundaries: Preserve encapsulation between `pkg/proxy`, `pkg/analysis`, `pkg/ringbuffer`, `pkg/cert`, `pkg/dashboard`. No circular dependencies or cross-package leakages.
+   - Clean Package Boundaries: Preserve encapsulation between ``gossipmesh/p2p`, `gossipmesh/consensus`, `gossipmesh/agents`, `gossipmesh/core`, `gossipmesh/cli`. No circular dependencies or cross-package leakages.
 2. Concurrency Safety:
-   - Zero data races, proper synchronization via `sync.RWMutex`, `sync.Once`, atomic operations, or channels.
-   - Goroutine lifecycle safety: All launched goroutines must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
-   - Defer hygiene: Mutex unlocks and resource closes must be deferred immediately with zero defer leaks inside hot unbounded loops.
+   - Zero data races, proper synchronization via `asyncio locks, thread locks, atomic operations, or queues.
+   - Async/thread lifecycle safety: All launched threads/tasks must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
+   - Finally/ContextManager hygiene: Mutex unlocks and resource closes must be deferred immediately with zero resource leaks inside hot unbounded loops.
 3. Memory & High Throughput Invariants:
-   - Zero-allocation hot paths: Use `sync.Pool` for byte buffers (`[]byte`). Avoid allocating slices or copying payloads in the proxy stream forwarding path.
-   - Streaming compliance: Read and forward payloads via streaming readers/writers (`io.Reader`, `io.Writer`) without buffering entire multi-megabyte streams in RAM.
+   - Zero-allocation hot paths: Use `object pools for buffers. Avoid allocating large lists or copying payloads in the proxy stream forwarding path.
+   - Streaming compliance: Read and forward payloads via streaming readers/writers (Python streaming APIs) without buffering entire multi-megabyte streams in RAM.
 4. Security & Hardening:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
+
    - Enterprise Privacy & Secrets Policy Check: Ensure no PII, API keys, or sensitive credentials are leaked in the code or tests.
 5. Go Idiomatic Standards & Test Coverage:
    - Error wrapping using `%w` and proper sentinel error checking with `errors.Is`/`errors.As`.
@@ -72,6 +72,7 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
   "security_concurrency_audit": "Detailed analysis of data race freedom, goroutine lifecycle, mutex safety, and security posture.",
   "performance_memory_audit": "Evaluation of buffer pooling (sync.Pool), zero-allocation hot paths, and streaming throughput.",
   "test_coverage_audit": "Evaluation of test coverage, edge cases, error conditions, and concurrency tests.",
+
   "privacy_security_audit": "Enterprise Privacy & Secrets Policy Check: strict verification that no PII, API keys, or sensitive credentials are leaked.",
   "system_impact": "Detailed assessment of the PR's effect on the DevProxy system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
   "roi_metrics": {
@@ -95,40 +96,6 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
 }
 """
 
-def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_mesh/cache") -> dict:
-    """Calls local Ollama API for fast edge inference."""
-    url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
-    payload = {
-        "model": model,
-        "prompt": f"{REVIEWER_SYSTEM_PROMPT}\n\n{prompt}",
-        "stream": False,
-        "format": "json"
-    }
-
-    sem_cache = SemanticCache(cache_dir=cache_dir)
-    cache_key_text = f"{model}:{prompt}"
-    cached_val = sem_cache.get(cache_key_text)
-    if cached_val:
-        return cached_val
-
-    print(f"[*] Requesting fast-pass architectural PR review from local edge model: {model}...", flush=True)
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            text_response = data.get("response", "").strip()
-            parsed_response = json.loads(text_response, strict=False)
-            sem_cache.put(cache_key_text, parsed_response)
-            return parsed_response
-    except Exception as e:
-        print(f"[Warning] Failed to query local edge model {model}: {e}", file=sys.stderr)
-        return {"verdict": "ACTION_REQUIRED", "score": 50, "executive_summary": f"Failed to query {model}: {e}"}
-
 def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback models and fallback API key, expecting JSON."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
@@ -140,11 +107,17 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     keys_to_try = [k for k in [api_key, fallback_key] if k.strip()]
 
     # Check cache
-    sem_cache = SemanticCache(cache_dir=cache_dir)
-    cache_key_text = f"{model}:{prompt}"
-    cached_val = sem_cache.get(cache_key_text)
-    if cached_val:
-        return cached_val
+    cache_path = Path(cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_file = cache_path / f"{cache_key}.json"
+
+    if cache_file.exists():
+        try:
+            print("[*] Cache hit! Returning cached Gemini response...", flush=True)
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
 
     last_err = None
     for current_key in keys_to_try:
@@ -190,7 +163,11 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                                 text_response = "\n".join(lines).strip()
                             parsed_response = json.loads(text_response, strict=False)
 
-                        sem_cache.put(cache_key_text, parsed_response)
+                        try:
+                            cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
+                        except Exception:
+                            pass
+
                         return parsed_response
                 except urllib.error.HTTPError as e:
                     err_msg = e.read().decode("utf-8", errors="replace")
@@ -246,25 +223,6 @@ def get_pr_diff(workspace: Path) -> str:
         pass
     return "No git diff available."
 
-import re
-
-def extract_ast_metadata(diff: str) -> str:
-    """Extracts a structural summary from the diff."""
-    summary = []
-    lines = diff.splitlines()
-    for line in lines:
-        clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
-        if clean_line.startswith("func ") or \
-           clean_line.startswith("type ") or \
-           clean_line.startswith("def ") or \
-           clean_line.startswith("class "):
-            summary.append(clean_line.strip())
-
-    if not summary:
-        return "No significant structural changes found in diff."
-
-    return "### Extracted Structural Changes (AST Summary):\n" + "\n".join(set(summary))
-
 def get_head_sha(workspace: Path) -> str:
     """Gets current HEAD commit SHA."""
     try:
@@ -303,7 +261,7 @@ def set_commit_status(head_sha: str, state: str, description: str, context: str 
         print(f"[Warning] Failed to set commit status: {e}", file=sys.stderr)
 
 def main():
-    parser = argparse.ArgumentParser(description="DevProxy Autonomous PR Reviewer & Architectural Gate")
+    parser = argparse.ArgumentParser(description="GossipMesh Autonomous PR Reviewer & Architectural Gate")
     parser.add_argument("--pr-number", required=True, help="GitHub Pull Request Number")
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
     args = parser.parse_args()
@@ -335,7 +293,7 @@ def main():
 
     # Fetch GossipMesh Memetic Knowledge
     kb = MemeticKnowledgeBase()
-    meme_context = kb.format_prompt_context(repo="DevProxy")
+    meme_context = kb.format_prompt_context(repo="GossipMesh")
 
     # Run Red Team Adversarial Audit
     auditor = RedTeamAuditor()
@@ -348,13 +306,9 @@ def main():
             red_team_findings += f"  Attack Vector: {p.attack_vector}\n"
             red_team_findings += f"  Suggested Test:\n{p.exploit_test_stub}\n"
 
-    ast_metadata = extract_ast_metadata(diff)
-
-    prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for DevProxy:
+    prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
 {meme_context}
-
-{ast_metadata}
 
 {red_team_findings}
 
@@ -377,10 +331,11 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     votes = []
 
     # We call our fallback models to get multiple votes
-    models_to_poll = ["llama3", "gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
+    models_to_poll = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
 
     for model in models_to_poll:
         try:
+
             if model == "llama3":
                 audit_result = call_ollama(prompt, model=model)
             else:
@@ -440,7 +395,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
 
-**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to DevProxy's anti-spaghetti, concurrency, and performance invariants!
+**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
 ### 🌐 Architectural System Impact Report
 {system_impact}
@@ -463,7 +418,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ### 🧪 Test Coverage & Invariant Verification
 {test_cov}
-{auto_patch_md}
+
 ---
 ### 🚦 Next Steps: Maintainer Sign-Off Required
 **@Aditya-9-6**: All automated quality gates, anti-spaghetti checks, and performance benchmarks have passed cleanly.
@@ -501,7 +456,7 @@ To complete the merge into `main`:
 
 ### 🛠️ Required Refactoring & Action Items
 {action_bullets}
-{auto_patch_md}
+
 ---
 🔄 **Autonomous Self-Healing Loop Active**: The PR Fixer Agent will refactor the code according to these directives and push updates until the PR achieves 100% readiness.
 """
