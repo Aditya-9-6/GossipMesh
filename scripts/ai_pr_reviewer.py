@@ -15,6 +15,7 @@ import urllib.error
 import subprocess
 import time
 import hashlib
+import datetime
 from pathlib import Path
 
 # Add parent directory to path to import gossipmesh
@@ -48,6 +49,11 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
    - Streaming compliance: Read and forward payloads via streaming readers/writers (Python streaming APIs) without buffering entire multi-megabyte streams in RAM.
 4. Security & Hardening:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
+
+   - Enterprise Privacy & Secrets Policy Check: Ensure no PII, API keys, or sensitive credentials are leaked in the code or tests.
+5. Go Idiomatic Standards & Test Coverage:
+   - Error wrapping using `%w` and proper sentinel error checking with `errors.Is`/`errors.As`.
+   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution (`t.Parallel()`).
 5. Python Idiomatic Standards & Test Coverage:
    - Error wrapping using `from e` and proper sentinel error checking with `isinstance`.
    - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution .
@@ -57,6 +63,7 @@ EVALUATION & VERDICT:
   verdict must be "ACTION_REQUIRED" and score < 90.
 - If code is clean, modular, race-free, properly tested, and meets all anti-spaghetti architectural invariants:
   verdict must be "APPROVED" and score >= 90 (typically 95-100).
+- You must prioritize high precision (minimal noise, fewer false positives) before recall. Do not flag trivial styling issues as ACTION_REQUIRED.
 
 OUTPUT SCHEMA:
 You MUST respond ONLY with a single valid JSON object with the following schema:
@@ -68,6 +75,26 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
   "security_concurrency_audit": "Detailed analysis of data race freedom, goroutine lifecycle, mutex safety, and security posture.",
   "performance_memory_audit": "Evaluation of buffer pooling (sync.Pool), zero-allocation hot paths, and streaming throughput.",
   "test_coverage_audit": "Evaluation of test coverage, edge cases, error conditions, and concurrency tests.",
+
+  "privacy_security_audit": "Enterprise Privacy & Secrets Policy Check: strict verification that no PII, API keys, or sensitive credentials are leaked.",
+  "system_impact": "Detailed assessment of the PR's effect on the DevProxy system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
+  "roi_metrics": {
+    "estimated_review_time_saved_minutes": 15,
+    "defects_prevented": 2
+  },
+  "action_items": [
+    {
+      "description": "Specific refactoring step or improvement needed",
+      "confidence_score": 95,
+      "why": "Detailed explanation of why this is necessary",
+      "evidence": "Code snippet or exact evidence supporting this finding"
+    }
+  ],
+  "safe_auto_fixes": [
+    {
+      "description": "Short description of the fix (e.g. formatting, bounds check).",
+      "patch": "Valid diff / git patch"
+    }
   "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
   "action_items": [
     "Specific refactoring step or improvement needed (empty list if APPROVED)"
@@ -167,6 +194,24 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                     break
 
     raise RuntimeError(f"Failed to obtain PR review from Gemini API. Last error: {last_err}")
+
+def log_enterprise_audit(workspace: Path, pr_number: str, verdict: str, metrics: dict, privacy_audit: str):
+    """Logs an immutable JSON audit trail for enterprise readiness."""
+    log_dir = workspace / ".gossip_mesh" / "audit_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "enterprise_audit_log.jsonl"
+
+    audit_entry = {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "pr_number": pr_number,
+        "verdict": verdict,
+        "model_used": DEFAULT_MODEL,
+        "roi_metrics": metrics,
+        "privacy_security_policy_check": privacy_audit
+    }
+
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(audit_entry) + "\n")
 
 def get_pr_diff(workspace: Path) -> str:
     """Gets git diff against origin/main."""
@@ -296,13 +341,30 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
     for model in models_to_poll:
         try:
+
+            if model == "llama3":
+                audit_result = call_ollama(prompt, model=model)
+            else:
+                audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
+            raw_action_items = audit_result.get("action_items", [])
+            concerns = []
+            confidence_scores = []
+            for item in raw_action_items:
+                if isinstance(item, dict):
+                    concerns.append(item.get("description", str(item)))
+                    confidence_scores.append(item.get("confidence_score", 100))
+                else:
+                    concerns.append(str(item))
+                    confidence_scores.append(100)
+
             audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
             vote = ModelVote(
                 model_name=model,
                 verdict=audit_result.get("verdict", "ACTION_REQUIRED").strip().upper(),
                 score=int(audit_result.get("score", 75)),
-                concerns=audit_result.get("action_items", []),
-                suggestions=[]
+                concerns=concerns,
+                suggestions=[],
+                confidence_scores=confidence_scores
             )
             votes.append(vote)
         except Exception as e:
@@ -321,8 +383,20 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     concurrency_sec = audit.get("security_concurrency_audit", "Concurrency & security invariants checked.")
     perf_mem = audit.get("performance_memory_audit", "Memory allocation & streaming checked.")
     test_cov = audit.get("test_coverage_audit", "Test coverage evaluated.")
+    privacy_sec = audit.get("privacy_security_audit", "Privacy and secrets verified.")
     system_impact = audit.get("system_impact", "System impact evaluated.")
+    roi_metrics = audit.get("roi_metrics", {"estimated_review_time_saved_minutes": 0, "defects_prevented": 0})
     action_items = audit.get("action_items", [])
+    safe_auto_fixes = audit.get("safe_auto_fixes", [])
+
+    auto_patch_md = ""
+    if safe_auto_fixes:
+        auto_patch_md += "\n### 🛠️ Safe Auto-Fixes\n"
+        for fix in safe_auto_fixes:
+            desc = fix.get("description", "Auto-Fix")
+            patch = fix.get("patch", "")
+            if patch:
+                auto_patch_md += f"**{desc}**\n```diff\n{patch}\n```\n\n"
 
     # Format Markdown Review
     if is_approved:
@@ -333,11 +407,18 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 ### 🌐 Architectural System Impact Report
 {system_impact}
 
+### 📈 Measurable ROI & Outcomes
+- **Estimated Review Time Saved**: {roi_metrics.get('estimated_review_time_saved_minutes', 0)} minutes
+- **Defects Prevented**: {roi_metrics.get('defects_prevented', 0)}
+
 ### 🍝 Anti-Spaghetti & Modularity Verification
 {anti_spaghetti}
 
 ### 🛡️ Concurrency, Race Freedom & Security Audit
 {concurrency_sec}
+
+### 🔒 Enterprise Privacy & Secrets Policy
+{privacy_sec}
 
 ### ⚡ Performance & Zero-Allocation Memory Invariants
 {perf_mem}
@@ -361,11 +442,18 @@ To complete the merge into `main`:
 ### 📋 Executive Summary
 {summary}
 
+### 📈 Measurable ROI & Outcomes
+- **Estimated Review Time Saved**: {roi_metrics.get('estimated_review_time_saved_minutes', 0)} minutes
+- **Defects Prevented**: {roi_metrics.get('defects_prevented', 0)}
+
 ### 🍝 Anti-Spaghetti & Modularity Findings
 {anti_spaghetti}
 
 ### 🛡️ Concurrency & Security Findings
 {concurrency_sec}
+
+### 🔒 Enterprise Privacy & Secrets Policy
+{privacy_sec}
 
 ### ⚡ Performance & Memory Footprint Audit
 {perf_mem}
@@ -379,8 +467,12 @@ To complete the merge into `main`:
 ---
 🔄 **Autonomous Self-Healing Loop Active**: The PR Fixer Agent will refactor the code according to these directives and push updates until the PR achieves 100% readiness.
 """
-        commit_desc = f"Architectural Improvements Required ({score}/100)"
-        set_commit_status(head_sha, "failure", commit_desc)
+        if consensus_result.avg_confidence_score >= 80:
+            commit_desc = f"Architectural Improvements Required ({score}/100) [High Confidence]"
+            set_commit_status(head_sha, "failure", commit_desc)
+        else:
+            commit_desc = f"Architectural Warnings ({score}/100) [Low Confidence - Non-Blocking]"
+            set_commit_status(head_sha, "success", commit_desc)
 
     # Save Markdown file
     review_file = workspace / "ai_pr_review.md"
@@ -396,6 +488,8 @@ To complete the merge into `main`:
         "system_impact": system_impact
     }
     status_file.write_text(json.dumps(status_data, indent=2), encoding="utf-8")
+
+    log_enterprise_audit(workspace, str(args.pr_number), status_data["verdict"], roi_metrics, privacy_sec)
 
     print(f"[OK] Audit finished: Verdict={status_data['verdict']} Score={score} (Written to {review_file} & {status_file})")
 

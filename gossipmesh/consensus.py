@@ -13,12 +13,14 @@ class ModelVote:
         score: int,
         concerns: Optional[List[str]] = None,
         suggestions: Optional[List[str]] = None,
+        confidence_scores: Optional[List[int]] = None,
     ):
         self.model_name = model_name
         self.verdict = verdict.upper()  # APPROVE, REVISE, REJECT
         self.score = max(0, min(100, score))
         self.concerns = concerns or []
         self.suggestions = suggestions or []
+        self.confidence_scores = confidence_scores or []
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -27,6 +29,7 @@ class ModelVote:
             "score": self.score,
             "concerns": self.concerns,
             "suggestions": self.suggestions,
+            "confidence_scores": self.confidence_scores,
         }
 
 class ConsensusResult:
@@ -38,6 +41,7 @@ class ConsensusResult:
         votes: List[ModelVote],
         combined_concerns: List[str],
         combined_suggestions: List[str],
+        avg_confidence_score: float = 100.0,
     ):
         self.is_approved = is_approved
         self.consensus_score = consensus_score
@@ -45,6 +49,7 @@ class ConsensusResult:
         self.votes = votes
         self.combined_concerns = combined_concerns
         self.combined_suggestions = combined_suggestions
+        self.avg_confidence_score = avg_confidence_score
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -54,6 +59,7 @@ class ConsensusResult:
             "votes": [v.to_dict() for v in self.votes],
             "combined_concerns": self.combined_concerns,
             "combined_suggestions": self.combined_suggestions,
+            "avg_confidence_score": round(self.avg_confidence_score, 1),
         }
 
 class ByzantineConsensusEngine:
@@ -71,7 +77,8 @@ class ByzantineConsensusEngine:
                 approval_ratio=0.0,
                 votes=[],
                 combined_concerns=["No model votes submitted"],
-                combined_suggestions=[]
+                combined_suggestions=[],
+                avg_confidence_score=0.0
             )
 
         if self.model_weights:
@@ -96,6 +103,12 @@ class ByzantineConsensusEngine:
 
         is_approved = (approval_ratio >= self.quorum_threshold) and (avg_score >= self.min_score_threshold)
 
+        all_confidences = []
+        for v in votes:
+            all_confidences.extend(v.confidence_scores)
+
+        avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 100.0
+
         return ConsensusResult(
             is_approved=is_approved,
             consensus_score=avg_score,
@@ -103,4 +116,5 @@ class ByzantineConsensusEngine:
             votes=votes,
             combined_concerns=all_concerns,
             combined_suggestions=all_suggestions,
+            avg_confidence_score=avg_confidence,
         )
