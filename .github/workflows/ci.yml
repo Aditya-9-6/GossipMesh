@@ -27,6 +27,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Run Test Suite
+      - name: Install dependencies
         run: |
-          python -m unittest discover -s tests -p "test_*.py" -v
+          pip install ".[dev]"
+
+      - name: Run Quality Checks & Tests
+        run: |
+          python -m compileall gossipmesh scripts
+          ruff check .
+          ruff format --check .
+          mypy gossipmesh
+          pytest -q

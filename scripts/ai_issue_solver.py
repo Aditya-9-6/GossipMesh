@@ -5,15 +5,15 @@ Uses Google Gemini API to analyze an issue, understand the Python codebase, gene
 and write files ready for automated pull request creation.
 """
 
-import os
-import sys
-import json
 import argparse
-import urllib.request
-import urllib.error
-import subprocess
-import time
 import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 DEFAULT_MODEL = "gemini-3.8-flash"
@@ -85,10 +85,10 @@ def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60
     overview.append("\n".join(selected))
     return "\n".join(overview)
 
-import sys
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.rag import VectorDB
+
 
 def get_relevant_files(workspace_root: Path, query_text: str) -> str:
     """Uses VectorDB RAG to find semantically relevant files for context."""
@@ -100,7 +100,7 @@ def get_relevant_files(workspace_root: Path, query_text: str) -> str:
         print("[*] VectorDB is empty. Indexing workspace...")
         db.index_workspace(workspace_root)
 
-    print(f"[*] Querying VectorDB for relevant context files...")
+    print("[*] Querying VectorDB for relevant context files...")
     results = db.search(query_text, top_k=3)
 
     for path, content, score in results:
@@ -120,7 +120,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
     # Check cache
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode()).hexdigest()
     cache_file = cache_path / f"{cache_key}.json"
 
     if cache_file.exists():

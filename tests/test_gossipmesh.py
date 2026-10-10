@@ -2,18 +2,19 @@
 Comprehensive Unit Test Suite for GossipMesh.
 """
 
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
 import unittest
+from pathlib import Path
 
-from gossipmesh.node import GossipNode, GossipTopic
-from gossipmesh.memetic import MemeticKnowledgeBase
-from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
-from gossipmesh.red_team import RedTeamAuditor
-from gossipmesh.bridge import CrossRepoBridge
-from gossipmesh.oracle import PerformanceOracle
 from gossipmesh.auction import TaskAuctioneer
+from gossipmesh.bridge import CrossRepoBridge
+from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
+from gossipmesh.memetic import MemeticKnowledgeBase
+from gossipmesh.node import GossipNode, GossipTopic
+from gossipmesh.oracle import PerformanceOracle
+from gossipmesh.red_team import RedTeamAuditor
+
 
 class TestGossipMesh(unittest.TestCase):
     def setUp(self):
@@ -102,8 +103,8 @@ class TestGossipMesh(unittest.TestCase):
         self.assertLess(weighted_result.approval_ratio, 0.2)
 
     def test_node_cleanup_ledger(self):
-        import time
         import json
+        import time
         node = GossipNode("node_cleaner", mesh_dir=self.test_dir)
 
         # Publish two messages, one recent, one artificially expired
