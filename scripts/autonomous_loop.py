@@ -280,35 +280,9 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         return False
 
     if verdict == "APPROVED" and score >= 90:
-        print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Checking for human merge permission...", flush=True)
-
-        has_merge_permission = False
-        try:
-            comments_out = run_cmd(["gh", "pr", "view", str(pr_num), "--repo", REPO, "--json", "comments"], cwd=workspace)
-            comments_data = json.loads(comments_out) if comments_out else {"comments": []}
-            for comment in comments_data.get("comments", []):
-                body = comment.get("body", "").lower()
-                if "/merge" in body:
-                    has_merge_permission = True
-                    break
-        except Exception as e:
-            print(f"[Warning] Failed to fetch comments for PR #{pr_num}: {e}", file=sys.stderr, flush=True)
-
-        if has_merge_permission:
-            print(f"[🚀] Permission granted! Merging PR #{pr_num} into main...", flush=True)
-            run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace, check=False)
-            run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
-            merge_out = run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace)
-            print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
-            run_cmd("git checkout main", cwd=workspace)
-            run_cmd("git pull origin main", cwd=workspace)
-            # Clean up feature branch
-            run_cmd(f"git branch -D {branch_name}", cwd=workspace, check=False)
-            run_cmd(f"git push origin --delete {branch_name}", cwd=workspace, check=False)
-            return True
-        else:
-            print(f"[*] PR #{pr_num} is approved but missing '/merge' comment from a human. Awaiting permission.", flush=True)
-            return False
+        print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)!", flush=True)
+        print(f"[*] PR #{pr_num} is approved. Awaiting manual merge by a human.", flush=True)
+        return False
     else:
         print(f"[!] PR #{pr_num} verdict: {verdict} (Score: {score}). Awaiting review fixes.", flush=True)
         return False

@@ -132,7 +132,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
 
     last_err = None
     for current_model in models_to_try:
-        url = f"https://generativelanguage.pyogleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
         
         payload = {
             "contents": [
@@ -214,7 +214,7 @@ def main():
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         print("MISSING_API_KEY: Environment variable GEMINI_API_KEY is not set.", file=sys.stderr)
-        print("To enable the bot, generate a free API key at https://aistudio.pyogle.com/ and add it to GitHub Secrets as GEMINI_API_KEY.")
+        print("To enable the bot, generate a free API key at https://aistudio.google.com/ and add it to GitHub Secrets as GEMINI_API_KEY.")
         sys.exit(2)
 
     workspace_root = Path(args.workspace).resolve()
