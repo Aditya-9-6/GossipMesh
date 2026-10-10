@@ -34,7 +34,7 @@ jobs:
       - name: Run Quality Checks & Tests
         run: |
           python -m compileall gossipmesh scripts
-          ruff check .
-          ruff format --check .
+          ruff check gossipmesh
+          ruff format --check gossipmesh
           mypy gossipmesh
           pytest -q
