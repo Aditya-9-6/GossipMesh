@@ -14,7 +14,14 @@ import urllib.request
 import urllib.error
 import subprocess
 import time
+import hashlib
 from pathlib import Path
+
+# Add parent directory to path to import gossipmesh
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from gossipmesh.memetic import MemeticKnowledgeBase
+from gossipmesh.red_team import RedTeamAuditor
+from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = [
@@ -68,7 +75,7 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
 }
 """
 
-def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL) -> dict:
+def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback models and fallback API key, expecting JSON."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
@@ -77,6 +84,19 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
             models_to_try.append(m)
 
     keys_to_try = [k for k in [api_key, fallback_key] if k.strip()]
+
+    # Check cache
+    cache_path = Path(cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_file = cache_path / f"{cache_key}.json"
+
+    if cache_file.exists():
+        try:
+            print("[*] Cache hit! Returning cached Gemini response...", flush=True)
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
 
     last_err = None
     for current_key in keys_to_try:
@@ -111,7 +131,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                         data = json.loads(resp.read().decode("utf-8"))
                         text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                         try:
-                            return json.loads(text_response, strict=False)
+                            parsed_response = json.loads(text_response, strict=False)
                         except json.JSONDecodeError:
                             if text_response.startswith("```"):
                                 lines = text_response.splitlines()
@@ -120,7 +140,14 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                                 if lines and lines[-1].startswith("```"):
                                     lines = lines[:-1]
                                 text_response = "\n".join(lines).strip()
-                            return json.loads(text_response, strict=False)
+                            parsed_response = json.loads(text_response, strict=False)
+
+                        try:
+                            cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
+                        except Exception:
+                            pass
+
+                        return parsed_response
                 except urllib.error.HTTPError as e:
                     err_msg = e.read().decode("utf-8", errors="replace")
                     print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}", file=sys.stderr)
@@ -225,7 +252,26 @@ def main():
     diff = get_pr_diff(workspace)
     head_sha = get_head_sha(workspace)
 
+    # Fetch GossipMesh Memetic Knowledge
+    kb = MemeticKnowledgeBase()
+    meme_context = kb.format_prompt_context(repo="DevProxy")
+
+    # Run Red Team Adversarial Audit
+    auditor = RedTeamAuditor()
+    red_team_findings = ""
+    probes = auditor.audit_diff(diff)
+    if probes:
+        red_team_findings = "### 🚨 RED TEAM ADVERSARIAL AUDIT FINDINGS:\n"
+        for p in probes:
+            red_team_findings += f"- [{p.severity}] {p.category}: {p.description}\n"
+            red_team_findings += f"  Attack Vector: {p.attack_vector}\n"
+            red_team_findings += f"  Suggested Test:\n{p.exploit_test_stub}\n"
+
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for DevProxy:
+
+{meme_context}
+
+{red_team_findings}
 
 ### Pull Request Title:
 {title}
@@ -241,11 +287,34 @@ def main():
 Audit the code against all anti-spaghetti, concurrency, performance, and security requirements. Provide your verdict in the required JSON schema.
 """
 
-    audit = call_gemini(primary_key, prompt, fallback_key=fallback_key)
+    # Call Gemini via Byzantine Consensus Engine
+    consensus_engine = ByzantineConsensusEngine()
+    votes = []
 
-    verdict = audit.get("verdict", "ACTION_REQUIRED").strip().upper()
-    score = int(audit.get("score", 75))
-    is_approved = (verdict == "APPROVED" and score >= 90)
+    # We call our fallback models to get multiple votes
+    models_to_poll = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
+
+    for model in models_to_poll:
+        try:
+            audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
+            vote = ModelVote(
+                model_name=model,
+                verdict=audit_result.get("verdict", "ACTION_REQUIRED").strip().upper(),
+                score=int(audit_result.get("score", 75)),
+                concerns=audit_result.get("action_items", []),
+                suggestions=[]
+            )
+            votes.append(vote)
+        except Exception as e:
+            print(f"[Warning] Model {model} failed to provide a valid vote: {e}", file=sys.stderr)
+
+    consensus_result = consensus_engine.evaluate(votes)
+
+    is_approved = consensus_result.is_approved
+    score = int(consensus_result.consensus_score)
+
+    # Use the primary model's detailed output for the markdown report
+    audit = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=DEFAULT_MODEL)
 
     summary = audit.get("executive_summary", "Autonomous architectural audit completed.")
     anti_spaghetti = audit.get("anti_spaghetti_audit", "No architectural issues noted.")
