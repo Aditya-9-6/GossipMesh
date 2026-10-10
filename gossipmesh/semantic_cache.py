@@ -27,37 +27,51 @@ class SemanticCache:
         except Exception:
             pass
 
-    def _get_cosine_sim(self, text1: str, text2: str) -> float:
-        words1 = re.findall(r'\w+', text1.lower())
-        words2 = re.findall(r'\w+', text2.lower())
-        vec1 = Counter(words1)
-        vec2 = Counter(words2)
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+        if not vec1 or not vec2: return 0.0
+        if len(vec1) != len(vec2): return 0.0
 
-        intersection = set(vec1.keys()) & set(vec2.keys())
-        numerator = sum([vec1[x] * vec2[x] for x in intersection])
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        norm_a = math.sqrt(sum(a * a for a in vec1))
+        norm_b = math.sqrt(sum(b * b for b in vec2))
 
-        sum1 = sum([vec1[x]**2 for x in vec1.keys()])
-        sum2 = sum([vec2[x]**2 for x in vec2.keys()])
-        denominator = math.sqrt(sum1) * math.sqrt(sum2)
-
-        if not denominator:
+        if norm_a == 0 or norm_b == 0:
             return 0.0
-        else:
-            return float(numerator) / denominator
+        return dot_product / (norm_a * norm_b)
 
     def get(self, key_text: str) -> dict | None:
         best_match = None
         best_score = 0.0
 
-        # Only check recent metadata items to limit O(N) impact, or just use exact matching for core parts
-        # For simplicity and correctness, if we want Semantic Cache, we need to extract the DIFF out of the key_text to compare.
-        # But since prompt includes diff, we can just exact match the diff or high similarity.
+        from gossipmesh.rag import VectorDB
+        db = VectorDB()
+        query_embedding = db.get_embedding(key_text)
 
-        for cache_key, cached_text in self.metadata.items():
-            score = self._get_cosine_sim(key_text, cached_text)
-            if score > best_score and score >= self.threshold:
-                best_score = score
-                best_match = cache_key
+        if not query_embedding:
+            # Fallback to exact match if embedding generation fails
+            cache_key = hashlib.sha256(key_text.encode("utf-8")).hexdigest()
+            if cache_key in self.metadata:
+                 cache_file = self.cache_dir / f"{cache_key}.json"
+                 if cache_file.exists():
+                     return json.loads(cache_file.read_text(encoding="utf-8"))
+            return None
+
+        for cache_key, data in self.metadata.items():
+            if isinstance(data, str):
+                # Legacy cache format: data is just the key_text string
+                # Fallback to exact match string comparison if it's the old format
+                if data == key_text:
+                    best_match = cache_key
+                    best_score = 1.0
+                    break
+            elif isinstance(data, dict):
+                # New cache format
+                cached_embedding = data.get("embedding")
+                if cached_embedding:
+                    score = self._cosine_similarity(query_embedding, cached_embedding)
+                    if score > best_score and score >= self.threshold:
+                        best_score = score
+                        best_match = cache_key
 
         if best_match:
             print(f"[*] Semantic cache hit! Similarity score: {best_score:.2f}")
@@ -78,9 +92,16 @@ class SemanticCache:
         cache_key = hashlib.sha256(key_text.encode("utf-8")).hexdigest()
         cache_file = self.cache_dir / f"{cache_key}.json"
 
+        from gossipmesh.rag import VectorDB
+        db = VectorDB()
+        embedding = db.get_embedding(key_text)
+
         try:
             cache_file.write_text(json.dumps(value), encoding="utf-8")
-            self.metadata[cache_key] = key_text
+            self.metadata[cache_key] = {
+                "key_text": key_text,
+                "embedding": embedding
+            }
             self._save_metadata()
         except Exception as e:
             print(f"[Warning] Failed to write cache: {e}")

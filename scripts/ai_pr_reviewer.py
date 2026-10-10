@@ -256,22 +256,68 @@ def get_pr_diff(workspace: Path) -> str:
 
 import re
 
+import ast
+
 def extract_ast_metadata(diff: str) -> str:
-    """Extracts a structural summary from the diff."""
+    """Extracts a structural summary from the diff using true AST parsing."""
     summary = []
-    lines = diff.splitlines()
-    for line in lines:
-        clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
-        if clean_line.startswith("func ") or \
-           clean_line.startswith("type ") or \
-           clean_line.startswith("def ") or \
-           clean_line.startswith("class "):
-            summary.append(clean_line.strip())
+
+    # We parse the raw diff blocks to find python code blocks
+    # Since diffs are fragmented, we attempt to parse blocks of added code
+    # to find functions and classes.
+    added_lines = []
+    for line in diff.splitlines():
+        # filter out git diff headers
+        if line.startswith('diff --git') or line.startswith('index ') or line.startswith('@@ ') or line.startswith('--- ') or line.startswith('+++ ') or line.startswith('new file mode') or line.startswith('deleted file mode'):
+            continue
+
+        if line.startswith('+') and not line.startswith('+++'):
+            added_lines.append(line[1:])
+        elif not line.startswith('-') and not line.startswith('---'):
+             # to keep indentations and context
+             # if the line starts with a space, keep it as context, otherwise just append (e.g. empty lines)
+             if line.startswith(' '):
+                 added_lines.append(line[1:])
+             else:
+                 added_lines.append(line)
+
+    code_block = "\n".join(added_lines)
+
+    try:
+        tree = ast.parse(code_block)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                summary.append(f"class {node.name}")
+            elif isinstance(node, ast.FunctionDef):
+                # get signature
+                args = [a.arg for a in node.args.args]
+                args_str = ", ".join(args)
+                summary.append(f"def {node.name}({args_str})")
+            elif isinstance(node, ast.AsyncFunctionDef):
+                args = [a.arg for a in node.args.args]
+                args_str = ", ".join(args)
+                summary.append(f"async def {node.name}({args_str})")
+    except SyntaxError:
+        # Diff might not form a complete valid Python file.
+        # Fallback to naive approach for partial snippets.
+        lines = diff.splitlines()
+        for line in lines:
+            clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
+            if clean_line.startswith("def ") or clean_line.startswith("class ") or clean_line.startswith("async def "):
+                summary.append(clean_line.strip())
 
     if not summary:
         return "No significant structural changes found in diff."
 
-    return "### Extracted Structural Changes (AST Summary):\n" + "\n".join(set(summary))
+    # Remove duplicates but preserve some order
+    seen = set()
+    dedup = []
+    for s in summary:
+        if s not in seen:
+            seen.add(s)
+            dedup.append(s)
+
+    return "### Extracted Structural Changes (AST Summary):\n" + "\n".join(dedup)
 
 def get_head_sha(workspace: Path) -> str:
     """Gets current HEAD commit SHA."""
