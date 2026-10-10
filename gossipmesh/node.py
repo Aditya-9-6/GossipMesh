@@ -76,6 +76,8 @@ class GossipNode:
         self.node_id = node_id
         if mesh_dir:
             self.mesh_dir = Path(mesh_dir).resolve()
+        elif os.environ.get("GOSSIPMESH_DIR"):
+            self.mesh_dir = Path(os.environ.get("GOSSIPMESH_DIR")).resolve()
         else:
             # Fallback to shared Google Drive or User home
             drive_mesh = Path("G:/My Drive/.gossip_mesh")
@@ -227,3 +229,33 @@ class GossipNode:
             pass
 
         return messages[-limit:]
+
+    def cleanup_ledger(self):
+        """Removes expired messages from the ledger based on TTL."""
+        if not self.log_file.exists():
+            return
+
+        valid_lines = []
+        now = time.time()
+        try:
+            with open(self.log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line_str = line.strip()
+                    if not line_str:
+                        continue
+                    try:
+                        data = json.loads(line_str)
+                        msg_time = data.get("timestamp", 0)
+                        msg_ttl = data.get("ttl", 10)
+                        # Retain if not expired (ttl is in hours)
+                        if msg_time + (msg_ttl * 3600) >= now:
+                            valid_lines.append(line_str)
+                    except Exception:
+                        pass
+
+            # Rewrite ledger with valid lines
+            with open(self.log_file, "w", encoding="utf-8") as f:
+                for line in valid_lines:
+                    f.write(line + "\n")
+        except Exception as e:
+            print(f"[{self.node_id}] Ledger cleanup error: {e}")

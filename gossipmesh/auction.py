@@ -24,10 +24,10 @@ class TaskAuctioneer:
     """Evaluates task specifications and elects winning agent nodes."""
 
     DOMAIN_KEYWORDS = {
-        "concurrency_specialist": ["lock-free", "atomic", "ringbuffer", "mutex", "channel", "concurrency", "race"],
-        "security_specialist": ["waf", "sanitizer", "injection", "jwt", "tls", "fingerprint", "xss", "cve"],
-        "crypto_specialist": ["wireguard", "pqc", "kyber", "noise", "handshake", "encryption", "mtu"],
-        "systems_specialist": ["simd", "ebpf", "streaming", "zero-allocation", "buffer", "memory", "cache"],
+        "concurrency_specialist": {"lock-free": 2.0, "atomic": 1.5, "ringbuffer": 1.5, "mutex": 1.0, "channel": 1.0, "concurrency": 1.0, "race": 1.0},
+        "security_specialist": {"waf": 2.0, "sanitizer": 1.5, "injection": 1.5, "jwt": 1.0, "tls": 1.0, "fingerprint": 1.0, "xss": 1.5, "cve": 2.0},
+        "crypto_specialist": {"wireguard": 2.0, "pqc": 2.0, "kyber": 2.0, "noise": 1.5, "handshake": 1.0, "encryption": 1.0, "mtu": 1.0},
+        "systems_specialist": {"simd": 2.0, "ebpf": 2.0, "streaming": 1.5, "zero-allocation": 2.0, "buffer": 1.0, "memory": 1.0, "cache": 1.0},
     }
 
     def generate_bids(self, task_title: str, task_body: str) -> List[AgentBid]:
@@ -36,9 +36,9 @@ class TaskAuctioneer:
         bids = []
 
         for role, keywords in self.DOMAIN_KEYWORDS.items():
-            matches = sum(1 for kw in keywords if kw in text)
-            score = min(100.0, 40.0 + (matches * 15.0))
-            rationale = f"Matched {matches} core domain keywords for {role}."
+            weighted_matches = sum(weight for kw, weight in keywords.items() if kw in text)
+            score = min(100.0, 40.0 + (weighted_matches * 15.0))
+            rationale = f"Matched weighted core domain keywords for {role}."
             bids.append(AgentBid(role, role, score, rationale))
 
         return bids

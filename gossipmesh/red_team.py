@@ -62,6 +62,13 @@ class RedTeamAuditor:
             "regex": r"(\.\./|filepath\.Join|os\.Open\()",
             "message": "Potential directory traversal vulnerability if input is unvalidated.",
             "test_stub": "// Security Fuzz Probe: Provide '../../../../etc/passwd' or encoded '%2e%2e%2f'."
+        },
+        {
+            "category": "Hardcoded Credentials",
+            "severity": "CRITICAL",
+            "regex": r"(?i)(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]",
+            "message": "Potential hardcoded credential or secret detected.",
+            "test_stub": "// Credential Probe:\n// Check if secrets are loaded from environment variables instead of hardcoded."
         }
     ]
 
