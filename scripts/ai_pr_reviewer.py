@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Autonomous PR Validator & Reviewer Agent for DevProxy
+Autonomous PR Validator & Reviewer Agent for GossipMesh
 Enforces strict anti-spaghetti architectural standards, modularity, zero-leak concurrency,
 zero-allocation memory invariants, and high test coverage.
 Outputs structured JSON and Markdown reports with system impact assessment.
@@ -31,7 +31,7 @@ FALLBACK_MODELS = [
     "gemini-3.1-pro-preview",
 ]
 
-REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on DevProxy (a high-performance HTTP/HTTPS proxy and security engine in Go).
+REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance HTTP/HTTPS proxy and security engine in Python).
 
 Your primary mission is to ENFORCE STRICT ARCHITECTURAL STANDARDS AND PREVENT SPAGHETTI CODE as the codebase scales at hyper-speed.
 
@@ -39,19 +39,19 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
 1. Anti-Spaghetti & Modularity:
    - Single Responsibility Principle (SRP): Functions must be focused (<60 LOC), clean, and self-documenting.
    - No spaghetti control flow: Reject deeply nested blocks (>3 levels), massive switch-case god functions, or unstructured goto/fallthrough loops.
-   - Clean Package Boundaries: Preserve encapsulation between `pkg/proxy`, `pkg/analysis`, `pkg/ringbuffer`, `pkg/cert`, `pkg/dashboard`. No circular dependencies or cross-package leakages.
+   - Clean Package Boundaries: Preserve encapsulation between ``gossipmesh/p2p`, `gossipmesh/consensus`, `gossipmesh/agents`, `gossipmesh/core`, `gossipmesh/cli`. No circular dependencies or cross-package leakages.
 2. Concurrency Safety:
-   - Zero data races, proper synchronization via `sync.RWMutex`, `sync.Once`, atomic operations, or channels.
-   - Goroutine lifecycle safety: All launched goroutines must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
-   - Defer hygiene: Mutex unlocks and resource closes must be deferred immediately with zero defer leaks inside hot unbounded loops.
+   - Zero data races, proper synchronization via `asyncio locks, thread locks, atomic operations, or queues.
+   - Async/thread lifecycle safety: All launched threads/tasks must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
+   - Finally/ContextManager hygiene: Mutex unlocks and resource closes must be deferred immediately with zero resource leaks inside hot unbounded loops.
 3. Memory & High Throughput Invariants:
-   - Zero-allocation hot paths: Use `sync.Pool` for byte buffers (`[]byte`). Avoid allocating slices or copying payloads in the proxy stream forwarding path.
-   - Streaming compliance: Read and forward payloads via streaming readers/writers (`io.Reader`, `io.Writer`) without buffering entire multi-megabyte streams in RAM.
+   - Zero-allocation hot paths: Use `object pools for buffers. Avoid allocating large lists or copying payloads in the proxy stream forwarding path.
+   - Streaming compliance: Read and forward payloads via streaming readers/writers (Python streaming APIs) without buffering entire multi-megabyte streams in RAM.
 4. Security & Hardening:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
-5. Go Idiomatic Standards & Test Coverage:
-   - Error wrapping using `%w` and proper sentinel error checking with `errors.Is`/`errors.As`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution (`t.Parallel()`).
+5. Python Idiomatic Standards & Test Coverage:
+   - Error wrapping using `from e` and proper sentinel error checking with `isinstance`.
+   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution .
 
 EVALUATION & VERDICT:
 - If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
@@ -69,11 +69,10 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
   "security_concurrency_audit": "Detailed analysis of data race freedom, goroutine lifecycle, mutex safety, and security posture.",
   "performance_memory_audit": "Evaluation of buffer pooling (sync.Pool), zero-allocation hot paths, and streaming throughput.",
   "test_coverage_audit": "Evaluation of test coverage, edge cases, error conditions, and concurrency tests.",
-  "system_impact": "Detailed assessment of the PR's effect on the DevProxy system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
+  "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
   "action_items": [
     "Specific refactoring step or improvement needed (empty list if APPROVED)"
-  ],
-  "auto_patch": "Optional valid diff / git patch to fix the identified issues."
+  ]
 }
 """
 
@@ -352,14 +351,11 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     votes = []
 
     # We call our fallback models to get multiple votes
-    models_to_poll = ["llama3", "gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
+    models_to_poll = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
 
     for model in models_to_poll:
         try:
-            if model == "llama3":
-                audit_result = call_ollama(prompt, model=model)
-            else:
-                audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
+            audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
             vote = ModelVote(
                 model_name=model,
                 verdict=audit_result.get("verdict", "ACTION_REQUIRED").strip().upper(),
@@ -418,7 +414,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ### 🧪 Test Coverage & Invariant Verification
 {test_cov}
-{auto_patch_md}
+
 ---
 ### 🚦 Next Steps: Maintainer Sign-Off Required
 **@Aditya-9-6**: All automated quality gates, anti-spaghetti checks, and performance benchmarks have passed cleanly.
@@ -449,7 +445,7 @@ To complete the merge into `main`:
 
 ### 🛠️ Required Refactoring & Action Items
 {action_bullets}
-{auto_patch_md}
+
 ---
 🔄 **Autonomous Self-Healing Loop Active**: The PR Fixer Agent will refactor the code according to these directives and push updates until the PR achieves 100% readiness.
 """

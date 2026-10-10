@@ -24,6 +24,7 @@ FALLBACK_MODELS = [
 ]
 
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Go, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
+SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
 You are working on GossipMesh, a high-performance, developer-first HTTP/HTTPS debugging proxy and security engine written in Python.
 
 CORE ARCHITECTURE GUIDELINES:
@@ -33,6 +34,9 @@ CORE ARCHITECTURE GUIDELINES:
 4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in _test.py) with the standard `testing` package.
 5. Code style: clean comments, adherence to standard black formatting.
 6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., pkg/proxy/<feature>.py) instead of rewriting existing complex files.
+4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in test_*.py) with the standard `testing` package.
+5. Code style: clean comments, adherence to standard black formatting.
+6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., pkg/proxy/<feature>.go) instead of rewriting existing complex files.
 
 You will be given a GitHub issue with its title, description, and repository context.
 Analyze the requirements and generate the exact file changes needed to implement the feature or fix the bug.
@@ -78,6 +82,7 @@ def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60
     
     overview.append("\n=== Repository File Tree ===")
     selected = [f for f in all_files if f.endswith((".py", ".mod", ".md", ".yaml", ".yml"))][:max_files]
+    selected = [f for f in all_files if f.endswith((".py", ".txt", ".md", ".yaml", ".yml"))][:max_files]
     overview.append("\n".join(selected))
     return "\n".join(overview)
 
@@ -88,6 +93,7 @@ def get_relevant_files(workspace_root: Path, all_files: list, keywords: list) ->
     max_bytes = 60_000  # Keep within fast token limit
     
     go_files = [f for f in all_files if f.endswith(".py") and not f.endswith("_test.py")]
+    go_files = [f for f in all_files if f.endswith(".py") and not "test_" in f]
     for rel_path in go_files:
         is_relevant = any(k.lower() in rel_path.lower() for k in keywords)
         if is_relevant:
@@ -236,6 +242,7 @@ Instructions:
 1. Implement the feature or fix specified in the issue.
 2. Adhere to GossipMesh performance and concurrency invariants.
 3. Write clean, idiomatic Go code with accompanying unit tests (test_*.py).
+3. Write clean, idiomatic Python code with accompanying unit tests (test_*.py).
 4. Output your response as valid JSON adhering to the specified schema.
 """
 

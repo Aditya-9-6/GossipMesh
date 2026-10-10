@@ -153,16 +153,22 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
     if fmt_res.stdout.strip():
         out_lines.append("=== BLACK FORMATTING ERRORS ===")
         out_lines.append(f"Unformatted files:\n{fmt_res.stdout.strip()}\n")
+    # Check gofmt
+    fmt_res = subprocess.run(["black", "--check", "."], cwd=workspace, capture_output=True, text=True)
+    if fmt_res.returncode != 0:
+        out_lines.append("=== BLACK FORMATTING ERRORS ===")
+        out_lines.append(f"Unformatted files:\n{fmt_res.stderr.strip()}\n")
 
     # Check go vet
-    vet_res = subprocess.run(["go", "vet", "./..."], cwd=workspace, capture_output=True, text=True)
+    vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True)
     if vet_res.returncode != 0:
         out_lines.append("=== FLAKE8 COMPILATION / STATIC ANALYSIS ERRORS ===")
+        out_lines.append("=== FLAKE8 LINT ERRORS ===")
         out_lines.append(vet_res.stderr.strip() or vet_res.stdout.strip())
         out_lines.append("")
 
     # Check go test
-    test_res = subprocess.run(["go", "test", "-v", "./..."], cwd=workspace, capture_output=True, text=True)
+    test_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True)
     if test_res.returncode != 0:
         out_lines.append("=== PYTHON TEST FAILURES ===")
         combined = (test_res.stdout + "\n" + test_res.stderr).strip()
@@ -173,7 +179,7 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
     return total_exit, combined_output
 
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
-    """Extracts Go file paths referenced in logs or diff."""
+    """Extracts Python file paths referenced in logs or diff."""
     found = set()
     pattern = re.compile(r'([\w/\\.-]+\.py)(?::\d+)?')
     for match in pattern.finditer(error_log):
@@ -320,6 +326,7 @@ Instructions:
 
         # Step 5: Format & verify
         subprocess.run(["black", "-w", "."], cwd=workspace)
+        subprocess.run(["black", "."], cwd=workspace)
         post_code, post_errors = run_diagnostics(workspace)
         if post_code == 0:
             print(f"[SUCCESS] Build and tests passed cleanly after pass {iteration}!")
