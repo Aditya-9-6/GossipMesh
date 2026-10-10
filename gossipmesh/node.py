@@ -79,12 +79,7 @@ class GossipNode:
         elif os.environ.get("GOSSIPMESH_DIR"):
             self.mesh_dir = Path(os.environ.get("GOSSIPMESH_DIR")).resolve()
         else:
-            # Fallback to shared Google Drive or User home
-            drive_mesh = Path("G:/My Drive/.gossip_mesh")
-            if drive_mesh.parent.exists():
-                self.mesh_dir = drive_mesh
-            else:
-                self.mesh_dir = Path.home() / ".gossip_mesh"
+            self.mesh_dir = Path.home() / ".gossip_mesh"
 
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = self.mesh_dir / "ledger.jsonl"

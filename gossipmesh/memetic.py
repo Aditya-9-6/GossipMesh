@@ -5,6 +5,7 @@ Survivors of evolutionary natural selection are injected into LLM system prompts
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -71,7 +72,13 @@ class KnowledgeMeme:
 class MemeticKnowledgeBase:
     """Persistent ledger of evolving architectural memes."""
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or Path("G:/My Drive/.gossip_mesh/memes.json")
+        if storage_path:
+            self.storage_path = storage_path
+        elif os.environ.get("GOSSIPMESH_DIR"):
+            self.storage_path = Path(os.environ.get("GOSSIPMESH_DIR")).resolve() / "memes.json"
+        else:
+            self.storage_path = Path.home() / ".gossip_mesh/memes.json"
+
         self.memes: Dict[str, KnowledgeMeme] = {}
         self._load()
 

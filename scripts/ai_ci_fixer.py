@@ -76,7 +76,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     last_err = None
     for current_key in keys_to_try:
         for current_model in models_to_try:
-            url = f"https://generativelanguage.pyogleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
                 "contents": [
                     {
