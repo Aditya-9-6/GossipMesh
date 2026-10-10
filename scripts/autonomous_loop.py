@@ -122,7 +122,6 @@ def get_open_advancement_issues(workspace: Path):
 def generate_new_issue(workspace: Path):
     """Runs the issue generator script with rotated key."""
     active_key = GLOBAL_POOL.next_key()
-    print(f"[*] Generating new architecture advancement issue for GossipMesh (Key index: {GLOBAL_POOL.idx % len(GLOBAL_POOL)})...", flush=True)
     print(f"[*] Generating new architecture advancement issue for GossipMesh (Key index: {GLOBAL_POOL.idx % max(1, len(GLOBAL_POOL))})...", flush=True)
     env = os.environ.copy()
     env["GEMINI_ISSUE_KEY"] = active_key
@@ -387,6 +386,7 @@ def run_loop_iteration(workspace: Path):
     print(f"\n--- [Autonomous GossipMesh Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
     issues = get_open_advancement_issues(workspace)
     if not issues:
+        pass
 
     # Check for requested PR reviews/fixes
     handle_pr_comments(workspace)
