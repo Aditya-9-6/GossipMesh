@@ -23,20 +23,16 @@ FALLBACK_MODELS = [
     "gemini-3.1-flash-lite",
 ]
 
-SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Go, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
 You are working on GossipMesh, a high-performance, developer-first HTTP/HTTPS debugging proxy and security engine written in Python.
 
 CORE ARCHITECTURE GUIDELINES:
-1. High throughput and low memory footprint: prefer streaming buffers, zero-allocation pooling (sync.Pool) on hot request/response paths.
-2. Concurrency safety: ensure data race freedom using proper sync primitives or lock-free circular ring buffers.
-3. Idiomatic Python: clean error handling, context cancellation propagation, no unhandled goroutine leaks, adhere to standard Go naming and conventions.
-4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in _test.py) with the standard `testing` package.
+1. High throughput and low memory footprint: prefer streaming buffers, efficient memory usage on hot request/response paths.
+2. Concurrency safety: ensure data race freedom using proper sync primitives or asyncio queues.
+3. Idiomatic Python: clean error handling, context cancellation propagation, no unhandled task leaks, adhere to standard Python naming and PEP8 conventions.
+4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in test_*.py) with the standard `unittest` package.
 5. Code style: clean comments, adherence to standard black formatting.
-6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., pkg/proxy/<feature>.py) instead of rewriting existing complex files.
-4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in test_*.py) with the standard `testing` package.
-5. Code style: clean comments, adherence to standard black formatting.
-6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., pkg/proxy/<feature>.go) instead of rewriting existing complex files.
+6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., gossipmesh/<feature>.py) instead of rewriting existing complex files.
 
 You will be given a GitHub issue with its title, description, and repository context.
 Analyze the requirements and generate the exact file changes needed to implement the feature or fix the bug.
@@ -108,7 +104,7 @@ def get_relevant_files(workspace_root: Path, all_files: list, keywords: list) ->
                 
     return "\n\n".join(context_files)
 
-def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
+def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback and retries across supported models."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
@@ -131,7 +127,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
 
     last_err = None
     for current_model in models_to_try:
-        url = f"https://generativelanguage.pyogleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
         
         payload = {
             "contents": [
@@ -213,7 +209,7 @@ def main():
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         print("MISSING_API_KEY: Environment variable GEMINI_API_KEY is not set.", file=sys.stderr)
-        print("To enable the bot, generate a free API key at https://aistudio.pyogle.com/ and add it to GitHub Secrets as GEMINI_API_KEY.")
+        print("To enable the bot, generate a free API key at https://aistudio.google.com/ and add it to GitHub Secrets as GEMINI_API_KEY.")
         sys.exit(2)
 
     workspace_root = Path(args.workspace).resolve()

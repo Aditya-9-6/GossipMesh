@@ -386,8 +386,6 @@ def run_loop_iteration(workspace: Path):
     """Executes a single cycle of the autonomous loop."""
     print(f"\n--- [Autonomous GossipMesh Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
     issues = get_open_advancement_issues(workspace)
-    if not issues:
-
     # Check for requested PR reviews/fixes
     handle_pr_comments(workspace)
 

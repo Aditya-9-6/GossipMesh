@@ -50,7 +50,7 @@ Respond ONLY with a single valid JSON object and nothing else (no conversational
 }
 """
 
-def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
+def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback models and fallback API key."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
@@ -76,7 +76,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     last_err = None
     for current_key in keys_to_try:
         for current_model in models_to_try:
-            url = f"https://generativelanguage.pyogleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
                 "contents": [
                     {
@@ -145,21 +145,14 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
 
 def run_diagnostics(workspace: Path) -> tuple[int, str]:
     """Runs compiler and test suite, returning exit code and combined error output."""
-    print("[*] Running local diagnostic checks (black, go vet, go test)...", flush=True)
+    print("[*] Running local diagnostic checks (black, flake8, python tests)...", flush=True)
     out_lines = []
 
     # Check black
-    fmt_res = subprocess.run(["black", "-l", "."], cwd=workspace, capture_output=True, text=True)
+    fmt_res = subprocess.run(["black", "--check", "."], cwd=workspace, capture_output=True, text=True)
     if fmt_res.stdout.strip():
         out_lines.append("=== BLACK FORMATTING ERRORS ===")
         out_lines.append(f"Unformatted files:\n{fmt_res.stdout.strip()}\n")
-    # Check gofmt
-    fmt_res = subprocess.run(["black", "--check", "."], cwd=workspace, capture_output=True, text=True)
-    if fmt_res.returncode != 0:
-        out_lines.append("=== BLACK FORMATTING ERRORS ===")
-        out_lines.append(f"Unformatted files:\n{fmt_res.stderr.strip()}\n")
-
-    # Check go vet
     vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True)
     if vet_res.returncode != 0:
         out_lines.append("=== FLAKE8 COMPILATION / STATIC ANALYSIS ERRORS ===")
@@ -325,7 +318,6 @@ Instructions:
             print(f"    [+] Wrote fixed file: {rel_path}")
 
         # Step 5: Format & verify
-        subprocess.run(["black", "-w", "."], cwd=workspace)
         subprocess.run(["black", "."], cwd=workspace)
         post_code, post_errors = run_diagnostics(workspace)
         if post_code == 0:

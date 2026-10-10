@@ -6,7 +6,7 @@ from collections import Counter
 import hashlib
 
 class SemanticCache:
-    def __init__(self, cache_dir: str = ".gossip_mesh/cache", threshold: float = 0.98):
+    def __init__(self, cache_dir: str = ".gossip_mesh/cache", threshold: float = 0.9999):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.threshold = threshold
