@@ -116,7 +116,6 @@ def generate_ai_advancement(existing_titles):
     if not api_key:
         return None
 
-    prompt = f"""You are the Principal Systems Software Architect of GossipMesh, an ultra-high performance HTTP/HTTPS reverse proxy and network analysis engine written in Go.
     prompt = f"""You are the Principal Systems Software Architect of GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python.
 
 Create a brand new, novel, high-impact systems engineering task for open-source contributors.
