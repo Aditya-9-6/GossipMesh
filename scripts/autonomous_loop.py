@@ -313,9 +313,80 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         print(f"[!] PR #{pr_num} verdict: {verdict} (Score: {score}). Awaiting review fixes.", flush=True)
         return False
 
+def handle_pr_comments(workspace: Path):
+    """Checks open PRs for /review or /fix comments and executes CI tests/error solve loop."""
+    try:
+        out = run_cmd(["gh", "pr", "list", "--repo", REPO, "--state", "open", "--json", "number,headRefName"], cwd=workspace)
+        prs = json.loads(out) if out else []
+        for pr in prs:
+            pr_num = str(pr["number"])
+            comments_out = run_cmd(["gh", "pr", "view", pr_num, "--repo", REPO, "--json", "comments"], cwd=workspace)
+            comments_data = json.loads(comments_out) if comments_out else {"comments": []}
+
+            needs_review_or_fix = False
+            for comment in comments_data.get("comments", []):
+                body = comment.get("body", "").lower()
+                if "/review" in body or "/fix" in body:
+                    needs_review_or_fix = True
+                    break
+
+            if needs_review_or_fix:
+                print(f"[*] Processing PR #{pr_num} for requested review/fix...", flush=True)
+                env = os.environ.copy()
+                branch_name = pr["headRefName"]
+
+                # Check out the PR branch
+                run_cmd(f"git checkout {branch_name}", cwd=workspace)
+                run_cmd(f"git pull origin {branch_name}", cwd=workspace, check=False)
+
+                # Run tests
+                check_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+                if check_res.returncode != 0:
+                    print(f"[!] PR #{pr_num} CI failed during requested review. Calling AI CI Fixer...", flush=True)
+                    ci_fixer_cmd = [
+                        sys.executable, "scripts/ai_ci_fixer.py",
+                        "--pr-number", str(pr_num),
+                        "--workspace", str(workspace)
+                    ]
+                    fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+                    print(fix_res.stdout, flush=True)
+
+                    # Re-commit and push if fixed
+                    run_cmd("git add -A", cwd=workspace)
+                    run_cmd(["git", "commit", "-m", f"fix: automated CI fix based on review request for PR #{pr_num}"], cwd=workspace, check=False)
+                    run_cmd(f"git push origin {branch_name}", cwd=workspace, check=False)
+                else:
+                    print(f"[*] PR #{pr_num} CI passed! Proceeding to reviewer...", flush=True)
+
+                # Run the reviewer regardless
+                reviewer_key = GLOBAL_POOL.next_key()
+                print(f"[*] Running Autonomous Architectural Reviewer on PR #{pr_num} (Key index: {GLOBAL_POOL.idx % max(1, len(GLOBAL_POOL))})...", flush=True)
+                env["GEMINI_REVIEWER_KEY"] = reviewer_key
+                rev_res = subprocess.run([
+                    sys.executable, "scripts/ai_pr_reviewer.py",
+                    "--pr-number", str(pr_num),
+                    "--workspace", str(workspace)
+                ], cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+                print(rev_res.stdout, flush=True)
+
+                review_md_file = workspace / "ai_pr_review.md"
+                if review_md_file.exists():
+                    run_cmd(["gh", "pr", "comment", str(pr_num), "--body-file", str(review_md_file)], cwd=workspace, check=False)
+
+                # Switch back to main
+                run_cmd("git checkout main", cwd=workspace)
+
+    except Exception as e:
+        print(f"[Warning] Failed to check PR comments: {e}", file=sys.stderr, flush=True)
+
+
 def run_loop_iteration(workspace: Path):
     """Executes a single cycle of the autonomous loop."""
     print(f"\n--- [Autonomous GossipMesh Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
+
+    # Check for requested PR reviews/fixes
+    handle_pr_comments(workspace)
 
     # Check if there are ANY open issues first, before filtering for /solve
     try:
