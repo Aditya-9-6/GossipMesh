@@ -13,6 +13,7 @@ import urllib.request
 import urllib.error
 import subprocess
 import time
+import hashlib
 from pathlib import Path
 
 DEFAULT_MODEL = "gemini-3.8-flash"
@@ -101,7 +102,7 @@ def get_relevant_files(workspace_root: Path, all_files: list, keywords: list) ->
                 
     return "\n\n".join(context_files)
 
-def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL) -> dict:
+def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback and retries across supported models."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
@@ -109,6 +110,19 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL) -> dict:
         if m not in models_to_try:
             models_to_try.append(m)
     
+    # Check cache
+    cache_path = Path(cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_file = cache_path / f"{cache_key}.json"
+
+    if cache_file.exists():
+        try:
+            print("[*] Cache hit! Returning cached Gemini response...", flush=True)
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
     last_err = None
     for current_model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
@@ -144,7 +158,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL) -> dict:
                     
                     # Parse JSON response
                     try:
-                        return json.loads(text_response, strict=False)
+                        parsed_response = json.loads(text_response, strict=False)
                     except json.JSONDecodeError:
                         if text_response.startswith("```"):
                             lines = text_response.splitlines()
@@ -153,7 +167,14 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL) -> dict:
                             if lines and lines[-1].startswith("```"):
                                 lines = lines[:-1]
                             text_response = "\n".join(lines).strip()
-                        return json.loads(text_response, strict=False)
+                        parsed_response = json.loads(text_response, strict=False)
+
+                    try:
+                        cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
+                    except Exception:
+                        pass
+
+                    return parsed_response
             except urllib.error.HTTPError as e:
                 err_msg = e.read().decode("utf-8", errors="replace")
                 print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:200]}", file=sys.stderr)
