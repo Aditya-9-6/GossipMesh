@@ -311,6 +311,15 @@ def main():
             red_team_findings += f"  Attack Vector: {p.attack_vector}\n"
             red_team_findings += f"  Suggested Test:\n{p.exploit_test_stub}\n"
 
+    # Run tests directly to override llm fake approvals
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ai_ci_fixer import run_diagnostics
+    diag_code, diag_log = run_diagnostics(workspace)
+    if diag_code != 0:
+        red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
+
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for DevProxy:
 
 {meme_context}
@@ -370,6 +379,14 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     test_cov = audit.get("test_coverage_audit", "Test coverage evaluated.")
     system_impact = audit.get("system_impact", "System impact evaluated.")
     action_items = audit.get("action_items", [])
+
+    if diag_code != 0:
+        print("[!] Local diagnostics failed! Forcing ACTION_REQUIRED.", flush=True)
+        is_approved = False
+        score = min(score, 50)
+        if not any("Local tests failed" in item for item in action_items):
+            action_items.append("Local tests failed: Check diagnostic verification logs.")
+
     auto_patch = audit.get("auto_patch", "")
 
     auto_patch_md = f"\n### 🛠️ Auto-Generated Patch\n```diff\n{auto_patch}\n```\n" if auto_patch else ""
@@ -448,6 +465,29 @@ To complete the merge into `main`:
     status_file.write_text(json.dumps(status_data, indent=2), encoding="utf-8")
 
     print(f"[OK] Audit finished: Verdict={status_data['verdict']} Score={score} (Written to {review_file} & {status_file})")
+
+    if not is_approved:
+        print("[*] Triggering Autonomous CI Fixer to resolve issues...", flush=True)
+        fix_env = os.environ.copy()
+        subprocess.run([
+            sys.executable, str(Path(__file__).resolve().parent / "ai_ci_fixer.py"),
+            "--pr-number", args.pr_number,
+            "--workspace", str(workspace),
+            "--review-feedback-file", str(review_file)
+        ], env=fix_env)
+
+        # Check if fixer made changes
+        status_check = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True)
+        if status_check.stdout.strip():
+            print("[*] Committing and pushing fixes to PR branch...", flush=True)
+            head_ref = pr_data.get("headRefName")
+            if head_ref:
+                subprocess.run(["git", "add", "-u"], cwd=workspace)
+                subprocess.run(["git", "reset", "--", "ai_pr_review.md", "ai_review_status.json", "ci_fix_summary.md"], cwd=workspace, check=False)
+                subprocess.run(["git", "config", "user.name", "Aditya Dahale"], cwd=workspace)
+                subprocess.run(["git", "config", "user.email", "aditya-9-6@users.noreply.github.com"], cwd=workspace)
+                subprocess.run(["git", "commit", "-m", "fix(ai): autonomous ci and architectural review fixes"], cwd=workspace)
+                subprocess.run(["git", "push", "origin", f"HEAD:{head_ref}"], cwd=workspace)
 
 if __name__ == "__main__":
     main()
