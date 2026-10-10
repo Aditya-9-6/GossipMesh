@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.memetic import MemeticKnowledgeBase
 from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
+from gossipmesh.semantic_cache import SemanticCache
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = [
@@ -102,6 +103,40 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
 }
 """
 
+def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_mesh/cache") -> dict:
+    """Calls local Ollama API for fast edge inference."""
+    url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+    payload = {
+        "model": model,
+        "prompt": f"{REVIEWER_SYSTEM_PROMPT}\n\n{prompt}",
+        "stream": False,
+        "format": "json"
+    }
+
+    sem_cache = SemanticCache(cache_dir=cache_dir)
+    cache_key_text = f"{model}:{prompt}"
+    cached_val = sem_cache.get(cache_key_text)
+    if cached_val:
+        return cached_val
+
+    print(f"[*] Requesting fast-pass architectural PR review from local edge model: {model}...", flush=True)
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            text_response = data.get("response", "").strip()
+            parsed_response = json.loads(text_response, strict=False)
+            sem_cache.put(cache_key_text, parsed_response)
+            return parsed_response
+    except Exception as e:
+        print(f"[Warning] Failed to query local edge model {model}: {e}", file=sys.stderr)
+        return {"verdict": "ACTION_REQUIRED", "score": 50, "executive_summary": f"Failed to query {model}: {e}"}
+
 def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback models and fallback API key, expecting JSON."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
@@ -113,17 +148,11 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     keys_to_try = [k for k in [api_key, fallback_key] if k.strip()]
 
     # Check cache
-    cache_path = Path(cache_dir)
-    cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
-    cache_file = cache_path / f"{cache_key}.json"
-
-    if cache_file.exists():
-        try:
-            print("[*] Cache hit! Returning cached Gemini response...", flush=True)
-            return json.loads(cache_file.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+    sem_cache = SemanticCache(cache_dir=cache_dir)
+    cache_key_text = f"{model}:{prompt}"
+    cached_val = sem_cache.get(cache_key_text)
+    if cached_val:
+        return cached_val
 
     last_err = None
     for current_key in keys_to_try:
@@ -169,11 +198,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                                 text_response = "\n".join(lines).strip()
                             parsed_response = json.loads(text_response, strict=False)
 
-                        try:
-                            cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
-                        except Exception:
-                            pass
-
+                        sem_cache.put(cache_key_text, parsed_response)
                         return parsed_response
                 except urllib.error.HTTPError as e:
                     err_msg = e.read().decode("utf-8", errors="replace")
@@ -228,6 +253,25 @@ def get_pr_diff(workspace: Path) -> str:
     except Exception:
         pass
     return "No git diff available."
+
+import re
+
+def extract_ast_metadata(diff: str) -> str:
+    """Extracts a structural summary from the diff."""
+    summary = []
+    lines = diff.splitlines()
+    for line in lines:
+        clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
+        if clean_line.startswith("func ") or \
+           clean_line.startswith("type ") or \
+           clean_line.startswith("def ") or \
+           clean_line.startswith("class "):
+            summary.append(clean_line.strip())
+
+    if not summary:
+        return "No significant structural changes found in diff."
+
+    return "### Extracted Structural Changes (AST Summary):\n" + "\n".join(set(summary))
 
 def get_head_sha(workspace: Path) -> str:
     """Gets current HEAD commit SHA."""
@@ -312,9 +356,24 @@ def main():
             red_team_findings += f"  Attack Vector: {p.attack_vector}\n"
             red_team_findings += f"  Suggested Test:\n{p.exploit_test_stub}\n"
 
+
+    ast_metadata = extract_ast_metadata(diff)
+
+    # Run tests directly to override llm fake approvals
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ai_ci_fixer import run_diagnostics
+    diag_code, diag_log = run_diagnostics(workspace)
+    if diag_code != 0:
+        red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
+
+
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
 {meme_context}
+
+{ast_metadata}
 
 {red_team_findings}
 
@@ -397,6 +456,17 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
             patch = fix.get("patch", "")
             if patch:
                 auto_patch_md += f"**{desc}**\n```diff\n{patch}\n```\n\n"
+
+    if diag_code != 0:
+        print("[!] Local diagnostics failed! Forcing ACTION_REQUIRED.", flush=True)
+        is_approved = False
+        score = min(score, 50)
+        if not any("Local tests failed" in item for item in action_items):
+            action_items.append("Local tests failed: Check diagnostic verification logs.")
+
+    auto_patch = audit.get("auto_patch", "")
+
+    auto_patch_md = f"\n### 🛠️ Auto-Generated Patch\n```diff\n{auto_patch}\n```\n" if auto_patch else ""
 
     # Format Markdown Review
     if is_approved:
@@ -492,6 +562,29 @@ To complete the merge into `main`:
     log_enterprise_audit(workspace, str(args.pr_number), status_data["verdict"], roi_metrics, privacy_sec)
 
     print(f"[OK] Audit finished: Verdict={status_data['verdict']} Score={score} (Written to {review_file} & {status_file})")
+
+    if not is_approved:
+        print("[*] Triggering Autonomous CI Fixer to resolve issues...", flush=True)
+        fix_env = os.environ.copy()
+        subprocess.run([
+            sys.executable, str(Path(__file__).resolve().parent / "ai_ci_fixer.py"),
+            "--pr-number", args.pr_number,
+            "--workspace", str(workspace),
+            "--review-feedback-file", str(review_file)
+        ], env=fix_env)
+
+        # Check if fixer made changes
+        status_check = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True)
+        if status_check.stdout.strip():
+            print("[*] Committing and pushing fixes to PR branch...", flush=True)
+            head_ref = pr_data.get("headRefName")
+            if head_ref:
+                subprocess.run(["git", "add", "-u"], cwd=workspace)
+                subprocess.run(["git", "reset", "--", "ai_pr_review.md", "ai_review_status.json", "ci_fix_summary.md"], cwd=workspace, check=False)
+                subprocess.run(["git", "config", "user.name", "Aditya Dahale"], cwd=workspace)
+                subprocess.run(["git", "config", "user.email", "aditya-9-6@users.noreply.github.com"], cwd=workspace)
+                subprocess.run(["git", "commit", "-m", "fix(ai): autonomous ci and architectural review fixes"], cwd=workspace)
+                subprocess.run(["git", "push", "origin", f"HEAD:{head_ref}"], cwd=workspace)
 
 if __name__ == "__main__":
     main()

@@ -116,6 +116,7 @@ def generate_ai_advancement(existing_titles):
     if not api_key:
         return None
 
+    prompt = f"""You are the Principal Systems Software Architect of GossipMesh, an ultra-high performance HTTP/HTTPS reverse proxy and network analysis engine written in Go.
     prompt = f"""You are the Principal Systems Software Architect of GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python.
 
 Create a brand new, novel, high-impact systems engineering task for open-source contributors.
@@ -192,6 +193,10 @@ def create_issue(item):
 ### 📂 Target Files & Modules
 {target_files_md}
 
+### 📋 Technical Acceptance Criteria
+- [ ] Conforms to GossipMesh's zero-allocation streaming patterns (utilize `sync.Pool` for buffers).
+- [ ] Maintains deterministic performance ($O(1)$ lookup or $O(N)$ streaming throughput).
+- [ ] Concurrency safety verified: zero data races, proper mutex/atomic synchronization, no goroutine leaks on context cancellation.
 ### 📋 Technical Acceptance Criteria & Architectural Sanity Checklist
 - [ ] Conforms to GossipMesh's robust Python engineering patterns.
 - [ ] Feature has a positive system impact and does not introduce bloat, unnecessary dependencies, or highly speculative experimental code.
