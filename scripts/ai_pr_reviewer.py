@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.memetic import MemeticKnowledgeBase
 from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
+from gossipmesh.semantic_cache import SemanticCache
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = [
@@ -86,17 +87,11 @@ def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_me
         "format": "json"
     }
 
-    cache_path = Path(cache_dir)
-    cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
-    cache_file = cache_path / f"{cache_key}.json"
-
-    if cache_file.exists():
-        try:
-            print("[*] Cache hit! Returning cached Ollama response...", flush=True)
-            return json.loads(cache_file.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+    sem_cache = SemanticCache(cache_dir=cache_dir)
+    cache_key_text = f"{model}:{prompt}"
+    cached_val = sem_cache.get(cache_key_text)
+    if cached_val:
+        return cached_val
 
     print(f"[*] Requesting fast-pass architectural PR review from local edge model: {model}...", flush=True)
     req = urllib.request.Request(
@@ -110,10 +105,7 @@ def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_me
             data = json.loads(resp.read().decode("utf-8"))
             text_response = data.get("response", "").strip()
             parsed_response = json.loads(text_response, strict=False)
-            try:
-                cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
-            except Exception:
-                pass
+            sem_cache.put(cache_key_text, parsed_response)
             return parsed_response
     except Exception as e:
         print(f"[Warning] Failed to query local edge model {model}: {e}", file=sys.stderr)
@@ -130,17 +122,11 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     keys_to_try = [k for k in [api_key, fallback_key] if k.strip()]
 
     # Check cache
-    cache_path = Path(cache_dir)
-    cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
-    cache_file = cache_path / f"{cache_key}.json"
-
-    if cache_file.exists():
-        try:
-            print("[*] Cache hit! Returning cached Gemini response...", flush=True)
-            return json.loads(cache_file.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+    sem_cache = SemanticCache(cache_dir=cache_dir)
+    cache_key_text = f"{model}:{prompt}"
+    cached_val = sem_cache.get(cache_key_text)
+    if cached_val:
+        return cached_val
 
     last_err = None
     for current_key in keys_to_try:
@@ -186,11 +172,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                                 text_response = "\n".join(lines).strip()
                             parsed_response = json.loads(text_response, strict=False)
 
-                        try:
-                            cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
-                        except Exception:
-                            pass
-
+                        sem_cache.put(cache_key_text, parsed_response)
                         return parsed_response
                 except urllib.error.HTTPError as e:
                     err_msg = e.read().decode("utf-8", errors="replace")
@@ -227,6 +209,25 @@ def get_pr_diff(workspace: Path) -> str:
     except Exception:
         pass
     return "No git diff available."
+
+import re
+
+def extract_ast_metadata(diff: str) -> str:
+    """Extracts a structural summary from the diff."""
+    summary = []
+    lines = diff.splitlines()
+    for line in lines:
+        clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
+        if clean_line.startswith("func ") or \
+           clean_line.startswith("type ") or \
+           clean_line.startswith("def ") or \
+           clean_line.startswith("class "):
+            summary.append(clean_line.strip())
+
+    if not summary:
+        return "No significant structural changes found in diff."
+
+    return "### Extracted Structural Changes (AST Summary):\n" + "\n".join(set(summary))
 
 def get_head_sha(workspace: Path) -> str:
     """Gets current HEAD commit SHA."""
@@ -311,9 +312,13 @@ def main():
             red_team_findings += f"  Attack Vector: {p.attack_vector}\n"
             red_team_findings += f"  Suggested Test:\n{p.exploit_test_stub}\n"
 
+    ast_metadata = extract_ast_metadata(diff)
+
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for DevProxy:
 
 {meme_context}
+
+{ast_metadata}
 
 {red_team_findings}
 
