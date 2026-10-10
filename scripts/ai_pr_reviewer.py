@@ -71,9 +71,53 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
   "system_impact": "Detailed assessment of the PR's effect on the DevProxy system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
   "action_items": [
     "Specific refactoring step or improvement needed (empty list if APPROVED)"
-  ]
+  ],
+  "auto_patch": "Optional valid diff / git patch to fix the identified issues."
 }
 """
+
+def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_mesh/cache") -> dict:
+    """Calls local Ollama API for fast edge inference."""
+    url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
+    payload = {
+        "model": model,
+        "prompt": f"{REVIEWER_SYSTEM_PROMPT}\n\n{prompt}",
+        "stream": False,
+        "format": "json"
+    }
+
+    cache_path = Path(cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_file = cache_path / f"{cache_key}.json"
+
+    if cache_file.exists():
+        try:
+            print("[*] Cache hit! Returning cached Ollama response...", flush=True)
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    print(f"[*] Requesting fast-pass architectural PR review from local edge model: {model}...", flush=True)
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            text_response = data.get("response", "").strip()
+            parsed_response = json.loads(text_response, strict=False)
+            try:
+                cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
+            except Exception:
+                pass
+            return parsed_response
+    except Exception as e:
+        print(f"[Warning] Failed to query local edge model {model}: {e}", file=sys.stderr)
+        return {"verdict": "ACTION_REQUIRED", "score": 50, "executive_summary": f"Failed to query {model}: {e}"}
 
 def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback models and fallback API key, expecting JSON."""
@@ -292,11 +336,14 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     votes = []
 
     # We call our fallback models to get multiple votes
-    models_to_poll = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
+    models_to_poll = ["llama3", "gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
 
     for model in models_to_poll:
         try:
-            audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
+            if model == "llama3":
+                audit_result = call_ollama(prompt, model=model)
+            else:
+                audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
             vote = ModelVote(
                 model_name=model,
                 verdict=audit_result.get("verdict", "ACTION_REQUIRED").strip().upper(),
@@ -323,6 +370,9 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     test_cov = audit.get("test_coverage_audit", "Test coverage evaluated.")
     system_impact = audit.get("system_impact", "System impact evaluated.")
     action_items = audit.get("action_items", [])
+    auto_patch = audit.get("auto_patch", "")
+
+    auto_patch_md = f"\n### 🛠️ Auto-Generated Patch\n```diff\n{auto_patch}\n```\n" if auto_patch else ""
 
     # Format Markdown Review
     if is_approved:
@@ -344,7 +394,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ### 🧪 Test Coverage & Invariant Verification
 {test_cov}
-
+{auto_patch_md}
 ---
 ### 🚦 Next Steps: Maintainer Sign-Off Required
 **@Aditya-9-6**: All automated quality gates, anti-spaghetti checks, and performance benchmarks have passed cleanly.
@@ -375,7 +425,7 @@ To complete the merge into `main`:
 
 ### 🛠️ Required Refactoring & Action Items
 {action_bullets}
-
+{auto_patch_md}
 ---
 🔄 **Autonomous Self-Healing Loop Active**: The PR Fixer Agent will refactor the code according to these directives and push updates until the PR achieves 100% readiness.
 """
