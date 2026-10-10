@@ -54,6 +54,9 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
 5. Go Idiomatic Standards & Test Coverage:
    - Error wrapping using `%w` and proper sentinel error checking with `errors.Is`/`errors.As`.
    - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution (`t.Parallel()`).
+5. Python Idiomatic Standards & Test Coverage:
+   - Error wrapping using `from e` and proper sentinel error checking with `isinstance`.
+   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution .
 
 EVALUATION & VERDICT:
 - If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
@@ -92,6 +95,9 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
       "description": "Short description of the fix (e.g. formatting, bounds check).",
       "patch": "Valid diff / git patch"
     }
+  "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
+  "action_items": [
+    "Specific refactoring step or improvement needed (empty list if APPROVED)"
   ]
 }
 """
@@ -351,6 +357,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
                     concerns.append(str(item))
                     confidence_scores.append(100)
 
+            audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
             vote = ModelVote(
                 model_name=model,
                 verdict=audit_result.get("verdict", "ACTION_REQUIRED").strip().upper(),
