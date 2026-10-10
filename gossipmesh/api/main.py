@@ -14,4 +14,5 @@ app.include_router(repositories.router, prefix=f"{settings.API_V1_STR}/repositor
 
 @app.get("/health")
 def health_check():
+    """Return a static health response without checking dependencies."""
     return {"status": "healthy"}

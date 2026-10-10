@@ -24,7 +24,12 @@ def register_provider(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
-    """Registers a provider instance in memory for the session."""
+    """Register or replace a provider in the shared in-memory manager.
+
+    Registration is process-local, shared across users, and not persisted.
+    Return a success message; convert registration ValueError to HTTP 400.
+    Other provider initialization errors propagate.
+    """
     try:
         kwargs = {}
         if registration.base_url:

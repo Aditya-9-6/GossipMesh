@@ -23,7 +23,11 @@ def sync_repository(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
-    """Queues a background task to sync repository metadata from GitHub."""
+    """Queue a placeholder GitHub metadata fetch and return an acknowledgment.
+
+    Raise HTTP 403 if the user is not a member of the requested organization.
+    The task uses mock credentials and does not persist repository metadata.
+    """
     # In a full implementation, we'd trigger a Celery task here.
     # We are using FastAPI BackgroundTasks for simplicity in this endpoint demonstration.
 
@@ -33,6 +37,10 @@ def sync_repository(
         raise HTTPException(status_code=403, detail="Not authorized for this organization")
 
     def _sync_task(full_name: str, installation_id: int, org_id: int):
+        """Attempt a metadata fetch with mock credentials, discarding the result.
+
+        Fetch errors are suppressed. The organization ID is currently unused.
+        """
         # We would use real secrets in production
         github = GitHubIntegration(app_id="mock_app_id", private_key="mock_key")
         try:

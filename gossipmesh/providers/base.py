@@ -5,6 +5,7 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 class BaseProvider(ABC):
 
     def __init__(self, api_key: str):
+        """Store the API key for use by provider implementations."""
         self.api_key = api_key
 
     @property
@@ -15,12 +16,12 @@ class BaseProvider(ABC):
 
     @abstractmethod
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        """Generate a response synchronously (wrapped in async)."""
+        """Generate and return a complete response asynchronously."""
         pass
 
     @abstractmethod
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
-        """Stream a response."""
+        """Yield response text chunks asynchronously."""
         pass
 
     @abstractmethod

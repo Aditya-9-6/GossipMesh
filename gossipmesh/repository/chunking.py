@@ -2,9 +2,15 @@ from typing import List, Dict, Any
 import ast
 
 def chunk_python_code(code: str, filepath: str) -> List[Dict[str, Any]]:
-    """
-    Splits Python code into symbol-level chunks (functions, classes).
-    This is a basic AST-based chunker.
+    """Return chunks for top-level Python functions and classes.
+
+    Each chunk includes its symbol name, AST node type, source content,
+    filepath, and inclusive 1-based line bounds. Decorator lines are excluded;
+    nested symbols remain inside their enclosing chunk. The filepath labels
+    the supplied source and is not read from disk.
+
+    Return the whole source as a Module chunk if no symbols exist, or as a
+    Text chunk on SyntaxError. Empty source has bounds 1 through 0.
     """
     chunks = []
     try:

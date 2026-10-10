@@ -6,10 +6,15 @@ from gossipmesh.core.config import settings
 
 class GitHubIntegration:
     def __init__(self, app_id: str, private_key: str):
+        """Store the GitHub App ID and private signing key for later authentication."""
         self.app_id = app_id
         self.private_key = private_key
 
     def _generate_jwt(self) -> str:
+        """Sign an RS256 app token expiring in 10 minutes, backdated by 60 seconds.
+
+        JWT signing errors propagate.
+        """
         payload = {
             "iat": int(time.time()) - 60,
             "exp": int(time.time()) + (10 * 60),
@@ -35,7 +40,11 @@ class GitHubIntegration:
         return Github(auth=auth)
 
     def sync_repository(self, full_name: str, installation_id: int):
-        """Mock method for synchronizing repository metadata."""
+        """Fetch metadata for an owner/repository name as the given installation.
+
+        Return github_id, name, default_branch, and clone_url without persisting
+        them. Authentication and GitHub API errors propagate.
+        """
         client = self.get_installation_client(installation_id)
         repo = client.get_repo(full_name)
         # We would typically save repo.id, repo.default_branch, etc. to our database

@@ -16,5 +16,6 @@ def read_organizations_me(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
+    """Return the organizations associated with the authenticated user."""
     # A complete implementation would join UserOrganization
     return [org.organization for org in current_user.organizations]

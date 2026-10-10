@@ -8,14 +8,22 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 
 class OllamaProvider(BaseProvider):
     def __init__(self, base_url: str = "http://localhost:11434"):
+        """Store the Ollama server base URL; no API key is used."""
         super().__init__(api_key="") # Ollama usually doesn't need an API key
         self.base_url = base_url
 
     @property
     def provider_name(self) -> str:
+        """Return the provider identifier "ollama"."""
         return "ollama"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
+        """Return chat text, evaluation token counts, and the raw Ollama response.
+
+        Missing text and counts default to an empty string and zero respectively;
+        cost is always zero. HTTP, JSON decoding, and response processing errors
+        propagate.
+        """
         start_time = time.time()
 
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
@@ -55,6 +63,11 @@ class OllamaProvider(BaseProvider):
         )
 
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+        """Yield message content from streamed Ollama JSON lines, including empty text.
+
+        HTTP, JSON decoding, and response processing errors propagate, possibly
+        after yielding text.
+        """
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
         async with httpx.AsyncClient() as client:
@@ -81,6 +94,11 @@ class OllamaProvider(BaseProvider):
                             yield data["message"]["content"]
 
     async def check_health(self) -> ProviderHealth:
+        """Probe the tags endpoint with a five-second HTTP timeout.
+
+        Return health with latency in milliseconds; exceptions become an unhealthy
+        result containing the error message.
+        """
         start_time = time.time()
         try:
             async with httpx.AsyncClient() as client:
@@ -92,4 +110,5 @@ class OllamaProvider(BaseProvider):
             return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
+        """Estimate tokens as 1.3 times the whitespace word count, rounded down."""
         return int(len(text.split()) * 1.3)
