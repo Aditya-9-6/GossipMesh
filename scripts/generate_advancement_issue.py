@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DevProxy Architecture Advancement Issue Generator Engine
+GossipMesh Architecture Advancement Issue Generator Engine
 Autonomous issue generator bot for continuous open-source contribution & architectural advancement.
 Features:
 - Curated high-impact systems engineering catalog
@@ -11,8 +11,9 @@ Features:
 """
 
 import json
-import os
 import subprocess
+import os
+
 import sys
 import time
 import urllib.request
@@ -23,77 +24,35 @@ from pathlib import Path
 DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"]
 
-# Curated catalog of high-impact open-source architecture advancements for DevProxy (Go)
+# Curated catalog of high-impact open-source architecture advancements for GossipMesh (Python)
 CATALOG = [
     {
-        "title": "feat(tls): Add JA4+ TLS Client Fingerprinting & Bot Classifier",
-        "area": "area/security",
+        "title": "feat(p2p): Implement Kademlia DHT for Peer Discovery",
+        "area": "area/p2p",
         "difficulty": "enhancement",
-        "spec": "Capture TLS ClientHello extension lists, cipher suites, ALPN protocols, and signature algorithms to generate standard JA4 and JA4S fingerprints. Implement an in-memory classifier to flag suspicious client fingerprints diverging from claimed User-Agent headers.",
-        "target_files": ["pkg/proxy/proxy.go", "pkg/analysis/rules.go", "pkg/ringbuffer/event.go"]
+        "spec": "Replace static peer configuration with a distributed hash table (DHT) based on Kademlia. Implement XOR metric routing and bucket updates for active peers.",
+        "target_files": ["gossipmesh/p2p/dht.py", "gossipmesh/p2p/node.py"]
     },
     {
-        "title": "feat(proxy): Add gRPC & Protobuf Binary Stream Decoder in Dashboard",
-        "area": "area/proxy",
+        "title": "feat(consensus): Add Byzantine Fault Tolerant (BFT) Voting Quorum",
+        "area": "area/consensus",
+        "difficulty": "priority/high",
+        "spec": "Implement a 2/3 majority BFT voting mechanism for architectural proposals. Ensure that malicious or lagging nodes cannot disrupt the consensus state.",
+        "target_files": ["gossipmesh/consensus/bft.py", "tests/test_bft.py"]
+    },
+    {
+        "title": "feat(agents): Integrate Local LLM Fallback via Llama.cpp",
+        "area": "area/agents",
+        "difficulty": "good first issue",
+        "spec": "Add a fallback completion provider that uses local Llama.cpp bindings when the Gemini API is rate-limited or unavailable, preserving autonomy.",
+        "target_files": ["gossipmesh/agents/llm.py"]
+    },
+    {
+        "title": "feat(core): Zero-Copy Vector Clock Synchronization",
+        "area": "area/core",
         "difficulty": "enhancement",
-        "spec": "Detect application/grpc and application/grpc+proto streams over HTTP/2. Parse standard 5-byte gRPC framing headers (compressed flag + 4-byte big-endian length prefix) and decode structured protobuf fields to display readable JSON in the Web Dashboard.",
-        "target_files": ["pkg/proxy/grpc.go", "pkg/dashboard/hub.go", "web/index.html"]
-    },
-    {
-        "title": "feat(proxy): Implement Upstream Dynamic Proxy Chaining (SOCKS5 & HTTP Connect)",
-        "area": "area/proxy",
-        "difficulty": "good first issue",
-        "spec": "Add support for an -upstream-proxy CLI flag supporting socks5:// and http:// corporate egress proxies. Configure http.Transport.Proxy dialer to transparently tunnel outbound proxy requests through the corporate boundary.",
-        "target_files": ["pkg/proxy/proxy.go", "cmd/devproxy/main.go"]
-    },
-    {
-        "title": "feat(tracing): Add Distributed OpenTelemetry (OTel) W3C Context Propagation",
-        "area": "area/proxy",
-        "difficulty": "good first issue",
-        "spec": "Extract incoming W3C traceparent and tracestate headers and inject them into downstream proxy requests. Record trace IDs in TrafficEvent to enable end-to-end distributed trace tracking across microservices.",
-        "target_files": ["pkg/proxy/proxy.go", "pkg/ringbuffer/event.go", "pkg/dashboard/hub.go"]
-    },
-    {
-        "title": "feat(replay): Implement Deterministic HAR (HTTP Archive) Recording and Playback",
-        "area": "area/replay",
-        "difficulty": "good first issue",
-        "spec": "Export captured ringbuffer traffic to valid HAR 1.2 format JSON files. Support a devproxy replay -har=session.har command that mocks endpoints according to previously recorded session timings and status codes.",
-        "target_files": ["pkg/replay/har.go", "pkg/mock/server.go", "cmd/devproxy/main.go"]
-    },
-    {
-        "title": "feat(security): Add SIMD-Accelerated Aho-Corasick Multi-Pattern Secret Scanner",
-        "area": "area/security",
-        "difficulty": "enhancement",
-        "spec": "Deploy pre-compiled Aho-Corasick automaton for simultaneous matching of API keys (AWS, Stripe, GitHub, OpenAI) in HTTP request bodies with sub-microsecond inspection latency.",
-        "target_files": ["pkg/analysis/rules.go", "pkg/analysis/finding.go"]
-    },
-    {
-        "title": "feat(metrics): Add Lock-Free HDR Latency Histograms for P99/P99.9 Percentiles",
-        "area": "area/proxy",
-        "difficulty": "good first issue",
-        "spec": "Implement atomic HDR histogram collection tracking P50, P90, P99, and P99.9 latency percentiles across proxy endpoints. Expose metrics at /metrics Prometheus endpoint.",
-        "target_files": ["pkg/proxy/metrics.go", "pkg/dashboard/server.go"]
-    },
-    {
-        "title": "feat(proxy): Add Dynamic Upstream Connection Pooling with Active Keepalive Probes",
-        "area": "area/proxy",
-        "difficulty": "enhancement",
-        "spec": "Implement active health-check probes on idle HTTP/1.1 and HTTP/2 upstream TCP connections in http.Transport to eliminate 502 Bad Gateway race conditions caused by silently closed server sockets.",
-        "target_files": ["pkg/proxy/proxy.go", "pkg/proxy/upstream.go"]
-    },
-    {
-        "title": "feat(waf): Add HTTP Request Smuggling (CL.TE / TE.CL) Desynchronization Detector",
-        "area": "area/security",
-        "difficulty": "enhancement",
-        "spec": "Analyze incoming request headers for conflicting Content-Length and Transfer-Encoding headers, whitespace obfuscation, and duplicate headers to detect desynchronization smuggling exploits before dispatch.",
-        "target_files": ["pkg/analysis/rules.go", "pkg/proxy/proxy.go"]
-    },
-    {
-        "title": "feat(dashboard): Add WebSocket Backpressure & Zero-Copy Packet Telemetry Streamer",
-        "area": "area/dashboard",
-        "difficulty": "good first issue",
-        "spec": "Implement bounded ring-buffer dispatch for the WebSocket hub to drop outdated telemetry frames under slow client network conditions, preventing proxy worker memory ballooning.",
-        "target_files": ["pkg/dashboard/hub.go", "pkg/dashboard/server.go"]
+        "spec": "Optimize the vector clock anti-entropy sync using efficient delta encodings and avoiding deep copies of the state ledger during peer exchanges.",
+        "target_files": ["gossipmesh/core/clocks.py", "tests/test_clocks.py"]
     }
 ]
 
@@ -101,7 +60,7 @@ def get_existing_issues():
     """Fetch existing issue titles and creation timestamps."""
     issues_info = []
     try:
-        cmd = ["gh", "issue", "list", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
+        cmd = ["gh", "issue", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         issues = json.loads(result.stdout)
         return issues
@@ -157,14 +116,15 @@ def generate_ai_advancement(existing_titles):
     if not api_key:
         return None
 
-    prompt = f"""You are the Principal Systems Software Architect of DevProxy, an ultra-high performance HTTP/HTTPS reverse proxy and network analysis engine written in Go.
+    prompt = f"""You are the Principal Systems Software Architect of GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python.
 
 Create a brand new, novel, high-impact systems engineering task for open-source contributors.
 
-STRICT QUALITY INVARIANTS:
+STRICT QUALITY INVARIANTS (ANTI-POISONING):
 1. NO TRIVIAL CHORES: Do NOT generate documentation fixes, typo corrections, dependency bumps, cosmetic UI adjustments, or trivial variable renames.
-2. PRODUCTION SYSTEMS FOCUS: Tasks must involve network protocols, high-throughput streaming, zero-allocation buffer pooling (sync.Pool), concurrency safety, security/WAF detection, distributed telemetry, or TLS cryptography.
-3. ANTI-SPAGHETTI DESIGN: Every feature must specify clean package decoupling, single-responsibility functions (<60 LOC), and zero circular dependencies.
+2. POSITIVE SYSTEM IMPACT ONLY: You MUST NOT propose any feature that introduces unnecessary dependencies, bloat, highly speculative ideas, or experimental toys that do not directly improve production stability, performance, or core decentralization properties.
+3. ANTI-SPAGHETTI DESIGN: Every feature must specify clean package decoupling, single-responsibility functions (<60 LOC), and zero circular dependencies. Avoid God classes and massive God functions. Propose solutions that increase modularity, not decrease it.
+4. PRODUCTION SYSTEMS FOCUS: Tasks must involve P2P networking, multi-agent systems, byzantine consensus, distributed ledgers, or AI prompt engineering.
 
 DO NOT duplicate any of these existing titles:
 {json.dumps(list(existing_titles)[:30], indent=2)}
@@ -172,10 +132,10 @@ DO NOT duplicate any of these existing titles:
 Output ONLY valid JSON matching this schema:
 {{
   "title": "feat(subsystem): Concise descriptive title",
-  "area": "area/proxy" or "area/security" or "area/replay" or "area/dashboard" or "area/metrics",
+  "area": "area/p2p" or "area/consensus" or "area/agents" or "area/cli" or "area/core",
   "difficulty": "good first issue" or "enhancement" or "priority/high",
-  "spec": "Clear 3-4 sentence technical specification outlining what to implement, performance invariants, zero-allocation memory constraints, and target packages.",
-  "target_files": ["pkg/proxy/...", "pkg/analysis/..."]
+  "spec": "Clear 3-4 sentence technical specification outlining what to implement, performance invariants, and target packages.",
+  "target_files": ["gossipmesh/...", "tests/..."]
 }}
 """
     payload = {
@@ -212,12 +172,12 @@ Output ONLY valid JSON matching this schema:
 def create_issue(item):
     """Create a structured GitHub issue with strict anti-spaghetti warnings."""
     title = item["title"]
-    area = item.get("area", "area/proxy")
+    area = item.get("area", "area/p2p")
     difficulty = item.get("difficulty", "good first issue")
     spec = item["spec"]
     target_files = item.get("target_files", [])
 
-    target_files_md = "\n".join(f"- `{f}`" for f in target_files) if target_files else "- Relevant files in `pkg/`"
+    target_files_md = "\n".join(f"- `{f}`" for f in target_files) if target_files else "- Relevant files in `gossipmesh/`"
 
     body = f"""## 🚀 Architecture Advancement Specification
 
@@ -227,38 +187,37 @@ def create_issue(item):
 ### 🎯 Subsystem & Domain
 - **Domain**: `{area}`
 - **Difficulty**: `{difficulty}`
-- **Initiative**: Hacktoberfest / Sovereign High-Performance DevProxy Advancement
+- **Initiative**: Hacktoberfest / Sovereign High-Performance GossipMesh Advancement
 
 ### 📂 Target Files & Modules
 {target_files_md}
 
-### 📋 Technical Acceptance Criteria
-- [ ] Conforms to DevProxy's zero-allocation streaming patterns (utilize `sync.Pool` for buffers).
-- [ ] Maintains deterministic performance ($O(1)$ lookup or $O(N)$ streaming throughput).
-- [ ] Concurrency safety verified: zero data races, proper mutex/atomic synchronization, no goroutine leaks on context cancellation.
+### 📋 Technical Acceptance Criteria & Architectural Sanity Checklist
+- [ ] Conforms to GossipMesh's robust Python engineering patterns.
+- [ ] Feature has a positive system impact and does not introduce bloat, unnecessary dependencies, or highly speculative experimental code.
+- [ ] Concurrency safety verified: proper async/await usage if applicable, zero data races.
 - [ ] Unit tests added covering normal operation, boundary conditions, and error branches.
-- [ ] Code formatted with `gofmt` and static checks clean (`go vet ./...`).
+- [ ] Code formatted with `black` and static checks clean (`flake8 .`).
 
 ---
 
-### 🍝 Anti-Spaghetti Code Warning & Architecture Invariants
-> ⚠️ **STRICT CODE REVIEWER STANDARDS**: Any implementation that introduces spaghetti code will be automatically rejected by the Autonomous Reviewer Bot!
+### 🍝 Anti-Spaghetti Code & Anti-Poisoning Warning
+> ⚠️ **STRICT CODE REVIEWER STANDARDS**: Any implementation that introduces spaghetti code, architectural regressions, or negative system impacts will be automatically rejected by the Autonomous Reviewer Bot!
 > 
-> - **Modular Architecture**: Keep functions concise (<60 LOC), single-purpose, and decoupled across `pkg/proxy`, `pkg/analysis`, `pkg/ringbuffer`, `pkg/dashboard`.
-> - **Zero Data Races**: Enforce thread safety using `sync.RWMutex`, `sync.Once`, atomic values, or Go channels. Goroutines must terminate cleanly on `ctx.Done()`.
-> - **Zero-Allocation Hot Paths**: Utilize `sync.Pool` for byte buffers (`[]byte`). Avoid heap allocations on proxy request forwarding loops.
-> - **Streaming Invariants**: Stream payloads via `io.Reader`/`io.Writer` rather than buffering whole multi-megabyte payloads in memory.
-> - **Table-Driven Tests**: Provide comprehensive Go unit tests covering happy paths, edge cases, and error branches.
+> - **Modular Architecture**: Keep functions concise (<60 LOC), single-purpose, and decoupled across `gossipmesh/` modules. No God classes.
+> - **Dependency Hygiene**: Do not introduce heavy or unnecessary third-party dependencies unless strictly required for core functionality.
+> - **Zero Data Races**: Enforce thread/async safety.
+> - **Comprehensive Tests**: Provide comprehensive Python unit tests covering happy paths, edge cases, and error branches.
 
 ### 🛠️ Getting Started
 1. Fork the repository and create a branch: `git checkout -b feature/{area.replace('area/', '')}-advancement`
-2. Run local tests: `go test -v ./...`
-3. When ready, open a PR. Comment `@devproxy-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
+2. Run local tests: `python -m unittest discover`
+3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
 
     labels = f"{area},{difficulty},hacktoberfest,advancement"
     cmd = [
-        "gh", "issue", "create",
+        "gh", "issue", "create", "--repo", "Aditya-9-6/GossipMesh",
         "--title", title,
         "--body", body,
         "--label", labels
