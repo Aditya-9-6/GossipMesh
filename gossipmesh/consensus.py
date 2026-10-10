@@ -58,9 +58,10 @@ class ConsensusResult:
 
 class ByzantineConsensusEngine:
     """Enforces Byzantine Fault Tolerant quorum across multi-model peer audits."""
-    def __init__(self, quorum_threshold: float = 0.66, min_score_threshold: int = 85):
+    def __init__(self, quorum_threshold: float = 0.66, min_score_threshold: int = 85, model_weights: Optional[Dict[str, float]] = None):
         self.quorum_threshold = quorum_threshold
         self.min_score_threshold = min_score_threshold
+        self.model_weights = model_weights
 
     def evaluate(self, votes: List[ModelVote]) -> ConsensusResult:
         if not votes:
@@ -73,9 +74,15 @@ class ByzantineConsensusEngine:
                 combined_suggestions=[]
             )
 
-        approvals = sum(1 for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
-        approval_ratio = approvals / len(votes)
-        avg_score = sum(v.score for v in votes) / len(votes)
+        if self.model_weights:
+            total_weight = sum(self.model_weights.get(v.model_name, 1.0) for v in votes)
+            approvals_weight = sum(self.model_weights.get(v.model_name, 1.0) for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
+            approval_ratio = approvals_weight / total_weight if total_weight > 0 else 0.0
+            avg_score = sum(v.score * self.model_weights.get(v.model_name, 1.0) for v in votes) / total_weight if total_weight > 0 else 0.0
+        else:
+            approvals = sum(1 for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
+            approval_ratio = approvals / len(votes)
+            avg_score = sum(v.score for v in votes) / len(votes)
 
         all_concerns = []
         all_suggestions = []

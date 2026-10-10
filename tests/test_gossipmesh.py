@@ -87,6 +87,55 @@ class TestGossipMesh(unittest.TestCase):
         self.assertFalse(fail_result.is_approved)
         self.assertIn("Severe data race in map access", fail_result.combined_concerns)
 
+        # Weighted model consensus
+        weighted_engine = ByzantineConsensusEngine(
+            quorum_threshold=0.66,
+            min_score_threshold=80,
+            model_weights={"flash-3.8": 0.5, "pro-3.1": 2.0, "lite-3.1": 0.5}
+        )
+        weighted_result = weighted_engine.evaluate(divided_votes)
+        self.assertFalse(weighted_result.is_approved)
+        # Weight calculations:
+        # total_weight = 0.5 + 2.0 + 0.5 = 3.0
+        # approvals_weight = 0.5 (only flash-3.8 approves and >= 80)
+        # approval_ratio = 0.5 / 3.0 ≈ 0.166... which is < 0.66
+        self.assertLess(weighted_result.approval_ratio, 0.2)
+
+    def test_node_cleanup_ledger(self):
+        import time
+        import json
+        node = GossipNode("node_cleaner", mesh_dir=self.test_dir)
+
+        # Publish two messages, one recent, one artificially expired
+        msg1 = node.publish(GossipTopic.HEARTBEATS, {"status": "alive"})
+        msg2 = node.publish(GossipTopic.HEARTBEATS, {"status": "alive"})
+
+        # Artificially expire msg1 in the ledger
+        lines = []
+        with open(node.log_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        with open(node.log_file, "w", encoding="utf-8") as f:
+            for line in lines:
+                data = json.loads(line)
+                if data["message_id"] == msg1.message_id:
+                    data["timestamp"] = time.time() - (data.get("ttl", 10) * 3600 + 100) # strictly expired
+                f.write(json.dumps(data) + "\n")
+
+        # Call cleanup
+        node.cleanup_ledger()
+
+        # Verify
+        remaining = []
+        with open(node.log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                data = json.loads(line.strip())
+                remaining.append(data["message_id"])
+
+        self.assertEqual(len(remaining), 1)
+        self.assertIn(msg2.message_id, remaining)
+        self.assertNotIn(msg1.message_id, remaining)
+
     def test_red_team_auditor(self):
         auditor = RedTeamAuditor()
         bad_code = """
