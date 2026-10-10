@@ -23,7 +23,6 @@ FALLBACK_MODELS = [
     "gemini-3.1-flash-lite",
 ]
 
-SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Go, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
 You are working on GossipMesh, a high-performance, developer-first HTTP/HTTPS debugging proxy and security engine written in Python.
 
@@ -86,25 +85,27 @@ def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60
     overview.append("\n".join(selected))
     return "\n".join(overview)
 
-def get_relevant_files(workspace_root: Path, all_files: list, keywords: list) -> str:
-    """Reads contents of key files matching keywords to give context to LLM."""
+import sys
+# Add parent directory to path to import gossipmesh
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from gossipmesh.rag import VectorDB
+
+def get_relevant_files(workspace_root: Path, query_text: str) -> str:
+    """Uses VectorDB RAG to find semantically relevant files for context."""
     context_files = []
-    collected_bytes = 0
-    max_bytes = 60_000  # Keep within fast token limit
     
-    go_files = [f for f in all_files if f.endswith(".py") and not f.endswith("_test.py")]
-    go_files = [f for f in all_files if f.endswith(".py") and not "test_" in f]
-    for rel_path in go_files:
-        is_relevant = any(k.lower() in rel_path.lower() for k in keywords)
-        if is_relevant:
-            try:
-                p = workspace_root / rel_path
-                content = p.read_text(encoding="utf-8")
-                if collected_bytes + len(content) <= max_bytes:
-                    context_files.append(f"=== Existing File: {rel_path} ===\n{content}")
-                    collected_bytes += len(content)
-            except Exception:
-                pass
+    # Initialize and index workspace if not already done
+    db = VectorDB()
+    if not db.embeddings:
+        print("[*] VectorDB is empty. Indexing workspace...")
+        db.index_workspace(workspace_root)
+
+    print(f"[*] Querying VectorDB for relevant context files...")
+    results = db.search(query_text, top_k=3)
+
+    for path, content, score in results:
+        print(f"    [+] RAG hit: {path} (Similarity: {score:.2f})")
+        context_files.append(f"=== Existing File: {path} ===\n{content}")
                 
     return "\n\n".join(context_files)
 
@@ -224,7 +225,9 @@ def main():
     print("[*] Inspecting repository context...")
     all_files = get_git_files(workspace_root)
     overview = get_repo_overview(workspace_root, all_files)
-    relevant_files = get_relevant_files(workspace_root, all_files, keywords)
+
+    query_text = f"{args.issue_title} {args.issue_body}"
+    relevant_files = get_relevant_files(workspace_root, query_text)
 
     prompt = f"""
 GitHub Issue #{args.issue_number}: {args.issue_title}
