@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Autonomous Multi-Agent GitHub Advancement Loop for DevProxy (Local Daemon & Cloud Runner)
+Autonomous Multi-Agent GitHub Advancement Loop for GossipMesh (Local Daemon & Cloud Runner)
 
 Executes the continuous hyper-scale development cycle:
 1. Dynamic Key Pooling: Rotates Gemini API keys round-robin to maximize RPM/TPM quota.
@@ -26,7 +26,7 @@ try:
 except Exception:
     pass
 
-REPO = "Aditya-9-6/DevProxy"
+REPO = "Aditya-9-6/GossipMesh"
 USER_NAME = "Aditya Dahale"
 USER_EMAIL = "aditya-9-6@users.noreply.github.com"
 
@@ -101,7 +101,7 @@ def get_open_advancement_issues(workspace: Path):
 def generate_new_issue(workspace: Path):
     """Runs the issue generator script with rotated key."""
     active_key = GLOBAL_POOL.next_key()
-    print(f"[*] Generating new architecture advancement issue for DevProxy (Key index: {GLOBAL_POOL.idx % len(GLOBAL_POOL)})...", flush=True)
+    print(f"[*] Generating new architecture advancement issue for GossipMesh (Key index: {GLOBAL_POOL.idx % len(GLOBAL_POOL)})...", flush=True)
     env = os.environ.copy()
     env["GEMINI_ISSUE_KEY"] = active_key
     env["GH_REPO"] = REPO
@@ -255,7 +255,7 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
 
 def run_loop_iteration(workspace: Path):
     """Executes a single cycle of the autonomous loop."""
-    print(f"\n--- [Autonomous DevProxy Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
+    print(f"\n--- [Autonomous GossipMesh Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
     issues = get_open_advancement_issues(workspace)
     if not issues:
         print("[*] No open advancement issues found. Generating one...", flush=True)
@@ -271,8 +271,8 @@ def run_loop_iteration(workspace: Path):
     solve_issue(workspace, target["number"], target["title"], target.get("body", ""))
 
 def main():
-    parser = argparse.ArgumentParser(description="DevProxy Autonomous Multi-Agent Daemon")
-    parser.add_argument("--workspace", default=".", help="Path to DevProxy repository root")
+    parser = argparse.ArgumentParser(description="GossipMesh Autonomous Multi-Agent Daemon")
+    parser.add_argument("--workspace", default=".", help="Path to GossipMesh repository root")
     parser.add_argument("--once", action="store_true", help="Run once and exit instead of continuous daemon")
     parser.add_argument("--interval", type=int, default=10, help="Interval in seconds between cycles (default: 10s)")
     parser.add_argument("--add-keys", nargs="*", default=[], help="Additional Gemini API keys to add to the round-robin pool")
@@ -283,12 +283,12 @@ def main():
     if args.add_keys:
         GLOBAL_POOL.add_keys(args.add_keys)
 
-    print(f"[*] DevProxy Multi-Agent Engine initialized with {len(GLOBAL_POOL)} API keys in active rotation.", flush=True)
+    print(f"[*] GossipMesh Multi-Agent Engine initialized with {len(GLOBAL_POOL)} API keys in active rotation.", flush=True)
 
     if args.once:
         run_loop_iteration(workspace)
     else:
-        print(f"[*] Starting DevProxy Continuous Autonomous Daemon (interval: {args.interval}s)...", flush=True)
+        print(f"[*] Starting GossipMesh Continuous Autonomous Daemon (interval: {args.interval}s)...", flush=True)
         while True:
             try:
                 run_loop_iteration(workspace)

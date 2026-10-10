@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DevProxy Architecture Advancement Issue Generator Engine
+GossipMesh Architecture Advancement Issue Generator Engine
 Autonomous issue generator bot for continuous open-source contribution & architectural advancement.
 Features:
 - Curated high-impact systems engineering catalog
@@ -23,7 +23,7 @@ from pathlib import Path
 DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"]
 
-# Curated catalog of high-impact open-source architecture advancements for DevProxy (Go)
+# Curated catalog of high-impact open-source architecture advancements for GossipMesh (Python)
 CATALOG = [
     {
         "title": "feat(tls): Add JA4+ TLS Client Fingerprinting & Bot Classifier",
@@ -157,7 +157,7 @@ def generate_ai_advancement(existing_titles):
     if not api_key:
         return None
 
-    prompt = f"""You are the Principal Systems Software Architect of DevProxy, an ultra-high performance HTTP/HTTPS reverse proxy and network analysis engine written in Go.
+    prompt = f"""You are the Principal Systems Software Architect of GossipMesh, an ultra-high performance HTTP/HTTPS reverse proxy and network analysis engine written in Go.
 
 Create a brand new, novel, high-impact systems engineering task for open-source contributors.
 
@@ -227,17 +227,17 @@ def create_issue(item):
 ### 🎯 Subsystem & Domain
 - **Domain**: `{area}`
 - **Difficulty**: `{difficulty}`
-- **Initiative**: Hacktoberfest / Sovereign High-Performance DevProxy Advancement
+- **Initiative**: Hacktoberfest / Sovereign High-Performance GossipMesh Advancement
 
 ### 📂 Target Files & Modules
 {target_files_md}
 
 ### 📋 Technical Acceptance Criteria
-- [ ] Conforms to DevProxy's zero-allocation streaming patterns (utilize `sync.Pool` for buffers).
+- [ ] Conforms to GossipMesh's zero-allocation streaming patterns (utilize `sync.Pool` for buffers).
 - [ ] Maintains deterministic performance ($O(1)$ lookup or $O(N)$ streaming throughput).
 - [ ] Concurrency safety verified: zero data races, proper mutex/atomic synchronization, no goroutine leaks on context cancellation.
 - [ ] Unit tests added covering normal operation, boundary conditions, and error branches.
-- [ ] Code formatted with `gofmt` and static checks clean (`go vet ./...`).
+- [ ] Code formatted with `black` and static checks clean (`flake8 .`).
 
 ---
 
@@ -252,8 +252,8 @@ def create_issue(item):
 
 ### 🛠️ Getting Started
 1. Fork the repository and create a branch: `git checkout -b feature/{area.replace('area/', '')}-advancement`
-2. Run local tests: `go test -v ./...`
-3. When ready, open a PR. Comment `@devproxy-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
+2. Run local tests: `python -m unittest discover`
+3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
 
     labels = f"{area},{difficulty},hacktoberfest,advancement"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Autonomous CI Test & Build Auto-Fixer for DevProxy
+Autonomous CI Test & Build Auto-Fixer for GossipMesh
 Analyzes failing compiler, test, or lint errors, queries Google Gemini AI,
 applies the fix, and verifies that tests pass before pushing.
 Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tests.
@@ -26,14 +26,14 @@ FALLBACK_MODELS = [
     "gemini-3.7-flash",
 ]
 
-SYSTEM_PROMPT = """You are an expert autonomous Go systems engineer and compiler repair agent for DevProxy.
-Your mission is to fix failing Go build errors, compiler errors, data races, broken unit tests, AND refactor spaghetti code based on AI Reviewer feedback.
+SYSTEM_PROMPT = """You are an expert autonomous Python systems engineer and compiler repair agent for GossipMesh.
+Your mission is to fix failing Python build errors, compiler errors, data races, broken unit tests, AND refactor spaghetti code based on AI Reviewer feedback.
 
 CRITICAL RULES:
 1. ANTI-SPAGHETTI & MODULARITY: Ensure functions are concise (<60 LOC), single-purpose, and decoupled. Refactor any tangled or duplicate logic identified by the reviewer.
 2. PRESERVE EXISTING INTERFACES & EXPORTS: Never remove or omit existing structs, interfaces, methods, or helper functions that other files or packages depend on.
-3. COMPILE-READY CODE: All files must be syntactically valid Go, with correct imports, correct types, and no undefined identifiers.
-4. CONCURRENCY & PERFORMANCE: Maintain DevProxy's zero-allocation streaming patterns (sync.Pool) and race-free concurrency.
+3. COMPILE-READY CODE: All files must be syntactically valid Python, with correct imports, correct types, and no undefined identifiers.
+4. CONCURRENCY & PERFORMANCE: Maintain GossipMesh's zero-allocation streaming patterns (sync.Pool) and race-free concurrency.
 5. UNIT TEST GENERATION: Add comprehensive unit tests covering newly added functions, edge cases, and error branches.
 6. COMPLETE FILE CONTENT: When updating a file, provide the COMPLETE, FULL file content so it can replace the file directly.
 
@@ -43,14 +43,14 @@ Respond ONLY with a single valid JSON object and nothing else (no conversational
   "summary": "Clear explanation of how the reviewer feedback was resolved and how the code was refactored.",
   "files": [
     {
-      "path": "relative/path/to/file.go",
+      "path": "relative/path/to/file.py",
       "content": "full updated file content"
     }
   ]
 }
 """
 
-def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
+def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
     """Calls Gemini REST API with fallback models and fallback API key."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
@@ -76,7 +76,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     last_err = None
     for current_key in keys_to_try:
         for current_model in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
+            url = f"https://generativelanguage.pyogleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
                 "contents": [
                     {
@@ -145,26 +145,26 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
 
 def run_diagnostics(workspace: Path) -> tuple[int, str]:
     """Runs compiler and test suite, returning exit code and combined error output."""
-    print("[*] Running local diagnostic checks (gofmt, go vet, go test)...", flush=True)
+    print("[*] Running local diagnostic checks (black, go vet, go test)...", flush=True)
     out_lines = []
 
-    # Check gofmt
-    fmt_res = subprocess.run(["gofmt", "-l", "."], cwd=workspace, capture_output=True, text=True)
+    # Check black
+    fmt_res = subprocess.run(["black", "-l", "."], cwd=workspace, capture_output=True, text=True)
     if fmt_res.stdout.strip():
-        out_lines.append("=== GOFMT FORMATTING ERRORS ===")
+        out_lines.append("=== BLACK FORMATTING ERRORS ===")
         out_lines.append(f"Unformatted files:\n{fmt_res.stdout.strip()}\n")
 
     # Check go vet
     vet_res = subprocess.run(["go", "vet", "./..."], cwd=workspace, capture_output=True, text=True)
     if vet_res.returncode != 0:
-        out_lines.append("=== GO VET COMPILATION / STATIC ANALYSIS ERRORS ===")
+        out_lines.append("=== FLAKE8 COMPILATION / STATIC ANALYSIS ERRORS ===")
         out_lines.append(vet_res.stderr.strip() or vet_res.stdout.strip())
         out_lines.append("")
 
     # Check go test
     test_res = subprocess.run(["go", "test", "-v", "./..."], cwd=workspace, capture_output=True, text=True)
     if test_res.returncode != 0:
-        out_lines.append("=== GO TEST FAILURES ===")
+        out_lines.append("=== PYTHON TEST FAILURES ===")
         combined = (test_res.stdout + "\n" + test_res.stderr).strip()
         out_lines.append(combined)
 
@@ -175,14 +175,14 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
     """Extracts Go file paths referenced in logs or diff."""
     found = set()
-    pattern = re.compile(r'([\w/\\.-]+\.go)(?::\d+)?')
+    pattern = re.compile(r'([\w/\\.-]+\.py)(?::\d+)?')
     for match in pattern.finditer(error_log):
         rel_str = match.group(1).replace("\\", "/")
         p = workspace / rel_str
         if p.is_file():
             found.add(rel_str)
         else:
-            for sub in workspace.rglob("*.go"):
+            for sub in workspace.rglob("*.py"):
                 if sub.name == Path(rel_str).name:
                     try:
                         found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
@@ -194,7 +194,7 @@ def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
         diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
         for line in diff_names.stdout.splitlines():
             line = line.strip().replace("\\", "/")
-            if line.endswith(".go") and (workspace / line).is_file():
+            if line.endswith(".py") and (workspace / line).is_file():
                 found.add(line)
     except Exception:
         pass
@@ -218,7 +218,7 @@ def get_pr_diff(workspace: Path) -> str:
     return "No git diff available."
 
 def main():
-    parser = argparse.ArgumentParser(description="DevProxy Autonomous CI Auto-Fixer & Architectural Refactorer")
+    parser = argparse.ArgumentParser(description="GossipMesh Autonomous CI Auto-Fixer & Architectural Refactorer")
     parser.add_argument("--pr-number", required=True, help="GitHub Pull Request Number")
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
     parser.add_argument("--error-log-file", default="", help="Optional pre-captured error log file")
@@ -319,7 +319,7 @@ Instructions:
             print(f"    [+] Wrote fixed file: {rel_path}")
 
         # Step 5: Format & verify
-        subprocess.run(["gofmt", "-w", "."], cwd=workspace)
+        subprocess.run(["black", "-w", "."], cwd=workspace)
         post_code, post_errors = run_diagnostics(workspace)
         if post_code == 0:
             print(f"[SUCCESS] Build and tests passed cleanly after pass {iteration}!")
