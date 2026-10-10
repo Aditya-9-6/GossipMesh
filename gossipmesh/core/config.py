@@ -23,12 +23,10 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URI(self) -> PostgresDsn | str:
-        """Build a PostgreSQL URL from settings without escaping its components."""
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     @property
     def REDIS_URI(self) -> str:
-        """Return the configured Redis URL using database 0."""
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)

@@ -16,5 +16,4 @@ class UserResponse(BaseModel):
 def read_user_me(
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Return the authenticated user for profile serialization."""
     return current_user

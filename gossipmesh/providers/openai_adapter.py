@@ -8,21 +8,14 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 
 class OpenAIProvider(BaseProvider):
     def __init__(self, api_key: str):
-        """Create an asynchronous OpenAI client using the supplied API key."""
         super().__init__(api_key)
         self.client = AsyncOpenAI(api_key=self.api_key)
 
     @property
     def provider_name(self) -> str:
-        """Return the provider identifier "openai"."""
         return "openai"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        """Return the first completion's text, reported token usage, and raw response.
-
-        The cost estimate is always zero. SDK and response processing errors
-        propagate.
-        """
         start_time = time.time()
 
         formatted_messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
@@ -52,10 +45,6 @@ class OpenAIProvider(BaseProvider):
         )
 
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
-        """Yield nonempty text deltas from the first choice in each streamed chunk.
-
-        SDK and stream processing errors propagate, possibly after yielding text.
-        """
         formatted_messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         stream = await self.client.chat.completions.create(
             model=request.model,
@@ -70,10 +59,6 @@ class OpenAIProvider(BaseProvider):
                 yield chunk.choices[0].delta.content
 
     async def check_health(self) -> ProviderHealth:
-        """Probe the models API and return health with latency in milliseconds.
-
-        Exceptions become an unhealthy result containing the error message.
-        """
         start_time = time.time()
         try:
             # simple models query to check auth and network
@@ -84,11 +69,6 @@ class OpenAIProvider(BaseProvider):
             return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
-        """Count tokens with cl100k_base, independently of the requested model.
-
-        Tokenizer errors propagate, including ValueError for disallowed special
-        token text.
-        """
         # Defaulting to cl100k_base which is used by most modern OpenAI models (GPT-4, 3.5-turbo)
         encoding = tiktoken.get_encoding("cl100k_base")
         return len(encoding.encode(text))

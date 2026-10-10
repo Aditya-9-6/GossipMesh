@@ -20,12 +20,6 @@ class Token(BaseModel):
 def login_access_token(
     db: Session = Depends(deps.get_db), form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
-    """Return a bearer access token after authenticating an active user.
-
-    The form's username is the user's email address. Raise HTTP 400 for
-    incorrect credentials or an inactive account. Database, password
-    verification, and token encoding errors propagate.
-    """
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")

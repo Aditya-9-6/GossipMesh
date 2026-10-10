@@ -7,23 +7,14 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 
 class AnthropicProvider(BaseProvider):
     def __init__(self, api_key: str):
-        """Create an asynchronous Anthropic client using the supplied API key."""
         super().__init__(api_key)
         self.client = AsyncAnthropic(api_key=self.api_key)
 
     @property
     def provider_name(self) -> str:
-        """Return the provider identifier "anthropic"."""
         return "anthropic"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        """Return the first content block's text and reported token usage.
-
-        Use only the first system message as the system prompt, excluding all
-        system messages from the conversation. The cost estimate is zero and
-        raw_response contains only the response ID and type. SDK errors and
-        errors accessing a non-text content block propagate.
-        """
         start_time = time.time()
 
         # Anthropic separates system prompts from the main messages list
@@ -60,11 +51,6 @@ class AnthropicProvider(BaseProvider):
         )
 
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
-        """Yield text chunks using only the first system message as the system prompt.
-
-        All system messages are excluded from the conversation. SDK and stream
-        processing errors propagate, possibly after yielding text.
-        """
         system_prompt = next((msg.content for msg in request.messages if msg.role == "system"), "")
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages if msg.role != "system"]
 
@@ -80,11 +66,6 @@ class AnthropicProvider(BaseProvider):
                 yield text
 
     async def check_health(self) -> ProviderHealth:
-        """Probe Claude 3 Haiku with a generation request capped at one output token.
-
-        Return health with latency in milliseconds; exceptions become an unhealthy
-        result containing the error message.
-        """
         start_time = time.time()
         try:
             # simple ping query
@@ -99,7 +80,6 @@ class AnthropicProvider(BaseProvider):
             return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
-        """Estimate tokens as 1.3 times the whitespace word count, rounded down."""
         # Client side token counting for Anthropic is typically done via their API,
         # but for local approximation we can use an average word-to-token ratio
         return int(len(text.split()) * 1.3)

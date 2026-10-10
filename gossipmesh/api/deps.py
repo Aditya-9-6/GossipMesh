@@ -14,7 +14,6 @@ reusable_oauth2 = OAuth2PasswordBearer(
 )
 
 def get_db() -> Generator:
-    """Yield a database session and close it when the dependency exits."""
     try:
         db = SessionLocal()
         yield db
@@ -24,12 +23,6 @@ def get_db() -> Generator:
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
 ) -> User:
-    """Return the user identified by the bearer token's subject.
-
-    Raise HTTP 403 for an invalid token or missing subject and HTTP 404 if
-    no user matches. Inactive users are returned without an activity check.
-    Database query errors propagate.
-    """
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]

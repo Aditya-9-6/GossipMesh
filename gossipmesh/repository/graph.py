@@ -4,17 +4,12 @@ from typing import Dict, Any
 
 class ArchitectureGraph:
     def __init__(self):
-        """Initialize an empty directed dependency graph."""
         self.graph = nx.DiGraph()
 
     def build_from_files(self, files: Dict[str, str]):
-        """Add Python files and their top-level imports to the existing graph.
-
-        Map each filepath to its source text. Only .py paths are processed;
-        invalid Python remains as a file node without new import edges.
-        Import targets replace dots with slashes and append .py, without
-        resolving relative imports or checking whether targets exist.
-        Existing nodes and edges are retained.
+        """
+        Builds a dependency graph from a dictionary of filepath -> content.
+        Very basic implementation looking for 'import' and 'from ... import'.
         """
         for filepath, content in files.items():
             if not filepath.endswith(".py"):
@@ -38,13 +33,11 @@ class ArchitectureGraph:
                 pass
 
     def get_dependencies(self, filepath: str) -> list:
-        """Return direct import targets, or an empty list for an unknown filepath."""
         if filepath in self.graph:
             return list(self.graph.successors(filepath))
         return []
 
     def get_dependents(self, filepath: str) -> list:
-        """Return direct importers, or an empty list for an unknown filepath."""
         if filepath in self.graph:
             return list(self.graph.predecessors(filepath))
         return []

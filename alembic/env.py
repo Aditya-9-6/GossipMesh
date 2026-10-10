@@ -17,14 +17,9 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def get_url():
-    """Return the database URL assembled from the application settings."""
     return str(settings.DATABASE_URI)
 
 def run_migrations_offline() -> None:
-    """Emit migration SQL without opening a database connection.
-
-    Migration errors propagate to the caller.
-    """
     url = get_url()
     context.configure(
         url=url,
@@ -36,10 +31,6 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
-    """Run migrations against the configured database in a transaction.
-
-    Connection and migration errors propagate to the caller.
-    """
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = get_url()
     connectable = engine_from_config(

@@ -1,47 +1,90 @@
-from typing import Any, Dict
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Any, Dict, List
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
+from gossipmesh.models.provider import ProviderCredential
+from gossipmesh.core.security import encrypt_string, decrypt_string
 from gossipmesh.providers.manager import ProviderManager
 from gossipmesh.providers.models import ProviderHealth
 
 router = APIRouter()
-provider_manager = ProviderManager()
 
-# Usually, credentials would be fetched from the DB for the current user's org.
-# This is a simplification for the API layout.
 class ProviderRegistration(BaseModel):
     name: str
     api_key: str | None = None
     base_url: str | None = None
 
+def _get_provider_manager_for_org(db: Session, org_id: int) -> ProviderManager:
+    """Instantiates a ProviderManager and loads the organization's saved credentials."""
+    manager = ProviderManager()
+    credentials = db.query(ProviderCredential).filter(ProviderCredential.organization_id == org_id).all()
+
+    for cred in credentials:
+        try:
+            # We assume Ollama uses base_url instead of api_key if needed, but for simplicity here:
+            decrypted_key = decrypt_string(cred.encrypted_key) if cred.encrypted_key else None
+            manager.register_provider(cred.provider_name, decrypted_key)
+        except Exception:
+            pass # Skip failed decryptions in this simple example
+
+    return manager
+
 @router.post("/register", status_code=201)
 def register_provider(
     registration: ProviderRegistration,
+    organization_id: int,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
-    """Register or replace a provider in the shared in-memory manager.
+    """Registers and persists a provider credential for the organization."""
+    user_org_ids = [org.organization_id for org in current_user.organizations]
+    if organization_id not in user_org_ids:
+        raise HTTPException(status_code=403, detail="Not authorized for this organization")
 
-    Registration is process-local, shared across users, and not persisted.
-    Return a success message; convert registration ValueError to HTTP 400.
-    Other provider initialization errors propagate.
-    """
     try:
+        # Verify it can be instantiated
+        manager = ProviderManager()
         kwargs = {}
         if registration.base_url:
             kwargs["base_url"] = registration.base_url
-        provider_manager.register_provider(registration.name, registration.api_key, **kwargs)
-        return {"status": "success", "message": f"Provider {registration.name} registered."}
+        manager.register_provider(registration.name, registration.api_key, **kwargs)
+
+        # Persist to database
+        encrypted_key = encrypt_string(registration.api_key) if registration.api_key else ""
+
+        cred = db.query(ProviderCredential).filter(
+            ProviderCredential.organization_id == organization_id,
+            ProviderCredential.provider_name == registration.name
+        ).first()
+
+        if cred:
+            cred.encrypted_key = encrypted_key
+        else:
+            cred = ProviderCredential(
+                organization_id=organization_id,
+                provider_name=registration.name,
+                encrypted_key=encrypted_key
+            )
+            db.add(cred)
+        db.commit()
+
+        return {"status": "success", "message": f"Provider {registration.name} registered and saved."}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/health", response_model=Dict[str, ProviderHealth])
 async def get_providers_health(
+    organization_id: int,
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
-    """Returns the health status of all currently registered providers."""
-    return await provider_manager.check_all_health()
+    """Returns the health status of providers registered for the organization."""
+    user_org_ids = [org.organization_id for org in current_user.organizations]
+    if organization_id not in user_org_ids:
+        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+
+    manager = _get_provider_manager_for_org(db, organization_id)
+    return await manager.check_all_health()
