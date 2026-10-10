@@ -267,7 +267,7 @@ def set_commit_status(head_sha: str, state: str, description: str, context: str 
         print(f"[Warning] Failed to set commit status: {e}", file=sys.stderr)
 
 def main():
-    parser = argparse.ArgumentParser(description="DevProxy Autonomous PR Reviewer & Architectural Gate")
+    parser = argparse.ArgumentParser(description="GossipMesh Autonomous PR Reviewer & Architectural Gate")
     parser.add_argument("--pr-number", required=True, help="GitHub Pull Request Number")
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
     args = parser.parse_args()
@@ -299,7 +299,7 @@ def main():
 
     # Fetch GossipMesh Memetic Knowledge
     kb = MemeticKnowledgeBase()
-    meme_context = kb.format_prompt_context(repo="DevProxy")
+    meme_context = kb.format_prompt_context(repo="GossipMesh")
 
     # Run Red Team Adversarial Audit
     auditor = RedTeamAuditor()
@@ -325,7 +325,7 @@ def main():
         red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
 
 
-    prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for DevProxy:
+    prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
 {meme_context}
 
@@ -402,7 +402,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
 
-**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to DevProxy's anti-spaghetti, concurrency, and performance invariants!
+**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
 ### 🌐 Architectural System Impact Report
 {system_impact}
