@@ -96,9 +96,6 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
       "description": "Short description of the fix (e.g. formatting, bounds check).",
       "patch": "Valid diff / git patch"
     }
-  "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
-  "action_items": [
-    "Specific refactoring step or improvement needed (empty list if APPROVED)"
   ]
 }
 """
