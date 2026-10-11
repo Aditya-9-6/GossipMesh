@@ -25,11 +25,10 @@ from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.semantic_cache import SemanticCache
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3.1-pro-preview",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
 
 REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance HTTP/HTTPS proxy and security engine in Python).
@@ -439,7 +438,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     votes = []
 
     # We call our fallback models to get multiple votes
-    models_to_poll = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
+    models_to_poll = ["gemini-2.5-pro", "gemini-1.5-pro"]
 
     for model in models_to_poll:
         try:
