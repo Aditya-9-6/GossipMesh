@@ -16,11 +16,10 @@ import time
 import hashlib
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.1-pro-preview",
-    "gemini-3.1-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
 
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
