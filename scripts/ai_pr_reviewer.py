@@ -21,6 +21,8 @@ from pathlib import Path
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.memetic import MemeticKnowledgeBase
+import json
+
 from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.semantic_cache import SemanticCache
@@ -511,7 +513,63 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
     auto_patch_md = f"\n### 🛠️ Auto-Generated Patch\n```diff\n{auto_patch}\n```\n" if auto_patch else ""
 
+
+    # Memetic memory extraction
+    meme_prompt = f"""
+    Based on the following code review outcome, extract a core architectural rule or invariant (a 'meme') that we should remember for future PRs.
+
+    Outcome: {"APPROVED (Positive Meme)" if is_approved else "REJECTED (Negative Meme / Anti-Pattern)"}
+
+    Code Context: {concurrency_sec} {perf_mem}
+    Action Items (if any): {action_items}
+
+    Respond ONLY in valid JSON matching this schema exactly:
+    {{
+      "meme_id": "a_snake_case_short_id",
+      "title": "Short descriptive title",
+      "rule": "The core invariant or rule to follow",
+      "anti_pattern": "What to avoid doing",
+      "correct_pattern": "What to do instead"
+    }}
+    """
+
+    try:
+        meme_result = call_gemini(primary_key, meme_prompt, fallback_key=fallback_key, model=DEFAULT_MODEL)
+
+        # In case the result is returned as text from our wrapper, parse it
+        if isinstance(meme_result, str):
+            try:
+                if meme_result.startswith("```"):
+                    lines = meme_result.splitlines()
+                    if lines and lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    meme_result = "\n".join(lines).strip()
+                meme_result = json.loads(meme_result)
+            except Exception:
+                meme_result = {}
+
+        if meme_result and "meme_id" in meme_result:
+            m_id = meme_result["meme_id"]
+            kb.record_or_update(
+                meme_id=m_id,
+                title=meme_result.get("title", m_id),
+                rule=meme_result.get("rule", ""),
+                anti_pattern=meme_result.get("anti_pattern", ""),
+                correct_pattern=meme_result.get("correct_pattern", ""),
+                repo="GossipMesh"
+            )
+            if score >= 95:
+                kb.reward(m_id)
+            elif not is_approved:
+                kb.penalize(m_id)
+            print(f"[*] Distilled new memetic knowledge: {m_id} (Approved: {is_approved})")
+    except Exception as e:
+        print(f"[Warning] Failed to extract memetic knowledge: {e}")
+
     # Format Markdown Review
+
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
 

@@ -89,6 +89,7 @@ import sys
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.rag import VectorDB
+from gossipmesh.memetic import MemeticKnowledgeBase
 
 def get_relevant_files(workspace_root: Path, query_text: str) -> str:
     """Uses VectorDB RAG to find semantically relevant files for context."""
@@ -229,6 +230,10 @@ def main():
     query_text = f"{args.issue_title} {args.issue_body}"
     relevant_files = get_relevant_files(workspace_root, query_text)
 
+    # Memetic Knowledge Injection
+    kb = MemeticKnowledgeBase()
+    meme_context = kb.format_prompt_context(repo="GossipMesh")
+
     prompt = f"""
 GitHub Issue #{args.issue_number}: {args.issue_title}
 
@@ -240,6 +245,8 @@ GitHub Issue #{args.issue_number}: {args.issue_title}
 
 ### Relevant Existing Source Files:
 {relevant_files if relevant_files else "No directly matching files found. Implement new package or integrate into existing packages."}
+
+{meme_context}
 
 Instructions:
 1. Implement the feature or fix specified in the issue.
