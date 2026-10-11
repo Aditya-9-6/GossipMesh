@@ -37,3 +37,6 @@ gossipmesh = "gossipmesh.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["gossipmesh*"]
+
+[project.optional-dependencies]
+api = ["fastapi", "httpx"]
