@@ -20,8 +20,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-3.8-flash"
-FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"]
+DEFAULT_MODEL = "gemini-1.5-flash-lite"
+FALLBACK_MODELS = ["gemini-1.5-flash-lite", "gemini-1.5-flash"]
 
 # Curated catalog of high-impact open-source architecture advancements for GossipMesh (Python)
 CATALOG = [
@@ -192,6 +192,7 @@ def create_issue(item):
 {target_files_md}
 
 ### 📋 Technical Acceptance Criteria
+### 📋 Technical Acceptance Criteria & Architectural Sanity Checklist
 - [ ] Conforms to GossipMesh's robust Python engineering patterns.
 - [ ] Feature has a positive system impact and does not introduce bloat, unnecessary dependencies, or highly speculative experimental code.
 - [ ] Concurrency safety verified: proper async/await usage if applicable, zero data races.

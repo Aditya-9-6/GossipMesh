@@ -40,3 +40,6 @@ build/
 
 .gossip_mesh/
 G:/
+# Database
+*.db
+*.sqlite3

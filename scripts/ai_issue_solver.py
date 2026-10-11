@@ -16,11 +16,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.1-pro-preview",
-    "gemini-3.1-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
 
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
@@ -85,9 +84,80 @@ def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60
     overview.append("\n".join(selected))
     return "\n".join(overview)
 
+import sys
+import ast
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.rag import VectorDB
+from gossipmesh.memetic import MemeticKnowledgeBase
+
+def summarize_python_file(content: str) -> str:
+    """Parses a Python file and returns its imports and function/class signatures with docstrings."""
+    summary = []
+    try:
+        tree = ast.parse(content)
+
+        # Helper to unparse signature without body
+        def get_signature_and_doc(node, indent=0):
+            node_copy = ast.copy_location(type(node)(), node)
+            for field, value in ast.iter_fields(node):
+                if field != 'body':
+                    setattr(node_copy, field, value)
+
+            # replace body with pass
+            node_copy.body = [ast.Pass()]
+
+            sig = ast.unparse(node_copy).strip()
+            # remove the 'pass'
+            if sig.endswith('pass'):
+                 sig = sig[:-4].strip()
+
+            lines = [(" " * indent) + sig]
+            doc = ast.get_docstring(node)
+            if doc:
+                lines.append((" " * (indent + 4)) + f'"""{doc}"""')
+            return lines
+
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                for name in node.names:
+                    summary.append(f"import {name.name}")
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                names = ", ".join(n.name for n in node.names)
+                summary.append(f"from {module} import {names}")
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                summary.extend(get_signature_and_doc(node, 0))
+            elif isinstance(node, ast.ClassDef):
+                summary.extend(get_signature_and_doc(node, 0))
+                # Also get methods
+                for class_node in node.body:
+                    if isinstance(class_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        summary.extend(get_signature_and_doc(class_node, 4))
+    except Exception as e:
+        return f"# Error parsing python file: {e}\n{content[:1000]}"
+    return "\n".join(summary)
+
+def summarize_go_file(filepath: str, workspace_root: Path, raw_content: str) -> str:
+    """Runs the go_ast_extractor tool on a Go file to get a structural summary."""
+    try:
+        extractor_path = Path(__file__).resolve().parent / "go_ast_extractor.go"
+        target_file = workspace_root / filepath
+        res = subprocess.run(["go", "run", str(extractor_path), str(target_file)], capture_output=True, text=True, timeout=10)
+        if res.returncode == 0:
+            data = json.loads(res.stdout)
+            summary = [f"package {data.get('package', '')}", ""]
+            summary.append("import (")
+            for imp in data.get("imports", []):
+                summary.append(f"    {imp}")
+            summary.append(")")
+            summary.append("")
+            summary.extend(data.get("declarations", []))
+            return "\n".join(summary)
+        else:
+             return f"// Error parsing go file: {res.stderr}\n// Proceeding with raw context...\n{raw_content}"
+    except Exception as e:
+        return f"// Error parsing go file: {e}\n{raw_content}"
 
 
 def get_relevant_files(workspace_root: Path, query_text: str) -> str:
@@ -105,7 +175,14 @@ def get_relevant_files(workspace_root: Path, query_text: str) -> str:
 
     for path, content, score in results:
         print(f"    [+] RAG hit: {path} (Similarity: {score:.2f})")
-        context_files.append(f"=== Existing File: {path} ===\n{content}")
+        if path.endswith(".py"):
+             summarized = summarize_python_file(content)
+        elif path.endswith(".go"):
+             summarized = summarize_go_file(path, workspace_root, content)
+        else:
+             summarized = content
+
+        context_files.append(f"=== Existing File: {path} ===\n{summarized}")
                 
     return "\n\n".join(context_files)
 
@@ -229,6 +306,10 @@ def main():
     query_text = f"{args.issue_title} {args.issue_body}"
     relevant_files = get_relevant_files(workspace_root, query_text)
 
+    # Memetic Knowledge Injection
+    kb = MemeticKnowledgeBase()
+    meme_context = kb.format_prompt_context(repo="GossipMesh")
+
     prompt = f"""
 GitHub Issue #{args.issue_number}: {args.issue_title}
 
@@ -240,6 +321,8 @@ GitHub Issue #{args.issue_number}: {args.issue_title}
 
 ### Relevant Existing Source Files:
 {relevant_files if relevant_files else "No directly matching files found. Implement new package or integrate into existing packages."}
+
+{meme_context}
 
 Instructions:
 1. Implement the feature or fix specified in the issue.

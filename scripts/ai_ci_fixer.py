@@ -18,12 +18,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
 
 SYSTEM_PROMPT = """You are an expert autonomous Python systems engineer and compiler repair agent for GossipMesh.
@@ -179,25 +177,21 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
     return total_exit, combined_output
 
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
-    """Extracts Python file paths referenced in logs or diff."""
+    """Extracts Python file paths modified in diff to prevent context bloat."""
     found = set()
-    pattern = re.compile(r'([\w/\\.-]+\.py)(?::\d+)?')
-    for match in pattern.finditer(error_log):
-        rel_str = match.group(1).replace("\\", "/")
-        p = workspace / rel_str
-        if p.is_file():
-            found.add(rel_str)
-        else:
-            for sub in workspace.rglob("*.py"):
-                if sub.name == Path(rel_str).name:
-                    try:
-                        found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
-                    except ValueError:
-                        pass
 
     # Also include modified files in git status/diff
     try:
         diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
+        for line in diff_names.stdout.splitlines():
+            line = line.strip().replace("\\", "/")
+            if line.endswith(".py") and (workspace / line).is_file():
+                found.add(line)
+    except Exception:
+        pass
+
+    try:
+        diff_names = subprocess.run(["git", "diff", "--name-only", "HEAD~1"], cwd=workspace, capture_output=True, text=True)
         for line in diff_names.stdout.splitlines():
             line = line.strip().replace("\\", "/")
             if line.endswith(".py") and (workspace / line).is_file():

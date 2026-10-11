@@ -21,14 +21,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.memetic import MemeticKnowledgeBase
+import json
+
 from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.semantic_cache import SemanticCache
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3.1-pro-preview",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
 
 REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance HTTP/HTTPS proxy and security engine in Python).
@@ -95,9 +96,6 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
       "description": "Short description of the fix (e.g. formatting, bounds check).",
       "patch": "Valid diff / git patch"
     }
-  "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
-  "action_items": [
-    "Specific refactoring step or improvement needed (empty list if APPROVED)"
   ]
 }
 """
@@ -441,7 +439,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     votes = []
 
     # We call our fallback models to get multiple votes
-    models_to_poll = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"]
+    models_to_poll = ["gemini-2.5-pro", "gemini-1.5-pro"]
 
     for model in models_to_poll:
         try:
@@ -513,7 +511,63 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
     auto_patch_md = f"\n### 🛠️ Auto-Generated Patch\n```diff\n{auto_patch}\n```\n" if auto_patch else ""
 
+
+    # Memetic memory extraction
+    meme_prompt = f"""
+    Based on the following code review outcome, extract a core architectural rule or invariant (a 'meme') that we should remember for future PRs.
+
+    Outcome: {"APPROVED (Positive Meme)" if is_approved else "REJECTED (Negative Meme / Anti-Pattern)"}
+
+    Code Context: {concurrency_sec} {perf_mem}
+    Action Items (if any): {action_items}
+
+    Respond ONLY in valid JSON matching this schema exactly:
+    {{
+      "meme_id": "a_snake_case_short_id",
+      "title": "Short descriptive title",
+      "rule": "The core invariant or rule to follow",
+      "anti_pattern": "What to avoid doing",
+      "correct_pattern": "What to do instead"
+    }}
+    """
+
+    try:
+        meme_result = call_gemini(primary_key, meme_prompt, fallback_key=fallback_key, model=DEFAULT_MODEL)
+
+        # In case the result is returned as text from our wrapper, parse it
+        if isinstance(meme_result, str):
+            try:
+                if meme_result.startswith("```"):
+                    lines = meme_result.splitlines()
+                    if lines and lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    meme_result = "\n".join(lines).strip()
+                meme_result = json.loads(meme_result)
+            except Exception:
+                meme_result = {}
+
+        if meme_result and "meme_id" in meme_result:
+            m_id = meme_result["meme_id"]
+            kb.record_or_update(
+                meme_id=m_id,
+                title=meme_result.get("title", m_id),
+                rule=meme_result.get("rule", ""),
+                anti_pattern=meme_result.get("anti_pattern", ""),
+                correct_pattern=meme_result.get("correct_pattern", ""),
+                repo="GossipMesh"
+            )
+            if score >= 95:
+                kb.reward(m_id)
+            elif not is_approved:
+                kb.penalize(m_id)
+            print(f"[*] Distilled new memetic knowledge: {m_id} (Approved: {is_approved})")
+    except Exception as e:
+        print(f"[Warning] Failed to extract memetic knowledge: {e}")
+
     # Format Markdown Review
+
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
 
