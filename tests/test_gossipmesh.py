@@ -64,6 +64,18 @@ class TestGossipMesh(unittest.TestCase):
         context = kb.format_prompt_context()
         self.assertIn("GOSSIPED ARCHITECTURAL MEMES", context)
 
+    def test_byzantine_consensus_empty_votes(self):
+        engine = ByzantineConsensusEngine()
+        result = engine.evaluate([])
+
+        self.assertFalse(result.is_approved)
+        self.assertEqual(result.consensus_score, 0.0)
+        self.assertEqual(result.approval_ratio, 0.0)
+        self.assertEqual(result.votes, [])
+        self.assertEqual(result.combined_concerns, ["No model votes submitted"])
+        self.assertEqual(result.combined_suggestions, [])
+        self.assertEqual(result.avg_confidence_score, 0.0)
+
     def test_byzantine_consensus_quorum(self):
         engine = ByzantineConsensusEngine(quorum_threshold=0.66, min_score_threshold=80)
 
