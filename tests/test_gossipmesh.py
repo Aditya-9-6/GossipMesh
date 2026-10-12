@@ -64,6 +64,18 @@ class TestGossipMesh(unittest.TestCase):
         context = kb.format_prompt_context()
         self.assertIn("GOSSIPED ARCHITECTURAL MEMES", context)
 
+    def test_byzantine_consensus_empty_votes(self):
+        engine = ByzantineConsensusEngine()
+        result = engine.evaluate([])
+
+        self.assertFalse(result.is_approved)
+        self.assertEqual(result.consensus_score, 0.0)
+        self.assertEqual(result.approval_ratio, 0.0)
+        self.assertEqual(result.votes, [])
+        self.assertEqual(result.combined_concerns, ["No model votes submitted"])
+        self.assertEqual(result.combined_suggestions, [])
+        self.assertEqual(result.avg_confidence_score, 0.0)
+
     def test_byzantine_consensus_quorum(self):
         engine = ByzantineConsensusEngine(quorum_threshold=0.66, min_score_threshold=80)
 
@@ -207,6 +219,21 @@ class TestGossipMesh(unittest.TestCase):
         winner = auctioneer.elect_winner(bids)
         self.assertIsNotNone(winner)
         self.assertEqual(winner.specialty, "crypto_specialist")
+
+    def test_node_cleanup_ledger_error(self):
+        import io
+        import contextlib
+        from unittest.mock import patch
+
+        node = GossipNode("test_node", mesh_dir=self.test_dir)
+        # Create an empty file so the initial exists() check passes
+        node.log_file.touch()
+
+        with patch("builtins.open", side_effect=IOError("Permission denied")):
+            f = io.StringIO()
+            with contextlib.redirect_stdout(f):
+                node.cleanup_ledger()
+            self.assertIn("[test_node] Ledger cleanup error: Permission denied", f.getvalue())
 
 if __name__ == "__main__":
     unittest.main()
