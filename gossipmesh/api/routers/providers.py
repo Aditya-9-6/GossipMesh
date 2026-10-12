@@ -1,3 +1,5 @@
+import threading
+from collections import OrderedDict
 from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -12,6 +14,10 @@ from gossipmesh.providers.models import ProviderHealth
 
 router = APIRouter()
 
+_MANAGER_CACHE: OrderedDict[int, ProviderManager] = OrderedDict()
+_CACHE_LOCK = threading.Lock()
+MAX_CACHE_SIZE = 128
+
 class ProviderRegistration(BaseModel):
     name: str
     api_key: str | None = None
@@ -19,6 +25,11 @@ class ProviderRegistration(BaseModel):
 
 def _get_provider_manager_for_org(db: Session, org_id: int) -> ProviderManager:
     """Instantiates a ProviderManager and loads the organization's saved credentials."""
+    with _CACHE_LOCK:
+        if org_id in _MANAGER_CACHE:
+            _MANAGER_CACHE.move_to_end(org_id)
+            return _MANAGER_CACHE[org_id]
+
     manager = ProviderManager()
     credentials = db.query(ProviderCredential).filter(ProviderCredential.organization_id == org_id).all()
 
@@ -30,6 +41,11 @@ def _get_provider_manager_for_org(db: Session, org_id: int) -> ProviderManager:
         except Exception:
             pass # Skip failed decryptions in this simple example
 
+    with _CACHE_LOCK:
+        if len(_MANAGER_CACHE) >= MAX_CACHE_SIZE:
+            _MANAGER_CACHE.popitem(last=False)
+
+        _MANAGER_CACHE[org_id] = manager
     return manager
 
 @router.post("/register", status_code=201)
@@ -70,6 +86,9 @@ def register_provider(
             )
             db.add(cred)
         db.commit()
+
+        with _CACHE_LOCK:
+            _MANAGER_CACHE.pop(organization_id, None)
 
         return {"status": "success", "message": f"Provider {registration.name} registered and saved."}
     except ValueError as e:
