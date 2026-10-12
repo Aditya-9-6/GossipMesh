@@ -131,6 +131,29 @@ class TestGossipMesh(unittest.TestCase):
         self.assertEqual(result.consensus_score, 0.0)
         self.assertFalse(result.is_approved)
 
+    def test_node_sync_malformed_json_error_path(self):
+        import json
+        node = GossipNode("node_sync_error", mesh_dir=self.test_dir)
+
+        # Write malformed JSON to the log file
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write("{invalid_json: 'missing_quotes'}\n")
+
+        # Write valid JSON to the log file
+        valid_msg = {"message_id": "valid_123", "topic": GossipTopic.HEARTBEATS.value, "origin_node": "other_node", "payload": {}}
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(valid_msg) + "\n")
+
+        # Write another malformed JSON to the log file
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write("completely unparseable string\n")
+
+        # Should not crash and should return the 1 valid message
+        messages = node.sync()
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].message_id, "valid_123")
+
+
     def test_node_cleanup_ledger(self):
         import time
         import json
