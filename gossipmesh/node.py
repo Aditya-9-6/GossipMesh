@@ -7,6 +7,7 @@ import os
 import json
 import time
 import uuid
+from collections import deque
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Any
@@ -93,6 +94,7 @@ class GossipNode:
         self.clock_seq = 0
         self.seen_messages: set = set()
         self.subscriptions: Dict[str, List[Callable[[GossipMessage], None]]] = {}
+        self._message_cache = deque(maxlen=10000)
 
         # Initial anti-entropy catchup
         self._load_seen_history()
@@ -111,6 +113,7 @@ class GossipNode:
                                 mid = data.get("message_id")
                                 if mid:
                                     self.seen_messages.add(mid)
+                                    self._message_cache.append(GossipMessage.from_dict(data))
                             except Exception:
                                 pass
             except Exception:
@@ -137,6 +140,7 @@ class GossipNode:
         )
 
         self.seen_messages.add(msg.message_id)
+        self._message_cache.append(msg)
 
         # Atomic append to ledger
         line = json.dumps(msg.to_dict()) + "\n"
@@ -175,6 +179,7 @@ class GossipNode:
                             self.seen_messages.add(mid)
                             msg = GossipMessage.from_dict(data)
                             new_messages.append(msg)
+                            self._message_cache.append(msg)
                             # Dispatch to subscribers
                             if msg.topic in self.subscriptions:
                                 for handler in self.subscriptions[msg.topic]:
@@ -208,27 +213,18 @@ class GossipNode:
             pass
 
     def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
-        """Fetches the latest gossip messages from the ledger."""
-        messages = []
-        if not self.log_file.exists():
-            return messages
-
+        """Fetches the latest gossip messages from the in-memory cache."""
         t_val = topic.value if isinstance(topic, GossipTopic) else (str(topic) if topic else None)
-        try:
-            with open(self.log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        try:
-                            data = json.loads(line)
-                            if t_val is None or data.get("topic") == t_val:
-                                messages.append(GossipMessage.from_dict(data))
-                        except Exception:
-                            pass
-        except Exception:
-            pass
 
-        return messages[-limit:]
+        filtered = []
+        for msg in reversed(self._message_cache):
+            if t_val is None or msg.topic == t_val:
+                filtered.append(msg)
+                if len(filtered) >= limit:
+                    break
+
+        filtered.reverse()
+        return filtered
 
     def cleanup_ledger(self):
         """Removes expired messages from the ledger based on TTL."""
@@ -257,5 +253,14 @@ class GossipNode:
             with open(self.log_file, "w", encoding="utf-8") as f:
                 for line in valid_lines:
                     f.write(line + "\n")
+
+            # Reload cache
+            self._message_cache.clear()
+            for line_str in valid_lines:
+                try:
+                    data = json.loads(line_str)
+                    self._message_cache.append(GossipMessage.from_dict(data))
+                except Exception:
+                    pass
         except Exception as e:
             print(f"[{self.node_id}] Ledger cleanup error: {e}")
