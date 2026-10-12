@@ -1,6 +1,6 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization
