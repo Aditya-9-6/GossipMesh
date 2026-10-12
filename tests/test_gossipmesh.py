@@ -220,5 +220,20 @@ class TestGossipMesh(unittest.TestCase):
         self.assertIsNotNone(winner)
         self.assertEqual(winner.specialty, "crypto_specialist")
 
+    def test_node_cleanup_ledger_error(self):
+        import io
+        import contextlib
+        from unittest.mock import patch
+
+        node = GossipNode("test_node", mesh_dir=self.test_dir)
+        # Create an empty file so the initial exists() check passes
+        node.log_file.touch()
+
+        with patch("builtins.open", side_effect=IOError("Permission denied")):
+            f = io.StringIO()
+            with contextlib.redirect_stdout(f):
+                node.cleanup_ledger()
+            self.assertIn("[test_node] Ledger cleanup error: Permission denied", f.getvalue())
+
 if __name__ == "__main__":
     unittest.main()
