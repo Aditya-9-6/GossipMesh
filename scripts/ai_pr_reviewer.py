@@ -153,8 +153,25 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
         return cached_val
 
     last_err = None
+    max_attempts = 3
+
+    # Pre-compute all strategy combinations (keys x models) to try before sleeping
+    strategies = []
     for current_key in keys_to_try:
         for current_model in models_to_try:
+            strategies.append((current_key, current_model))
+
+    # Keep track of strategies that have permanently failed (e.g. 400 Bad Request)
+    terminal_strategies = set()
+
+    for attempt in range(1, max_attempts + 1):
+        # Only try strategies that haven't permanently failed
+        active_strategies = [s for s in strategies if s not in terminal_strategies]
+
+        if not active_strategies:
+            break
+
+        for current_key, current_model in active_strategies:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
                 "contents": [
@@ -172,49 +189,49 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
             }
 
             print(f"[*] Requesting architectural PR review from model: {current_model}...", flush=True)
-            max_attempts = 3
-            for attempt in range(1, max_attempts + 1):
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST"
-                )
-                try:
-                    with urllib.request.urlopen(req, timeout=90) as resp:
-                        data = json.loads(resp.read().decode("utf-8"))
-                        text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                        try:
-                            parsed_response = json.loads(text_response, strict=False)
-                        except json.JSONDecodeError:
-                            if text_response.startswith("```"):
-                                lines = text_response.splitlines()
-                                if lines[0].startswith("```"):
-                                    lines = lines[1:]
-                                if lines and lines[-1].startswith("```"):
-                                    lines = lines[:-1]
-                                text_response = "\n".join(lines).strip()
-                            parsed_response = json.loads(text_response, strict=False)
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=90) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    try:
+                        parsed_response = json.loads(text_response, strict=False)
+                    except json.JSONDecodeError:
+                        if text_response.startswith("```"):
+                            lines = text_response.splitlines()
+                            if lines[0].startswith("```"):
+                                lines = lines[1:]
+                            if lines and lines[-1].startswith("```"):
+                                lines = lines[:-1]
+                            text_response = "\n".join(lines).strip()
+                        parsed_response = json.loads(text_response, strict=False)
 
-                        sem_cache.put(cache_key_text, parsed_response)
-                        return parsed_response
-                except urllib.error.HTTPError as e:
-                    err_msg = e.read().decode("utf-8", errors="replace")
-                    print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}", file=sys.stderr)
-                    last_err = err_msg
-                    if e.code == 404:
-                        break
-                    if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
-                        time.sleep(1 * attempt)
-                        continue
-                    break
-                except Exception as e:
-                    print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
-                    last_err = str(e)
-                    if attempt < max_attempts:
-                        time.sleep(1 * attempt)
-                        continue
-                    break
+                    sem_cache.put(cache_key_text, parsed_response)
+                    return parsed_response
+            except urllib.error.HTTPError as e:
+                err_msg = e.read().decode("utf-8", errors="replace")
+                print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}", file=sys.stderr)
+                last_err = err_msg
+                if e.code not in (429, 500, 502, 503, 504):
+                    # For terminal errors like 400, 403, 404, we don't want to retry this strategy
+                    terminal_strategies.add((current_key, current_model))
+                continue
+            except Exception as e:
+                print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
+                last_err = str(e)
+                continue  # Try next strategy
+
+        # Check if there are still non-terminal strategies left to retry
+        active_strategies = [s for s in strategies if s not in terminal_strategies]
+
+        # If we exhausted all strategies in this attempt, we have attempts left, and there is something left to retry, we sleep
+        if attempt < max_attempts and active_strategies:
+            time.sleep(1 * attempt)
 
     raise RuntimeError(f"Failed to obtain PR review from Gemini API. Last error: {last_err}")
 

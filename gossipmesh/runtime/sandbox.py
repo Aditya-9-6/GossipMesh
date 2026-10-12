@@ -2,7 +2,8 @@ import os
 import shutil
 import tempfile
 import subprocess
-from typing import Optional, Tuple
+import shlex
+from typing import Optional, Tuple, Union, List
 
 class SandboxEnvironment:
     """
@@ -20,14 +21,16 @@ class SandboxEnvironment:
         if self.workspace_dir and os.path.exists(self.workspace_dir):
             shutil.rmtree(self.workspace_dir)
 
-    def run_command(self, cmd: str, timeout: int = 30) -> Tuple[int, str, str]:
+    def run_command(self, cmd: Union[str, List[str]], timeout: int = 30) -> Tuple[int, str, str]:
         """Runs a command within the sandbox workspace."""
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
+        if isinstance(cmd, str):
+            cmd = shlex.split(cmd)
+
         process = subprocess.Popen(
             cmd,
-            shell=True,
             cwd=self.workspace_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -45,7 +48,12 @@ class SandboxEnvironment:
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
-        full_path = os.path.join(self.workspace_dir, filepath)
+        workspace_abs = os.path.abspath(self.workspace_dir)
+        full_path = os.path.abspath(os.path.join(workspace_abs, filepath))
+
+        if os.path.commonpath([workspace_abs, full_path]) != workspace_abs:
+            raise ValueError("Path traversal attempt detected")
+
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "w") as f:
             f.write(content)
