@@ -6,11 +6,11 @@ class Settings(BaseSettings):
     VERSION: str = "0.2.0"
     API_V1_STR: str = "/api/v1"
 
-    SECRET_KEY: str = "supersecretkey_please_change_in_production"
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    ENCRYPTION_KEY: str = "b_wH5yL7g3XQz8T1kVcZp6sN0mR9dE2fA4uYxWqVjMw=" # Example Fernet key
+    ENCRYPTION_KEY: str
 
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
