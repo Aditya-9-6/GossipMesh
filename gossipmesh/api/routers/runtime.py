@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
-from gossipmesh.models.organization import UserOrganization
 from gossipmesh.runtime.workflow import WorkflowManager
 
 router = APIRouter()
@@ -22,11 +21,8 @@ def create_workflow(
     db: Session = Depends(deps.get_db)
 ) -> Any:
     # Ensure user has access to organization
-    is_member = db.query(UserOrganization).filter(
-        UserOrganization.user_id == current_user.id,
-        UserOrganization.organization_id == request.organization_id
-    ).first()
-    if not is_member:
+    user_org_ids = [org.organization_id for org in current_user.organizations]
+    if request.organization_id not in user_org_ids:
         raise HTTPException(status_code=403, detail="Not authorized for this organization")
 
     manager = WorkflowManager(db)

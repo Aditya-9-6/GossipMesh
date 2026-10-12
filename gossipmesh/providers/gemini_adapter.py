@@ -1,6 +1,7 @@
 from typing import AsyncGenerator
 import time
 import google.generativeai as genai
+from google.generativeai import GenerativeModel
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage

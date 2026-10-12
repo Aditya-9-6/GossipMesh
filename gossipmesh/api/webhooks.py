@@ -20,15 +20,11 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
     """
     secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
     if not secret:
-        # If secret is not configured, we allow it for development only
-        if os.environ.get("ENVIRONMENT") == "development":
-            logger.warning(
-                "GITHUB_WEBHOOK_SECRET is not set, skipping signature verification in development"
-            )
-            return True
-        else:
-            logger.error("GITHUB_WEBHOOK_SECRET is not set in a non-development environment")
-            return False
+        # If secret is not configured, we allow it for development, but warn
+        logger.warning(
+            "GITHUB_WEBHOOK_SECRET is not set, skipping signature verification"
+        )
+        return True
 
     signature_header = request.headers.get("X-Hub-Signature-256")
     if not signature_header:

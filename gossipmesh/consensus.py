@@ -91,8 +91,15 @@ class ByzantineConsensusEngine:
             approval_ratio = approvals / len(votes)
             avg_score = sum(v.score for v in votes) / len(votes)
 
-        all_concerns = list(dict.fromkeys(c for v in votes for c in v.concerns))
-        all_suggestions = list(dict.fromkeys(s for v in votes for s in v.suggestions))
+        all_concerns = []
+        all_suggestions = []
+        for v in votes:
+            for c in v.concerns:
+                if c not in all_concerns:
+                    all_concerns.append(c)
+            for s in v.suggestions:
+                if s not in all_suggestions:
+                    all_suggestions.append(s)
 
         is_approved = (approval_ratio >= self.quorum_threshold) and (avg_score >= self.min_score_threshold)
 

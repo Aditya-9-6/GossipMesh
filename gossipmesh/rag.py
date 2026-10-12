@@ -10,7 +10,6 @@ import urllib.error
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 import math
-import operator
 
 class VectorDB:
     def __init__(self, db_path: str = ".gossip_mesh/vectordb.json"):
@@ -67,9 +66,9 @@ class VectorDB:
         if not vec1 or not vec2: return 0.0
         if len(vec1) != len(vec2): return 0.0
 
-        dot_product = sum(map(operator.mul, vec1, vec2))
-        norm_a = math.hypot(*vec1)
-        norm_b = math.hypot(*vec2)
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        norm_a = math.sqrt(sum(a * a for a in vec1))
+        norm_b = math.sqrt(sum(b * b for b in vec2))
 
         if norm_a == 0 or norm_b == 0:
             return 0.0

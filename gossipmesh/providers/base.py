@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator
+from typing import List, AsyncGenerator
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth
 
 class BaseProvider(ABC):

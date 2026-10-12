@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
-from gossipmesh.models.organization import UserOrganization
 from gossipmesh.models.repository import Repository, IndexState
 from gossipmesh.repository.github import GitHubIntegration
 from gossipmesh.core.config import settings
@@ -27,11 +26,8 @@ def sync_repository(
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Queues a background task to sync repository metadata from GitHub."""
-    is_member = db.query(UserOrganization).filter(
-        UserOrganization.user_id == current_user.id,
-        UserOrganization.organization_id == request.organization_id
-    ).first()
-    if not is_member:
+    user_org_ids = [org.organization_id for org in current_user.organizations]
+    if request.organization_id not in user_org_ids:
         raise HTTPException(status_code=403, detail="Not authorized for this organization")
 
     def _sync_task(full_name: str, installation_id: int, org_id: int):

@@ -1,9 +1,8 @@
-from sqlalchemy import String, Integer, JSON, DateTime
+from sqlalchemy import String, Integer, ForeignKey, JSON, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from datetime import datetime
 from gossipmesh.models.base import Base
-
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
