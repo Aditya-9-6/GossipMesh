@@ -1,4 +1,5 @@
-from typing import Dict, Any, Callable
+from typing import Dict, Callable
+
 
 class AgentRegistry:
     def __init__(self):
@@ -18,6 +19,7 @@ class AgentRegistry:
 
     def list_agents(self) -> list[str]:
         return list(self._agents.keys())
+
 
 # Global registry instance
 agent_registry = AgentRegistry()
