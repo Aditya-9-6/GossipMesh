@@ -38,8 +38,6 @@ __pycache__/
 dist/
 build/
 
-.gossip_mesh/
-G:/
 # Database
 *.db
 *.sqlite3

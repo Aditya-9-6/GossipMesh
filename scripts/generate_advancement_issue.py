@@ -11,12 +11,13 @@ Features:
 """
 
 import json
-import os
 import subprocess
+import os
+
 import sys
 import time
-import urllib.error
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -191,7 +192,6 @@ def create_issue(item):
 ### 📂 Target Files & Modules
 {target_files_md}
 
-### 📋 Technical Acceptance Criteria
 ### 📋 Technical Acceptance Criteria & Architectural Sanity Checklist
 - [ ] Conforms to GossipMesh's robust Python engineering patterns.
 - [ ] Feature has a positive system impact and does not introduce bloat, unnecessary dependencies, or highly speculative experimental code.
@@ -214,6 +214,7 @@ def create_issue(item):
 2. Run local tests: `python -m unittest discover`
 3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
+
     labels = f"{area},{difficulty},hacktoberfest,advancement"
     cmd = [
         "gh", "issue", "create", "--repo", "Aditya-9-6/GossipMesh",

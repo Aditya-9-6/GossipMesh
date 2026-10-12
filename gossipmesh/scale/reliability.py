@@ -2,7 +2,7 @@
 Scale and reliability features for GossipMesh.
 Milestone 10 Implementation.
 """
-from typing import Dict, List, Any
+from typing import Dict, List
 
 class RateLimiter:
     """Handles rate limiting for API requests and agent actions."""

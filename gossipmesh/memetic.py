@@ -5,10 +5,8 @@ Survivors of evolutionary natural selection are injected into LLM system prompts
 """
 
 import json
-import os
 from pathlib import Path
-from typing import Any
-
+from typing import Dict, List, Optional, Any
 
 class KnowledgeMeme:
     def __init__(
@@ -43,7 +41,7 @@ class KnowledgeMeme:
         self.fitness_score = max(0.0, self.fitness_score - delta)
         self.failed_applications += 1
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "meme_id": self.meme_id,
             "title": self.title,
@@ -57,7 +55,7 @@ class KnowledgeMeme:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "KnowledgeMeme":
+    def from_dict(cls, data: Dict[str, Any]) -> "KnowledgeMeme":
         return cls(
             meme_id=data["meme_id"],
             title=data["title"],
@@ -72,15 +70,9 @@ class KnowledgeMeme:
 
 class MemeticKnowledgeBase:
     """Persistent ledger of evolving architectural memes."""
-    def __init__(self, storage_path: Path | None = None):
-        if storage_path:
-            self.storage_path = storage_path
-        elif os.environ.get("GOSSIPMESH_DIR"):
-            self.storage_path = Path(os.environ.get("GOSSIPMESH_DIR") or "").resolve() / "memes.json"
-        else:
-            self.storage_path = Path.home() / ".gossip_mesh/memes.json"
-
-        self.memes: dict[str, KnowledgeMeme] = {}
+    def __init__(self, storage_path: Optional[Path] = None):
+        self.storage_path = storage_path or Path("G:/My Drive/.gossip_mesh/memes.json")
+        self.memes: Dict[str, KnowledgeMeme] = {}
         self._load()
 
         # Seed foundational high-fitness patterns if empty
@@ -181,7 +173,7 @@ class MemeticKnowledgeBase:
             self.memes[meme_id].penalize(delta)
             self.save()
 
-    def get_top_memes(self, repo: str = "global", min_fitness: float = 1.0, limit: int = 10) -> list[KnowledgeMeme]:
+    def get_top_memes(self, repo: str = "global", min_fitness: float = 1.0, limit: int = 10) -> List[KnowledgeMeme]:
         """Returns surviving high-fitness memes for prompt injection, filtered by repo."""
         candidates = [
             m for m in self.memes.values()

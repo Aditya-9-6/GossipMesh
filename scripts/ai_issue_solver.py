@@ -5,15 +5,15 @@ Uses Google Gemini API to analyze an issue, understand the Python codebase, gene
 and write files ready for automated pull request creation.
 """
 
-import argparse
-import hashlib
-import json
 import os
-import subprocess
 import sys
-import time
-import urllib.error
+import json
+import argparse
 import urllib.request
+import urllib.error
+import subprocess
+import time
+import hashlib
 from pathlib import Path
 
 DEFAULT_MODEL = "gemini-2.5-pro"
@@ -159,7 +159,6 @@ def summarize_go_file(filepath: str, workspace_root: Path, raw_content: str) -> 
     except Exception as e:
         return f"// Error parsing go file: {e}\n{raw_content}"
 
-
 def get_relevant_files(workspace_root: Path, query_text: str) -> str:
     """Uses VectorDB RAG to find semantically relevant files for context."""
     context_files = []
@@ -170,7 +169,7 @@ def get_relevant_files(workspace_root: Path, query_text: str) -> str:
         print("[*] VectorDB is empty. Indexing workspace...")
         db.index_workspace(workspace_root)
 
-    print("[*] Querying VectorDB for relevant context files...")
+    print(f"[*] Querying VectorDB for relevant context files...")
     results = db.search(query_text, top_k=3)
 
     for path, content, score in results:
@@ -197,7 +196,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
     # Check cache
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode()).hexdigest()
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
     cache_file = cache_path / f"{cache_key}.json"
 
     if cache_file.exists():
