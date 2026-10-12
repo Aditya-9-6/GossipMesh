@@ -2,7 +2,8 @@ import os
 import shutil
 import tempfile
 import subprocess
-from typing import Optional, Tuple
+import shlex
+from typing import Optional, Tuple, Union, List
 
 class SandboxEnvironment:
     """
@@ -20,14 +21,16 @@ class SandboxEnvironment:
         if self.workspace_dir and os.path.exists(self.workspace_dir):
             shutil.rmtree(self.workspace_dir)
 
-    def run_command(self, cmd: str, timeout: int = 30) -> Tuple[int, str, str]:
+    def run_command(self, cmd: Union[str, List[str]], timeout: int = 30) -> Tuple[int, str, str]:
         """Runs a command within the sandbox workspace."""
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
+        if isinstance(cmd, str):
+            cmd = shlex.split(cmd)
+
         process = subprocess.Popen(
             cmd,
-            shell=True,
             cwd=self.workspace_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
