@@ -32,5 +32,23 @@ class TestSandboxEnvironment(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.sandbox.write_file("/tmp/test_traversal.txt", "traversal data")
 
+    def test_run_command_string(self):
+        code, stdout, stderr = self.sandbox.run_command("echo hello")
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout.strip(), "hello")
+
+    def test_run_command_list(self):
+        code, stdout, stderr = self.sandbox.run_command(["echo", "hello list"])
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout.strip(), "hello list")
+
+    def test_run_command_shell_injection(self):
+        # If shell=True, this would execute `echo injected`, and we'd see 'hello' and 'injected'.
+        # With shell=False and shlex.split, this gets treated as arguments to `echo`.
+        code, stdout, stderr = self.sandbox.run_command("echo hello ; echo injected")
+        self.assertEqual(code, 0)
+        # Should literally output 'hello ; echo injected'
+        self.assertEqual(stdout.strip(), "hello ; echo injected")
+
 if __name__ == "__main__":
     unittest.main()
