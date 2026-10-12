@@ -1,3 +1,4 @@
+import tests  # Initialize env vars
 import unittest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
