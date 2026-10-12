@@ -45,7 +45,12 @@ class SandboxEnvironment:
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
-        full_path = os.path.join(self.workspace_dir, filepath)
+        workspace_abs = os.path.abspath(self.workspace_dir)
+        full_path = os.path.abspath(os.path.join(workspace_abs, filepath))
+
+        if os.path.commonpath([workspace_abs, full_path]) != workspace_abs:
+            raise ValueError("Path traversal attempt detected")
+
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "w") as f:
             f.write(content)
