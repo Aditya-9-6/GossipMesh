@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.provider import ProviderCredential
+from gossipmesh.models.organization import UserOrganization
 from gossipmesh.core.security import encrypt_string, decrypt_string
 from gossipmesh.providers.manager import ProviderManager
 from gossipmesh.providers.models import ProviderHealth
@@ -40,8 +41,11 @@ def register_provider(
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Registers and persists a provider credential for the organization."""
-    user_org_ids = [org.organization_id for org in current_user.organizations]
-    if organization_id not in user_org_ids:
+    is_member = db.query(UserOrganization).filter(
+        UserOrganization.user_id == current_user.id,
+        UserOrganization.organization_id == organization_id
+    ).first()
+    if not is_member:
         raise HTTPException(status_code=403, detail="Not authorized for this organization")
 
     try:
@@ -82,8 +86,11 @@ async def get_providers_health(
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Returns the health status of providers registered for the organization."""
-    user_org_ids = [org.organization_id for org in current_user.organizations]
-    if organization_id not in user_org_ids:
+    is_member = db.query(UserOrganization).filter(
+        UserOrganization.user_id == current_user.id,
+        UserOrganization.organization_id == organization_id
+    ).first()
+    if not is_member:
         raise HTTPException(status_code=403, detail="Not authorized for this organization")
 
     manager = _get_provider_manager_for_org(db, organization_id)
