@@ -82,7 +82,7 @@ class KeyPool:
 
 GLOBAL_POOL = KeyPool(DEFAULT_KEYS)
 
-def run_cmd(cmd, cwd=None, check=True):
+def run_cmd(cmd, cwd=None, check=False):
     """Runs a shell command and returns stdout."""
     res = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str), capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and res.returncode != 0:
@@ -280,6 +280,9 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         return False
 
     if verdict == "APPROVED" and score >= 90:
+        print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)!", flush=True)
+        print(f"[*] PR #{pr_num} is approved. Awaiting manual merge by a human.", flush=True)
+        return False
         print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Checking for human merge permission...", flush=True)
 
         has_merge_permission = False
