@@ -45,7 +45,12 @@ class SandboxEnvironment:
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
-        full_path = os.path.join(self.workspace_dir, filepath)
+        full_path = os.path.abspath(os.path.join(self.workspace_dir, filepath))
+        workspace_abs = os.path.abspath(self.workspace_dir)
+
+        if not full_path.startswith(workspace_abs + os.sep) and full_path != workspace_abs:
+            raise ValueError("Path traversal detected")
+
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "w") as f:
             f.write(content)
@@ -58,7 +63,13 @@ class SandboxEnvironment:
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
-        source = os.path.join(self.workspace_dir, artifact_name)
+        source = os.path.abspath(os.path.join(self.workspace_dir, artifact_name))
+        workspace_abs = os.path.abspath(self.workspace_dir)
+
+        # Ensure the resolved path is within the workspace directory
+        if not source.startswith(workspace_abs + os.sep) and source != workspace_abs:
+            raise ValueError("Path traversal detected")
+
         if os.path.exists(source):
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             shutil.copy2(source, dest_path)
