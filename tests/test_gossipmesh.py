@@ -64,6 +64,18 @@ class TestGossipMesh(unittest.TestCase):
         context = kb.format_prompt_context()
         self.assertIn("GOSSIPED ARCHITECTURAL MEMES", context)
 
+    def test_byzantine_consensus_empty_votes(self):
+        engine = ByzantineConsensusEngine()
+        result = engine.evaluate([])
+
+        self.assertFalse(result.is_approved)
+        self.assertEqual(result.consensus_score, 0.0)
+        self.assertEqual(result.approval_ratio, 0.0)
+        self.assertEqual(result.votes, [])
+        self.assertEqual(result.combined_concerns, ["No model votes submitted"])
+        self.assertEqual(result.combined_suggestions, [])
+        self.assertEqual(result.avg_confidence_score, 0.0)
+
     def test_byzantine_consensus_quorum(self):
         engine = ByzantineConsensusEngine(quorum_threshold=0.66, min_score_threshold=80)
 
@@ -100,6 +112,24 @@ class TestGossipMesh(unittest.TestCase):
         # approvals_weight = 0.5 (only flash-3.8 approves and >= 80)
         # approval_ratio = 0.5 / 3.0 ≈ 0.166... which is < 0.66
         self.assertLess(weighted_result.approval_ratio, 0.2)
+
+    def test_byzantine_consensus_zero_weight(self):
+        engine = ByzantineConsensusEngine(
+            quorum_threshold=0.66,
+            min_score_threshold=80,
+            model_weights={"flash-3.8": 0.0, "pro-3.1": 0.0}
+        )
+
+        votes = [
+            ModelVote("flash-3.8", "APPROVE", 95),
+            ModelVote("pro-3.1", "APPROVE", 90),
+        ]
+
+        # This shouldn't raise a ZeroDivisionError due to total_weight=0.0
+        result = engine.evaluate(votes)
+        self.assertEqual(result.approval_ratio, 0.0)
+        self.assertEqual(result.consensus_score, 0.0)
+        self.assertFalse(result.is_approved)
 
     def test_node_cleanup_ledger(self):
         import time

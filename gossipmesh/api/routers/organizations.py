@@ -1,8 +1,9 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
+from gossipmesh.models.organization import UserOrganization
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -16,5 +17,7 @@ def read_organizations_me(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
-    # A complete implementation would join UserOrganization
-    return [org.organization for org in current_user.organizations]
+    user_orgs = db.query(UserOrganization).options(
+        joinedload(UserOrganization.organization)
+    ).filter(UserOrganization.user_id == current_user.id).all()
+    return [org.organization for org in user_orgs]
