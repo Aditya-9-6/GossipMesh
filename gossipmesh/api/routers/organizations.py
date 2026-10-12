@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization
+from gossipmesh.models.organization import UserOrganization
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -22,3 +23,7 @@ def read_organizations_me(
     ).filter(
         UserOrganization.user_id == current_user.id
     ).all()
+    user_orgs = db.query(UserOrganization).options(
+        joinedload(UserOrganization.organization)
+    ).filter(UserOrganization.user_id == current_user.id).all()
+    return [org.organization for org in user_orgs]
