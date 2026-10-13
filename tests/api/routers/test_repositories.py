@@ -65,6 +65,7 @@ class TestRepositoriesAPI(unittest.TestCase):
                     "message": "Not authorized for this organization"
                 }
             }
+            {"error": {"code": "AUTHORIZATION_ERROR", "message": "Not authorized for this organization"}}
         )
         # Ensure that the background task was NOT queued
         mock_add_task.assert_not_called()

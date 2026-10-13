@@ -1,4 +1,5 @@
 from sqlalchemy import String, ForeignKey
+from sqlalchemy import String, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from gossipmesh.models.base import Base
 
@@ -12,3 +13,7 @@ class Project(Base):
 
     organization = relationship("Organization", back_populates="projects")
     repositories = relationship("Repository", back_populates="project")
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    organization = relationship("Organization")
