@@ -19,8 +19,11 @@ class TestRepositoriesAPI(unittest.TestCase):
         self.mock_user.organizations = [mock_org]
 
         # Override dependencies
+        self.mock_db = MagicMock()
+        self.mock_db.query.return_value.filter.return_value.first.return_value = True
+
         app.dependency_overrides[deps.get_current_user] = lambda: self.mock_user
-        app.dependency_overrides[deps.get_db] = lambda: None
+        app.dependency_overrides[deps.get_db] = lambda: self.mock_db
 
     def tearDown(self):
         # Clear dependency overrides
@@ -45,6 +48,7 @@ class TestRepositoriesAPI(unittest.TestCase):
 
     @patch("fastapi.BackgroundTasks.add_task")
     def test_sync_repository_unauthorized(self, mock_add_task):
+        self.mock_db.query.return_value.filter.return_value.first.return_value = None
         payload = {
             "full_name": "test/repo",
             "installation_id": 123,

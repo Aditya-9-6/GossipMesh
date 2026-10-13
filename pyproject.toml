@@ -65,3 +65,32 @@ include = ["gossipmesh*"]
 
 [project.optional-dependencies]
 api = ["fastapi", "httpx"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "coverage"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--cov=gossipmesh --cov-report=term-missing"
+markers = [
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "asyncio: mark a test as an asyncio test",
+]
+
+[tool.coverage.run]
+source = ["gossipmesh"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
+ignore_errors = true
