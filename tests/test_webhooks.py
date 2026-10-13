@@ -28,7 +28,7 @@ class TestWebhooks(unittest.TestCase):
             response.json(), {"detail": "Missing X-GitHub-Event header"}
         )
 
-    @patch("gossipmesh.workflows.pr_review.PRReviewWorkflow.execute")
+    @patch("gossipmesh.jobs.pr_review.PRReviewJob.execute")
     def test_pull_request_event(self, mock_execute):
         payload = {"action": "opened", "pull_request": {"number": 123}}
         response = client.post(
