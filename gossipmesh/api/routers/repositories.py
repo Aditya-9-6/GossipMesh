@@ -1,6 +1,6 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
-from gossipmesh.api.background_tasks import CorrelationIdBackgroundTasks
+from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ class SyncRequest(BaseModel):
 @router.post("/sync", status_code=202)
 def sync_repository(
     request: SyncRequest,
-    background_tasks: CorrelationIdBackgroundTasks,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:

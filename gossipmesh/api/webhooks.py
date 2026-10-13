@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException
-from gossipmesh.api.background_tasks import CorrelationIdBackgroundTasks
+from fastapi import BackgroundTasks
 import logging
 import hashlib
 import hmac
@@ -49,7 +49,7 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
 
 
 @router.post("/github")
-async def github_webhook(request: Request, background_tasks: CorrelationIdBackgroundTasks):
+async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Handle incoming GitHub webhooks for Milestone 6 and 7.
     Supported events: pull_request, issues, issue_comment, workflow_run

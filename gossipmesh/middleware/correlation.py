@@ -1,16 +1,25 @@
 import uuid
 import contextvars
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
 
 correlation_id: contextvars.ContextVar[str] = contextvars.ContextVar(
     "correlation_id", default=""
 )
 
-class CorrelationIdMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # We don't trust user input for security context, so we strictly validate it
-        req_id = request.headers.get("X-Correlation-ID")
+class CorrelationIdMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        # Extract X-Correlation-ID from headers
+        req_id = None
+        for name, value in scope.get("headers", []):
+            if name.lower() == b"x-correlation-id":
+                req_id = value.decode("latin1")
+                break
 
         if req_id:
             try:
@@ -25,9 +34,14 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         token = correlation_id.set(req_id)
 
         try:
-            response = await call_next(request)
-            response.headers["X-Correlation-ID"] = req_id
-            return response
+            async def send_wrapper(message):
+                if message["type"] == "http.response.start":
+                    headers = message.get("headers", [])
+                    headers.append((b"x-correlation-id", req_id.encode("latin1")))
+                    message["headers"] = headers
+                await send(message)
+
+            await self.app(scope, receive, send_wrapper)
         finally:
             correlation_id.reset(token)
 
