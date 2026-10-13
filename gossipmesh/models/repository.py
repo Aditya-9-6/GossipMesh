@@ -2,8 +2,9 @@ from sqlalchemy import String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from gossipmesh.models.base import Base
+from gossipmesh.models.mixins import SoftDeleteMixin
 
-class Repository(Base):
+class Repository(SoftDeleteMixin, Base):
     __tablename__ = "repositories"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -15,7 +16,7 @@ class Repository(Base):
 
     organization = relationship("Organization")
 
-class IndexState(Base):
+class IndexState(SoftDeleteMixin, Base):
     __tablename__ = "index_states"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
