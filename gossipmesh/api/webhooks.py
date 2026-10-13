@@ -5,7 +5,7 @@ import hmac
 import os
 import json
 
-from gossipmesh.workflows.pr_review import PRReviewWorkflow
+from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
 from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
 
@@ -75,8 +75,8 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         action = payload.get("action")
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
-            workflow = PRReviewWorkflow(pr_data)
-            background_tasks.add_task(workflow.execute)
+            job = PRReviewJob(pr_data)
+            background_tasks.add_task(job.execute)
 
     # Milestone 7: Issue Solver
     elif event == "issues":
