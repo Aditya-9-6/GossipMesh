@@ -1,5 +1,5 @@
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -7,6 +7,7 @@ from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
 from gossipmesh.runtime.workflow import WorkflowManager
+from gossipmesh.core.exceptions import AuthorizationError
 
 router = APIRouter()
 
@@ -27,7 +28,7 @@ def create_workflow(
         UserOrganization.organization_id == request.organization_id
     ).first()
     if not is_member:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise AuthorizationError(message="Not authorized for this organization")
 
     manager = WorkflowManager(db)
     workflow = manager.create_workflow(request.organization_id, request.repository_id)
