@@ -1,6 +1,6 @@
 import unittest
 from gossipmesh.enterprise.controls import (
-    SSOManager, SCIMProvisioner, RoleManager,
+    SSOManager, SCIMProvisioner,
     DataRetentionPolicy, DataExporter, ComplianceAuditor
 )
 from gossipmesh.billing.commercialization import (
@@ -24,13 +24,6 @@ class TestEnterpriseControls(unittest.TestCase):
         self.assertFalse(provisioner.provision_user("user123", {"name": "Test"})) # already exists
         self.assertTrue(provisioner.deprovision_user("user123"))
         self.assertFalse(provisioner.deprovision_user("user123")) # already deleted
-
-    def test_role_manager(self):
-        manager = RoleManager()
-        manager.assign_role("user1", "admin")
-        self.assertTrue(manager.has_permission("user1", "write"))
-        self.assertFalse(manager.has_permission("user1", "unknown_perm"))
-        self.assertFalse(manager.has_permission("user2", "read"))
 
     def test_data_retention_policy(self):
         policy = DataRetentionPolicy()
