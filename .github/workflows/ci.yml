@@ -11,9 +11,32 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Run Unit Tests & Invariant Verification
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -30,6 +53,180 @@ jobs:
       - name: Install dependencies
         run: pip install -e .[api]
 
-      - name: Run Test Suite
+      - name: Run Unit Tests
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          ENVIRONMENT: development
         run: |
-          python -m unittest discover -s tests -p "test_*.py" -v
+          # Use find to run test files directly in tests/ and its subdirectories, excluding integration/
+          find tests -type d -name integration -prune -o -name "test_*.py" -print | xargs python -m unittest -v
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -e .[api]
+
+      - name: Run Integration Tests
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          ENVIRONMENT: development
+        run: |
+          python -m unittest discover -s tests/integration -p "test_*.py" -v
+
+  ruff:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Ruff
+        run: pip install ruff
+      - name: Run Ruff
+        run: ruff check .
+
+  type-checking:
+    name: Type Checking
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e .[api] mypy types-passlib
+      - name: Run Mypy
+        run: mypy gossipmesh
+
+  coverage:
+    name: Coverage Threshold
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e .[api] coverage
+      - name: Run Tests and Check Coverage
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          ENVIRONMENT: development
+        run: |
+          coverage run -m unittest discover -s tests -p "test_*.py" -v
+          coverage report --fail-under=75
+
+  dependency-scanning:
+    name: Dependency Vulnerability Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e .[api]
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Run pip-audit
+        run: pip-audit
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: zricethezav/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
