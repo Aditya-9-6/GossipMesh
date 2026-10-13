@@ -1,3 +1,4 @@
+import os
 import logging
 from logging.config import fileConfig
 
@@ -19,8 +20,24 @@ target_metadata = Base.metadata
 def get_url():
     return str(settings.DATABASE_URI)
 
+def check_destructive_migrations():
+    """Prevent destructive migrations (downgrades) in production."""
+    if os.environ.get("ENVIRONMENT") == "production":
+        # Check if this is a downgrade by checking the context
+        if context.get_x_argument(as_dictionary=True).get("cmd") == "downgrade" or getattr(config.cmd_opts, "cmd", None) == "downgrade":
+             raise RuntimeError("Downgrades are not allowed in the production environment.")
+
+        # A more robust check by looking at the context's current migration context if available,
+        # but in env.py we can check the command from context
+        # alembic passes context.is_offline_mode(), etc.
+        # But actually checking if it's a downgrade can be tricky, we can check sys.argv
+        import sys
+        if "downgrade" in sys.argv:
+            raise RuntimeError("Downgrades are not allowed in the production environment.")
+
 def run_migrations_offline() -> None:
     url = get_url()
+    check_destructive_migrations()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -39,6 +56,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        check_destructive_migrations()
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
