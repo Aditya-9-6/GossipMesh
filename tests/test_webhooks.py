@@ -1,11 +1,13 @@
-import unittest
-from unittest.mock import patch
-from fastapi.testclient import TestClient
-from gossipmesh.api import app
-import os
 import hashlib
 import hmac
 import json
+import os
+import unittest
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from gossipmesh.api import app
 
 client = TestClient(app)
 

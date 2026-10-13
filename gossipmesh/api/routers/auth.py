@@ -1,14 +1,15 @@
 from datetime import timedelta
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from gossipmesh.api import deps
 from gossipmesh.core.config import settings
-from gossipmesh.core.security import verify_password, create_access_token
+from gossipmesh.core.security import create_access_token, verify_password
 from gossipmesh.models.user import User
-from pydantic import BaseModel
 
 router = APIRouter()
 

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ class IssueSolverWorkflow:
     Orchestrates the Issue Solver workflow (Milestone 7).
     """
 
-    def __init__(self, issue_data: Dict[str, Any]):
+    def __init__(self, issue_data: dict[str, Any]):
         self.issue_data = issue_data
 
     async def execute(self):
@@ -72,4 +72,3 @@ class IssueSolverWorkflow:
         Creates a PR with the generated patch (no automatic merge).
         """
         logger.info("Creating PR with the generated patch.")
-        pass

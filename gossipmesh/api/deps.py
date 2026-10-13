@@ -1,12 +1,13 @@
-from typing import Generator
+from collections.abc import Generator
+
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-import jwt
-from sqlalchemy.orm import Session
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
-from gossipmesh.db.session import SessionLocal
 from gossipmesh.core.config import settings
+from gossipmesh.db.session import SessionLocal
 from gossipmesh.models.user import User
 
 reusable_oauth2 = OAuth2PasswordBearer(

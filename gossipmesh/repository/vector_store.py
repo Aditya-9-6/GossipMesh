@@ -1,8 +1,10 @@
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, Integer, String, JSON
-from sqlalchemy.orm import Session
+from sqlalchemy import JSON, Column, Integer, String
 from sqlalchemy.future import select
+from sqlalchemy.orm import Session
+
 from gossipmesh.models.base import Base
+
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"

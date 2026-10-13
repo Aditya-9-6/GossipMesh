@@ -1,9 +1,9 @@
-from typing import Dict, Callable
+from collections.abc import Callable
 
 
 class AgentRegistry:
     def __init__(self):
-        self._agents: Dict[str, Callable] = {}
+        self._agents: dict[str, Callable] = {}
 
     def register(self, name: str, handler: Callable):
         """Registers a new agent handler function by name."""

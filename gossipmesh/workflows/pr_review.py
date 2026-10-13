@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ class PRReviewWorkflow:
     Orchestrates the PR Review process (Milestone 6).
     """
 
-    def __init__(self, pr_data: Dict[str, Any]):
+    def __init__(self, pr_data: dict[str, Any]):
         self.pr_data = pr_data
 
     async def execute(self):
@@ -52,18 +52,15 @@ class PRReviewWorkflow:
         logger.info(
             f"Generating inline comments for {len(findings)} findings."
         )
-        pass
 
     async def post_review_report(self, findings: list, test_results: dict):
         """
         Posts the final review report summary.
         """
         logger.info("Posting review report.")
-        pass
 
     async def handle_human_approval(self):
         """
         Manages the human approval workflow state.
         """
         logger.info("Awaiting human approval workflow logic.")
-        pass

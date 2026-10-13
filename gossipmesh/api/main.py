@@ -1,6 +1,14 @@
 from fastapi import FastAPI
+
+from gossipmesh.api.routers import (
+    auth,
+    organizations,
+    providers,
+    repositories,
+    runtime,
+    users,
+)
 from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime
 
 app = FastAPI(
     title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json"

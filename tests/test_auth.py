@@ -1,13 +1,14 @@
-import tests  # Initialize env vars
+import tests
 import unittest
 from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from gossipmesh.api.main import app
 from gossipmesh.api import deps
-from gossipmesh.models.user import User
+from gossipmesh.api.main import app
 from gossipmesh.core.config import settings
+from gossipmesh.models.user import User
 
 client = TestClient(app)
 

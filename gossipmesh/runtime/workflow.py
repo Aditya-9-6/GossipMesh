@@ -1,6 +1,8 @@
-from sqlalchemy.orm import Session
-from gossipmesh.models.runtime import Workflow, Job
 import logging
+
+from sqlalchemy.orm import Session
+
+from gossipmesh.models.runtime import Job, Workflow
 
 logger = logging.getLogger(__name__)
 

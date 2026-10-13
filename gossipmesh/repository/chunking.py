@@ -1,7 +1,8 @@
-from typing import List, Dict, Any
 import ast
+from typing import Any
 
-def chunk_python_code(code: str, filepath: str) -> List[Dict[str, Any]]:
+
+def chunk_python_code(code: str, filepath: str) -> list[dict[str, Any]]:
     """
     Splits Python code into symbol-level chunks (functions, classes).
     This is a basic AST-based chunker.

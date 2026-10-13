@@ -1,6 +1,8 @@
-from sqlalchemy.orm import Session
-from gossipmesh.models.runtime import Budget
 import logging
+
+from sqlalchemy.orm import Session
+
+from gossipmesh.models.runtime import Budget
 
 logger = logging.getLogger(__name__)
 

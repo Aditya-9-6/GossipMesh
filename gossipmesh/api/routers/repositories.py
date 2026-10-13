@@ -1,15 +1,14 @@
+import logging
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from gossipmesh.api import deps
-from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
-from gossipmesh.models.repository import Repository, IndexState
+from gossipmesh.models.user import User
 from gossipmesh.repository.github import GitHubIntegration
-from gossipmesh.core.config import settings
-import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

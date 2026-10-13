@@ -1,8 +1,8 @@
 import time
+
 import jwt
-from github import Github, Auth
-from github.Installation import Installation
-from gossipmesh.core.config import settings
+from github import Auth, Github
+
 
 class GitHubIntegration:
     def __init__(self, app_id: str, private_key: str):

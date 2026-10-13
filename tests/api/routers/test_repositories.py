@@ -1,9 +1,10 @@
 import unittest
 from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
-from gossipmesh.api.main import app
 from gossipmesh.api import deps
+from gossipmesh.api.main import app
 from gossipmesh.core.config import settings
 
 client = TestClient(app)

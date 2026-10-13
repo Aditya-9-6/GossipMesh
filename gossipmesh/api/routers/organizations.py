@@ -1,11 +1,12 @@
-from typing import Any, List
+from typing import Any
+
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session, joinedload
-from gossipmesh.api import deps
-from gossipmesh.models.user import User
-from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.organization import UserOrganization
 from pydantic import BaseModel
+from sqlalchemy.orm import Session, joinedload
+
+from gossipmesh.api import deps
+from gossipmesh.models.organization import Organization, UserOrganization
+from gossipmesh.models.user import User
 
 router = APIRouter()
 
@@ -13,7 +14,7 @@ class OrganizationResponse(BaseModel):
     id: int
     name: str
 
-@router.get("/me", response_model=List[OrganizationResponse])
+@router.get("/me", response_model=list[OrganizationResponse])
 def read_organizations_me(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)

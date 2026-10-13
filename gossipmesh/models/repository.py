@@ -1,7 +1,10 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from gossipmesh.models.base import Base
+
 
 class Repository(Base):
     __tablename__ = "repositories"

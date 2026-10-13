@@ -1,8 +1,10 @@
 import tests
 import unittest
+
 from fastapi.testclient import TestClient
-from gossipmesh.api.main import app
+
 from gossipmesh.api import deps
+from gossipmesh.api.main import app
 from gossipmesh.models.user import User
 
 client = TestClient(app)

@@ -1,11 +1,12 @@
 from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from gossipmesh.api import deps
-from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
+from gossipmesh.models.user import User
 from gossipmesh.runtime.workflow import WorkflowManager
 
 router = APIRouter()

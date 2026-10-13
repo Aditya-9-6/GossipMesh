@@ -1,6 +1,8 @@
-from sqlalchemy import String, Integer, ForeignKey
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from gossipmesh.models.base import Base
+
 
 class ProviderCredential(Base):
     __tablename__ = "provider_credentials"
