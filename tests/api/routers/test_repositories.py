@@ -59,6 +59,12 @@ class TestRepositoriesAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
             response.json(),
+            {
+                "error": {
+                    "code": "AUTHORIZATION_ERROR",
+                    "message": "Not authorized for this organization"
+                }
+            }
             {"error": {"code": "AUTHORIZATION_ERROR", "message": "Not authorized for this organization"}}
         )
         # Ensure that the background task was NOT queued
