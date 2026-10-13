@@ -1,6 +1,5 @@
-Plan:
-1. Fix the N+1 query in `gossipmesh/api/routers/organizations.py` using `joinedload`. The benchmark proved it exists (N+2 queries).
-2. Fix the reported N+1 query (which is actually an algorithmic inefficiency / O(N) memory + extra query issue) in `gossipmesh/api/routers/providers.py` by using a direct `exists` query, avoiding loading all organizations into memory.
-3. Apply the same authorization check optimization to `gossipmesh/api/routers/runtime.py` and `gossipmesh/api/routers/repositories.py` which have the exact same snippet of code.
-4. Complete pre commit steps.
-5. Submit PR with benchmark results showing the reduction in queries.
+1. **Initial Migration Validation**: Check if there's a script or function to validate Alembic migrations. If not, create a validation script/function. Alembic validation can mean verifying that the database matches the models, or that the current head revision can be reached.
+2. **Upgrade and Downgrade Tests**: Implement tests that verify Alembic migrations can upgrade to `head` and downgrade to `base` without errors using an in-memory SQLite database (as recommended for offline testing).
+3. **Migration Documentation**: Add a `docs/migrations.md` file (or append to a relevant file) to detail the Alembic workflow and conventions.
+4. **Startup Migration Policy**: Although no auto-migration exists in `main.py` currently, I'll add explicit startup logic using a Fastapi lifespan that prevents accidental destructive migrations (checking if it's production and failing if migrations are attempted, or requiring an explicit flag).
+5. **Prevention of Accidental Destructive Migrations**: Update `alembic/env.py` to prevent running down migrations in production.
