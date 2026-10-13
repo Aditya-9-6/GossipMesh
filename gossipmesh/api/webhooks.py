@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi import BackgroundTasks
+from fastapi import APIRouter, Request, BackgroundTasks
 import logging
 import hashlib
 import hmac
 import os
 import json
 
-from gossipmesh.workflows.pr_review import PRReviewWorkflow
+from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
 from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
+from gossipmesh.core.exceptions import AuthenticationError, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -56,18 +58,16 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     event = request.headers.get("X-GitHub-Event")
     if not event:
-        raise HTTPException(
-            status_code=400, detail="Missing X-GitHub-Event header"
-        )
+        raise ValidationError(message="Missing X-GitHub-Event header")
 
     payload_bytes = await request.body()
     if not verify_github_signature(request, payload_bytes):
-        raise HTTPException(status_code=401, detail="Invalid signature")
+        raise AuthenticationError(message="Invalid signature")
 
     try:
         payload = json.loads(payload_bytes)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        raise ValidationError(message="Invalid JSON payload")
 
     logger.info(f"Received GitHub webhook event: {event}")
 
@@ -76,8 +76,8 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         action = payload.get("action")
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
-            workflow = PRReviewWorkflow(pr_data)
-            background_tasks.add_task(workflow.execute)
+            job = PRReviewJob(pr_data)
+            background_tasks.add_task(job.execute)
 
     # Milestone 7: Issue Solver
     elif event == "issues":

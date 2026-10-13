@@ -1,78 +1,77 @@
 # GossipMesh 🌐
 
 > **Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh**  
-> *Enabling autonomous software engineering agents to cross-pollinate architectural wisdom, prevent repeated mistakes, enforce Byzantine quorum consensus, and maintain cross-repository wire compatibility.*
+> *A prototype AI engineering automation platform for autonomous coding agents.*
 
 ---
 
 ## 🌟 Overview
 
-In traditional multi-agent systems, agents operate as isolated silos: issue generators don't know why previous PRs failed, solvers repeat past anti-patterns, and different repositories (e.g. Go network proxies and Rust Zero-Trust VPNs) suffer from protocol drift.
-
-**GossipMesh** introduces a peer-to-peer epidemic knowledge protocol for autonomous coding agents. Agents continuously disseminate discoveries, dynamic architectural memes, adversarial stress probes, and benchmark invariants across decentralized nodes.
-
-```mermaid
-graph TD
-    subgraph Gossip Mesh Ledger
-        GL[Append-Only Gossip Ledger & Vector Clocks]
-    end
-
-    subgraph DevProxy Cluster (Go)
-        D_GEN[Issue Generator Node] -->|Sync Memes| GL
-        D_SOLV[Solver Node] -->|Broadcast Findings| GL
-        D_REV[Reviewer Node] -->|Gossip Anti-Patterns| GL
-    end
-
-    subgraph Spryzen Cluster (Rust)
-        S_GEN[Architect Node] -->|Sync Wire Schemas| GL
-        S_SOLV[Solver Node] -->|Broadcast Benchmarks| GL
-        S_REV[Reviewer Node] -->|Vote Quorum| GL
-    end
-
-    subgraph Autonomous Peers
-        RED[Red Team Adversarial Fuzzer] -->|Exploit Probes| GL
-        ORACLE[Zero-Allocation Perf Oracle] -->|Telemetry Veto| GL
-        AUCTION[Contract Net Auctioneer] -->|Task Allocation| GL
-    end
-```
+**GossipMesh** is currently a strong prototype for autonomous code-review agents, transitioning into a secure, multi-tenant AI agent SaaS platform. It aims to enable autonomous software engineering agents to cross-pollinate architectural wisdom, prevent repeated mistakes, enforce Byzantine quorum consensus, and maintain cross-repository wire compatibility.
 
 ---
 
-## 🚀 Key Advancements
+## 🚀 Implemented Features
 
-### 1. Epidemic Anti-Entropy Gossip Dissemination (`gossipmesh.node`)
-- Peer nodes exchange cryptographically verified messages with **vector clocks** and **time-to-live (TTL)** counters.
-- Automatic anti-entropy synchronization catches up lagging nodes whenever they cycle.
+The following features have been implemented and integrated into the repository:
+- **AST Parsing:** Extracts structural changes from Python and Go diffs to reduce LLM context bloat.
+- **Gemini Embeddings & RAG:** Basic Retrieval-Augmented Generation using Gemini and local JSON vector search.
+- **Semantic Caching:** Reduces redundant LLM API calls using vector embeddings via a local VectorDB.
+- **AI PR Reviewer:** An autonomous loop that evaluates PRs and merges them if the score is $\ge 90/100$, or closes them if rejected.
+- **AI CI Fixer & Issue Solver:** Scripts for AI issue implementation and CI repair.
 
-### 2. Memetic Knowledge Distillation (`gossipmesh.memetic`)
-- Treats architectural rules as evolving **Memes** with dynamic **fitness scores**:
-  - PR approved & merged ($\ge 90/100$ score): Meme rewarded (`fitness += 1.0`).
-  - PR rejected / CI break: Meme penalized (`fitness -= 2.0`).
-- The mesh runs **evolutionary natural selection**, pruning bad advice and prioritizing battle-tested invariants in LLM prompt headers.
+## 🏗️ Prototype Features
 
-### 3. Heterogeneous Multi-Model Byzantine Consensus (`gossipmesh.consensus`)
-- Cross-audits proposed code changes across multiple model tiers (`gemini-3.8-flash`, `gemini-3.1-pro-preview`, and `gemini-3.1-flash-lite`).
-- Requires a **$2/3$ majority quorum** and minimum score threshold before allowing code to be pushed to GitHub.
+These features currently exist as in-memory stubs, local scripts, or mock implementations, lacking a full database or API layer:
+- **Local file-backed gossip node and ledger:** Peer nodes exchange cryptographically verified messages with vector clocks and TTL counters using local JSON files.
+- **Memetic Knowledge Distillation (`gossipmesh.memetic`):** Persistent architectural knowledge and scoring using dynamic fitness scores.
+- **Heterogeneous Multi-Model Byzantine Consensus (`gossipmesh.consensus`):** Multi-model vote aggregation (currently mocked for Gemini models).
+- **Red Team vs. Blue Team Adversarial Auditing (`gossipmesh.red_team`):** Regex-based adversarial audit rules probing for vulnerabilities prior to PR creation.
+- **Cross-Repo Wire Contract Synchronizer (`gossipmesh.bridge`):** Go/Rust wire-contract code generation.
+- **Zero-Allocation Performance Regression Oracle (`gossipmesh.oracle`):** In-memory benchmark regression checks.
+- **Contract Net Protocol Task Auction (`gossipmesh.auction`):** Keyword-based agent specialty selection for RFQs.
 
-### 4. Red Team vs. Blue Team Adversarial Auditing (`gossipmesh.red_team`)
-- Adversarial peer inspects code diffs prior to PR creation.
-- Probes for mutex bottlenecks on hot paths, unbounded heap allocations, out-of-bounds slicing, and path traversal vectors.
+## 🔮 Planned Features
+
+The platform is transitioning toward a full SaaS offering with the following planned features:
+- **Multi-tenant Secure Platform:** Transitioning from local scripts to a provider-neutral agent platform.
+- **Full Backend Stack:** Integration with FastAPI, PostgreSQL, SQLAlchemy 2.0, Alembic, Redis, and Celery for background workers.
+- **Secure Agent Runtime:** A `SandboxEnvironment` for execution isolation, complete with `WorkflowManager`, `BudgetManager`, and robust database models.
+- **Enterprise Controls & Billing:** Milestones for RBAC, provider credential encryption (Fernet), SaaS RAG, and scalable deployment.
 
 ### 5. Cross-Repo Wire Contract Synchronizer (`gossipmesh.bridge`)
-- Translates shared data structures between **Go** ([`DevProxy`](https://github.com/Aditya-9-6/DevProxy)) and **Rust** ([`Spryzen`](https://github.com/Aditya-9-6/spryzen)).
+- Translates shared data structures between **Go** ([`DevProxy`](https://github.com/GossipMesh/DevProxy)) and **Rust** ([`Spryzen`](https://github.com/GossipMesh/spryzen)).
 - Generates matching Go structs and Rust Serde types automatically to prevent protocol divergence.
+---
 
-### 6. Zero-Allocation Performance Regression Oracle (`gossipmesh.oracle`)
-- Tracks time-series microbenchmark metrics (`ns/op`, `B/op`, `allocs/op`).
-- Issues an immediate **VETO** if a proposed change introduces unexpected allocations on a zero-allocation hot path.
+## ⚠️ Security Warnings
 
-### 7. Contract Net Protocol Task Auction (`gossipmesh.auction`)
-- Rather than naive sequential issue processing, advancement specifications are posted as RFQs.
-- Specialized personas (*Concurrency*, *Security*, *Crypto*, *Systems*) submit competitive domain bids to select the optimal solver.
+- **Do not use in production environments.** GossipMesh is a prototype.
+- **Credential Security:** AI must never receive unrestricted production credentials. Do not provide sensitive values like database credentials or production API keys.
+- **Execution Risks:** The framework currently executes AI-generated code. All patches must go through a validation pipeline. Do not push/merge without explicit policy authorization in non-development setups.
 
 ---
 
-## 💻 CLI Usage
+## 💻 Local Development Instructions
+
+The project requires Python version >= 3.10. Dependencies are managed via `pyproject.toml`.
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/Aditya-9-6/GossipMesh.git
+cd GossipMesh
+
+# Create a virtual environment and activate it
+python -m venv venv
+source venv/bin/activate
+
+# Install the package with API dependencies
+pip install -e .[api]
+```
+
+### CLI Usage
 
 ```bash
 # Check mesh status, active heartbeats, and top memetic knowledge
@@ -80,26 +79,32 @@ python -m gossipmesh.cli status
 
 # Broadcast an architectural learning across all agent daemons
 python -m gossipmesh.cli broadcast --topic anti_patterns --message "Use atomic buckets, avoid mutex on hot path" --repo DevProxy
-
-# Inspect the formatted prompt injection context
-python -m gossipmesh.cli memes --repo DevProxy
-
-# Run the Red Team adversarial auditor on a code file
-python -m gossipmesh.cli audit path/to/source.go
 ```
 
----
-
-## 🧪 Testing
+### Testing
 
 Run the comprehensive unit test suite:
 
 ```bash
+# Setup development environment variables to bypass strict signature verification if needed
+export ENVIRONMENT="development"
+
+# Run tests
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 ---
 
+## 🚦 Production Deployment Status
+
+**Not ready for production.** GossipMesh is currently in a prototype phase and lacks the full realization and dependencies for its planned SaaS stack. It is intended strictly for local development and conceptual validation.
+
+For more details on our path to production and architectural decisions, please refer to the following documentation:
+- [Production Readiness](docs/PRODUCTION_READINESS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+
+---
+
 ## 📜 License
 
-Apache-2.0 License. Built by [Aditya Dahale](https://github.com/Aditya-9-6).
+Apache-2.0 License. Built by [Maintainers](https://github.com/Maintainers).

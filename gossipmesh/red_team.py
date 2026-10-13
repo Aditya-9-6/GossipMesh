@@ -40,7 +40,7 @@ class RedTeamAuditor:
             "severity": "HIGH",
             "regex": r"(sync\.(RWMutex|Mutex)|\.Lock\(\))",
             "message": "Potential mutex bottleneck detected on high-throughput hot path.",
-            "test_stub": "// Concurrent Stress Test:\n// Run 1,000 goroutines recording concurrently to expose contention."
+            "test_stub": "// Concurrent Stress Test:\n// Run 1,000 asyncio tasks recording concurrently to expose contention."
         },
         {
             "category": "Unbounded Heap Allocation",

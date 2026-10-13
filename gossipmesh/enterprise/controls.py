@@ -40,30 +40,6 @@ class SCIMProvisioner:
             return True
         return False
 
-
-class RoleManager:
-    """Manages advanced roles and permissions."""
-
-    def __init__(self):
-        self.user_roles: Dict[str, List[str]] = {}
-        self.role_permissions: Dict[str, List[str]] = {
-            "admin": ["read", "write", "delete"],
-            "user": ["read"],
-        }
-
-    def assign_role(self, user_id: str, role: str):
-        if user_id not in self.user_roles:
-            self.user_roles[user_id] = []
-        self.user_roles[user_id].append(role)
-
-    def has_permission(self, user_id: str, permission: str) -> bool:
-        roles = self.user_roles.get(user_id, [])
-        for role in roles:
-            if permission in self.role_permissions.get(role, []):
-                return True
-        return False
-
-
 class DataRetentionPolicy:
     """Enforces data retention policies."""
 
