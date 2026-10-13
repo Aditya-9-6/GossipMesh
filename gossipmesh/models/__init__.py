@@ -1,4 +1,6 @@
 from gossipmesh.models.base import Base
+from gossipmesh.models.user import User, UserGitHubCredential
+from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
@@ -11,6 +13,7 @@ from gossipmesh.repository.vector_store import DocumentChunk
 __all__ = [
     "Base",
     "User",
+    "UserGitHubCredential",
     "Organization",
     "UserOrganization",
     "OrganizationInvitation",
