@@ -6,6 +6,7 @@ from gossipmesh.models.provider import ProviderCredential
 from gossipmesh.models.repository import Repository, IndexState
 from gossipmesh.models.runtime import Workflow, Job, Budget, Artifact
 from gossipmesh.repository.vector_store import DocumentChunk
+from gossipmesh.models.session import UserSession, RefreshToken
 
 __all__ = [
     "Base",
@@ -21,4 +22,6 @@ __all__ = [
     "Budget",
     "Artifact",
     "DocumentChunk",
+    "UserSession",
+    "RefreshToken",
 ]

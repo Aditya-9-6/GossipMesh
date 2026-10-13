@@ -58,8 +58,8 @@ class TestRepositoriesAPI(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
-            response.json(),
-            {"detail": "Not authorized for this organization"}
+            response.json()["error"]["message"],
+            "Not authorized for this organization"
         )
         # Ensure that the background task was NOT queued
         mock_add_task.assert_not_called()
