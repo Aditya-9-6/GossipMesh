@@ -59,7 +59,7 @@ graph TD
 - Probes for mutex bottlenecks on hot paths, unbounded heap allocations, out-of-bounds slicing, and path traversal vectors.
 
 ### 5. Cross-Repo Wire Contract Synchronizer (`gossipmesh.bridge`)
-- Translates shared data structures between **Go** ([`DevProxy`](https://github.com/Aditya-9-6/DevProxy)) and **Rust** ([`Spryzen`](https://github.com/Aditya-9-6/spryzen)).
+- Translates shared data structures between **Go** ([`DevProxy`](https://github.com/GossipMesh/DevProxy)) and **Rust** ([`Spryzen`](https://github.com/GossipMesh/spryzen)).
 - Generates matching Go structs and Rust Serde types automatically to prevent protocol divergence.
 
 ### 6. Zero-Allocation Performance Regression Oracle (`gossipmesh.oracle`)
@@ -102,4 +102,4 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 ## 📜 License
 
-Apache-2.0 License. Built by [Aditya Dahale](https://github.com/Aditya-9-6).
+Apache-2.0 License. Built by [Maintainers](https://github.com/Maintainers).
