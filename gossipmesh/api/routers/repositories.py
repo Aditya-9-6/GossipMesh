@@ -1,5 +1,5 @@
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -9,6 +9,7 @@ from gossipmesh.models.organization import UserOrganization
 from gossipmesh.models.repository import Repository, IndexState
 from gossipmesh.repository.github import GitHubIntegration
 from gossipmesh.core.config import settings
+from gossipmesh.core.exceptions import AuthorizationError
 import logging
 
 router = APIRouter()
@@ -32,7 +33,7 @@ def sync_repository(
         UserOrganization.organization_id == request.organization_id
     ).first()
     if not is_member:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise AuthorizationError(message="Not authorized for this organization")
 
     def _sync_task(full_name: str, installation_id: int, org_id: int):
         # We need a proper RSA key for PyGithub, mock it safely here to prevent crash

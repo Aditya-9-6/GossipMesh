@@ -23,9 +23,9 @@ class TestWebhooks(unittest.TestCase):
 
     def test_missing_event_header(self):
         response = client.post("/webhooks/github", json={})
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 422)
         self.assertEqual(
-            response.json(), {"detail": "Missing X-GitHub-Event header"}
+            response.json()["error"]["message"], "Missing X-GitHub-Event header"
         )
 
     @patch("gossipmesh.jobs.pr_review.PRReviewJob.execute")
@@ -82,7 +82,7 @@ class TestWebhooks(unittest.TestCase):
             json=payload,
         )
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json(), {"detail": "Invalid signature"})
+        self.assertEqual(response.json()["error"]["message"], "Invalid signature")
         del os.environ["GITHUB_WEBHOOK_SECRET"]
 
     @patch("gossipmesh.workflows.issue_solver.IssueSolverWorkflow.execute")
@@ -125,7 +125,7 @@ class TestWebhooks(unittest.TestCase):
             json=payload,
         )
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json(), {"detail": "Invalid signature"})
+        self.assertEqual(response.json()["error"]["message"], "Invalid signature")
 
 
 if __name__ == "__main__":
