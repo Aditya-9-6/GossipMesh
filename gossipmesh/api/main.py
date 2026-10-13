@@ -41,10 +41,13 @@ async def lifespan(app: FastAPI):
     # Cleanup on shutdown can go here if needed
 from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
 from gossipmesh.core.exceptions import GossipMeshException
+from gossipmesh.api.rate_limit import rate_limit
+from fastapi import Depends
 
 app = FastAPI(
     title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
+    dependencies=[Depends(rate_limit(limit_type="api_global", limit=1000, window=60))]
 )
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])

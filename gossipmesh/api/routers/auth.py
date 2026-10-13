@@ -9,6 +9,7 @@ from gossipmesh.core.config import settings
 from gossipmesh.core.security import verify_password, create_access_token
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 from gossipmesh.models.user import User
+from gossipmesh.api.rate_limit import rate_limit
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -17,7 +18,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-@router.post("/login/access-token", response_model=Token)
+@router.post(
+    "/login/access-token",
+    response_model=Token,
+    dependencies=[Depends(rate_limit(limit_type="login", limit=10, window=60))]
+)
 def login_access_token(
     db: Session = Depends(deps.get_db), form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:

@@ -30,3 +30,13 @@ def mock_db_session():
     """Provide a mocked database session."""
     session = MagicMock()
     yield session
+
+@pytest.fixture(autouse=True)
+def mock_rate_limit():
+    """Globally mock the rate limiter so tests don't require Redis."""
+    from unittest.mock import patch
+    import time
+    # Check limit should return (True, 99, current_time + 60)
+    with patch("gossipmesh.core.rate_limit.RateLimiter.check_limit") as mock_check:
+        mock_check.return_value = (True, 99, int(time.time() + 60))
+        yield mock_check

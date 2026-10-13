@@ -10,6 +10,7 @@ from gossipmesh.models.repository import Repository, IndexState
 from gossipmesh.repository.github import GitHubIntegration
 from gossipmesh.core.config import settings
 from gossipmesh.core.exceptions import AuthorizationError
+from gossipmesh.api.rate_limit import rate_limit
 import logging
 
 router = APIRouter()
@@ -20,7 +21,11 @@ class SyncRequest(BaseModel):
     installation_id: int
     organization_id: int
 
-@router.post("/sync", status_code=202)
+@router.post(
+    "/sync",
+    status_code=202,
+    dependencies=[Depends(rate_limit(limit_type="repo_sync", limit=5, window=60))]
+)
 def sync_repository(
     request: SyncRequest,
     background_tasks: BackgroundTasks,

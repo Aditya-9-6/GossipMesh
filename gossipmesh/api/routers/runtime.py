@@ -8,6 +8,7 @@ from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
 from gossipmesh.runtime.workflow import WorkflowManager
 from gossipmesh.core.exceptions import AuthorizationError
+from gossipmesh.api.rate_limit import rate_limit
 
 router = APIRouter()
 
@@ -16,7 +17,11 @@ class CreateWorkflowRequest(BaseModel):
     repository_id: int
     agent_name: str
 
-@router.post("/workflows", status_code=201)
+@router.post(
+    "/workflows",
+    status_code=201,
+    dependencies=[Depends(rate_limit(limit_type="workflow", limit=5, window=60))]
+)
 def create_workflow(
     request: CreateWorkflowRequest,
     current_user: User = Depends(deps.get_current_user),
@@ -37,7 +42,10 @@ def create_workflow(
     # Normally this would enqueue a Celery task to begin execution
     return {"workflow_id": workflow.id, "job_id": job.id, "status": workflow.status}
 
-@router.post("/workflows/{workflow_id}/cancel")
+@router.post(
+    "/workflows/{workflow_id}/cancel",
+    dependencies=[Depends(rate_limit(limit_type="workflow", limit=10, window=60))]
+)
 def cancel_workflow(
     workflow_id: int,
     current_user: User = Depends(deps.get_current_user),
@@ -48,7 +56,10 @@ def cancel_workflow(
     manager.cancel_workflow(workflow_id)
     return {"status": "cancelled"}
 
-@router.post("/workflows/{workflow_id}/approve")
+@router.post(
+    "/workflows/{workflow_id}/approve",
+    dependencies=[Depends(rate_limit(limit_type="workflow", limit=10, window=60))]
+)
 def approve_workflow(
     workflow_id: int,
     current_user: User = Depends(deps.get_current_user),
