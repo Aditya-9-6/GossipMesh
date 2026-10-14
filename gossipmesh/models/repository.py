@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime
+from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from gossipmesh.models.base import Base
@@ -13,6 +13,9 @@ class Repository(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     full_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     default_branch: Mapped[str] = mapped_column(String, default="main")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    installation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
     organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
