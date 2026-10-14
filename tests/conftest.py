@@ -1,6 +1,5 @@
 import os
 import pytest
-from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 # Set up required environment variables before any tests run
