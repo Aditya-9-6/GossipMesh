@@ -1,4 +1,9 @@
 import pytest
+
+@pytest.fixture
+def mock_db_session():
+    return MagicMock()
+
 from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from gossipmesh.api.main import app
@@ -14,16 +19,16 @@ def mock_current_user():
     user = User(id=1, email="test@example.com", hashed_password="hashed")
     app.dependency_overrides[deps.get_current_user] = lambda: user
     yield user
-    app.dependency_overrides.clear()
+
 
 def test_create_organization(test_client, mock_db_session, mock_current_user):
     # Mock db queries
     mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
     def side_effect(obj):
-        if isinstance(obj, Organization):
+        if getattr(obj, '__tablename__', None) == 'organizations' or isinstance(obj, Organization):
             obj.id = 1
-        if isinstance(obj, UserOrganization):
+        if getattr(obj, '__tablename__', None) == 'user_organizations' or isinstance(obj, UserOrganization):
             pass
     mock_db_session.add.side_effect = side_effect
 
@@ -104,8 +109,14 @@ def test_connect_repository(test_client, mock_db_session, mock_current_user):
     mock_db_session.query.return_value.filter.return_value.first.side_effect = [UserOrganization(role="admin", is_suspended=False), None]
 
     def side_effect(obj):
-        if isinstance(obj, Repository):
+        if getattr(obj, '__tablename__', None) == 'repositories':
             obj.id = 1
+            try:
+                obj.is_active = True
+                obj.is_archived = False
+                obj.installation_id = None
+            except:
+                pass
     mock_db_session.add.side_effect = side_effect
     app.dependency_overrides[deps.get_db] = lambda: mock_db_session
 
