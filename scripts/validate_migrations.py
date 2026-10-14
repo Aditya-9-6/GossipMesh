@@ -1,4 +1,3 @@
-import os
 import sys
 import logging
 from alembic.config import Config

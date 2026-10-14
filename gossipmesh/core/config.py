@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import PostgresDsn, RedisDsn
+from pydantic import PostgresDsn
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "GossipMesh SaaS"

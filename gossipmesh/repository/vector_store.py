@@ -1,4 +1,5 @@
 from pgvector.sqlalchemy import Vector
+from typing import Any
 from sqlalchemy import Column, Integer, String, JSON
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
@@ -11,7 +12,7 @@ class DocumentChunk(Base):
     repo_id: int = Column(Integer, index=True)
     filepath: str = Column(String, index=True)
     content: str = Column(String)
-    embedding: list[float] = Column(Vector(1536))
+    embedding: Any = Column(Vector(1536))
     metadata_json: dict = Column(JSON)
 
 class PGVectorStore:
