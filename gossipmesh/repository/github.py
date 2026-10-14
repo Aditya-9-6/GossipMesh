@@ -1,8 +1,6 @@
 import time
-
 import jwt
-from github import Auth, Github
-
+from github import Github, Auth
 
 class GitHubIntegration:
     def __init__(self, app_id: str, private_key: str):
@@ -13,7 +11,7 @@ class GitHubIntegration:
         payload = {
             "iat": int(time.time()) - 60,
             "exp": int(time.time()) + (10 * 60),
-            "iss": self.app_id,
+            "iss": self.app_id
         }
         return jwt.encode(payload, self.private_key, algorithm="RS256")
 
@@ -43,5 +41,5 @@ class GitHubIntegration:
             "github_id": repo.id,
             "name": repo.name,
             "default_branch": repo.default_branch,
-            "clone_url": repo.clone_url,
+            "clone_url": repo.clone_url
         }

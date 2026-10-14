@@ -1,13 +1,12 @@
-import ast
-
 import networkx as nx
-
+import ast
+from typing import Dict
 
 class ArchitectureGraph:
     def __init__(self):
         self.graph = nx.DiGraph()
 
-    def build_from_files(self, files: dict[str, str]):
+    def build_from_files(self, files: Dict[str, str]):
         """
         Builds a dependency graph from a dictionary of filepath -> content.
         Very basic implementation looking for 'import' and 'from ... import'.

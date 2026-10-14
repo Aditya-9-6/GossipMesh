@@ -3,11 +3,10 @@ Cross-Repo Wire Contract & Telemetry Schema Synchronizer.
 Keeps DevProxy (Go) and Spryzen (Rust) type definitions in automated lockstep.
 """
 
+from typing import Dict
 
 class WireContract:
-    def __init__(
-        self, name: str, version: int, fields: dict[str, str], source_repo: str
-    ):
+    def __init__(self, name: str, version: int, fields: Dict[str, str], source_repo: str):
         self.name = name
         self.version = version
         self.fields = fields
@@ -15,9 +14,7 @@ class WireContract:
 
     def to_go_struct(self) -> str:
         """Generates idiomatic Go struct representation."""
-        lines = [
-            f"// {self.name} (v{self.version}) - Synchronized via GossipMesh from {self.source_repo}"
-        ]
+        lines = [f"// {self.name} (v{self.version}) - Synchronized via GossipMesh from {self.source_repo}"]
         lines.append(f"type {self.name} struct {{")
         type_map = {
             "string": "string",
@@ -32,7 +29,7 @@ class WireContract:
             go_type = type_map.get(f_type, "string")
             # PascalCase field name
             pascal_name = "".join(part.capitalize() for part in field.split("_"))
-            lines.append(f'\t{pascal_name} {go_type} `json:"{field}"`')
+            lines.append(f"\t{pascal_name} {go_type} `json:\"{field}\"`")
         lines.append("}")
         return "\n".join(lines)
 
@@ -41,7 +38,7 @@ class WireContract:
         lines = [
             f"/// {self.name} (v{self.version}) - Synchronized via GossipMesh from {self.source_repo}",
             "#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]",
-            f"pub struct {self.name} {{",
+            f"pub struct {self.name} {{"
         ]
         type_map = {
             "string": "String",
@@ -58,16 +55,12 @@ class WireContract:
         lines.append("}")
         return "\n".join(lines)
 
-
 class CrossRepoBridge:
     """Manages shared wire schemas between Go and Rust repositories."""
-
     def __init__(self):
-        self.contracts: dict[str, WireContract] = {}
+        self.contracts: Dict[str, WireContract] = {}
 
-    def register(
-        self, name: str, version: int, fields: dict[str, str], source_repo: str
-    ) -> WireContract:
+    def register(self, name: str, version: int, fields: Dict[str, str], source_repo: str) -> WireContract:
         contract = WireContract(name, version, fields, source_repo)
         self.contracts[name] = contract
         return contract

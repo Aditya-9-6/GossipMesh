@@ -1,9 +1,7 @@
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User, UserGitHubCredential
 from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.user import User
-from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
+from gossipmesh.models.organization import OrganizationInvitation
 from gossipmesh.models.project import Project
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.models.sso import OrganizationSAMLConfig

@@ -1,6 +1,5 @@
-from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+from pydantic import PostgresDsn
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "GossipMesh SaaS"
@@ -38,9 +37,6 @@ class Settings(BaseSettings):
     def REDIS_URI(self) -> str:
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=True
-    )
-
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
 
 settings = Settings()
