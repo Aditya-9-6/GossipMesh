@@ -20,8 +20,6 @@ def mock_db_session():
     return MagicMock()
 
 def test_create_organization(test_client, mock_db_session, mock_current_user):
-def test_create_organization(test_client, mock_current_user):
-    mock_db_session = MagicMock()
     # Mock db queries
     mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -40,8 +38,6 @@ def test_create_organization(test_client, mock_current_user):
     assert response.json() == {"id": 1, "name": "New Org"}
 
 def test_create_organization_exists(test_client, mock_db_session, mock_current_user):
-def test_create_organization_exists(test_client, mock_current_user):
-    mock_db_session = MagicMock()
     mock_db_session.query.return_value.filter.return_value.first.return_value = Organization(id=1, name="Existing")
     app.dependency_overrides[deps.get_db] = lambda: mock_db_session
 
@@ -49,8 +45,6 @@ def test_create_organization_exists(test_client, mock_current_user):
     assert response.status_code == 400
 
 def test_create_invitation(test_client, mock_db_session, mock_current_user):
-def test_create_invitation(test_client, mock_current_user):
-    mock_db_session = MagicMock()
     mock_db_session.query.return_value.filter.return_value.first.return_value = UserOrganization(role="admin", is_suspended=False)
     app.dependency_overrides[deps.get_db] = lambda: mock_db_session
 
@@ -60,8 +54,6 @@ def test_create_invitation(test_client, mock_current_user):
     assert "token" in response.json()
 
 def test_create_invitation_unauthorized(test_client, mock_db_session, mock_current_user):
-def test_create_invitation_unauthorized(test_client, mock_current_user):
-    mock_db_session = MagicMock()
     mock_db_session.query.return_value.filter.return_value.first.return_value = None # Not an admin
     app.dependency_overrides[deps.get_db] = lambda: mock_db_session
 
@@ -70,7 +62,6 @@ def test_create_invitation_unauthorized(test_client, mock_current_user):
     assert response.status_code == 403
 
 def test_accept_invitation(test_client, mock_db_session, mock_current_user):
-def test_accept_invitation(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # Mock finding the invitation
     mock_invitation = OrganizationInvitation(id=1, email="invite@example.com", token="valid_token", organization_id=1, role="member")
@@ -86,7 +77,6 @@ def test_accept_invitation(test_client, mock_current_user):
     assert mock_db_session.delete.call_count == 1 # Invitation
 
 def test_assign_role(test_client, mock_db_session, mock_current_user):
-def test_assign_role(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # First query checks admin, second finds the user to update
     mock_admin_check = UserOrganization(role="admin", is_suspended=False)
@@ -100,7 +90,6 @@ def test_assign_role(test_client, mock_current_user):
     assert mock_user_org.role == "admin"
 
 def test_create_project(test_client, mock_db_session, mock_current_user):
-def test_create_project(test_client, mock_current_user):
     mock_db_session = MagicMock()
     mock_db_session.query.return_value.filter.return_value.first.return_value = UserOrganization(role="admin", is_suspended=False)
 
@@ -116,7 +105,6 @@ def test_create_project(test_client, mock_current_user):
     assert response.json() == {"id": 1, "name": "New Project", "description": "Desc"}
 
 def test_connect_repository(test_client, mock_db_session, mock_current_user):
-def test_connect_repository(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # First query admin check, second repo check
     mock_db_session.query.return_value.filter.return_value.first.side_effect = [UserOrganization(role="admin", is_suspended=False), None]
@@ -139,7 +127,6 @@ def test_connect_repository(test_client, mock_current_user):
     assert response.json()["id"] == 1
 
 def test_remove_member(test_client, mock_db_session, mock_current_user):
-def test_remove_member(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # First admin check, second find member
     mock_admin_check = UserOrganization(role="admin", is_suspended=False)
@@ -153,7 +140,6 @@ def test_remove_member(test_client, mock_current_user):
     assert mock_db_session.delete.call_count == 1
 
 def test_suspend_member(test_client, mock_db_session, mock_current_user):
-def test_suspend_member(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # First admin check, second find member
     mock_admin_check = UserOrganization(role="admin", is_suspended=False)
