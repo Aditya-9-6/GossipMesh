@@ -4,7 +4,7 @@ import uuid
 import urllib.parse
 from typing import Any
 import httpx
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, status, Response, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from gossipmesh.models.user import User, UserGitHubCredential
 from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.db.redis import redis_client
+from gossipmesh.api.rate_limit import rate_limit
 from pydantic import BaseModel
 import base64
 import hashlib
@@ -30,7 +31,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-@router.post("/login/access-token", response_model=Token)
+@router.post(
+    "/login/access-token",
+    response_model=Token,
+    dependencies=[Depends(rate_limit(limit_type="login", limit=10, window=60))]
+)
 def login_access_token(
     db: Session = Depends(deps.get_db), form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
