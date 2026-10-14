@@ -80,7 +80,7 @@ jobs:
           POSTGRES_PORT: 5432
           SECRET_KEY: test_secret_key
           ENCRYPTION_KEY: test_encryption_key
-        run: pytest -m integration tests/ || test $? -eq 5
+        run: pytest -m integration tests/
 
   linting:
     name: Linting
@@ -110,7 +110,7 @@ jobs:
           pip install -e .[api,dev]
           pip install mypy
       - name: Run Mypy
-        run: mypy gossipmesh/ || true
+        run: mypy gossipmesh/
 
   test-coverage:
     name: Test Coverage Tracking
@@ -176,13 +176,9 @@ jobs:
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
