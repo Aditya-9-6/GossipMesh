@@ -1,13 +1,11 @@
 import pytest
 from unittest.mock import MagicMock
-from fastapi.testclient import TestClient
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
 from gossipmesh.models.repository import Repository
-from gossipmesh.models.audit import AuditEvent
 
 @pytest.fixture
 def mock_current_user():
@@ -146,4 +144,4 @@ def test_suspend_member(test_client, mock_current_user, mock_db_session):
     response = test_client.patch("/api/v1/organizations/1/members/2/suspend")
 
     assert response.status_code == 200
-    assert mock_user_org.is_suspended == True
+    assert mock_user_org.is_suspended
