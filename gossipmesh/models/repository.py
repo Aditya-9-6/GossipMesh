@@ -11,12 +11,14 @@ class Repository(Base):
 
     __mapper_args__ = {"version_id_col": version_id}
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     full_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     default_branch: Mapped[str] = mapped_column(String, default="main")
 
     organization = relationship("Organization")
+    project = relationship("Project", back_populates="repositories")
 
 class IndexState(Base):
     __tablename__ = "index_states"
