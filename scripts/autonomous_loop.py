@@ -7,7 +7,7 @@ Executes the continuous hyper-scale development cycle:
 2. Issue Generation: Creates architecture advancement specifications.
 3. AI Solver: Implements solutions with zero-allocation, anti-spaghetti invariants.
 4. Pre-Commit Quality Gate: Runs black . || echo 'black not found', flake8 . || echo 'flake8 not found', and python -m unittest discover -s tests -p 'test_*.py' -v
-5. Contribution Attribution: Commits with 'Aditya Dahale <aditya-9-6@users.noreply.github.com>'.
+5. Contribution Attribution: Commits with 'GossipMesh Bot <bot@gossipmesh.io>'.
 6. Autonomous Reviewer Gate: Audits PR against strict performance and decoupling invariants.
 7. Auto-Merger: Squash-merges approved PRs to continuously illuminate GitHub contribution chart.
 """
@@ -26,9 +26,9 @@ try:
 except Exception:
     pass
 
-REPO = "Aditya-9-6/GossipMesh"
-USER_NAME = "Aditya Dahale"
-USER_EMAIL = "aditya-9-6@users.noreply.github.com"
+REPO = "GossipMesh/GossipMesh"
+USER_NAME = "GossipMesh Bot"
+USER_EMAIL = "bot@gossipmesh.io"
 
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []
@@ -82,7 +82,7 @@ class KeyPool:
 
 GLOBAL_POOL = KeyPool(DEFAULT_KEYS)
 
-def run_cmd(cmd, cwd=None, check=True):
+def run_cmd(cmd, cwd=None, check=False):
     """Runs a shell command and returns stdout."""
     res = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str), capture_output=True, text=True, encoding="utf-8", errors="replace")
     if check and res.returncode != 0:
@@ -165,13 +165,13 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         return False
 
     # Pre-commit Quality Assurance Gate
-    print("[*] Tidying Go modules with python -m compileall ....", flush=True)
+    print("[*] Tidying Python files with python -m compileall ....", flush=True)
     run_cmd(["python", "-m", "compileall", "."], cwd=workspace, check=False)
 
-    print("[*] Formatting Go codebase with gofmt...", flush=True)
+    print("[*] Formatting Python codebase with black...", flush=True)
     run_cmd(["black", "."], cwd=workspace, check=False)
 
-    print("[*] Verifying Go compilation & static analysis (go vet)...", flush=True)
+    print("[*] Verifying Python linting & static analysis (flake8)...", flush=True)
     vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
     check_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
@@ -188,12 +188,12 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
 
     branch_name = f"ai/solve-issue-{issue_num}"
     print(f"[*] Staging changes on branch {branch_name}...", flush=True)
-    run_cmd(f"git checkout -B {branch_name}", cwd=workspace)
-    run_cmd("git config user.name 'Aditya Dahale'", cwd=workspace)
-    run_cmd(f"git config user.email '{USER_EMAIL}'", cwd=workspace)
+    run_cmd(["git", "checkout", "-B", branch_name], cwd=workspace)
+    run_cmd(["git", "config", "user.name", "GossipMesh Bot"], cwd=workspace)
+    run_cmd(["git", "config", "user.email", USER_EMAIL], cwd=workspace)
 
     run_cmd("git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
-    run_cmd("git add -A", cwd=workspace)
+    run_cmd(["git", "add", "-A"], cwd=workspace)
     run_cmd("git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
 
     commit_msg = f"feat: automated resolution for issue #{issue_num} ({issue_title})"
@@ -204,7 +204,7 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     ], cwd=workspace, check=False)
 
     print(f"[*] Pushing branch {branch_name} to origin...", flush=True)
-    run_cmd(f"git push origin {branch_name} --force", cwd=workspace)
+    run_cmd(["git", "push", "origin", branch_name, "--force"], cwd=workspace)
 
     print("[*] Creating / updating Pull Request...", flush=True)
     summary_file = workspace / "ai_pr_summary.md"
@@ -274,12 +274,15 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         print(fix_res.stdout, flush=True)
 
         # Re-commit and push if fixed
-        run_cmd("git add -A", cwd=workspace)
+        run_cmd(["git", "add", "-A"], cwd=workspace)
         run_cmd(["git", "commit", "-m", f"fix: incorporate ai reviewer feedback for PR #{pr_num}"], cwd=workspace, check=False)
-        run_cmd(f"git push origin {branch_name} --force", cwd=workspace, check=False)
+        run_cmd(["git", "push", "origin", branch_name, "--force"], cwd=workspace, check=False)
         return False
 
     if verdict == "APPROVED" and score >= 90:
+        print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)!", flush=True)
+        print(f"[*] PR #{pr_num} is approved. Awaiting manual merge by a human.", flush=True)
+        return False
         print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Checking for human merge permission...", flush=True)
 
         has_merge_permission = False
@@ -300,11 +303,11 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
             run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
             merge_out = run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace)
             print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
-            run_cmd("git checkout main", cwd=workspace)
-            run_cmd("git pull origin main", cwd=workspace)
+            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
             # Clean up feature branch
-            run_cmd(f"git branch -D {branch_name}", cwd=workspace, check=False)
-            run_cmd(f"git push origin --delete {branch_name}", cwd=workspace, check=False)
+            run_cmd(["git", "branch", "-D", branch_name], cwd=workspace, check=False)
+            run_cmd(["git", "push", "origin", "--delete", branch_name], cwd=workspace, check=False)
             return True
         else:
             print(f"[*] PR #{pr_num} is approved but missing '/merge' comment from a human. Awaiting permission.", flush=True)
@@ -336,8 +339,8 @@ def handle_pr_comments(workspace: Path):
                 branch_name = pr["headRefName"]
 
                 # Check out the PR branch
-                run_cmd(f"git checkout {branch_name}", cwd=workspace)
-                run_cmd(f"git pull origin {branch_name}", cwd=workspace, check=False)
+                run_cmd(["git", "checkout", branch_name], cwd=workspace)
+                run_cmd(["git", "pull", "origin", branch_name], cwd=workspace, check=False)
 
                 # Run tests
                 check_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -353,9 +356,9 @@ def handle_pr_comments(workspace: Path):
                     print(fix_res.stdout, flush=True)
 
                     # Re-commit and push if fixed
-                    run_cmd("git add -A", cwd=workspace)
+                    run_cmd(["git", "add", "-A"], cwd=workspace)
                     run_cmd(["git", "commit", "-m", f"fix: automated CI fix based on review request for PR #{pr_num}"], cwd=workspace, check=False)
-                    run_cmd(f"git push origin {branch_name}", cwd=workspace, check=False)
+                    run_cmd(["git", "push", "origin", branch_name], cwd=workspace, check=False)
                 else:
                     print(f"[*] PR #{pr_num} CI passed! Proceeding to reviewer...", flush=True)
 
@@ -375,7 +378,7 @@ def handle_pr_comments(workspace: Path):
                     run_cmd(["gh", "pr", "comment", str(pr_num), "--body-file", str(review_md_file)], cwd=workspace, check=False)
 
                 # Switch back to main
-                run_cmd("git checkout main", cwd=workspace)
+                run_cmd(["git", "checkout", "main"], cwd=workspace)
 
     except Exception as e:
         print(f"[Warning] Failed to check PR comments: {e}", file=sys.stderr, flush=True)

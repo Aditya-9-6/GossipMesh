@@ -33,7 +33,7 @@ FALLBACK_MODELS = [
     "gemini-1.5-pro",
 ]
 
-REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance HTTP/HTTPS proxy and security engine in Python).
+REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance AI Agent SaaS platform in Python).
 
 Your primary mission is to ENFORCE STRICT ARCHITECTURAL STANDARDS AND PREVENT SPAGHETTI CODE as the codebase scales at hyper-speed.
 
@@ -47,18 +47,15 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
    - Async/thread lifecycle safety: All launched threads/tasks must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
    - Finally/ContextManager hygiene: Mutex unlocks and resource closes must be deferred immediately with zero resource leaks inside hot unbounded loops.
 3. Memory & High Throughput Invariants:
-   - Zero-allocation hot paths: Use `object pools for buffers. Avoid allocating large lists or copying payloads in the proxy stream forwarding path.
+   - Zero-allocation hot paths: Use `object pools for buffers. Avoid allocating large lists or copying payloads in the AI workflow execution path.
    - Streaming compliance: Read and forward payloads via streaming readers/writers (Python streaming APIs) without buffering entire multi-megabyte streams in RAM.
 4. Security & Hardening:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
 
    - Enterprise Privacy & Secrets Policy Check: Ensure no PII, API keys, or sensitive credentials are leaked in the code or tests.
-5. Go Idiomatic Standards & Test Coverage:
-   - Error wrapping using `%w` and proper sentinel error checking with `errors.Is`/`errors.As`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution (`t.Parallel()`).
 5. Python Idiomatic Standards & Test Coverage:
-   - Error wrapping using `from e` and proper sentinel error checking with `isinstance`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution .
+   - Error wrapping and proper exception handling using `try...except`.
+   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and proper asyncio usage.
 
 EVALUATION & VERDICT:
 - If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
@@ -74,12 +71,12 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
   "score": 95,
   "executive_summary": "Concise summary of the PR and overall architectural quality.",
   "anti_spaghetti_audit": "Detailed evaluation of code modularity, function sizing, decoupling, and maintainability.",
-  "security_concurrency_audit": "Detailed analysis of data race freedom, goroutine lifecycle, mutex safety, and security posture.",
+  "security_concurrency_audit": "Detailed analysis of data race freedom, asyncio task lifecycle, mutex safety, and security posture.",
   "performance_memory_audit": "Evaluation of buffer pooling (sync.Pool), zero-allocation hot paths, and streaming throughput.",
   "test_coverage_audit": "Evaluation of test coverage, edge cases, error conditions, and concurrency tests.",
 
   "privacy_security_audit": "Enterprise Privacy & Secrets Policy Check: strict verification that no PII, API keys, or sensitive credentials are leaked.",
-  "system_impact": "Detailed assessment of the PR's effect on the DevProxy system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
+  "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Maintainers.",
   "roi_metrics": {
     "estimated_review_time_saved_minutes": 15,
     "defects_prevented": 2
@@ -153,8 +150,25 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
         return cached_val
 
     last_err = None
+    max_attempts = 3
+
+    # Pre-compute all strategy combinations (keys x models) to try before sleeping
+    strategies = []
     for current_key in keys_to_try:
         for current_model in models_to_try:
+            strategies.append((current_key, current_model))
+
+    # Keep track of strategies that have permanently failed (e.g. 400 Bad Request)
+    terminal_strategies = set()
+
+    for attempt in range(1, max_attempts + 1):
+        # Only try strategies that haven't permanently failed
+        active_strategies = [s for s in strategies if s not in terminal_strategies]
+
+        if not active_strategies:
+            break
+
+        for current_key, current_model in active_strategies:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
                 "contents": [
@@ -172,49 +186,49 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
             }
 
             print(f"[*] Requesting architectural PR review from model: {current_model}...", flush=True)
-            max_attempts = 3
-            for attempt in range(1, max_attempts + 1):
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST"
-                )
-                try:
-                    with urllib.request.urlopen(req, timeout=90) as resp:
-                        data = json.loads(resp.read().decode("utf-8"))
-                        text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                        try:
-                            parsed_response = json.loads(text_response, strict=False)
-                        except json.JSONDecodeError:
-                            if text_response.startswith("```"):
-                                lines = text_response.splitlines()
-                                if lines[0].startswith("```"):
-                                    lines = lines[1:]
-                                if lines and lines[-1].startswith("```"):
-                                    lines = lines[:-1]
-                                text_response = "\n".join(lines).strip()
-                            parsed_response = json.loads(text_response, strict=False)
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=90) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    try:
+                        parsed_response = json.loads(text_response, strict=False)
+                    except json.JSONDecodeError:
+                        if text_response.startswith("```"):
+                            lines = text_response.splitlines()
+                            if lines[0].startswith("```"):
+                                lines = lines[1:]
+                            if lines and lines[-1].startswith("```"):
+                                lines = lines[:-1]
+                            text_response = "\n".join(lines).strip()
+                        parsed_response = json.loads(text_response, strict=False)
 
-                        sem_cache.put(cache_key_text, parsed_response)
-                        return parsed_response
-                except urllib.error.HTTPError as e:
-                    err_msg = e.read().decode("utf-8", errors="replace")
-                    print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}", file=sys.stderr)
-                    last_err = err_msg
-                    if e.code == 404:
-                        break
-                    if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
-                        time.sleep(1 * attempt)
-                        continue
-                    break
-                except Exception as e:
-                    print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
-                    last_err = str(e)
-                    if attempt < max_attempts:
-                        time.sleep(1 * attempt)
-                        continue
-                    break
+                    sem_cache.put(cache_key_text, parsed_response)
+                    return parsed_response
+            except urllib.error.HTTPError as e:
+                err_msg = e.read().decode("utf-8", errors="replace")
+                print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}", file=sys.stderr)
+                last_err = err_msg
+                if e.code not in (429, 500, 502, 503, 504):
+                    # For terminal errors like 400, 403, 404, we don't want to retry this strategy
+                    terminal_strategies.add((current_key, current_model))
+                continue
+            except Exception as e:
+                print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
+                last_err = str(e)
+                continue  # Try next strategy
+
+        # Check if there are still non-terminal strategies left to retry
+        active_strategies = [s for s in strategies if s not in terminal_strategies]
+
+        # If we exhausted all strategies in this attempt, we have attempts left, and there is something left to retry, we sleep
+        if attempt < max_attempts and active_strategies:
+            time.sleep(1 * attempt)
 
     raise RuntimeError(f"Failed to obtain PR review from Gemini API. Last error: {last_err}")
 
@@ -572,7 +586,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
 
-**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
+**cc @Maintainers** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
 ### 🌐 Architectural System Impact Report
 {system_impact}
@@ -598,7 +612,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ---
 ### 🚦 Next Steps: Maintainer Sign-Off Required
-**@Aditya-9-6**: All automated quality gates, anti-spaghetti checks, and performance benchmarks have passed cleanly.
+**@Maintainers**: All automated quality gates, anti-spaghetti checks, and performance benchmarks have passed cleanly.
 To complete the merge into `main`:
 - **Approve this Pull Request**, OR
 - Comment **`/merge`** on this PR.

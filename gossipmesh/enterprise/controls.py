@@ -2,13 +2,16 @@
 Enterprise controls for GossipMesh.
 Milestone 8 Implementation.
 """
+
 import uuid
-from typing import Dict, List, Any
+from typing import Dict, List
+
 
 class SSOManager:
     """Handles Single Sign-On (SSO) integration."""
+
     def __init__(self):
-        self.active_sessions: Dict[str, str] = {} # token -> user_id
+        self.active_sessions: Dict[str, str] = {}  # token -> user_id
 
     def authenticate(self, user_token: str) -> bool:
         return user_token in self.active_sessions
@@ -18,8 +21,10 @@ class SSOManager:
         self.active_sessions[token] = user_id
         return token
 
+
 class SCIMProvisioner:
     """Handles SCIM provisioning and de-provisioning."""
+
     def __init__(self):
         self.users: Dict[str, dict] = {}
 
@@ -35,31 +40,11 @@ class SCIMProvisioner:
             return True
         return False
 
-class RoleManager:
-    """Manages advanced roles and permissions."""
-    def __init__(self):
-        self.user_roles: Dict[str, List[str]] = {}
-        self.role_permissions: Dict[str, List[str]] = {
-            "admin": ["read", "write", "delete"],
-            "user": ["read"]
-        }
-
-    def assign_role(self, user_id: str, role: str):
-        if user_id not in self.user_roles:
-            self.user_roles[user_id] = []
-        self.user_roles[user_id].append(role)
-
-    def has_permission(self, user_id: str, permission: str) -> bool:
-        roles = self.user_roles.get(user_id, [])
-        for role in roles:
-            if permission in self.role_permissions.get(role, []):
-                return True
-        return False
-
 class DataRetentionPolicy:
     """Enforces data retention policies."""
+
     def __init__(self):
-        self.policies: Dict[str, int] = {} # resource_type -> days
+        self.policies: Dict[str, int] = {}  # resource_type -> days
 
     def set_policy(self, resource_type: str, days: int):
         self.policies[resource_type] = days
@@ -69,8 +54,10 @@ class DataRetentionPolicy:
             return True
         return False
 
+
 class DataExporter:
     """Handles data and audit log exports."""
+
     def export_data(self, tenant_id: str) -> str:
         # In a real system, this would gather data from a DB.
         return f"Data exported for tenant {tenant_id}."
@@ -78,8 +65,10 @@ class DataExporter:
     def export_audit_logs(self, tenant_id: str) -> str:
         return f"Audit logs exported for tenant {tenant_id}."
 
+
 class ComplianceAuditor:
     """Handles compliance program auditing."""
+
     def run_audit(self) -> bool:
         # Returns True if all compliance checks pass
         return True

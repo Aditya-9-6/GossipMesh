@@ -6,20 +6,23 @@ class Settings(BaseSettings):
     VERSION: str = "0.2.0"
     API_V1_STR: str = "/api/v1"
 
-    SECRET_KEY: str = "supersecretkey_please_change_in_production"
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    ENCRYPTION_KEY: str = "b_wH5yL7g3XQz8T1kVcZp6sN0mR9dE2fA4uYxWqVjMw=" # Example Fernet key
+    ENCRYPTION_KEY: str
 
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: str = "5432"
-    POSTGRES_DB: str = "gossipmesh"
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: str
+    POSTGRES_DB: str
 
     REDIS_HOST: str = "localhost"
     REDIS_PORT: str = "6379"
+
+    GITHUB_CLIENT_ID: str | None = None
+    GITHUB_CLIENT_SECRET: str | None = None
 
     @property
     def DATABASE_URI(self) -> PostgresDsn | str:
