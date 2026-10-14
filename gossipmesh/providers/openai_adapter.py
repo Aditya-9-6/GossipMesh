@@ -1,11 +1,17 @@
-from typing import Any
-from typing import AsyncGenerator
 import time
-from openai import AsyncOpenAI
+from collections.abc import AsyncGenerator
+
 import tiktoken
+from openai import AsyncOpenAI
 
 from gossipmesh.providers.base import BaseProvider
-from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
+from gossipmesh.providers.models import (
+    GenerationRequest,
+    GenerationResponse,
+    ProviderHealth,
+    Usage,
+)
+
 
 class OpenAIProvider(BaseProvider):
     def __init__(self, api_key: str):
@@ -19,41 +25,47 @@ class OpenAIProvider(BaseProvider):
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         start_time = time.time()
 
-        formatted_messages: list[Any] = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        formatted_messages = [
+            {"role": msg.role, "content": msg.content} for msg in request.messages
+        ]
 
         response = await self.client.chat.completions.create(
             model=request.model,
             messages=formatted_messages,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
-            stop=request.stop_sequences
+            stop=request.stop_sequences,
         )
 
         end_time = time.time()
 
         usage = Usage(
-            prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
-            completion_tokens=response.usage.completion_tokens if response.usage else 0,
-            total_tokens=response.usage.total_tokens if response.usage else 0,
-            cost_estimate_usd=0.0 # To be implemented properly via a pricing table
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+            total_tokens=response.usage.total_tokens,
+            cost_estimate_usd=0.0,  # To be implemented properly via a pricing table
         )
 
         return GenerationResponse(
             content=response.choices[0].message.content or "",
             model=response.model,
             usage=usage,
-            raw_response=response.model_dump()
+            raw_response=response.model_dump(),
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
-        formatted_messages: list[Any] = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        stream: Any = await self.client.chat.completions.create(
+    async def generate_stream(
+        self, request: GenerationRequest
+    ) -> AsyncGenerator[str, None]:
+        formatted_messages = [
+            {"role": msg.role, "content": msg.content} for msg in request.messages
+        ]
+        stream = await self.client.chat.completions.create(
             model=request.model,
             messages=formatted_messages,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stop=request.stop_sequences,
-            stream=True
+            stream=True,
         )
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
