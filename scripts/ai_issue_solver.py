@@ -1,15 +1,3 @@
-# ruff: noqa: E402
-import ast
-import os
-import sys
-from pathlib import Path
-import json
-import argparse
-import urllib.request
-import urllib.error
-import subprocess
-import time
-import hashlib
 #!/usr/bin/env python3
 """
 AI Issue Solver for GossipMesh
@@ -17,6 +5,16 @@ Uses Google Gemini API to analyze an issue, understand the Python codebase, gene
 and write files ready for automated pull request creation.
 """
 
+import os
+import sys
+import json
+import argparse
+import urllib.request
+import urllib.error
+import subprocess
+import time
+import hashlib
+from pathlib import Path
 
 DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
@@ -83,8 +81,10 @@ def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60
     overview.append("\n".join(selected))
     return "\n".join(overview)
 
-
+import sys
+import ast
 # Add parent directory to path to import gossipmesh
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.rag import VectorDB
 from gossipmesh.memetic import MemeticKnowledgeBase
 
@@ -166,7 +166,7 @@ def get_relevant_files(workspace_root: Path, query_text: str) -> str:
         print("[*] VectorDB is empty. Indexing workspace...")
         db.index_workspace(workspace_root)
 
-    print("[*] Querying VectorDB for relevant context files...")
+    print(f"[*] Querying VectorDB for relevant context files...")
     results = db.search(query_text, top_k=3)
 
     for path, content, score in results:
@@ -293,6 +293,7 @@ def main():
     workspace_root = Path(args.workspace).resolve()
     print(f"[*] Solving Issue #{args.issue_number}: {args.issue_title}")
 
+    keywords = [w for w in (args.issue_title + " " + args.issue_body).split() if len(w) > 3]
     
     print("[*] Inspecting repository context...")
     all_files = get_git_files(workspace_root)
@@ -305,7 +306,7 @@ def main():
     kb = MemeticKnowledgeBase()
     meme_context = kb.format_prompt_context(repo="GossipMesh")
 
-    prompt = f"""\n
+    prompt = f"""
 GitHub Issue #{args.issue_number}: {args.issue_title}
 
 ### Issue Description & Acceptance Criteria:
@@ -324,7 +325,6 @@ Instructions:
 2. Adhere to GossipMesh performance and concurrency invariants.
 3. Write clean, idiomatic Python code with accompanying unit tests (test_*.py).
 4. Output your response as valid JSON adhering to the specified schema.
-"""
 
     print("[*] Requesting solution from Gemini AI...")
     result = call_gemini(api_key, prompt)
@@ -347,7 +347,24 @@ Instructions:
         print(f"    [+] Wrote: {rel_path}")
 
     summary_file = workspace_root / "ai_pr_summary.md"
-    summary_content = f"""## 🤖 Automated Solution for Issue #{args.issue_number}\n\n**Issue**: #{args.issue_number} - {args.issue_title}\n\n### 📝 Solution Overview\n{summary}\n\n### 📦 Files Changed\n{chr(10).join(f"- `{f['path']}`" for f in files)}\n\n### 🛡️ Quality & Performance Invariants\n- [x] Idiomatic Python concurrency and memory safety.\n- [x] High throughput and streaming invariants preserved.\n- [x] Comprehensive unit tests included.\n\n---\n*Closes #{args.issue_number}*\n"""
+    summary_content = f"""## 🤖 Automated Solution for Issue #{args.issue_number}
+
+**Issue**: #{args.issue_number} - {args.issue_title}
+
+### 📝 Solution Overview
+{summary}
+
+### 📦 Files Changed
+{chr(10).join(f"- `{f['path']}`" for f in files)}
+
+### 🛡️ Quality & Performance Invariants
+- [x] Idiomatic Python concurrency and memory safety.
+- [x] High throughput and streaming invariants preserved.
+- [x] Comprehensive unit tests included.
+
+---
+*Closes #{args.issue_number}*
+"""
     summary_file.write_text(summary_content, encoding="utf-8")
     print("[OK] Solution generated and files written successfully.")
 

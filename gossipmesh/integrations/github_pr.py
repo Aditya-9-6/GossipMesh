@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import httpx
 
 from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError

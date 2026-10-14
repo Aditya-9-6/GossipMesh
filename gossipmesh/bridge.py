@@ -3,7 +3,7 @@ Cross-Repo Wire Contract & Telemetry Schema Synchronizer.
 Keeps DevProxy (Go) and Spryzen (Rust) type definitions in automated lockstep.
 """
 
-from typing import Dict
+from typing import Dict, Any, List
 
 class WireContract:
     def __init__(self, name: str, version: int, fields: Dict[str, str], source_repo: str):
