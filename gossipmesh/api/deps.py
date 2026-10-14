@@ -10,9 +10,8 @@ from gossipmesh.core.config import settings
 from gossipmesh.models.user import User
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 
-reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login/access-token"
-)
+reusable_oauth2 = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login/access-token")
+
 
 def get_db() -> Generator:
     try:
@@ -21,13 +20,10 @@ def get_db() -> Generator:
     finally:
         db.close()
 
-def get_current_user(
-    db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
-) -> User:
+
+def get_current_user(db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)) -> User:
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         token_data = payload.get("sub")
         if token_data is None:
             raise AuthenticationError(message="Could not validate credentials")
@@ -74,4 +70,3 @@ def get_scim_token(
     if api_key:
         return api_key
     raise AuthenticationError(message="Invalid SCIM token")
-
