@@ -1,11 +1,13 @@
-import unittest
-from unittest.mock import patch
-from fastapi.testclient import TestClient
-from gossipmesh.api import app
-import os
 import hashlib
 import hmac
 import json
+import os
+import unittest
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from gossipmesh.api import app
 
 client = TestClient(app)
 
@@ -50,9 +52,7 @@ class TestWebhooks(unittest.TestCase):
             json=payload,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(), {"status": "accepted", "event": "issues"}
-        )
+        self.assertEqual(response.json(), {"status": "accepted", "event": "issues"})
 
     @patch("gossipmesh.workflows.ci_fixer.CIFixerWorkflow.execute")
     def test_workflow_run_event_failure(self, mock_execute):
@@ -105,9 +105,7 @@ class TestWebhooks(unittest.TestCase):
             content=payload_bytes,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(), {"status": "accepted", "event": "issues"}
-        )
+        self.assertEqual(response.json(), {"status": "accepted", "event": "issues"})
         del os.environ["GITHUB_WEBHOOK_SECRET"]
 
     def test_missing_secret_in_production(self):
