@@ -1,6 +1,5 @@
 import os
 import pytest
-from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 # Set up required environment variables before any tests run
@@ -27,6 +26,14 @@ def test_client():
 
 @pytest.fixture
 def mock_db_session():
-    """Provide a mocked database session."""
-    session = MagicMock()
+    """Provide a real in-memory sqlite session instead of MagicMock."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from gossipmesh.models.base import Base
+
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
     yield session
+    session.close()

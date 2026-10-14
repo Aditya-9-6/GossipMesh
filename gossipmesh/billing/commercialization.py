@@ -2,7 +2,7 @@
 Billing and commercialization for GossipMesh.
 Milestone 9 Implementation.
 """
-from typing import Dict, List, Any
+from typing import Dict, List
 
 class StripeBillingEngine:
     """Handles Stripe billing integration."""

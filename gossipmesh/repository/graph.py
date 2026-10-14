@@ -1,6 +1,6 @@
 import networkx as nx
 import ast
-from typing import Dict, Any
+from typing import Dict
 
 class ArchitectureGraph:
     def __init__(self):

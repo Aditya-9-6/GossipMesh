@@ -1,4 +1,3 @@
-from typing import Dict, Type, List
 from typing import Dict, Type
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.openai_adapter import OpenAIProvider

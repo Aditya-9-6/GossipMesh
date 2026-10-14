@@ -41,5 +41,7 @@ build/
 # Database
 *.db
 *.sqlite3
-venv/
 .coverage
+.venv/
+venv/
+uv.lock
