@@ -1,4 +1,3 @@
-import tests  # Initialize env vars
 import unittest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
@@ -161,7 +160,6 @@ class TestAuth(unittest.TestCase):
         # Mock DB logic
         from gossipmesh.models.user import User
         from gossipmesh.models.organization import Organization
-        from gossipmesh.models.audit import AuditEvent
 
         mock_user = User(id=1, email="testoidc@example.com")
         self.mock_db.query.return_value.filter.return_value.first.side_effect = [
