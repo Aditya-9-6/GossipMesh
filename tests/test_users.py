@@ -1,11 +1,13 @@
-import tests
 import unittest
+
 from fastapi.testclient import TestClient
-from gossipmesh.api.main import app
+
 from gossipmesh.api import deps
+from gossipmesh.api.main import app
 from gossipmesh.models.user import User
 
 client = TestClient(app)
+
 
 class TestUsersRouter(unittest.TestCase):
     def setUp(self):
@@ -39,7 +41,9 @@ class TestUsersRouter(unittest.TestCase):
         # The endpoint should return 401 Unauthorized since OAuth2PasswordBearer
         # normally returns a 401 when a token is not provided.
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json(), {"detail": "Not authenticated"})
+        json_resp = response.json()
+        self.assertEqual(json_resp["detail"], "Not authenticated")
+
 
 if __name__ == "__main__":
     unittest.main()
