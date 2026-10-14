@@ -32,12 +32,8 @@ def create_workflow(
         raise AuthorizationError(message="Not authorized for this organization")
 
     manager = WorkflowManager(db)
-    workflow, job = manager.create_workflow_with_job(
-        request.organization_id,
-        request.repository_id,
-        request.agent_name,
-        actor_id=current_user.id
-    )
+    workflow = manager.create_workflow(request.organization_id, request.repository_id)
+    job = manager.add_job(workflow.id, request.agent_name)
 
     # Normally this would enqueue a Celery task to begin execution
     return {"workflow_id": workflow.id, "job_id": job.id, "status": workflow.status}
@@ -61,7 +57,7 @@ def cancel_workflow(
         raise AuthorizationError(message="Not authorized for this organization")
 
     manager = WorkflowManager(db)
-    manager.cancel_workflow(workflow_id, actor_id=current_user.id)
+    manager.cancel_workflow(workflow_id)
     return {"status": "cancelled"}
 
 @router.post("/workflows/{workflow_id}/approve")
@@ -82,5 +78,5 @@ def approve_workflow(
         raise AuthorizationError(message="Not authorized for this organization")
 
     manager = WorkflowManager(db)
-    manager.approve_patch(workflow_id, actor_id=current_user.id)
+    manager.approve_patch(workflow_id)
     return {"status": "approved, workflow unblocked"}

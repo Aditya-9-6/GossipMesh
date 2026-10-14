@@ -1,0 +1,5 @@
+1. **Initial Migration Validation**: Check if there's a script or function to validate Alembic migrations. If not, create a validation script/function. Alembic validation can mean verifying that the database matches the models, or that the current head revision can be reached.
+2. **Upgrade and Downgrade Tests**: Implement tests that verify Alembic migrations can upgrade to `head` and downgrade to `base` without errors using an in-memory SQLite database (as recommended for offline testing).
+3. **Migration Documentation**: Add a `docs/migrations.md` file (or append to a relevant file) to detail the Alembic workflow and conventions.
+4. **Startup Migration Policy**: Although no auto-migration exists in `main.py` currently, I'll add explicit startup logic using a Fastapi lifespan that prevents accidental destructive migrations (checking if it's production and failing if migrations are attempted, or requiring an explicit flag).
+5. **Prevention of Accidental Destructive Migrations**: Update `alembic/env.py` to prevent running down migrations in production.

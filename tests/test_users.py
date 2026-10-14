@@ -39,8 +39,7 @@ class TestUsersRouter(unittest.TestCase):
         # The endpoint should return 401 Unauthorized since OAuth2PasswordBearer
         # normally returns a 401 when a token is not provided.
         self.assertEqual(response.status_code, 401)
-        json_resp = response.json()
-        self.assertEqual(json_resp["detail"], "Not authenticated")
+        self.assertEqual(response.json(), {"detail": "Not authenticated"})
 
 if __name__ == "__main__":
     unittest.main()
