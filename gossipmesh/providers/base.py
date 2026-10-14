@@ -9,6 +9,7 @@ from gossipmesh.providers.models import (
 
 
 class BaseProvider(ABC):
+
     def __init__(self, api_key: str):
         self.api_key = api_key
 
@@ -22,9 +23,7 @@ class BaseProvider(ABC):
         """Generate a response synchronously (wrapped in async)."""
 
     @abstractmethod
-    async def generate_stream(
-        self, request: GenerationRequest
-    ) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
         """Stream a response."""
 
     @abstractmethod

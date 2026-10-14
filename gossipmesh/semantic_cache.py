@@ -1,7 +1,8 @@
+import hashlib
 import json
 import math
 from pathlib import Path
-import hashlib
+
 
 class SemanticCache:
     def __init__(self, cache_dir: str = ".gossip_mesh/cache", threshold: float = 0.98):

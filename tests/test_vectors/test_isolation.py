@@ -1,11 +1,12 @@
 import unittest
 from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 
-from gossipmesh.api.main import app
 from gossipmesh.api import deps
+from gossipmesh.api.main import app
 from gossipmesh.core.config import settings
-from gossipmesh.core.exceptions import AuthorizationError
+
 
 class TestOrganizationScoping(unittest.TestCase):
     def setUp(self):

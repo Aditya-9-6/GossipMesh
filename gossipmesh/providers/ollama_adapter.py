@@ -15,7 +15,7 @@ from gossipmesh.providers.models import (
 
 class OllamaProvider(BaseProvider):
     def __init__(self, base_url: str = "http://localhost:11434"):
-        super().__init__(api_key="")  # Ollama usually doesn't need an API key
+        super().__init__(api_key="") # Ollama usually doesn't need an API key
         self.base_url = base_url
 
     @property
@@ -25,9 +25,7 @@ class OllamaProvider(BaseProvider):
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         start_time = time.time()
 
-        messages = [
-            {"role": msg.role, "content": msg.content} for msg in request.messages
-        ]
+        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -39,10 +37,10 @@ class OllamaProvider(BaseProvider):
                     "options": {
                         "temperature": request.temperature,
                         "num_predict": request.max_tokens,
-                        "stop": request.stop_sequences,
-                    },
+                        "stop": request.stop_sequences
+                    }
                 },
-                timeout=300.0,
+                timeout=300.0
             )
             response.raise_for_status()
             data = response.json()
@@ -53,41 +51,34 @@ class OllamaProvider(BaseProvider):
             prompt_tokens=data.get("prompt_eval_count", 0),
             completion_tokens=data.get("eval_count", 0),
             total_tokens=data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
-            cost_estimate_usd=0.0,
+            cost_estimate_usd=0.0
         )
 
         return GenerationResponse(
             content=data.get("message", {}).get("content", ""),
             model=data.get("model", request.model),
             usage=usage,
-            raw_response=data,
+            raw_response=data
         )
 
-    async def generate_stream(
-        self, request: GenerationRequest
-    ) -> AsyncGenerator[str, None]:
-        messages = [
-            {"role": msg.role, "content": msg.content} for msg in request.messages
-        ]
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
-        async with (
-            httpx.AsyncClient() as client,
-            client.stream(
-                "POST",
-                f"{self.base_url}/api/chat",
-                json={
-                    "model": request.model,
-                    "messages": messages,
-                    "stream": True,
-                    "options": {
-                        "temperature": request.temperature,
-                        "num_predict": request.max_tokens,
-                        "stop": request.stop_sequences,
-                    },
-                },
-                timeout=300.0,
-            ) as response,
-        ):
+        async with httpx.AsyncClient() as client, client.stream(
+            "POST",
+            f"{self.base_url}/api/chat",
+            json={
+                "model": request.model,
+                "messages": messages,
+                "stream": True,
+                "options": {
+                    "temperature": request.temperature,
+                    "num_predict": request.max_tokens,
+                    "stop": request.stop_sequences
+                }
+            },
+            timeout=300.0
+        ) as response:
             response.raise_for_status()
             async for chunk in response.aiter_lines():
                 if chunk:

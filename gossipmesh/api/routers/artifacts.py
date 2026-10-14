@@ -1,11 +1,13 @@
 from typing import Any
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
 from gossipmesh.api import deps
-from gossipmesh.models.user import User
+from gossipmesh.core.exceptions import AuthorizationError
 from gossipmesh.models.organization import UserOrganization
 from gossipmesh.models.runtime import Artifact, Job, Workflow
-from gossipmesh.core.exceptions import AuthorizationError
+from gossipmesh.models.user import User
 
 router = APIRouter()
 

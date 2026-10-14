@@ -11,13 +11,12 @@ Features:
 """
 
 import json
-import subprocess
 import os
-
+import subprocess
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -60,7 +59,7 @@ def get_existing_issues():
     """Fetch existing issue titles and creation timestamps."""
     issues_info = []
     try:
-        cmd = ["gh", "issue", "list", "--repo", "GossipMesh/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
+        cmd = ["gh", "issue", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         issues = json.loads(result.stdout)
         return issues
@@ -217,7 +216,7 @@ def create_issue(item):
 
     labels = f"{area},{difficulty},hacktoberfest,advancement"
     cmd = [
-        "gh", "issue", "create", "--repo", "GossipMesh/GossipMesh",
+        "gh", "issue", "create", "--repo", "Aditya-9-6/GossipMesh",
         "--title", title,
         "--body", body,
         "--label", labels

@@ -45,18 +45,16 @@ class GeminiProvider(BaseProvider):
                 temperature=request.temperature,
                 max_output_tokens=request.max_tokens,
                 stop_sequences=request.stop_sequences,
-            ),
+            )
         )
 
         end_time = time.time()
 
         usage = Usage(
-            prompt_tokens=self.count_tokens(
-                " ".join([m.content for m in request.messages])
-            ),
+            prompt_tokens=self.count_tokens(" ".join([m.content for m in request.messages])),
             completion_tokens=self.count_tokens(response.text),
             total_tokens=0,
-            cost_estimate_usd=0.0,
+            cost_estimate_usd=0.0
         )
         usage.total_tokens = usage.prompt_tokens + usage.completion_tokens
 
@@ -64,12 +62,10 @@ class GeminiProvider(BaseProvider):
             content=response.text,
             model=request.model,
             usage=usage,
-            raw_response={"prompt_feedback": str(response.prompt_feedback)},
+            raw_response={"prompt_feedback": str(response.prompt_feedback)}
         )
 
-    async def generate_stream(
-        self, request: GenerationRequest
-    ) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -80,7 +76,7 @@ class GeminiProvider(BaseProvider):
                 temperature=request.temperature,
                 max_output_tokens=request.max_tokens,
                 stop_sequences=request.stop_sequences,
-            ),
+            )
         )
         async for chunk in response:
             yield chunk.text

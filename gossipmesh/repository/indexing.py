@@ -1,4 +1,5 @@
 import logging
+
 from gossipmesh.repository.chunking import chunk_python_code
 from gossipmesh.repository.vector_store import PGVectorStore
 

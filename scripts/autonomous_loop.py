@@ -12,12 +12,12 @@ Executes the continuous hyper-scale development cycle:
 7. Auto-Merger: Squash-merges approved PRs to continuously illuminate GitHub contribution chart.
 """
 
-import os
-import sys
-import json
-import time
-import subprocess
 import argparse
+import json
+import os
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 try:
@@ -26,9 +26,9 @@ try:
 except Exception:
     pass
 
-REPO = "GossipMesh/GossipMesh"
-USER_NAME = "GossipMesh Bot"
-USER_EMAIL = "bot@gossipmesh.io"
+REPO = "Aditya-9-6/GossipMesh"
+USER_NAME = "Aditya Dahale"
+USER_EMAIL = "aditya-9-6@users.noreply.github.com"
 
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []

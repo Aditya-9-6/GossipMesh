@@ -10,7 +10,6 @@ class SandboxEnvironment:
     Provides a temporary, isolated directory for executing jobs safely.
     In a full production environment, this would wrap Docker or Firecracker microVMs.
     """
-
     def __init__(self):
         self.workspace_dir: str | None = None
 
@@ -22,9 +21,7 @@ class SandboxEnvironment:
         if self.workspace_dir and os.path.exists(self.workspace_dir):
             shutil.rmtree(self.workspace_dir)
 
-    def run_command(
-        self, cmd: str | list[str], timeout: int = 30
-    ) -> tuple[int, str, str]:
+    def run_command(self, cmd: str | list[str], timeout: int = 30) -> tuple[int, str, str]:
         """Runs a command within the sandbox workspace."""
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
@@ -37,7 +34,7 @@ class SandboxEnvironment:
             cwd=self.workspace_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            text=True
         )
         try:
             stdout, stderr = process.communicate(timeout=timeout)

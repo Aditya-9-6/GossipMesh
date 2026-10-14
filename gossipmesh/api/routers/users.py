@@ -1,8 +1,10 @@
 from typing import Any
+
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
-from pydantic import BaseModel
 
 router = APIRouter()
 

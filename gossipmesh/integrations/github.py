@@ -10,11 +10,11 @@ class GitHubIntegration:
         """
         Generates inline review comments on the PR based on findings.
         """
-        logger.info(f"Generating inline comments for {len(findings)} findings.")
+        logger.info(
+            f"Generating inline comments for {len(findings)} findings."
+        )
 
-    async def post_review_report(
-        self, findings: list[SecurityFinding], test_results: TestResult
-    ):
+    async def post_review_report(self, findings: list[SecurityFinding], test_results: TestResult):
         """
         Posts the final review report summary.
         """

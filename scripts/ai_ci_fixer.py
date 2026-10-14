@@ -6,15 +6,15 @@ applies the fix, and verifies that tests pass before pushing.
 Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tests.
 """
 
-import os
-import sys
-import json
 import argparse
-import urllib.request
-import urllib.error
-import subprocess
-import time
 import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 DEFAULT_MODEL = "gemini-2.5-pro"
@@ -60,7 +60,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     # Check cache
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode()).hexdigest()
     cache_file = cache_path / f"{cache_key}.json"
 
     if cache_file.exists():

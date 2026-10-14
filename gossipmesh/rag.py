@@ -44,14 +44,16 @@ class VectorDB:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
         payload = {
             "model": "models/text-embedding-004",
-            "content": {"parts": [{"text": text}]},
+            "content": {
+                "parts": [{"text": text}]
+            }
         }
 
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"},
-            method="POST",
+            method="POST"
         )
 
         try:
@@ -63,10 +65,8 @@ class VectorDB:
             return []
 
     def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        if not vec1 or not vec2:
-            return 0.0
-        if len(vec1) != len(vec2):
-            return 0.0
+        if not vec1 or not vec2: return 0.0
+        if len(vec1) != len(vec2): return 0.0
 
         dot_product = sum(map(operator.mul, vec1, vec2))
         norm_a = math.hypot(*vec1)
@@ -80,18 +80,11 @@ class VectorDB:
         """Indexes all .py files in the workspace, skipping tests if necessary."""
         print("[*] Indexing workspace into VectorDB...")
         for root, dirs, files in os.walk(workspace_path):
-            dirs[:] = [
-                d
-                for d in dirs
-                if d
-                not in [".git", "vendor", ".gossip_mesh", "__pycache__", "node_modules"]
-            ]
+            dirs[:] = [d for d in dirs if d not in [".git", "vendor", ".gossip_mesh", "__pycache__", "node_modules"]]
             for file in files:
                 if file.endswith(".py") and not file.startswith("test_"):
                     full_path = Path(root) / file
-                    rel_path = str(full_path.relative_to(workspace_path)).replace(
-                        "\\", "/"
-                    )
+                    rel_path = str(full_path.relative_to(workspace_path)).replace("\\", "/")
 
                     try:
                         content = full_path.read_text(encoding="utf-8")
@@ -102,7 +95,7 @@ class VectorDB:
                         if embedding:
                             self.embeddings[rel_path] = {
                                 "content": chunk,
-                                "embedding": embedding,
+                                "embedding": embedding
                             }
                             print(f"  [+] Indexed: {rel_path}")
                     except Exception as e:
@@ -110,9 +103,7 @@ class VectorDB:
         self.save()
         print(f"[*] Workspace indexing complete. Total files: {len(self.embeddings)}")
 
-    def search(
-        self, query: str, top_k: int = 3, api_key: str = ""
-    ) -> list[tuple[str, str, float]]:
+    def search(self, query: str, top_k: int = 3, api_key: str = "") -> list[tuple[str, str, float]]:
         """Searches the VectorDB for the most relevant files based on the query."""
         if not self.embeddings:
             return []

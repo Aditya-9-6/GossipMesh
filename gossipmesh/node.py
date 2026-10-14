@@ -24,7 +24,6 @@ class GossipTopic(str, Enum):
     TASK_AUCTIONS = "task_auctions"
     HEARTBEATS = "heartbeats"
 
-
 class GossipMessage:
     def __init__(
         self,
@@ -71,13 +70,11 @@ class GossipMessage:
             ttl=data.get("ttl", 10),
         )
 
-
 class GossipNode:
     """
     Decentralized Gossip Peer Node.
     Communicates via a shared ledger directory (file-backed mesh) or local bus.
     """
-
     def __init__(self, node_id: str, mesh_dir: str | None = None):
         self.node_id = node_id
         if mesh_dir:
@@ -118,9 +115,7 @@ class GossipNode:
                                 mid = data.get("message_id")
                                 if mid:
                                     self.seen_messages.add(mid)
-                                    self._message_cache.append(
-                                        GossipMessage.from_dict(data)
-                                    )
+                                    self._message_cache.append(GossipMessage.from_dict(data))
                             except Exception:
                                 pass
             except Exception:
@@ -133,13 +128,7 @@ class GossipNode:
             self.subscriptions[t_val] = []
         self.subscriptions[t_val].append(handler)
 
-    def publish(
-        self,
-        topic: GossipTopic,
-        payload: dict[str, Any],
-        repo: str = "global",
-        ttl: int = 10,
-    ) -> GossipMessage:
+    def publish(self, topic: GossipTopic, payload: dict[str, Any], repo: str = "global", ttl: int = 10) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh."""
         t_val = topic.value if isinstance(topic, GossipTopic) else str(topic)
         self.clock_seq += 1
@@ -199,9 +188,7 @@ class GossipNode:
                                     try:
                                         handler(msg)
                                     except Exception as e:
-                                        print(
-                                            f"[{self.node_id}] Gossip dispatch error: {e}"
-                                        )
+                                        print(f"[{self.node_id}] Gossip dispatch error: {e}")
                     except Exception:
                         pass
         except Exception as e:
@@ -227,15 +214,9 @@ class GossipNode:
         except Exception:
             pass
 
-    def get_recent_messages(
-        self, topic: GossipTopic | None = None, limit: int = 50
-    ) -> list[GossipMessage]:
+    def get_recent_messages(self, topic: GossipTopic | None = None, limit: int = 50) -> list[GossipMessage]:
         """Fetches the latest gossip messages from the in-memory cache."""
-        t_val = (
-            topic.value
-            if isinstance(topic, GossipTopic)
-            else (str(topic) if topic else None)
-        )
+        t_val = topic.value if isinstance(topic, GossipTopic) else (str(topic) if topic else None)
 
         filtered = []
         for msg in reversed(self._message_cache):

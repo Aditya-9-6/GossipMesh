@@ -1,6 +1,8 @@
-from sqlalchemy import String, Boolean
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from gossipmesh.models.base import Base
+
 
 class User(Base):
     __tablename__ = "users"

@@ -4,14 +4,13 @@ Milestone 8 Implementation.
 """
 
 import uuid
-from typing import Dict
 
 
 class SSOManager:
     """Handles Single Sign-On (SSO) integration."""
 
     def __init__(self):
-        self.active_sessions: Dict[str, str] = {}  # token -> user_id
+        self.active_sessions: dict[str, str] = {}  # token -> user_id
 
     def authenticate(self, user_token: str) -> bool:
         return user_token in self.active_sessions
@@ -26,7 +25,7 @@ class SCIMProvisioner:
     """Handles SCIM provisioning and de-provisioning."""
 
     def __init__(self):
-        self.users: Dict[str, dict] = {}
+        self.users: dict[str, dict] = {}
 
     def provision_user(self, user_id: str, user_data: dict) -> bool:
         if user_id in self.users:
@@ -45,8 +44,8 @@ class RoleManager:
     """Manages advanced roles and permissions."""
 
     def __init__(self):
-        self.user_roles: Dict[str, List[str]] = {}
-        self.role_permissions: Dict[str, List[str]] = {
+        self.user_roles: dict[str, list[str]] = {}
+        self.role_permissions: dict[str, list[str]] = {
             "admin": ["read", "write", "delete"],
             "user": ["read"],
         }
@@ -68,7 +67,7 @@ class DataRetentionPolicy:
     """Enforces data retention policies."""
 
     def __init__(self):
-        self.policies: Dict[str, int] = {}  # resource_type -> days
+        self.policies: dict[str, int] = {}  # resource_type -> days
 
     def set_policy(self, resource_type: str, days: int):
         self.policies[resource_type] = days

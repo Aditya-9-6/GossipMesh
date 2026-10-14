@@ -1,11 +1,12 @@
-import pytest
 from unittest.mock import MagicMock
-from fastapi.testclient import TestClient
-from gossipmesh.api.main import app
+
+import pytest
+
 from gossipmesh.api import deps
+from gossipmesh.api.main import app
+from gossipmesh.models.organization import Organization
 from gossipmesh.models.user import User
-from gossipmesh.models.organization import Organization, UserOrganization
-from pydantic import BaseModel
+
 
 @pytest.fixture
 def mock_current_user():

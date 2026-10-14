@@ -1,7 +1,9 @@
-import unittest
 import os
+import unittest
 from unittest.mock import patch
+
 from alembic.config import Config
+
 from alembic import command
 
 # Ensure environment variables are set for settings
@@ -15,6 +17,7 @@ os.environ["POSTGRES_DB"] = "test"
 
 # Make sure imports that rely on settings happen after env setup
 from gossipmesh.core.config import Settings
+
 
 class TestMigrations(unittest.TestCase):
     def setUp(self):

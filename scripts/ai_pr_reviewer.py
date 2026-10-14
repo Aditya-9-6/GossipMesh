@@ -6,23 +6,22 @@ zero-allocation memory invariants, and high test coverage.
 Outputs structured JSON and Markdown reports with system impact assessment.
 """
 
-import os
-import sys
-import json
 import argparse
-import urllib.request
-import urllib.error
-import subprocess
-import time
 import datetime
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from gossipmesh.memetic import MemeticKnowledgeBase
-
-from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
+from gossipmesh.memetic import MemeticKnowledgeBase
+from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.semantic_cache import SemanticCache
 
 DEFAULT_MODEL = "gemini-2.5-pro"
@@ -269,6 +268,7 @@ def get_pr_diff(workspace: Path) -> str:
 
 
 import ast
+
 
 def extract_ast_metadata(diff: str) -> str:
     """Extracts a structural summary from the diff using true AST parsing."""

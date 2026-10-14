@@ -41,6 +41,5 @@ class TestArchitecture(unittest.TestCase):
                                         f"Architectural violation in {filepath}: imported from {node.module}",
                                     )
 
-
 if __name__ == "__main__":
     unittest.main()

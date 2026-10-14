@@ -15,6 +15,4 @@ class AuditEvent(Base):
     actor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

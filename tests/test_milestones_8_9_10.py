@@ -11,6 +11,7 @@ from gossipmesh.enterprise.controls import (
     ComplianceAuditor,
     DataExporter,
     DataRetentionPolicy,
+    RoleManager,
     SCIMProvisioner,
     SSOManager,
 )
@@ -32,11 +33,16 @@ class TestEnterpriseControls(unittest.TestCase):
     def test_scim_provisioner(self):
         provisioner = SCIMProvisioner()
         self.assertTrue(provisioner.provision_user("user123", {"name": "Test"}))
-        self.assertFalse(
-            provisioner.provision_user("user123", {"name": "Test"})
-        )  # already exists
+        self.assertFalse(provisioner.provision_user("user123", {"name": "Test"})) # already exists
         self.assertTrue(provisioner.deprovision_user("user123"))
-        self.assertFalse(provisioner.deprovision_user("user123"))  # already deleted
+        self.assertFalse(provisioner.deprovision_user("user123")) # already deleted
+
+    def test_role_manager(self):
+        manager = RoleManager()
+        manager.assign_role("user1", "admin")
+        self.assertTrue(manager.has_permission("user1", "write"))
+        self.assertFalse(manager.has_permission("user1", "unknown_perm"))
+        self.assertFalse(manager.has_permission("user2", "read"))
 
     def test_data_retention_policy(self):
         policy = DataRetentionPolicy()
@@ -73,9 +79,9 @@ class TestBillingCommercialization(unittest.TestCase):
     def test_seat_manager(self):
         manager = SeatManager()
         self.assertTrue(manager.allocate_seat("org1", "user1"))
-        self.assertFalse(manager.allocate_seat("org1", "user1"))  # already allocated
+        self.assertFalse(manager.allocate_seat("org1", "user1")) # already allocated
         self.assertTrue(manager.remove_seat("org1", "user1"))
-        self.assertFalse(manager.remove_seat("org1", "user1"))  # already removed
+        self.assertFalse(manager.remove_seat("org1", "user1")) # already removed
 
     def test_metered_usage_tracker(self):
         tracker = MeteredUsageTracker()
@@ -118,8 +124,7 @@ class TestScaleReliability(unittest.TestCase):
         self.assertTrue(monitor.record_metric("api_service", True))
         self.assertTrue(monitor.record_metric("api_service", False))
         budget = monitor.check_error_budget("api_service")
-        self.assertTrue(budget < 0)  # 66.6% < 99.0%
+        self.assertTrue(budget < 0) # 66.6% < 99.0%
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

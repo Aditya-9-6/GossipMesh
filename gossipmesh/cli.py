@@ -3,13 +3,15 @@ GossipMesh Command-Line Interface.
 Manage peer nodes, inspect memetic knowledge, broadcast gossip, and audit diffs.
 """
 
-import sys
-import json
 import argparse
+import json
+import sys
 from pathlib import Path
-from .node import GossipNode
+
 from .memetic import MemeticKnowledgeBase
+from .node import GossipNode
 from .red_team import RedTeamAuditor
+
 
 def cmd_status(args):
     node = GossipNode("cli_inspector", mesh_dir=args.mesh_dir)

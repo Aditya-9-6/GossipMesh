@@ -46,8 +46,6 @@ if conflict_start != -1 and conflict_end != -1:
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0].message_id, "valid_123")
 """
-    new_content = (
-        content[:conflict_start] + resolved.lstrip("\n") + content[conflict_end:]
-    )
+    new_content = content[:conflict_start] + resolved.lstrip("\n") + content[conflict_end:]
     with open("tests/test_gossipmesh.py", "w") as f:
         f.write(new_content)
