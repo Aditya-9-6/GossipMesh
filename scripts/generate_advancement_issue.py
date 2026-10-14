@@ -215,6 +215,10 @@ def create_issue(item):
 3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
 
+    labels_list = [area, difficulty, "hacktoberfest", "advancement"]
+    for lbl in labels_list:
+        subprocess.run(["gh", "label", "create", lbl, "--repo", "Aditya-9-6/GossipMesh", "--force"], capture_output=True)
+
     labels = f"{area},{difficulty},hacktoberfest,advancement"
     cmd = [
         "gh", "issue", "create", "--repo", "Aditya-9-6/GossipMesh",
