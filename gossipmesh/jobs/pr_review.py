@@ -1,8 +1,8 @@
 import logging
-from typing import Dict, Any
+from typing import Any
 
-from gossipmesh.services.pr_review import PRReviewService
 from gossipmesh.integrations.github import GitHubIntegration
+from gossipmesh.services.pr_review import PRReviewService
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ class PRReviewJob:
     Orchestrates the PR Review process (Milestone 6).
     """
 
-    def __init__(self, pr_data: Dict[str, Any]):
+    def __init__(self, pr_data: dict[str, Any]):
         self.pr_data = pr_data
 
     async def execute(self):
