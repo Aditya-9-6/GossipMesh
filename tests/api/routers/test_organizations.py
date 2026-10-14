@@ -1,13 +1,11 @@
 import pytest
 from unittest.mock import MagicMock
-from fastapi.testclient import TestClient
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
 from gossipmesh.models.repository import Repository
-from gossipmesh.models.audit import AuditEvent
 
 @pytest.fixture
 def mock_current_user():
@@ -15,7 +13,6 @@ def mock_current_user():
     app.dependency_overrides[deps.get_current_user] = lambda: user
     yield user
     app.dependency_overrides.clear()
-
 
 def test_create_organization(test_client, mock_current_user):
     mock_db_session = MagicMock()
@@ -37,7 +34,6 @@ def test_create_organization(test_client, mock_current_user):
     assert response.json() == {"id": 1, "name": "New Org"}
     assert mock_db_session.add.call_count == 3 # Org, UserOrg, AuditEvent
 
-
 def test_create_organization_exists(test_client, mock_current_user):
     mock_db_session = MagicMock()
     mock_db_session.query.return_value.filter.return_value.first.return_value = Organization(id=1, name="Existing")
@@ -45,7 +41,6 @@ def test_create_organization_exists(test_client, mock_current_user):
 
     response = test_client.post("/api/v1/organizations/", json={"name": "Existing"})
     assert response.status_code == 400
-
 
 def test_create_invitation(test_client, mock_current_user):
     mock_db_session = MagicMock()
@@ -57,7 +52,6 @@ def test_create_invitation(test_client, mock_current_user):
     assert response.status_code == 200
     assert "token" in response.json()
 
-
 def test_create_invitation_unauthorized(test_client, mock_current_user):
     mock_db_session = MagicMock()
     mock_db_session.query.return_value.filter.return_value.first.return_value = None # Not an admin
@@ -66,7 +60,6 @@ def test_create_invitation_unauthorized(test_client, mock_current_user):
     response = test_client.post("/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "member"})
 
     assert response.status_code == 403
-
 
 def test_accept_invitation(test_client, mock_current_user):
     mock_db_session = MagicMock()
@@ -83,7 +76,6 @@ def test_accept_invitation(test_client, mock_current_user):
     assert mock_db_session.add.call_count == 2 # UserOrg, AuditEvent
     assert mock_db_session.delete.call_count == 1 # Invitation
 
-
 def test_assign_role(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # First query checks admin, second finds the user to update
@@ -96,7 +88,6 @@ def test_assign_role(test_client, mock_current_user):
 
     assert response.status_code == 200
     assert mock_user_org.role == "admin"
-
 
 def test_create_project(test_client, mock_current_user):
     mock_db_session = MagicMock()
@@ -112,7 +103,6 @@ def test_create_project(test_client, mock_current_user):
 
     assert response.status_code == 200
     assert response.json() == {"id": 1, "name": "New Project", "description": "Desc"}
-
 
 def test_connect_repository(test_client, mock_current_user):
     mock_db_session = MagicMock()
@@ -130,7 +120,6 @@ def test_connect_repository(test_client, mock_current_user):
     assert response.status_code == 200
     assert response.json()["id"] == 1
 
-
 def test_remove_member(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # First admin check, second find member
@@ -144,7 +133,6 @@ def test_remove_member(test_client, mock_current_user):
     assert response.status_code == 200
     assert mock_db_session.delete.call_count == 1
 
-
 def test_suspend_member(test_client, mock_current_user):
     mock_db_session = MagicMock()
     # First admin check, second find member
@@ -156,4 +144,4 @@ def test_suspend_member(test_client, mock_current_user):
     response = test_client.patch("/api/v1/organizations/1/members/2/suspend")
 
     assert response.status_code == 200
-    assert mock_user_org.is_suspended == True
+    assert mock_user_org.is_suspended

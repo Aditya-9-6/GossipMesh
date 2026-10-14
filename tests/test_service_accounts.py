@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from gossipmesh.models.user import User
@@ -25,7 +24,7 @@ class TestServiceAccounts(unittest.TestCase):
 
     def test_create_service_account(self):
         user = User(id=1, email="test@example.com")
-        org = Organization(id=1, name="Test Org")
+        Organization(id=1, name="Test Org")
         user_org = UserOrganization(user_id=1, organization_id=1)
 
         self.mock_db_session.query.return_value.filter.return_value.first.return_value = user_org
