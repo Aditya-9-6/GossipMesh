@@ -2,7 +2,6 @@ from datetime import timedelta, datetime, timezone
 from typing import Any
 import uuid
 import fastapi
-import fastapi
 from fastapi import APIRouter, Depends, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
