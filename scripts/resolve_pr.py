@@ -92,9 +92,15 @@ def resolve_pr(pr_number: int, head_ref: str):
         print(f"[!] Conflicted files: {conflicted_files}")
         
         for cf in conflicted_files:
-            print(f"[*] Resolving {cf} using origin/main version...")
-            run_cmd(['git', 'checkout', 'origin/main', '--', cf])
-            run_cmd(['git', 'add', cf])
+            print(f"[*] Resolving {cf}...")
+            chk = subprocess.run(['git', 'cat-file', '-e', f"origin/main:{cf}"], capture_output=True)
+            if chk.returncode == 0:
+                print(f"    Restoring {cf} from origin/main...")
+                run_cmd(['git', 'checkout', 'origin/main', '--', cf])
+                run_cmd(['git', 'add', cf])
+            else:
+                print(f"    Removing {cf} (not present in origin/main)...")
+                run_cmd(['git', 'rm', '-f', cf], check=False)
         
         # Check if conflicts resolved
         unresolved = [line.strip() for line in run_cmd(['git', 'diff', '--name-only', '--diff-filter=U']).stdout.splitlines() if line.strip()]
