@@ -1,14 +1,13 @@
 import unittest
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
-
 from fastapi.testclient import TestClient
+from datetime import datetime, timezone
 
+from gossipmesh.models.user import User
+from gossipmesh.models.organization import Organization, UserOrganization
+from gossipmesh.models.service_account import ServiceAccount, APIKey
 from gossipmesh.api import deps
 from gossipmesh.api.main import app
-from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.service_account import APIKey, ServiceAccount
-from gossipmesh.models.user import User
 
 
 # Create dummy verify function to avoid passlib bcrypt issues in tests
@@ -25,7 +24,7 @@ class TestServiceAccounts(unittest.TestCase):
 
     def test_create_service_account(self):
         user = User(id=1, email="test@example.com")
-        Organization(id=1, name="Test Org")
+        org = Organization(id=1, name="Test Org")
         user_org = UserOrganization(user_id=1, organization_id=1)
 
         self.mock_db_session.query.return_value.filter.return_value.first.return_value = user_org
@@ -37,7 +36,7 @@ class TestServiceAccounts(unittest.TestCase):
         def side_effect(obj):
             if isinstance(obj, ServiceAccount):
                 obj.id = 1
-            return
+            return None
 
         self.mock_db_session.add.return_value = None
         self.mock_db_session.commit.return_value = None
@@ -80,7 +79,7 @@ class TestServiceAccounts(unittest.TestCase):
             if isinstance(obj, APIKey):
                 obj.id = 1
                 obj.created_at = datetime.now(timezone.utc)
-            return
+            return None
 
         self.mock_db_session.refresh.side_effect = side_effect
 
@@ -103,7 +102,7 @@ class TestServiceAccounts(unittest.TestCase):
 
         # Verify hashed key
         args_list = self.mock_db_session.add.call_args_list
-        api_key_obj = next(call.args[0] for call in args_list if isinstance(call.args[0], APIKey))
+        api_key_obj = [call.args[0] for call in args_list if isinstance(call.args[0], APIKey)][0]
         self.assertEqual(api_key_obj.hashed_key, f"hashed_{data['key']}")
 
     def test_list_api_keys_does_not_return_raw_key(self):
