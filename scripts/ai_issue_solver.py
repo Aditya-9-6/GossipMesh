@@ -325,6 +325,7 @@ Instructions:
 2. Adhere to GossipMesh performance and concurrency invariants.
 3. Write clean, idiomatic Python code with accompanying unit tests (test_*.py).
 4. Output your response as valid JSON adhering to the specified schema.
+"""
 
     print("[*] Requesting solution from Gemini AI...")
     result = call_gemini(api_key, prompt)
