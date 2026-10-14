@@ -94,7 +94,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         run_data = payload.get("workflow_run", {})
         if action == "completed" and run_data.get("conclusion") == "failure":
             ci_workflow = CIFixerWorkflow(run_data)
-            background_tasks.add_task(workflow.execute)
+            background_tasks.add_task(ci_workflow.execute)
 
     elif event == "issue_comment":
         action = payload.get("action")
