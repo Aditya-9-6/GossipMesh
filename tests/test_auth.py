@@ -119,7 +119,7 @@ class TestAuth(unittest.TestCase):
         mock_redis.setex.assert_called_once()
 
     @patch('gossipmesh.api.routers.auth.jwt.decode')
-    @patch('gossipmesh.api.routers.auth.PyJWKClient')
+    @patch('gossipmesh.api.routers.auth.jwt.PyJWKClient')
     @patch('gossipmesh.api.routers.auth.httpx.Client.post')
     @patch('gossipmesh.api.routers.auth.httpx.Client.get')
     @patch('gossipmesh.api.routers.auth.redis_client')

@@ -1,11 +1,9 @@
 from typing import Any
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, Column, Integer, String
-from sqlalchemy.future import select
+from sqlalchemy import Column, Integer, String, JSON
 from sqlalchemy.orm import Session
-
+from sqlalchemy.future import select
 from gossipmesh.models.base import Base
-
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
@@ -17,10 +15,8 @@ class DocumentChunk(Base):
     embedding: Any = Column(Vector(1536))
     metadata_json: Any = Column(JSON)
 
-
 class PGVectorStore:
     """A minimal abstraction over a pgvector backed SQLAlchemy model."""
-
     def __init__(self, db_session: Session):
         self.db = db_session
 
@@ -40,12 +36,9 @@ class PGVectorStore:
 
     def search(self, vector: list[float], filter: dict, top_k: int = 5):
         # L2 distance search using pgvector
-        stmt = (
-            select(DocumentChunk)
-            .filter_by(repo_id=filter.get("repo_id"))
-            .order_by(DocumentChunk.embedding.l2_distance(vector))
-            .limit(top_k)
-        )
+        stmt = select(DocumentChunk).filter_by(repo_id=filter.get("repo_id")).order_by(
+            DocumentChunk.embedding.l2_distance(vector)
+        ).limit(top_k)
 
         results = self.db.execute(stmt).scalars().all()
         return [
@@ -54,13 +47,14 @@ class PGVectorStore:
                 "content": r.content,
                 "metadata": r.metadata_json,
                 # Note: distance is not returned natively this way without explicit selection
-                "score": 0.0,
+                "score": 0.0
             }
             for r in results
         ]
 
     def delete_by_metadata(self, repo_id: int, filepath: str):
         self.db.query(DocumentChunk).filter(
-            DocumentChunk.repo_id == repo_id, DocumentChunk.filepath == filepath
+            DocumentChunk.repo_id == repo_id,
+            DocumentChunk.filepath == filepath
         ).delete()
         self.db.commit()

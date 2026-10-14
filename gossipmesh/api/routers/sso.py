@@ -68,7 +68,7 @@ def saml_login(
 ) -> Any:
     config = db.query(OrganizationSAMLConfig).filter(
         OrganizationSAMLConfig.organization_id == org_id,
-        OrganizationSAMLConfig.is_active == True
+        OrganizationSAMLConfig.is_active
     ).first()
 
     if not config:
@@ -100,7 +100,7 @@ def saml_acs(
 ) -> Any:
     config = db.query(OrganizationSAMLConfig).filter(
         OrganizationSAMLConfig.organization_id == org_id,
-        OrganizationSAMLConfig.is_active == True
+        OrganizationSAMLConfig.is_active
     ).first()
 
     if not config:
@@ -145,7 +145,7 @@ def saml_logout(
 ) -> Any:
     config = db.query(OrganizationSAMLConfig).filter(
         OrganizationSAMLConfig.organization_id == org_id,
-        OrganizationSAMLConfig.is_active == True
+        OrganizationSAMLConfig.is_active
     ).first()
 
     if not config:

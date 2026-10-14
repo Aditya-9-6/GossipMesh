@@ -1,12 +1,12 @@
 import logging
-
+from typing import List
 from gossipmesh.models.pr_review import SecurityFinding, TestResult
 
 logger = logging.getLogger(__name__)
 
 
 class PRReviewService:
-    async def extract_security_findings(self) -> list[SecurityFinding]:
+    async def extract_security_findings(self) -> List[SecurityFinding]:
         """
         Analyzes the PR for security findings.
         Returns a list of mock findings.
