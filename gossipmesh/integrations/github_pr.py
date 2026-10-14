@@ -77,7 +77,7 @@ class GitHubPRService:
 
             # Extract next url from Link header
             link_header = response.headers.get("link")
-            next_url = None
+            next_url: str | None = None
             if link_header:
                 links = link_header.split(",")
                 for link in links:

@@ -18,6 +18,8 @@ def clean_tree(tree_sha: str) -> str:
     raw = res.stdout
     if not raw:
         return tree_sha
+    if b'\r' not in raw and b'G:' not in raw:
+        return tree_sha
     
     entries = []
     for chunk in raw.split(b'\0'):
