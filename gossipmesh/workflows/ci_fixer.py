@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ class CIFixerWorkflow:
     Orchestrates the CI Fixer workflow (Milestone 7).
     """
 
-    def __init__(self, ci_run_data: Dict[str, Any]):
+    def __init__(self, ci_run_data: dict[str, Any]):
         self.ci_run_data = ci_run_data
 
     async def execute(self):
@@ -52,4 +52,3 @@ class CIFixerWorkflow:
         Submits the fix as a commit or PR.
         """
         logger.info("Submitting the fix.")
-        pass
