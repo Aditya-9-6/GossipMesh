@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Any
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
