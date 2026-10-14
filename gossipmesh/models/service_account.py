@@ -1,8 +1,7 @@
-from sqlalchemy import String, Integer, JSON, DateTime, Boolean, ForeignKey
+from sqlalchemy import String, JSON, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
-from typing import List
 
 from gossipmesh.models.base import Base
 

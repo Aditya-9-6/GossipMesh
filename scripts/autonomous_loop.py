@@ -142,10 +142,10 @@ def generate_new_issue(workspace: Path):
 def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: str):
     """Solves an issue, creates PR, reviews, and merges."""
     solver_key = GLOBAL_POOL.next_key()
-    print(f"\n=======================================================", flush=True)
+    print("\n=======================================================", flush=True)
     print(f"[*] Solving Issue #{issue_num}: {issue_title}", flush=True)
     print(f"[*] Active Solver API Key: ...{solver_key[-6:] if len(solver_key) > 6 else 'key'}", flush=True)
-    print(f"=======================================================", flush=True)
+    print("=======================================================", flush=True)
 
     env = os.environ.copy()
     env["GEMINI_API_KEY"] = solver_key
@@ -176,7 +176,7 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     check_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
     if vet_res.returncode != 0 or check_res.returncode != 0:
-        print(f"[!] CI failed. Calling AI CI Fixer...", flush=True)
+        print("[!] CI failed. Calling AI CI Fixer...", flush=True)
         ci_fixer_cmd = [
             sys.executable, "scripts/ai_ci_fixer.py",
             "--pr-number", str(issue_num), # Fake PR number if it is not created yet

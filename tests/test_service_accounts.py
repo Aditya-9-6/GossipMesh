@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from gossipmesh.models.user import User

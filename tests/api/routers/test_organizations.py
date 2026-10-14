@@ -1,13 +1,11 @@
 import pytest
 from unittest.mock import MagicMock
-from fastapi.testclient import TestClient
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
 from gossipmesh.models.repository import Repository
-from gossipmesh.models.audit import AuditEvent
 
 @pytest.fixture
 def mock_current_user():
