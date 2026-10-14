@@ -4,7 +4,7 @@ import uuid
 import urllib.parse
 from typing import Any
 import httpx
-from fastapi import APIRouter, Depends, status, Response, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -21,7 +21,7 @@ from pydantic import BaseModel
 import base64
 import hashlib
 import jwt
-from jwt import PyJWKClient
+import jwt
 from gossipmesh.models.user import UserOIDCCredential
 
 router = APIRouter()
@@ -327,7 +327,7 @@ def oidc_callback(
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
-    nonce, code_verifier = state_data.split(":")
+    nonce, code_verifier = state_data.decode("utf-8").split(":") if isinstance(state_data, bytes) else state_data.split(":")
 
     with httpx.Client() as client:
         try:
@@ -364,7 +364,7 @@ def oidc_callback(
             raise AuthenticationError(message="No id_token received")
 
         try:
-            jwks_client = PyJWKClient(jwks_uri)
+            jwks_client: Any = jwt.PyJWKClient(jwks_uri)  # type: ignore
             signing_key = jwks_client.get_signing_key_from_jwt(id_token)
             claims = jwt.decode(
                 id_token,
@@ -407,7 +407,7 @@ def oidc_callback(
             )
             db.add(credential)
         else:
-            credential.sub = sub
+            credential.sub = str(sub)
             credential.encrypted_access_token = encrypt_string(access_token)
             if refresh_token:
                 credential.encrypted_refresh_token = encrypt_string(refresh_token)

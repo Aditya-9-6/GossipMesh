@@ -1,8 +1,6 @@
 import time
 import jwt
 from github import Github, Auth
-from github.Installation import Installation
-from gossipmesh.core.config import settings
 
 class GitHubIntegration:
     def __init__(self, app_id: str, private_key: str):
@@ -15,7 +13,8 @@ class GitHubIntegration:
             "exp": int(time.time()) + (10 * 60),
             "iss": self.app_id
         }
-        return jwt.encode(payload, self.private_key, algorithm="RS256")
+        encoded = jwt.encode(payload, self.private_key, algorithm="RS256")
+        return encoded if isinstance(encoded, str) else encoded.decode("utf-8")
 
     def get_app_client(self) -> Github:
         """Returns a Github client authenticated as the App."""
