@@ -10,6 +10,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=True) # made nullable because of github login
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
 
     organizations = relationship("UserOrganization", back_populates="user")
     github_credential = relationship("UserGitHubCredential", back_populates="user", uselist=False)
