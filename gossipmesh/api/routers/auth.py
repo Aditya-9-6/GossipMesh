@@ -1,28 +1,36 @@
-from datetime import timedelta
-import uuid
 import urllib.parse
+import uuid
+from datetime import timedelta
 from typing import Any
+
 import httpx
-from fastapi import APIRouter, Depends, status, Response, Request, HTTPException
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from gossipmesh.api import deps
 from gossipmesh.core.config import settings
-from gossipmesh.core.security import verify_password, create_access_token, encrypt_string, decrypt_string
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
-from gossipmesh.models.user import User, UserGitHubCredential
-from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.audit import AuditEvent
+from gossipmesh.core.security import (
+    create_access_token,
+    decrypt_string,
+    encrypt_string,
+    verify_password,
+)
 from gossipmesh.db.redis import redis_client
-from pydantic import BaseModel
+from gossipmesh.models.audit import AuditEvent
+from gossipmesh.models.organization import Organization, UserOrganization
+from gossipmesh.models.user import User, UserGitHubCredential
 
 router = APIRouter()
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str
+
 
 @router.post("/login/access-token", response_model=Token)
 def login_access_token(
@@ -61,10 +69,7 @@ def github_login(request: Request) -> Any:
 
 @router.get("/github/callback")
 def github_callback(
-    request: Request,
-    code: str,
-    state: str,
-    db: Session = Depends(deps.get_db)
+    request: Request, code: str, state: str, db: Session = Depends(deps.get_db)
 ) -> Any:
     # Validate state
     redis_key = f"github_oauth_state:{state}"
@@ -86,7 +91,11 @@ def github_callback(
         )
         token_data = token_response.json()
         if "error" in token_data:
-            raise AuthenticationError(message=token_data.get("error_description", "Failed to authenticate with GitHub"))
+            raise AuthenticationError(
+                message=token_data.get(
+                    "error_description", "Failed to authenticate with GitHub"
+                )
+            )
 
         access_token = token_data["access_token"]
         refresh_token = token_data.get("refresh_token")
@@ -98,7 +107,7 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         user_response.raise_for_status()
         github_user_data = user_response.json()
@@ -110,14 +119,23 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         emails_response.raise_for_status()
         emails_data = emails_response.json()
-        primary_email = next((email["email"] for email in emails_data if email["primary"] and email.get("verified")), None)
+        primary_email = next(
+            (
+                email["email"]
+                for email in emails_data
+                if email["primary"] and email.get("verified")
+            ),
+            None,
+        )
 
         if not primary_email:
-            raise AuthenticationError(message="No verified primary email found on GitHub account")
+            raise AuthenticationError(
+                message="No verified primary email found on GitHub account"
+            )
 
         github_id = github_user_data["id"]
 
@@ -130,13 +148,19 @@ def github_callback(
             db.refresh(user)
 
         # Update or create credentials
-        credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == user.id).first()
+        credential = (
+            db.query(UserGitHubCredential)
+            .filter(UserGitHubCredential.user_id == user.id)
+            .first()
+        )
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
                 github_id=github_id,
                 encrypted_access_token=encrypt_string(access_token),
-                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None
+                encrypted_refresh_token=encrypt_string(refresh_token)
+                if refresh_token
+                else None,
             )
             db.add(credential)
         else:
@@ -154,7 +178,7 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         orgs_response.raise_for_status()
         github_orgs = orgs_response.json()
@@ -168,7 +192,7 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         installations_count = 0
         if installations_response.status_code == 200:
@@ -183,16 +207,18 @@ def github_callback(
                 db.commit()
                 db.refresh(org)
 
-            user_org = db.query(UserOrganization).filter(
-                UserOrganization.user_id == user.id,
-                UserOrganization.organization_id == org.id
-            ).first()
+            user_org = (
+                db.query(UserOrganization)
+                .filter(
+                    UserOrganization.user_id == user.id,
+                    UserOrganization.organization_id == org.id,
+                )
+                .first()
+            )
 
             if not user_org:
                 user_org = UserOrganization(
-                    user_id=user.id,
-                    organization_id=org.id,
-                    role="member"
+                    user_id=user.id, organization_id=org.id, role="member"
                 )
                 db.add(user_org)
 
@@ -205,8 +231,8 @@ def github_callback(
             details={
                 "github_id": github_id,
                 "organizations": org_names,
-                "installations_count": installations_count
-            }
+                "installations_count": installations_count,
+            },
         )
         db.add(audit_event)
         db.commit()
@@ -223,11 +249,17 @@ def github_callback(
 @router.post("/github/refresh-token")
 def github_refresh_token(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
 ) -> Any:
-    credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
+    credential = (
+        db.query(UserGitHubCredential)
+        .filter(UserGitHubCredential.user_id == current_user.id)
+        .first()
+    )
     if not credential or not credential.encrypted_refresh_token:
-        raise AuthenticationError(message="No GitHub refresh token available for this user")
+        raise AuthenticationError(
+            message="No GitHub refresh token available for this user"
+        )
 
     refresh_token = decrypt_string(credential.encrypted_refresh_token)
 
@@ -244,7 +276,11 @@ def github_refresh_token(
         )
         token_data = token_response.json()
         if "error" in token_data:
-            raise AuthenticationError(message=token_data.get("error_description", "Failed to refresh GitHub token"))
+            raise AuthenticationError(
+                message=token_data.get(
+                    "error_description", "Failed to refresh GitHub token"
+                )
+            )
 
         new_access_token = token_data["access_token"]
         new_refresh_token = token_data.get("refresh_token")
@@ -261,7 +297,7 @@ def github_refresh_token(
             actor_id=current_user.id,
             details={
                 "github_id": credential.github_id,
-            }
+            },
         )
         db.add(audit_event)
         db.commit()

@@ -6,16 +6,15 @@ applies the fix, and verifies that tests pass before pushing.
 Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tests.
 """
 
-import os
-import sys
-import json
-import re
 import argparse
-import urllib.request
-import urllib.error
-import subprocess
-import time
 import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 DEFAULT_MODEL = "gemini-2.5-pro"
@@ -48,7 +47,14 @@ Respond ONLY with a single valid JSON object and nothing else (no conversational
 }
 """
 
-def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
+
+def call_gemini(
+    api_key: str,
+    prompt: str,
+    fallback_key: str = "",
+    model: str = DEFAULT_MODEL,
+    cache_dir: str = ".pyssip_mesh/cache",
+) -> dict:
     """Calls Gemini REST API with fallback models and fallback API key."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
@@ -61,7 +67,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
     # Check cache
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_key = hashlib.sha256(f"{model}:{prompt}".encode()).hexdigest()
     cache_file = cache_path / f"{cache_key}.json"
 
     if cache_file.exists():
@@ -76,33 +82,31 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
         for current_model in models_to_try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": SYSTEM_PROMPT},
-                            {"text": prompt}
-                        ]
-                    }
-                ],
+                "contents": [{"parts": [{"text": SYSTEM_PROMPT}, {"text": prompt}]}],
                 "generationConfig": {
                     "temperature": 0.1,
-                    "responseMimeType": "application/json"
-                }
+                    "responseMimeType": "application/json",
+                },
             }
 
-            print(f"[*] Querying model {current_model} for CI fix / refactoring...", flush=True)
+            print(
+                f"[*] Querying model {current_model} for CI fix / refactoring...",
+                flush=True,
+            )
             max_attempts = 3
             for attempt in range(1, max_attempts + 1):
                 req = urllib.request.Request(
                     url,
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
-                    method="POST"
+                    method="POST",
                 )
                 try:
                     with urllib.request.urlopen(req, timeout=90) as resp:
                         data = json.loads(resp.read().decode("utf-8"))
-                        text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                        text_response = data["candidates"][0]["content"]["parts"][0][
+                            "text"
+                        ].strip()
                         try:
                             parsed_response = json.loads(text_response, strict=False)
                         except json.JSONDecodeError:
@@ -116,14 +120,19 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                             parsed_response = json.loads(text_response, strict=False)
 
                         try:
-                            cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
+                            cache_file.write_text(
+                                json.dumps(parsed_response), encoding="utf-8"
+                            )
                         except Exception:
                             pass
 
                         return parsed_response
                 except urllib.error.HTTPError as e:
                     err_msg = e.read().decode("utf-8", errors="replace")
-                    print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}", file=sys.stderr)
+                    print(
+                        f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}",
+                        file=sys.stderr,
+                    )
                     last_err = err_msg
                     if e.code == 404:
                         break
@@ -132,14 +141,20 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                         continue
                     break
                 except Exception as e:
-                    print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
+                    print(
+                        f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}",
+                        file=sys.stderr,
+                    )
                     last_err = str(e)
                     if attempt < max_attempts:
                         time.sleep(1 * attempt)
                         continue
                     break
 
-    raise RuntimeError(f"Failed to obtain CI fix from Gemini API. Last error: {last_err}")
+    raise RuntimeError(
+        f"Failed to obtain CI fix from Gemini API. Last error: {last_err}"
+    )
+
 
 def run_diagnostics(workspace: Path) -> tuple[int, str]:
     """Runs compiler and test suite, returning exit code and combined error output."""
@@ -147,18 +162,24 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
     out_lines = []
 
     # Check black
-    fmt_res = subprocess.run(["black", "-l", "."], cwd=workspace, capture_output=True, text=True)
+    fmt_res = subprocess.run(
+        ["black", "-l", "."], cwd=workspace, capture_output=True, text=True
+    )
     if fmt_res.stdout.strip():
         out_lines.append("=== BLACK FORMATTING ERRORS ===")
         out_lines.append(f"Unformatted files:\n{fmt_res.stdout.strip()}\n")
     # Check gofmt
-    fmt_res = subprocess.run(["black", "--check", "."], cwd=workspace, capture_output=True, text=True)
+    fmt_res = subprocess.run(
+        ["black", "--check", "."], cwd=workspace, capture_output=True, text=True
+    )
     if fmt_res.returncode != 0:
         out_lines.append("=== BLACK FORMATTING ERRORS ===")
         out_lines.append(f"Unformatted files:\n{fmt_res.stderr.strip()}\n")
 
     # Check flake8
-    vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True)
+    vet_res = subprocess.run(
+        ["flake8", "."], cwd=workspace, capture_output=True, text=True
+    )
     if vet_res.returncode != 0:
         out_lines.append("=== FLAKE8 COMPILATION / STATIC ANALYSIS ERRORS ===")
         out_lines.append("=== FLAKE8 LINT ERRORS ===")
@@ -166,7 +187,22 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
         out_lines.append("")
 
     # Check pytest
-    test_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True)
+    test_res = subprocess.run(
+        [
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_*.py",
+            "-v",
+        ],
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+    )
     if test_res.returncode != 0:
         out_lines.append("=== PYTHON TEST FAILURES ===")
         combined = (test_res.stdout + "\n" + test_res.stderr).strip()
@@ -176,13 +212,19 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
     total_exit = 0 if not combined_output else 1
     return total_exit, combined_output
 
+
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
     """Extracts Python file paths modified in diff to prevent context bloat."""
     found = set()
 
     # Also include modified files in git status/diff
     try:
-        diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
+        diff_names = subprocess.run(
+            ["git", "diff", "--name-only", "origin/main...HEAD"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+        )
         for line in diff_names.stdout.splitlines():
             line = line.strip().replace("\\", "/")
             if line.endswith(".py") and (workspace / line).is_file():
@@ -191,7 +233,12 @@ def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
         pass
 
     try:
-        diff_names = subprocess.run(["git", "diff", "--name-only", "HEAD~1"], cwd=workspace, capture_output=True, text=True)
+        diff_names = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD~1"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+        )
         for line in diff_names.stdout.splitlines():
             line = line.strip().replace("\\", "/")
             if line.endswith(".py") and (workspace / line).is_file():
@@ -201,39 +248,67 @@ def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
 
     return sorted(list(found))
 
+
 def get_pr_diff(workspace: Path) -> str:
     """Gets git diff against origin/main or HEAD~1."""
     try:
-        res = subprocess.run(["git", "diff", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
+        res = subprocess.run(
+            ["git", "diff", "origin/main...HEAD"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+        )
         if res.stdout.strip():
             return res.stdout.strip()[:15000]
     except Exception:
         pass
     try:
-        res = subprocess.run(["git", "diff", "HEAD~1"], cwd=workspace, capture_output=True, text=True)
+        res = subprocess.run(
+            ["git", "diff", "HEAD~1"], cwd=workspace, capture_output=True, text=True
+        )
         if res.stdout.strip():
             return res.stdout.strip()[:15000]
     except Exception:
         pass
     return "No git diff available."
 
+
 def main():
-    parser = argparse.ArgumentParser(description="GossipMesh Autonomous CI Auto-Fixer & Architectural Refactorer")
+    parser = argparse.ArgumentParser(
+        description="GossipMesh Autonomous CI Auto-Fixer & Architectural Refactorer"
+    )
     parser.add_argument("--pr-number", required=True, help="GitHub Pull Request Number")
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
-    parser.add_argument("--error-log-file", default="", help="Optional pre-captured error log file")
-    parser.add_argument("--review-feedback-file", default="", help="Optional reviewer feedback markdown file")
+    parser.add_argument(
+        "--error-log-file", default="", help="Optional pre-captured error log file"
+    )
+    parser.add_argument(
+        "--review-feedback-file",
+        default="",
+        help="Optional reviewer feedback markdown file",
+    )
     args = parser.parse_args()
 
-    primary_key = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
-    fallback_key = os.environ.get("GEMINI_REVIEWER_KEY", "").strip() or os.environ.get("GEMINI_ISSUE_KEY", "").strip()
+    primary_key = (
+        os.environ.get("GEMINI_SOLVER_KEY", "").strip()
+        or os.environ.get("GEMINI_API_KEY", "").strip()
+    )
+    fallback_key = (
+        os.environ.get("GEMINI_REVIEWER_KEY", "").strip()
+        or os.environ.get("GEMINI_ISSUE_KEY", "").strip()
+    )
 
     if not primary_key:
-        print("MISSING_API_KEY: Environment variable GEMINI_SOLVER_KEY or GEMINI_API_KEY is not set.", file=sys.stderr)
+        print(
+            "MISSING_API_KEY: Environment variable GEMINI_SOLVER_KEY or GEMINI_API_KEY is not set.",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     workspace = Path(args.workspace).resolve()
-    print(f"[*] Starting Autonomous CI Fixer for PR #{args.pr_number} in {workspace}...")
+    print(
+        f"[*] Starting Autonomous CI Fixer for PR #{args.pr_number} in {workspace}..."
+    )
 
     review_feedback = ""
     if args.review_feedback_file and Path(args.review_feedback_file).is_file():
@@ -247,7 +322,9 @@ def main():
 
     max_iterations = 2
     for iteration in range(1, max_iterations + 1):
-        print(f"\n=== Autonomous Repair Pass {iteration}/{max_iterations} ===", flush=True)
+        print(
+            f"\n=== Autonomous Repair Pass {iteration}/{max_iterations} ===", flush=True
+        )
 
         # Step 1: Run diagnostics
         code, error_log = run_diagnostics(workspace)
@@ -257,7 +334,9 @@ def main():
             post_errors = ""
             break
 
-        print(f"[*] Diagnostics identified {len(error_log)} chars of error output at pass {iteration}.")
+        print(
+            f"[*] Diagnostics identified {len(error_log)} chars of error output at pass {iteration}."
+        )
 
         # Step 2: Extract referenced files & context
         combined_context_text = error_log + "\n" + review_feedback
@@ -301,7 +380,9 @@ Instructions:
 
         # Step 4: Request fix from Gemini
         result = call_gemini(primary_key, prompt, fallback_key=fallback_key)
-        latest_summary = result.get("summary", "Automated repair for architectural feedback and CI errors.")
+        latest_summary = result.get(
+            "summary", "Automated repair for architectural feedback and CI errors."
+        )
         files = result.get("files", [])
 
         if not files:
@@ -341,11 +422,12 @@ Instructions:
 {chr(10).join(f"- `{f}`" for f in sorted(list(all_repaired_files)))}
 
 ### 🧪 Diagnostic Verification
-- Local build & test status after fix: **{'PASSED (Clean)' if post_code == 0 else 'WARNING (Some checks still reporting errors)'}**
+- Local build & test status after fix: **{"PASSED (Clean)" if post_code == 0 else "WARNING (Some checks still reporting errors)"}**
 {f"```text{chr(10)}{post_errors[:1500]}{chr(10)}```" if post_code != 0 else ""}
 """
     summary_file.write_text(summary_content, encoding="utf-8")
     print(f"[OK] Fix cycle completed. Final verification status: code {post_code}")
+
 
 if __name__ == "__main__":
     main()

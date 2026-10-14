@@ -1,18 +1,20 @@
-from typing import Generator
-from fastapi import Depends, status
-from fastapi.security import OAuth2PasswordBearer
-import jwt
-from sqlalchemy.orm import Session
-from pydantic import ValidationError
+from collections.abc import Generator
 
-from gossipmesh.db.session import SessionLocal
+import jwt
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
+from pydantic import ValidationError
+from sqlalchemy.orm import Session
+
 from gossipmesh.core.config import settings
+from gossipmesh.core.exceptions import AuthenticationError
+from gossipmesh.db.session import SessionLocal
 from gossipmesh.models.user import User
-from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login/access-token"
 )
+
 
 def get_db() -> Generator:
     try:
@@ -20,6 +22,7 @@ def get_db() -> Generator:
         yield db
     finally:
         db.close()
+
 
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)

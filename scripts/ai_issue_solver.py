@@ -50,43 +50,67 @@ The JSON object must have this exact structure:
 }
 """
 
+
 def get_git_files(workspace_root: Path) -> list:
     """Uses git ls-files for lightning-fast file discovery."""
     try:
-        out = subprocess.check_output(["git", "ls-files"], cwd=workspace_root, text=True, stderr=subprocess.DEVNULL)
-        return [line.strip().replace("\\", "/") for line in out.splitlines() if line.strip()]
+        out = subprocess.check_output(
+            ["git", "ls-files"],
+            cwd=workspace_root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        return [
+            line.strip().replace("\\", "/") for line in out.splitlines() if line.strip()
+        ]
     except Exception:
         files = []
         for root, dirs, filenames in os.walk(workspace_root):
-            dirs[:] = [d for d in dirs if d not in [".git", "vendor", "node_modules", "bin"]]
+            dirs[:] = [
+                d for d in dirs if d not in [".git", "vendor", "node_modules", "bin"]
+            ]
             for f in filenames:
-                rel = os.path.relpath(os.path.join(root, f), workspace_root).replace("\\", "/")
+                rel = os.path.relpath(os.path.join(root, f), workspace_root).replace(
+                    "\\", "/"
+                )
                 files.append(rel)
         return files
 
-def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60) -> str:
+
+def get_repo_overview(
+    workspace_root: Path, all_files: list, max_files: int = 60
+) -> str:
     """Collects high-level overview of repo structure and pyproject.toml configuration."""
     overview = []
-    
+
     go_mod = workspace_root / "pyproject.toml"
     if go_mod.exists():
         try:
-            overview.append(f"=== Root pyproject.toml ===\n{go_mod.read_text(encoding='utf-8')[:2000]}")
+            overview.append(
+                f"=== Root pyproject.toml ===\n{go_mod.read_text(encoding='utf-8')[:2000]}"
+            )
         except Exception:
             pass
-    
+
     overview.append("\n=== Repository File Tree ===")
-    selected = [f for f in all_files if f.endswith((".py", ".mod", ".md", ".yaml", ".yml"))][:max_files]
-    selected = [f for f in all_files if f.endswith((".py", ".txt", ".md", ".yaml", ".yml"))][:max_files]
+    selected = [
+        f for f in all_files if f.endswith((".py", ".mod", ".md", ".yaml", ".yml"))
+    ][:max_files]
+    selected = [
+        f for f in all_files if f.endswith((".py", ".txt", ".md", ".yaml", ".yml"))
+    ][:max_files]
     overview.append("\n".join(selected))
     return "\n".join(overview)
 
+
 import sys
 import ast
+
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.rag import VectorDB
 from gossipmesh.memetic import MemeticKnowledgeBase
+
 
 def summarize_python_file(content: str) -> str:
     """Parses a Python file and returns its imports and function/class signatures with docstrings."""
@@ -98,7 +122,7 @@ def summarize_python_file(content: str) -> str:
         def get_signature_and_doc(node, indent=0):
             node_copy = ast.copy_location(type(node)(), node)
             for field, value in ast.iter_fields(node):
-                if field != 'body':
+                if field != "body":
                     setattr(node_copy, field, value)
 
             # replace body with pass
@@ -106,8 +130,8 @@ def summarize_python_file(content: str) -> str:
 
             sig = ast.unparse(node_copy).strip()
             # remove the 'pass'
-            if sig.endswith('pass'):
-                 sig = sig[:-4].strip()
+            if sig.endswith("pass"):
+                sig = sig[:-4].strip()
 
             lines = [(" " * indent) + sig]
             doc = ast.get_docstring(node)
@@ -135,12 +159,18 @@ def summarize_python_file(content: str) -> str:
         return f"# Error parsing python file: {e}\n{content[:1000]}"
     return "\n".join(summary)
 
+
 def summarize_go_file(filepath: str, workspace_root: Path, raw_content: str) -> str:
     """Runs the go_ast_extractor tool on a Go file to get a structural summary."""
     try:
         extractor_path = Path(__file__).resolve().parent / "go_ast_extractor.go"
         target_file = workspace_root / filepath
-        res = subprocess.run(["go", "run", str(extractor_path), str(target_file)], capture_output=True, text=True, timeout=10)
+        res = subprocess.run(
+            ["go", "run", str(extractor_path), str(target_file)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
         if res.returncode == 0:
             data = json.loads(res.stdout)
             summary = [f"package {data.get('package', '')}", ""]
@@ -152,14 +182,15 @@ def summarize_go_file(filepath: str, workspace_root: Path, raw_content: str) -> 
             summary.extend(data.get("declarations", []))
             return "\n".join(summary)
         else:
-             return f"// Error parsing go file: {res.stderr}\n// Proceeding with raw context...\n{raw_content}"
+            return f"// Error parsing go file: {res.stderr}\n// Proceeding with raw context...\n{raw_content}"
     except Exception as e:
         return f"// Error parsing go file: {e}\n{raw_content}"
+
 
 def get_relevant_files(workspace_root: Path, query_text: str) -> str:
     """Uses VectorDB RAG to find semantically relevant files for context."""
     context_files = []
-    
+
     # Initialize and index workspace if not already done
     db = VectorDB()
     if not db.embeddings:
@@ -172,24 +203,30 @@ def get_relevant_files(workspace_root: Path, query_text: str) -> str:
     for path, content, score in results:
         print(f"    [+] RAG hit: {path} (Similarity: {score:.2f})")
         if path.endswith(".py"):
-             summarized = summarize_python_file(content)
+            summarized = summarize_python_file(content)
         elif path.endswith(".go"):
-             summarized = summarize_go_file(path, workspace_root, content)
+            summarized = summarize_go_file(path, workspace_root, content)
         else:
-             summarized = content
+            summarized = content
 
         context_files.append(f"=== Existing File: {path} ===\n{summarized}")
-                
+
     return "\n\n".join(context_files)
 
-def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
+
+def call_gemini(
+    api_key: str,
+    prompt: str,
+    model: str = DEFAULT_MODEL,
+    cache_dir: str = ".pyssip_mesh/cache",
+) -> dict:
     """Calls Gemini REST API with fallback and retries across supported models."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
     for m in ordered:
         if m not in models_to_try:
             models_to_try.append(m)
-    
+
     # Check cache
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
@@ -206,22 +243,15 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
     last_err = None
     for current_model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
-        
+
         payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": SYSTEM_PROMPT},
-                        {"text": prompt}
-                    ]
-                }
-            ],
+            "contents": [{"parts": [{"text": SYSTEM_PROMPT}, {"text": prompt}]}],
             "generationConfig": {
                 "temperature": 0.2,
-                "responseMimeType": "application/json"
-            }
+                "responseMimeType": "application/json",
+            },
         }
-        
+
         print(f"[*] Attempting generation with model: {current_model}...", flush=True)
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
@@ -229,13 +259,15 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
                 url,
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
-                method="POST"
+                method="POST",
             )
             try:
                 with urllib.request.urlopen(req, timeout=90) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
-                    text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    
+                    text_response = data["candidates"][0]["content"]["parts"][0][
+                        "text"
+                    ].strip()
+
                     # Parse JSON response
                     try:
                         parsed_response = json.loads(text_response, strict=False)
@@ -250,14 +282,19 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
                         parsed_response = json.loads(text_response, strict=False)
 
                     try:
-                        cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
+                        cache_file.write_text(
+                            json.dumps(parsed_response), encoding="utf-8"
+                        )
                     except Exception:
                         pass
 
                     return parsed_response
             except urllib.error.HTTPError as e:
                 err_msg = e.read().decode("utf-8", errors="replace")
-                print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:200]}", file=sys.stderr)
+                print(
+                    f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:200]}",
+                    file=sys.stderr,
+                )
                 last_err = err_msg
                 # If model is deprecated / not found, do not waste retries
                 if e.code == 404:
@@ -267,14 +304,20 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
                     continue
                 break
             except Exception as e:
-                print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
+                print(
+                    f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}",
+                    file=sys.stderr,
+                )
                 last_err = str(e)
                 if attempt < max_attempts:
                     time.sleep(1 * attempt)
                     continue
                 break
 
-    raise RuntimeError(f"Failed to obtain solution from Gemini API across models {models_to_try}. Last error: {last_err}")
+    raise RuntimeError(
+        f"Failed to obtain solution from Gemini API across models {models_to_try}. Last error: {last_err}"
+    )
+
 
 def main():
     parser = argparse.ArgumentParser(description="GossipMesh AI Issue Solver")
@@ -286,15 +329,22 @@ def main():
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
-        print("MISSING_API_KEY: Environment variable GEMINI_API_KEY is not set.", file=sys.stderr)
-        print("To enable the bot, generate a free API key at https://aistudio.google.com/ and add it to GitHub Secrets as GEMINI_API_KEY.")
+        print(
+            "MISSING_API_KEY: Environment variable GEMINI_API_KEY is not set.",
+            file=sys.stderr,
+        )
+        print(
+            "To enable the bot, generate a free API key at https://aistudio.google.com/ and add it to GitHub Secrets as GEMINI_API_KEY."
+        )
         sys.exit(2)
 
     workspace_root = Path(args.workspace).resolve()
     print(f"[*] Solving Issue #{args.issue_number}: {args.issue_title}")
 
-    keywords = [w for w in (args.issue_title + " " + args.issue_body).split() if len(w) > 3]
-    
+    keywords = [
+        w for w in (args.issue_title + " " + args.issue_body).split() if len(w) > 3
+    ]
+
     print("[*] Inspecting repository context...")
     all_files = get_git_files(workspace_root)
     overview = get_repo_overview(workspace_root, all_files)
@@ -347,26 +397,10 @@ Instructions:
         print(f"    [+] Wrote: {rel_path}")
 
     summary_file = workspace_root / "ai_pr_summary.md"
-    summary_content = f"""## 🤖 Automated Solution for Issue #{args.issue_number}
-
-**Issue**: #{args.issue_number} - {args.issue_title}
-
-### 📝 Solution Overview
-{summary}
-
-### 📦 Files Changed
-{chr(10).join(f"- `{f['path']}`" for f in files)}
-
-### 🛡️ Quality & Performance Invariants
-- [x] Idiomatic Python concurrency and memory safety.
-- [x] High throughput and streaming invariants preserved.
-- [x] Comprehensive unit tests included.
-
----
-*Closes #{args.issue_number}*
-"""
+    summary_content = f"""  ## 🤖 Automated Solution for Issue #{args.issue_number}\n\n**Issue**: #{args.issue_number} - {args.issue_title}\n\n### 📝 Solution Overview\n{summary}\n\n### 📦 Files Changed\n{','.join([f['path'] for f in files])}\n\n### 🛡️ Quality & Performance Invariants\n- [x] Idiomatic Python concurrency and memory safety.\n- [x] High throughput and streaming invariants preserved.\n- [x] Comprehensive unit tests included.\n\n---\n*Closes #{args.issue_number}*\n"""
     summary_file.write_text(summary_content, encoding="utf-8")
     print("[OK] Solution generated and files written successfully.")
+
 
 if __name__ == "__main__":
     main()

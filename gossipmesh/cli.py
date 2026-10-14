@@ -3,13 +3,15 @@ GossipMesh Command-Line Interface.
 Manage peer nodes, inspect memetic knowledge, broadcast gossip, and audit diffs.
 """
 
-import sys
-import json
 import argparse
+import json
+import sys
 from pathlib import Path
-from .node import GossipNode, GossipTopic
+
 from .memetic import MemeticKnowledgeBase
+from .node import GossipNode
 from .red_team import RedTeamAuditor
+
 
 def cmd_status(args):
     node = GossipNode("cli_inspector", mesh_dir=args.mesh_dir)
@@ -26,7 +28,9 @@ def cmd_status(args):
         try:
             hb = json.loads(hb_file.read_text(encoding="utf-8"))
             for nid, data in hb.items():
-                print(f"  * {nid:<24} | Last Seen: {data.get('last_seen', 0):.1f} | Clock: {data.get('clock_seq', 0)}")
+                print(
+                    f"  * {nid:<24} | Last Seen: {data.get('last_seen', 0):.1f} | Clock: {data.get('clock_seq', 0)}"
+                )
         except Exception:
             print("  (No active heartbeats found)")
     else:
@@ -39,15 +43,20 @@ def cmd_status(args):
         print(f"  [{m.fitness_score:4.1f}*] {m.title:<35} ({m.repo})")
         print(f"         Rule: {m.rule}")
 
+
 def cmd_broadcast(args):
     node = GossipNode(args.node_id or "cli_broadcaster", mesh_dir=args.mesh_dir)
     payload = {"message": args.message, "origin": "cli"}
     msg = node.publish(args.topic, payload, repo=args.repo)
-    print(f"[OK] Broadcasted gossip message '{msg.message_id}' on topic '{args.topic}' across mesh.")
+    print(
+        f"[OK] Broadcasted gossip message '{msg.message_id}' on topic '{args.topic}' across mesh."
+    )
+
 
 def cmd_memes(args):
     kb = MemeticKnowledgeBase()
     print(kb.format_prompt_context(repo=args.repo))
+
 
 def cmd_audit(args):
     auditor = RedTeamAuditor()
@@ -60,12 +69,15 @@ def cmd_audit(args):
     probes = auditor.audit_diff(content)
     print(f"--- Red Team Adversarial Audit: {path.name} ---")
     if not probes:
-        print("[OK] No critical anti-patterns or race condition vulnerabilities detected.")
+        print(
+            "[OK] No critical anti-patterns or race condition vulnerabilities detected."
+        )
     else:
         for p in probes:
             print(f"[{p.severity}] {p.category}: {p.description}")
             print(f"  Attack Vector: {p.attack_vector}")
             print(f"  Suggested Test:\n{p.exploit_test_stub}\n")
+
 
 def main():
     parser = argparse.ArgumentParser(description="GossipMesh Multi-Agent Peer CLI")
@@ -73,21 +85,29 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # status
-    subparsers.add_parser("status", help="Inspect active peers, heartbeats, and top memes")
+    subparsers.add_parser(
+        "status", help="Inspect active peers, heartbeats, and top memes"
+    )
 
     # broadcast
-    p_bcast = subparsers.add_parser("broadcast", help="Publish a gossip event to the mesh")
+    p_bcast = subparsers.add_parser(
+        "broadcast", help="Publish a gossip event to the mesh"
+    )
     p_bcast.add_argument("--topic", default="best_practices", help="Gossip topic")
     p_bcast.add_argument("--message", required=True, help="Message content")
     p_bcast.add_argument("--repo", default="global", help="Target repository scope")
     p_bcast.add_argument("--node-id", default="cli_operator", help="Sender node ID")
 
     # memes
-    p_memes = subparsers.add_parser("memes", help="Show formatted prompt context for top memes")
+    p_memes = subparsers.add_parser(
+        "memes", help="Show formatted prompt context for top memes"
+    )
     p_memes.add_argument("--repo", default="global", help="Filter by repo")
 
     # audit
-    p_audit = subparsers.add_parser("audit", help="Run Red Team adversarial audit on a code file")
+    p_audit = subparsers.add_parser(
+        "audit", help="Run Red Team adversarial audit on a code file"
+    )
     p_audit.add_argument("path", help="Path to code file")
 
     args = parser.parse_args()
@@ -100,6 +120,7 @@ def main():
         cmd_memes(args)
     elif args.command == "audit":
         cmd_audit(args)
+
 
 if __name__ == "__main__":
     main()

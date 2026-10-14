@@ -1,8 +1,8 @@
-from sqlalchemy import String, ForeignKey
+from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from gossipmesh.models.base import Base
 
-from sqlalchemy import Boolean
 
 class Organization(Base):
     __tablename__ = "organizations"
@@ -15,18 +15,28 @@ class Organization(Base):
     owner = relationship("User")
     projects = relationship("Project", back_populates="organization")
 
+
 class UserOrganization(Base):
     __tablename__ = "user_organizations"
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), primary_key=True)
-    role: Mapped[str] = mapped_column(String, nullable=False, default="member") # admin, member, owner
-    status: Mapped[str] = mapped_column(String, nullable=False, default="active") # active, invited, suspended
-    role: Mapped[str] = mapped_column(String, nullable=False, default="member") # admin, member, etc
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(
+        String, nullable=False, default="member"
+    )  # admin, member, owner
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="active"
+    )  # active, invited, suspended
+    role: Mapped[str] = mapped_column(
+        String, nullable=False, default="member"
+    )  # admin, member, etc
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user = relationship("User", back_populates="organizations")
     organization = relationship("Organization", back_populates="users")
+
 
 class OrganizationInvitation(Base):
     __tablename__ = "organization_invitations"
@@ -34,7 +44,9 @@ class OrganizationInvitation(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String, index=True, nullable=False)
     token: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False, index=True
+    )
     role: Mapped[str] = mapped_column(String, nullable=False, default="member")
 
     organization = relationship("Organization")

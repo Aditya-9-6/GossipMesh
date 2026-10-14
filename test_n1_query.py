@@ -1,6 +1,6 @@
-import os
 import base64
-import sys
+import os
+
 os.environ["SECRET_KEY"] = "testsecretkey"
 os.environ["ENCRYPTION_KEY"] = base64.urlsafe_b64encode(b"A" * 32).decode("utf-8")
 os.environ["POSTGRES_USER"] = "test"
@@ -9,21 +9,20 @@ os.environ["POSTGRES_HOST"] = "test"
 os.environ["POSTGRES_PORT"] = "5432"
 os.environ["POSTGRES_DB"] = "test"
 
-from fastapi import FastAPI, Depends, APIRouter
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
 import time
 
-from gossipmesh.models.base import Base
-from gossipmesh.models.user import User
-from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.provider import ProviderCredential
-from gossipmesh.api.routers.providers import router as providers_router
-from gossipmesh.api.routers.organizations import router as organizations_router
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
+
 from gossipmesh.api import deps
-import logging
+from gossipmesh.api.routers.organizations import router as organizations_router
+from gossipmesh.api.routers.providers import router as providers_router
+from gossipmesh.models.base import Base
+from gossipmesh.models.organization import Organization, UserOrganization
+from gossipmesh.models.user import User
 
 engine = create_engine(
     "sqlite://",
@@ -33,12 +32,14 @@ engine = create_engine(
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
+
 def override_get_db():
     try:
         db = TestingSessionLocal()
         yield db
     finally:
         db.close()
+
 
 app = FastAPI()
 app.include_router(providers_router, prefix="/providers")
@@ -52,9 +53,11 @@ app.dependency_overrides[deps.get_db] = override_get_db
 # This doesn't eagerly load organizations. So any access to current_user.organizations will trigger a lazy load
 # which can lead to N+1 queries down the line.
 
+
 def override_get_current_user(db: Session = Depends(override_get_db)):
     user = db.query(User).filter(User.id == 1).first()
     return user
+
 
 app.dependency_overrides[deps.get_current_user] = override_get_current_user
 
@@ -78,6 +81,8 @@ db.close()
 
 # Count queries
 query_count = 0
+
+
 @event.listens_for(engine, "before_cursor_execute")
 def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
     global query_count
@@ -85,18 +90,20 @@ def before_cursor_execute(conn, cursor, statement, parameters, context, executem
     if "SELECT" in statement:
         query_count += 1
 
+
 client = TestClient(app)
 
 # Warmup
 try:
     client.get("/organizations/me")
-except Exception as e:
+except Exception:
     pass
 
 try:
     client.get("/providers/health?organization_id=1")
-except Exception as e:
+except Exception:
     pass
+
 
 def run_benchmark(endpoint, num_iterations=10):
     global query_count
@@ -110,12 +117,12 @@ def run_benchmark(endpoint, num_iterations=10):
 
         try:
             client.get(endpoint)
-        except Exception as e:
+        except Exception:
             pass
 
         end = time.time()
 
-        total_time += (end - start)
+        total_time += end - start
         total_queries += query_count
 
     avg_time = total_time / num_iterations
@@ -123,8 +130,15 @@ def run_benchmark(endpoint, num_iterations=10):
 
     return avg_time, avg_queries
 
+
 if __name__ == "__main__":
     avg_time_orgs, avg_queries_orgs = run_benchmark("/organizations/me")
-    print(f"BASELINE Organizations - Avg Time: {avg_time_orgs:.4f}s, Avg Queries: {avg_queries_orgs}")
-    avg_time_providers, avg_queries_providers = run_benchmark("/providers/health?organization_id=1")
-    print(f"BASELINE Providers - Avg Time: {avg_time_providers:.4f}s, Avg Queries: {avg_queries_providers}")
+    print(
+        f"BASELINE Organizations - Avg Time: {avg_time_orgs:.4f}s, Avg Queries: {avg_queries_orgs}"
+    )
+    avg_time_providers, avg_queries_providers = run_benchmark(
+        "/providers/health?organization_id=1"
+    )
+    print(
+        f"BASELINE Providers - Avg Time: {avg_time_providers:.4f}s, Avg Queries: {avg_queries_providers}"
+    )

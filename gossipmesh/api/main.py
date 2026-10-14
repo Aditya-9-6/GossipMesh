@@ -1,14 +1,25 @@
-from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
-from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, service_accounts
+from contextlib import asynccontextmanager
+
 from alembic.config import Config
-from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
+from fastapi import FastAPI
 from sqlalchemy import create_engine
 
+from gossipmesh.api.routers import (
+    auth,
+    organizations,
+    providers,
+    repositories,
+    runtime,
+    service_accounts,
+    users,
+)
+from gossipmesh.core.config import settings
+
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,24 +50,44 @@ async def lifespan(app: FastAPI):
 
     yield
     # Cleanup on shutdown can go here if needed
-from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
+
+
+from gossipmesh.api.errors import global_exception_handler, gossipmesh_exception_handler
 from gossipmesh.core.exceptions import GossipMeshException
 
 app = FastAPI(
-    title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
+    title=settings.PROJECT_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
-app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])
-app.include_router(providers.router, prefix=f"{settings.API_V1_STR}/providers", tags=["providers"])
-app.include_router(repositories.router, prefix=f"{settings.API_V1_STR}/repositories", tags=["repositories"])
-app.include_router(runtime.router, prefix=f"{settings.API_V1_STR}/runtime", tags=["runtime"])
-app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
+app.include_router(
+    organizations.router,
+    prefix=f"{settings.API_V1_STR}/organizations",
+    tags=["organizations"],
+)
+app.include_router(
+    providers.router, prefix=f"{settings.API_V1_STR}/providers", tags=["providers"]
+)
+app.include_router(
+    repositories.router,
+    prefix=f"{settings.API_V1_STR}/repositories",
+    tags=["repositories"],
+)
+app.include_router(
+    runtime.router, prefix=f"{settings.API_V1_STR}/runtime", tags=["runtime"]
+)
+app.include_router(
+    service_accounts.router,
+    prefix=f"{settings.API_V1_STR}/service-accounts",
+    tags=["service-accounts"],
+)
 
 app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler)
 app.add_exception_handler(Exception, global_exception_handler)
+
 
 @app.get("/health")
 def health_check():
