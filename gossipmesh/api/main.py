@@ -10,9 +10,7 @@ from gossipmesh.core.logging import setup_logging
 setup_logging()
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
-from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, service_accounts, sso
+from gossipmesh.api.routers import service_accounts, sso
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
@@ -51,13 +49,10 @@ async def lifespan(app: FastAPI):
     # Cleanup on shutdown can go here if needed
 from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
 from gossipmesh.core.exceptions import GossipMeshException
-from gossipmesh.api.rate_limit import rate_limit
-from fastapi import Depends
 
 app = FastAPI(
     title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan,
-    dependencies=[Depends(rate_limit(limit_type="api_global", limit=1000, window=60))]
+    lifespan=lifespan
 )
 
 app.add_middleware(CorrelationIdMiddleware)

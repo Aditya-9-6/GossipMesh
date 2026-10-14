@@ -1,21 +1,30 @@
-import unittest
-from unittest.mock import patch
-from fastapi.testclient import TestClient
-from gossipmesh.api import app
-import os
 import hashlib
 import hmac
 import json
+import os
+import unittest
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from gossipmesh.api import app
 
 client = TestClient(app)
 
+
+from unittest.mock import MagicMock
+from gossipmesh.api import deps
 
 class TestWebhooks(unittest.TestCase):
     def setUp(self):
         self.original_env = os.environ.get("ENVIRONMENT")
         os.environ["ENVIRONMENT"] = "development"
 
+        self.mock_db = MagicMock()
+        app.dependency_overrides[deps.get_db] = lambda: self.mock_db
+
     def tearDown(self):
+        app.dependency_overrides.clear()
         if self.original_env is not None:
             os.environ["ENVIRONMENT"] = self.original_env
         else:
@@ -50,9 +59,7 @@ class TestWebhooks(unittest.TestCase):
             json=payload,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(), {"status": "accepted", "event": "issues"}
-        )
+        self.assertEqual(response.json(), {"status": "accepted", "event": "issues"})
 
     @patch("gossipmesh.workflows.ci_fixer.CIFixerWorkflow.execute")
     def test_workflow_run_event_failure(self, mock_execute):
@@ -105,9 +112,7 @@ class TestWebhooks(unittest.TestCase):
             content=payload_bytes,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(), {"status": "accepted", "event": "issues"}
-        )
+        self.assertEqual(response.json(), {"status": "accepted", "event": "issues"})
         del os.environ["GITHUB_WEBHOOK_SECRET"]
 
     def test_missing_secret_in_production(self):
@@ -126,6 +131,55 @@ class TestWebhooks(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["error"]["message"], "Invalid signature")
+
+    def test_github_webhook_installation_created(self):
+        self.mock_db.query.return_value.filter.return_value.first.return_value = None
+
+        payload = {
+            "action": "created",
+            "installation": {
+                "id": 100,
+                "account": {"login": "test-org", "type": "Organization", "id": 200},
+                "repository_selection": "all",
+                "permissions": {"issues": "write"}
+            }
+        }
+        response = client.post(
+            "/webhooks/github",
+            headers={"X-GitHub-Event": "installation"},
+            json=payload,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "accepted", "event": "installation"})
+
+        # Verify db logic was called to add the installation and audit event
+        self.assertEqual(self.mock_db.add.call_count, 2)
+        self.assertEqual(self.mock_db.commit.call_count, 2)
+
+    def test_github_webhook_installation_deleted(self):
+        payload = {
+            "action": "deleted",
+            "installation": {
+                "id": 100,
+                "account": {"login": "test-org", "type": "Organization", "id": 200}
+            }
+        }
+        # mock finding the installation
+        mock_installation = MagicMock()
+        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_installation
+
+        response = client.post(
+            "/webhooks/github",
+            headers={"X-GitHub-Event": "installation"},
+            json=payload,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "accepted", "event": "installation"})
+
+        # Verify db logic was called to delete the installation and create audit event
+        self.mock_db.delete.assert_called_with(mock_installation)
+        self.mock_db.add.assert_called()
+        self.mock_db.commit.assert_called()
 
 
 if __name__ == "__main__":

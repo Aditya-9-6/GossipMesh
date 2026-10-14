@@ -346,6 +346,7 @@ Instructions:
         target_path.write_text(content, encoding="utf-8")
         print(f"    [+] Wrote: {rel_path}")
 
+    file_list = "\n".join(f"- `{f['path']}`" for f in files)
     summary_file = workspace_root / "ai_pr_summary.md"
     summary_content = f"""## 🤖 Automated Solution for Issue #{args.issue_number}
 
@@ -355,7 +356,7 @@ Instructions:
 {summary}
 
 ### 📦 Files Changed
-{chr(10).join(f"- `{f['path']}`" for f in files)}
+{file_list}
 
 ### 🛡️ Quality & Performance Invariants
 - [x] Idiomatic Python concurrency and memory safety.

@@ -1,7 +1,7 @@
 import threading
 from collections import OrderedDict
-from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, Request
+from typing import Any, Dict
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
