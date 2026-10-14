@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import httpx
 
 from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
@@ -64,8 +64,8 @@ class GitHubPRService:
 
     async def _get_paginated(self, url: str, **kwargs) -> List[Dict[str, Any]]:
         """Fetch all pages of a paginated GitHub API endpoint."""
-        results = []
-        next_url = url
+        results: List[Dict[str, Any]] = []
+        next_url: str | None = url
 
         while next_url:
             response = await self._request("GET", next_url, **kwargs)

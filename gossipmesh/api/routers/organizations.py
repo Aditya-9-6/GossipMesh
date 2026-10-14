@@ -1,6 +1,6 @@
 from typing import Any, List
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -42,7 +42,7 @@ def require_org_admin(org_id: int, db: Session, current_user: User):
         UserOrganization.organization_id == org_id,
         UserOrganization.user_id == current_user.id,
         UserOrganization.role == "admin",
-        UserOrganization.is_suspended == False
+        not UserOrganization.is_suspended
     ).first()
     if not user_org:
         raise HTTPException(status_code=403, detail="Not authorized to perform this action.")
