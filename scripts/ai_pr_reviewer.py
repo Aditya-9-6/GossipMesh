@@ -14,14 +14,12 @@ import urllib.request
 import urllib.error
 import subprocess
 import time
-import hashlib
 import datetime
 from pathlib import Path
 
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.memetic import MemeticKnowledgeBase
-import json
 
 from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
@@ -266,7 +264,6 @@ def get_pr_diff(workspace: Path) -> str:
         pass
     return "No git diff available."
 
-import re
 
 import ast
 

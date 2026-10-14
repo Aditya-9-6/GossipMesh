@@ -4,7 +4,7 @@ Milestone 8 Implementation.
 """
 
 import uuid
-from typing import Dict, List
+from typing import Dict
 
 
 class SSOManager:

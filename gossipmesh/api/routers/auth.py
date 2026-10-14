@@ -4,7 +4,7 @@ import uuid
 import urllib.parse
 from typing import Any
 import httpx
-from fastapi import APIRouter, Depends, status, Response, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
