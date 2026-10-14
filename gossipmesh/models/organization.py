@@ -14,6 +14,7 @@ class Organization(Base):
     users = relationship("UserOrganization", back_populates="organization")
     owner = relationship("User")
     projects = relationship("Project", back_populates="organization")
+    saml_config = relationship("OrganizationSAMLConfig", back_populates="organization", uselist=False, cascade="all, delete-orphan")
 
 class UserOrganization(Base):
     __tablename__ = "user_organizations"

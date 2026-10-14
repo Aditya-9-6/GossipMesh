@@ -7,6 +7,9 @@ class Repository(Base):
     __tablename__ = "repositories"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+
+    __mapper_args__ = {"version_id_col": version_id}
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
