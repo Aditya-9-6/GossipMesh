@@ -40,7 +40,7 @@ def sync_repository(
     def _sync_task(full_name: str, installation_id: int, org_id: int):
         # We need a proper RSA key for PyGithub, mock it safely here to prevent crash
         # In real use, this should come from a secure vault or settings (e.g. settings.GITHUB_APP_PRIVATE_KEY)
-        mock_rsa_key = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOQIBAAJAVY6qupT3\n-----END RSA PRIVATE KEY-----"
+        mock_rsa_key = "dummy_private_key"
         github = GitHubIntegration(app_id="12345", private_key=mock_rsa_key)
         try:
             # We mock the response because the JWT requires a valid key to not crash during tests/real calls.
