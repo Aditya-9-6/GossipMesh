@@ -1,5 +1,7 @@
+import threading
+from collections import OrderedDict
 from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -8,10 +10,15 @@ from gossipmesh.models.user import User
 from gossipmesh.models.provider import ProviderCredential
 from gossipmesh.models.organization import UserOrganization
 from gossipmesh.core.security import encrypt_string, decrypt_string
+from gossipmesh.core.exceptions import AuthorizationError, ValidationError
 from gossipmesh.providers.manager import ProviderManager
 from gossipmesh.providers.models import ProviderHealth
 
 router = APIRouter()
+
+_MANAGER_CACHE: OrderedDict[int, ProviderManager] = OrderedDict()
+_CACHE_LOCK = threading.Lock()
+MAX_CACHE_SIZE = 128
 
 class ProviderRegistration(BaseModel):
     name: str
@@ -20,6 +27,11 @@ class ProviderRegistration(BaseModel):
 
 def _get_provider_manager_for_org(db: Session, org_id: int) -> ProviderManager:
     """Instantiates a ProviderManager and loads the organization's saved credentials."""
+    with _CACHE_LOCK:
+        if org_id in _MANAGER_CACHE:
+            _MANAGER_CACHE.move_to_end(org_id)
+            return _MANAGER_CACHE[org_id]
+
     manager = ProviderManager()
     credentials = db.query(ProviderCredential).filter(ProviderCredential.organization_id == org_id).all()
 
@@ -31,6 +43,11 @@ def _get_provider_manager_for_org(db: Session, org_id: int) -> ProviderManager:
         except Exception:
             pass # Skip failed decryptions in this simple example
 
+    with _CACHE_LOCK:
+        if len(_MANAGER_CACHE) >= MAX_CACHE_SIZE:
+            _MANAGER_CACHE.popitem(last=False)
+
+        _MANAGER_CACHE[org_id] = manager
     return manager
 
 @router.post("/register", status_code=201)
@@ -46,7 +63,7 @@ def register_provider(
         UserOrganization.organization_id == organization_id
     ).first()
     if not is_member:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise AuthorizationError(message="Not authorized for this organization")
 
     try:
         # Verify it can be instantiated
@@ -75,9 +92,12 @@ def register_provider(
             db.add(cred)
         db.commit()
 
+        with _CACHE_LOCK:
+            _MANAGER_CACHE.pop(organization_id, None)
+
         return {"status": "success", "message": f"Provider {registration.name} registered and saved."}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise ValidationError(message=str(e))
 
 @router.get("/health", response_model=Dict[str, ProviderHealth])
 async def get_providers_health(
@@ -91,7 +111,7 @@ async def get_providers_health(
         UserOrganization.organization_id == organization_id
     ).first()
     if not is_member:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise AuthorizationError(message="Not authorized for this organization")
 
     manager = _get_provider_manager_for_org(db, organization_id)
     return await manager.check_all_health()

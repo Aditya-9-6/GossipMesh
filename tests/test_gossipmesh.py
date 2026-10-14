@@ -131,6 +131,29 @@ class TestGossipMesh(unittest.TestCase):
         self.assertEqual(result.consensus_score, 0.0)
         self.assertFalse(result.is_approved)
 
+    def test_node_sync_malformed_json_error_path(self):
+        import json
+        node = GossipNode("node_sync_error", mesh_dir=self.test_dir)
+
+        # Write malformed JSON to the log file
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write("{invalid_json: 'missing_quotes'}\n")
+
+        # Write valid JSON to the log file
+        valid_msg = {"message_id": "valid_123", "topic": GossipTopic.HEARTBEATS.value, "origin_node": "other_node", "payload": {}}
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(valid_msg) + "\n")
+
+        # Write another malformed JSON to the log file
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write("completely unparseable string\n")
+
+        # Should not crash and should return the 1 valid message
+        messages = node.sync()
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].message_id, "valid_123")
+
+
     def test_node_cleanup_ledger(self):
         import time
         import json
@@ -219,6 +242,21 @@ class TestGossipMesh(unittest.TestCase):
         winner = auctioneer.elect_winner(bids)
         self.assertIsNotNone(winner)
         self.assertEqual(winner.specialty, "crypto_specialist")
+
+    def test_node_cleanup_ledger_error(self):
+        import io
+        import contextlib
+        from unittest.mock import patch
+
+        node = GossipNode("test_node", mesh_dir=self.test_dir)
+        # Create an empty file so the initial exists() check passes
+        node.log_file.touch()
+
+        with patch("builtins.open", side_effect=IOError("Permission denied")):
+            f = io.StringIO()
+            with contextlib.redirect_stdout(f):
+                node.cleanup_ledger()
+            self.assertIn("[test_node] Ledger cleanup error: Permission denied", f.getvalue())
 
 if __name__ == "__main__":
     unittest.main()
