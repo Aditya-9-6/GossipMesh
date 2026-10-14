@@ -1,15 +1,16 @@
+from fastapi import APIRouter, Request, HTTPException
+from fastapi import BackgroundTasks
+from fastapi import APIRouter, Request, BackgroundTasks
+import logging
 import hashlib
 import hmac
-import json
-import logging
 import os
+import json
 
-from fastapi import APIRouter, BackgroundTasks, Request
-
-from gossipmesh.core.exceptions import AuthenticationError, ValidationError
 from gossipmesh.jobs.pr_review import PRReviewJob
-from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
+from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
+from gossipmesh.core.exceptions import AuthenticationError, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,7 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
             )
             return True
         else:
-            logger.error(
-                "GITHUB_WEBHOOK_SECRET is not set in a non-development environment"
-            )
+            logger.error("GITHUB_WEBHOOK_SECRET is not set in a non-development environment")
             return False
 
     signature_header = request.headers.get("X-Hub-Signature-256")
@@ -93,8 +92,8 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         action = payload.get("action")
         run_data = payload.get("workflow_run", {})
         if action == "completed" and run_data.get("conclusion") == "failure":
-            ci_workflow = CIFixerWorkflow(run_data)
-            background_tasks.add_task(ci_workflow.execute)
+            workflow = CIFixerWorkflow(run_data)
+            background_tasks.add_task(workflow.execute)
 
     elif event == "issue_comment":
         action = payload.get("action")
