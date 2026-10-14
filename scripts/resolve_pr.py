@@ -91,7 +91,7 @@ def resolve_pr(pr_number: int, head_ref: str):
         print(f"[!] Conflicted files: {conflicted_files}")
         
         for cf in conflicted_files:
-            if 'scripts/' in cf or 'test_organizations.py' in cf or 'test_repositories.py' in cf or 'conftest.py' in cf:
+            if any(p in cf for p in ['.github/', '.gitignore', 'pyproject.toml', 'scripts/', 'tests/', 'conftest.py', 'alembic', 'launch-gossipmesh.ps1']):
                 print(f"[*] Resolving {cf} using origin/main version...")
                 run_cmd(['git', 'checkout', 'origin/main', '--', cf])
                 run_cmd(['git', 'add', cf])
@@ -109,7 +109,7 @@ def resolve_pr(pr_number: int, head_ref: str):
             run_cmd(['git', 'checkout', 'main'])
             return False
         
-        run_cmd(['git', 'commit', '-m', f"merge origin/main into PR #{pr_number} [resolve conflicts]"])
+        run_cmd(['git', 'commit', '-m', f"merge origin/main into PR #{pr_number} [resolve conflicts]", '-m', "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>"])
     
     # Push to origin
     print(f"[*] Pushing resolved branch to origin {head_ref}...")
