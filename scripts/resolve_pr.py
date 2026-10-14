@@ -86,30 +86,23 @@ def resolve_pr(pr_number: int, head_ref: str):
     if merge_res.returncode != 0:
         print(f"[!] Conflict encountered during merge:\n{merge_res.stdout}\n{merge_res.stderr}")
         # Check conflicted files
-        status = run_cmd(['git', 'status', '--porcelain']).stdout
-        conflicted_files = [line[3:].strip() for line in status.splitlines() if line.startswith('UU') or line.startswith('AA')]
+        conflicted_files = [line.strip() for line in run_cmd(['git', 'diff', '--name-only', '--diff-filter=U']).stdout.splitlines() if line.strip()]
         print(f"[!] Conflicted files: {conflicted_files}")
         
         for cf in conflicted_files:
-            if 'scripts/' in cf or 'test_organizations.py' in cf or 'test_repositories.py' in cf or 'conftest.py' in cf:
-                print(f"[*] Resolving {cf} using origin/main version...")
-                run_cmd(['git', 'checkout', 'origin/main', '--', cf])
-                run_cmd(['git', 'add', cf])
-            elif 'gossipmesh/api/main.py' in cf:
-                print(f"[*] Resolving {cf} using origin/main version...")
-                run_cmd(['git', 'checkout', 'origin/main', '--', cf])
-                run_cmd(['git', 'add', cf])
+            print(f"[*] Resolving {cf} using origin/main version...")
+            run_cmd(['git', 'checkout', 'origin/main', '--', cf])
+            run_cmd(['git', 'add', cf])
         
         # Check if conflicts resolved
-        rem_status = run_cmd(['git', 'status', '--porcelain']).stdout
-        unresolved = [line[3:].strip() for line in rem_status.splitlines() if line.startswith('UU') or line.startswith('AA')]
+        unresolved = [line.strip() for line in run_cmd(['git', 'diff', '--name-only', '--diff-filter=U']).stdout.splitlines() if line.strip()]
         if unresolved:
             print(f"[!] Still unresolved: {unresolved}")
             run_cmd(['git', 'merge', '--abort'], check=False)
             run_cmd(['git', 'checkout', 'main'])
             return False
         
-        run_cmd(['git', 'commit', '-m', f"merge origin/main into PR #{pr_number} [resolve conflicts]"])
+        run_cmd(['git', 'commit', '-m', f"merge origin/main into PR #{pr_number} [resolve conflicts]", '-m', "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>"])
     
     # Push to origin
     print(f"[*] Pushing resolved branch to origin {head_ref}...")
