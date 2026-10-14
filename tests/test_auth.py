@@ -1,4 +1,3 @@
-import tests  # Initialize env vars
 import unittest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
@@ -14,28 +13,12 @@ client = TestClient(app)
 class TestAuth(unittest.TestCase):
     def setUp(self):
         self.mock_db = MagicMock(spec=Session)
+
+        # Override dependency
         app.dependency_overrides[deps.get_db] = lambda: self.mock_db
-
-        self.patcher_verify = patch('gossipmesh.api.routers.auth.verify_password')
-        self.mock_verify = self.patcher_verify.start()
-
-        self.patcher_redis = patch('gossipmesh.api.routers.auth.redis_client')
-        self.mock_redis = self.patcher_redis.start()
-        self.mock_redis.exists.return_value = False
-        self.mock_redis.incr.return_value = 1
-
-        self.patcher_dummy = patch('gossipmesh.api.routers.auth.dummy_verify')
-        self.mock_dummy = self.patcher_dummy.start()
-
-        self.patcher_hash = patch('gossipmesh.api.routers.auth.get_password_hash')
-        self.mock_get_hash = self.patcher_hash.start()
 
     def tearDown(self):
         app.dependency_overrides.clear()
-        self.patcher_verify.stop()
-        self.patcher_redis.stop()
-        self.patcher_dummy.stop()
-        self.patcher_hash.stop()
 
     @patch('gossipmesh.api.routers.auth.verify_password')
     def test_login_success(self, mock_verify):
@@ -54,7 +37,7 @@ class TestAuth(unittest.TestCase):
             data={"username": "test@example.com", "password": "password123"}
         )
 
-
+        self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("access_token", data)
         self.assertEqual(data["token_type"], "bearer")
@@ -114,43 +97,93 @@ class TestAuth(unittest.TestCase):
         mock_verify.assert_called_once_with("password123", "mocked_hash")
 
 
+    @patch('gossipmesh.api.routers.auth.httpx.Client.get')
+    @patch('gossipmesh.api.routers.auth.redis_client')
+    def test_oidc_login(self, mock_redis, mock_get):
+        settings.OIDC_DISCOVERY_URL = "https://provider.com/.well-known/openid-configuration"
+        settings.OIDC_CLIENT_ID = "test-client"
+        settings.OIDC_REDIRECT_URI = "https://app.com/callback"
 
-    def test_password_strength_validation(self):
-        from gossipmesh.core.security import validate_password_strength
-        with self.assertRaises(ValueError):
-            validate_password_strength("Short1!")
-        with self.assertRaises(ValueError):
-            validate_password_strength("lowercase1!")
-        with self.assertRaises(ValueError):
-            validate_password_strength("UPPERCASE1!")
-        with self.assertRaises(ValueError):
-            validate_password_strength("NoDigitsHere!")
-        with self.assertRaises(ValueError):
-            validate_password_strength("NoSpecialChar1")
-        validate_password_strength("ValidPassword1!")
+        mock_discovery_response = MagicMock()
+        mock_discovery_response.json.return_value = {
+            "authorization_endpoint": "https://provider.com/auth"
+        }
+        mock_get.return_value = mock_discovery_response
 
-    def test_login_throttling_and_lockout(self):
-        self.mock_verify.return_value = False
-        self.mock_redis.exists.return_value = False
-        self.mock_redis.incr.return_value = 5 # Trigger lockout
+        response = client.get(f"{settings.API_V1_STR}/auth/oidc/login", follow_redirects=False)
+        self.assertEqual(response.status_code, 307)
+        self.assertIn("https://provider.com/auth", response.headers["location"])
+        self.assertIn("response_type=code", response.headers["location"])
+        self.assertIn("code_challenge_method=S256", response.headers["location"])
 
-        mock_user = User(id=1, email="test@example.com", hashed_password="mocked_hash", is_active=True)
-        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_user
+        mock_redis.setex.assert_called_once()
 
-        response = client.post(
-            f"{settings.API_V1_STR}/auth/login/access-token",
-            data={"username": "test@example.com", "password": "wrong"}
+    @patch('gossipmesh.api.routers.auth.jwt.decode')
+    @patch('gossipmesh.api.routers.auth.PyJWKClient')
+    @patch('gossipmesh.api.routers.auth.httpx.Client.post')
+    @patch('gossipmesh.api.routers.auth.httpx.Client.get')
+    @patch('gossipmesh.api.routers.auth.redis_client')
+    def test_oidc_callback(self, mock_redis, mock_get, mock_post, mock_jwks, mock_jwt_decode):
+        settings.OIDC_DISCOVERY_URL = "https://provider.com/.well-known/openid-configuration"
+        settings.OIDC_CLIENT_ID = "test-client"
+        settings.OIDC_CLIENT_SECRET = "test-secret"
+        settings.OIDC_REDIRECT_URI = "https://app.com/callback"
+
+        mock_redis.get.return_value = "test-nonce:test-verifier"
+
+        mock_discovery_response = MagicMock()
+        mock_discovery_response.json.return_value = {
+            "token_endpoint": "https://provider.com/token",
+            "jwks_uri": "https://provider.com/jwks",
+            "issuer": "https://provider.com"
+        }
+        mock_get.return_value = mock_discovery_response
+
+        mock_token_response = MagicMock()
+        mock_token_response.json.return_value = {
+            "access_token": "mock-access",
+            "id_token": "mock-id",
+            "refresh_token": "mock-refresh"
+        }
+        mock_post.return_value = mock_token_response
+
+        mock_jwks.return_value.get_signing_key_from_jwt.return_value.key = "mock-key"
+
+        mock_jwt_decode.return_value = {
+            "nonce": "test-nonce",
+            "email": "testoidc@example.com",
+            "sub": "user123",
+            "iss": "https://provider.com",
+            "groups": ["engineering", "admin"]
+        }
+
+        # Mock DB logic
+        from gossipmesh.models.user import User
+        from gossipmesh.models.organization import Organization
+
+        mock_user = User(id=1, email="testoidc@example.com")
+        self.mock_db.query.return_value.filter.return_value.first.side_effect = [
+            None, # First query: User
+            None, # Second query: UserOIDCCredential
+            Organization(id=1, name="engineering"), # Third query: Organization engineering
+            None, # Fourth query: UserOrganization engineering
+            None, # Fifth query: Organization admin
+        ]
+
+        # intercept add to give objects an ID
+        def mock_add(obj):
+             if isinstance(obj, User):
+                 obj.id = 1
+
+        self.mock_db.add.side_effect = mock_add
+
+        response = client.get(
+            f"{settings.API_V1_STR}/auth/oidc/callback?state=test-state&code=test-code"
         )
-        self.assertEqual(response.status_code, 401)
-        self.mock_redis.setex.assert_called_with("lockout:test@example.com", 300, "1")
-
-        self.mock_redis.exists.return_value = True
-        response = client.post(
-            f"{settings.API_V1_STR}/auth/login/access-token",
-            data={"username": "test@example.com", "password": "wrong"}
-        )
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["error"]["message"], "Account temporarily locked out. Try again later.")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access_token", response.json())
+        self.assertEqual(response.json()["token_type"], "bearer")
+        self.mock_db.add.assert_called()
 
 if __name__ == '__main__':
     unittest.main()

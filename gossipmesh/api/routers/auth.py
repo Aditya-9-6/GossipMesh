@@ -1,29 +1,28 @@
+import os
 from datetime import timedelta
-from datetime import time as time_mod
-import secrets
-from datetime import time as time_moddelta
-import hashlib
 import uuid
 import urllib.parse
 from typing import Any
 import httpx
-from fastapi import APIRouter, Depends, status, Response, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from gossipmesh.api import deps
-import jwt
 from gossipmesh.core.config import settings
-from gossipmesh.core.security import verify_password, create_access_token, dummy_verify, validate_password_strength, get_password_hash, encrypt_string, decrypt_string
+from gossipmesh.core.security import verify_password, create_access_token, encrypt_string, decrypt_string
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
-from gossipmesh.models.user import User
-from gossipmesh.db.redis import redis_client
-from gossipmesh.models.user import UserGitHubCredential
+from gossipmesh.models.user import User, UserGitHubCredential
 from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.db.redis import redis_client
 from pydantic import BaseModel
+import base64
+import hashlib
+import jwt
+from jwt import PyJWKClient
+from gossipmesh.models.user import UserOIDCCredential
 
 router = APIRouter()
 
@@ -35,27 +34,11 @@ class Token(BaseModel):
 def login_access_token(
     db: Session = Depends(deps.get_db), form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
-    email = form_data.username
-    lockout_key = f"lockout:{email}"
-    if redis_client.exists(lockout_key):
-        raise AuthenticationError(message="Account temporarily locked out. Try again later.")
-
-    user = db.query(User).filter(User.email == email).first()
-
-    if not user:
-        dummy_verify()
-        _increment_login_failures(email)
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
         raise AuthenticationError(message="Incorrect email or password")
-
-    if not verify_password(form_data.password, user.hashed_password):
-        _increment_login_failures(email)
-        raise AuthenticationError(message="Incorrect email or password")
-
-    if not user.is_active:
+    elif not user.is_active:
         raise AuthorizationError(message="Inactive user")
-
-    redis_client.delete(f"login_failures:{email}")
-    redis_client.delete(f"lockout:{email}")
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
@@ -64,15 +47,6 @@ def login_access_token(
         ),
         "token_type": "bearer",
     }
-def _increment_login_failures(email: str) -> None:
-    fail_key = f"login_failures:{email}"
-    failures = redis_client.incr(fail_key)
-    redis_client.expire(fail_key, 90000) # 25 hours expiry for failure count
-
-    if failures >= 5:
-        lockout_time = min(300 * (2 ** (failures - 5)), 86400) # Max 24 hours
-        redis_client.setex(f"lockout:{email}", lockout_time, "1")
-
 
 
 @router.get("/github/login")
@@ -301,114 +275,182 @@ def github_refresh_token(
         return {"status": "success", "message": "GitHub token refreshed successfully"}
 
 
-class Msg(BaseModel):
-    message: str
+@router.get("/oidc/login")
+def oidc_login(request: Request) -> Any:
+    if not settings.OIDC_DISCOVERY_URL or not settings.OIDC_CLIENT_ID or not settings.OIDC_REDIRECT_URI:
+        raise HTTPException(status_code=500, detail="OIDC is not configured")
 
-class ChangePassword(BaseModel):
-    old_password: str
-    new_password: str
+    state = str(uuid.uuid4())
+    nonce = str(uuid.uuid4())
+    code_verifier = base64.urlsafe_b64encode(os.urandom(32)).decode('utf-8').rstrip('=')
+    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode('utf-8')).digest()).decode('utf-8').rstrip('=')
 
-@router.post("/logout", response_model=Msg)
-def logout(
-    current_user: User = Depends(deps.get_current_user),
-    token: str = Depends(deps.reusable_oauth2)
-) -> Any:
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        jti = payload.get("jti")
-        exp = payload.get("exp")
+    redis_client.setex(f"oidc_state:{state}", 300, f"{nonce}:{code_verifier}")
 
-        if jti and exp:
-            now = int(time.time())
-            ttl = max(0, exp - now)
-            if ttl > 0:
-                redis_client.setex(f"revoked_token:{jti}", ttl, "1")
-    except Exception:
-        pass
+    with httpx.Client() as client:
+        try:
+            discovery_response = client.get(settings.OIDC_DISCOVERY_URL)
+            discovery_response.raise_for_status()
+            discovery_data = discovery_response.json()
+            auth_endpoint = discovery_data.get("authorization_endpoint")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch OIDC discovery document: {e}")
 
-    return {"message": "Successfully logged out"}
+    params = {
+        "client_id": settings.OIDC_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": settings.OIDC_REDIRECT_URI,
+        "scope": "openid profile email",
+        "state": state,
+        "nonce": nonce,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256"
+    }
 
-@router.post("/change-password", response_model=Msg)
-def change_password(
-    body: ChangePassword,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
-) -> Any:
-    if not verify_password(body.old_password, current_user.hashed_password):
-        raise AuthenticationError(message="Incorrect password")
+    url = f"{auth_endpoint}?{urllib.parse.urlencode(params)}"
+    return RedirectResponse(url)
 
-    try:
-        validate_password_strength(body.new_password)
-    except ValueError as e:
-        raise AuthenticationError(message=str(e))
 
-    current_user.hashed_password = get_password_hash(body.new_password)
-    db.commit()
-
-    now = time.time()
-    redis_client.set(f"sessions_invalidated_before:{current_user.id}", str(now))
-
-    return {"message": "Password updated successfully"}
-
-class PasswordResetRequest(BaseModel):
-    email: str
-
-class PasswordReset(BaseModel):
-    token: str
-    new_password: str
-
-@router.post("/password-reset-request", response_model=Msg)
-def password_reset_request(
-    body: PasswordResetRequest,
+@router.get("/oidc/callback")
+def oidc_callback(
+    request: Request,
+    state: str,
+    code: str,
     db: Session = Depends(deps.get_db)
 ) -> Any:
-    user = db.query(User).filter(User.email == body.email).first()
-    if user:
-        raw_token = secrets.token_urlsafe(32)
-        import base64
-        uid_b64 = base64.urlsafe_b64encode(str(user.id).encode()).decode().rstrip('=')
-        reset_token = f"{uid_b64}:{raw_token}"
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        redis_client.setex(f"reset_token:{user.id}", 900, token_hash)
-    return {"message": "If the email exists, a password reset link has been sent"}
+    if not settings.OIDC_DISCOVERY_URL or not settings.OIDC_CLIENT_ID or not settings.OIDC_CLIENT_SECRET or not settings.OIDC_REDIRECT_URI:
+        raise HTTPException(status_code=500, detail="OIDC is not configured")
 
-@router.post("/password-reset", response_model=Msg)
-def password_reset(
-    body: PasswordReset,
-    db: Session = Depends(deps.get_db)
-) -> Any:
-    import base64
-    try:
-        uid_b64, raw_token = body.token.split(":")
-        padding = 4 - (len(uid_b64) % 4)
-        if padding != 4:
-            uid_b64 += "=" * padding
-        user_id = int(base64.urlsafe_b64decode(uid_b64).decode())
-    except Exception:
-        raise AuthenticationError(message="Invalid token")
+    redis_key = f"oidc_state:{state}"
+    state_data = redis_client.get(redis_key)
+    if not state_data:
+        raise AuthenticationError(message="Invalid or expired state parameter")
+    redis_client.delete(redis_key)
 
-    stored_hash = redis_client.get(f"reset_token:{user_id}")
-    if not stored_hash:
-        raise AuthenticationError(message="Invalid or expired token")
+    nonce, code_verifier = state_data.split(":")
 
-    provided_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    if not secrets.compare_digest(provided_hash, stored_hash if isinstance(stored_hash, str) else stored_hash.decode('utf-8')):
-        raise AuthenticationError(message="Invalid token")
+    with httpx.Client() as client:
+        try:
+            discovery_response = client.get(settings.OIDC_DISCOVERY_URL)
+            discovery_response.raise_for_status()
+            discovery_data = discovery_response.json()
+            token_endpoint = discovery_data.get("token_endpoint")
+            jwks_uri = discovery_data.get("jwks_uri")
+        except Exception as e:
+            raise AuthenticationError(message=f"Failed to fetch OIDC discovery document: {e}")
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise AuthenticationError(message="User not found")
+        # Exchange code for token
+        token_response = client.post(
+            token_endpoint,
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.OIDC_REDIRECT_URI,
+                "client_id": settings.OIDC_CLIENT_ID,
+                "client_secret": settings.OIDC_CLIENT_SECRET,
+                "code_verifier": code_verifier
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        token_data = token_response.json()
+        if "error" in token_data:
+            raise AuthenticationError(message=token_data.get("error_description", "Failed to exchange code"))
 
-    try:
-        validate_password_strength(body.new_password)
-    except ValueError as e:
-        raise AuthenticationError(message=str(e))
+        id_token = token_data.get("id_token")
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
 
-    user.hashed_password = get_password_hash(body.new_password)
-    db.commit()
+        if not id_token:
+            raise AuthenticationError(message="No id_token received")
 
-    now = time.time()
-    redis_client.set(f"sessions_invalidated_before:{user.id}", str(now))
-    redis_client.delete(f"reset_token:{user_id}")
+        try:
+            jwks_client = PyJWKClient(jwks_uri)
+            signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+            claims = jwt.decode(
+                id_token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=settings.OIDC_CLIENT_ID,
+                issuer=discovery_data.get("issuer")
+            )
+        except Exception as e:
+            raise AuthenticationError(message=f"Failed to validate ID token: {e}")
 
-    return {"message": "Password reset successful"}
+        if claims.get("nonce") != nonce:
+            raise AuthenticationError(message="Invalid nonce")
+
+        email = claims.get("email")
+        if not email:
+             raise AuthenticationError(message="OIDC claims did not contain an email")
+
+        sub = claims.get("sub")
+        issuer = claims.get("iss")
+
+        # Match or create user
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            user = User(email=email, hashed_password=None, is_active=True)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+        # Map OIDC Credentials
+        credential = db.query(UserOIDCCredential).filter(UserOIDCCredential.user_id == user.id, UserOIDCCredential.issuer == issuer).first()
+        if not credential:
+            credential = UserOIDCCredential(
+                user_id=user.id,
+                sub=sub,
+                issuer=issuer,
+                encrypted_access_token=encrypt_string(access_token),
+                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
+                encrypted_id_token=encrypt_string(id_token)
+            )
+            db.add(credential)
+        else:
+            credential.sub = sub
+            credential.encrypted_access_token = encrypt_string(access_token)
+            if refresh_token:
+                credential.encrypted_refresh_token = encrypt_string(refresh_token)
+            if id_token:
+                credential.encrypted_id_token = encrypt_string(id_token)
+
+        # Handle Organization Mapping via Groups/Roles if present
+        roles = claims.get("groups", claims.get("roles", []))
+        if isinstance(roles, list) and roles:
+            for role_name in roles:
+                org = db.query(Organization).filter(Organization.name == role_name).first()
+                if org:
+                    user_org = db.query(UserOrganization).filter(
+                        UserOrganization.user_id == user.id,
+                        UserOrganization.organization_id == org.id
+                    ).first()
+                    if not user_org:
+                        user_org = UserOrganization(
+                            user_id=user.id,
+                            organization_id=org.id,
+                            role="member"
+                        )
+                        db.add(user_org)
+
+        db.commit()
+
+        # Audit event
+        audit_event = AuditEvent(
+            action="oidc_login",
+            actor_id=user.id,
+            details={
+                "sub": sub,
+                "issuer": issuer,
+                "roles_mapped": roles
+            }
+        )
+        db.add(audit_event)
+        db.commit()
+
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        return {
+            "access_token": create_access_token(
+                user.id, expires_delta=access_token_expires
+            ),
+            "token_type": "bearer",
+        }

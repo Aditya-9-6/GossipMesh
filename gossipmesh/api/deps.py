@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Any
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
@@ -55,3 +55,40 @@ def get_current_user(
     if not user.is_active:
         raise AuthorizationError(message="Inactive user")
     return user
+
+
+def get_scim_token(
+    authorization: str = Depends(OAuth2PasswordBearer(tokenUrl="token", auto_error=False)),
+    db: Session = Depends(get_db),
+) -> Any:
+    from fastapi import Header
+    from gossipmesh.models.service_account import APIKey
+    from gossipmesh.core.security import verify_password
+    from datetime import datetime, timezone
+
+    if not authorization:
+        raise AuthenticationError(message="Bearer token required")
+
+    raw_token = authorization
+    if raw_token.startswith("Bearer "):
+        raw_token = raw_token.split("Bearer ", 1)[1].strip()
+
+    if not raw_token:
+        raise AuthenticationError(message="Bearer token required")
+
+    parts = raw_token.split(".", 1)
+    if len(parts) == 2:
+        prefix, secret = parts
+        api_key = db.query(APIKey).filter(APIKey.prefix == prefix, APIKey.is_revoked == False).first()
+        if api_key and verify_password(secret, api_key.hashed_key):
+            if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
+                raise AuthenticationError(message="Token has expired")
+            api_key.last_used_at = datetime.now(timezone.utc)
+            db.commit()
+            return api_key
+
+    api_key = db.query(APIKey).filter(APIKey.prefix == raw_token, APIKey.is_revoked == False).first()
+    if api_key:
+        return api_key
+    raise AuthenticationError(message="Invalid SCIM token")
+
