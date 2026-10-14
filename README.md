@@ -39,6 +39,9 @@ The platform is transitioning toward a full SaaS offering with the following pla
 - **Secure Agent Runtime:** A `SandboxEnvironment` for execution isolation, complete with `WorkflowManager`, `BudgetManager`, and robust database models.
 - **Enterprise Controls & Billing:** Milestones for RBAC, provider credential encryption (Fernet), SaaS RAG, and scalable deployment.
 
+### 5. Cross-Repo Wire Contract Synchronizer (`gossipmesh.bridge`)
+- Translates shared data structures between **Go** ([`DevProxy`](https://github.com/GossipMesh/DevProxy)) and **Rust** ([`Spryzen`](https://github.com/GossipMesh/spryzen)).
+- Generates matching Go structs and Rust Serde types automatically to prevent protocol divergence.
 ---
 
 ## ⚠️ Security Warnings
@@ -104,4 +107,4 @@ For more details on our path to production and architectural decisions, please r
 
 ## 📜 License
 
-Apache-2.0 License. Built by [Aditya Dahale](https://github.com/Aditya-9-6).
+Apache-2.0 License. Built by [Maintainers](https://github.com/Maintainers).
