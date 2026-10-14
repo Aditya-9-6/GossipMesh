@@ -44,7 +44,7 @@ class OpenAIProvider(BaseProvider):
             raw_response=response.model_dump()
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         formatted_messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         stream = await self.client.chat.completions.create(
             model=request.model,

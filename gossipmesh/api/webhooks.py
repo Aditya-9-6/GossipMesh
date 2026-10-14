@@ -74,8 +74,8 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
         action = payload.get("action")
         run_data = payload.get("workflow_run", {})
         if action == "completed" and run_data.get("conclusion") == "failure":
-            workflow = CIFixerWorkflow(run_data)
-            background_tasks.add_task(workflow.execute)
+            ci_workflow = CIFixerWorkflow(run_data)
+            background_tasks.add_task(ci_workflow.execute)
 
     elif event == "issue_comment":
         action = payload.get("action")

@@ -7,12 +7,12 @@ from gossipmesh.models.base import Base
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
-    id = Column(String, primary_key=True)
-    repo_id = Column(Integer, index=True)
-    filepath = Column(String, index=True)
-    content = Column(String)
-    embedding = Column(Vector(1536))
-    metadata_json = Column(JSON)
+    id: str = Column(String, primary_key=True)
+    repo_id: int = Column(Integer, index=True)
+    filepath: str = Column(String, index=True)
+    content: str = Column(String)
+    embedding: list[float] = Column(Vector(1536))
+    metadata_json: dict = Column(JSON)
 
 class PGVectorStore:
     """A minimal abstraction over a pgvector backed SQLAlchemy model."""

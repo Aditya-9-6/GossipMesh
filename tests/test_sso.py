@@ -1,7 +1,5 @@
-import tests # Initialize env vars
 import unittest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
@@ -15,9 +13,7 @@ client = TestClient(app)
 class TestSSO(unittest.TestCase):
     def setUp(self):
         # We'll use the real in-memory sqlite mock_db_session provided by conftest
-        from tests.conftest import mock_db_session as get_mock_db
-        # But we need to instantiate it or use the fixture properly.
-        # Given this is unittest style, we need to do dependency injection overrides manually.
+                # But we need to instantiate it or use the fixture properly.
         pass
 
     def tearDown(self):

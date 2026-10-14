@@ -1,15 +1,11 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
-import tests # Initialize dummy environment variables
 from gossipmesh.api import app
 from gossipmesh.api.deps import get_db, get_current_user
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 import os
-import hashlib
-import hmac
-import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool

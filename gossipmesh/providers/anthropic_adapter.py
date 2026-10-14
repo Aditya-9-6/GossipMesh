@@ -50,7 +50,7 @@ class AnthropicProvider(BaseProvider):
             raw_response={"id": response.id, "type": response.type}
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         system_prompt = next((msg.content for msg in request.messages if msg.role == "system"), "")
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages if msg.role != "system"]
 

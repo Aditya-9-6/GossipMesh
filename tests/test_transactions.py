@@ -51,8 +51,7 @@ class TestTransactions(unittest.TestCase):
         manager = WorkflowManager(self.session)
 
         # We can just patch db.add or flush
-        with patch.object(self.session, 'flush', side_effect=Exception("DB flush failed")):
-            with self.assertRaises(Exception):
+        with patch.object(self.session, 'flush', side_effect=Exception("DB flush failed")), self.assertRaises(Exception):
                 manager.create_workflow_with_job(organization_id=1, repository_id=1, agent_name="agent-1", actor_id=99)
 
         # Verify rollback

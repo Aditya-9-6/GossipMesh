@@ -54,7 +54,7 @@ class OllamaProvider(BaseProvider):
             raw_response=data
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
         async with httpx.AsyncClient() as client:

@@ -92,8 +92,8 @@ app.include_router(runtime.router, prefix=f"{settings.API_V1_STR}/runtime", tags
 app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 
-app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler)
-app.add_exception_handler(Exception, global_exception_handler)
+app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
+app.add_exception_handler(Exception, global_exception_handler) # type: ignore
 
 @app.get("/health")
 def health_check():
