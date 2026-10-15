@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
+from gossipmesh.models.runtime import Workflow
 from gossipmesh.runtime.workflow import WorkflowManager
 from gossipmesh.core.exceptions import AuthorizationError
 
@@ -47,7 +48,18 @@ def cancel_workflow(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
-    # Proper auth check on the workflow owner needed here in prod
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        # Depending on app convention, we could return 404 or gracefully ignore. Returning generic error for now.
+        return {"status": "error", "message": "Workflow not found"}
+
+    is_member = db.query(UserOrganization).filter(
+        UserOrganization.user_id == current_user.id,
+        UserOrganization.organization_id == workflow.organization_id
+    ).first()
+    if not is_member:
+        raise AuthorizationError(message="Not authorized for this organization")
+
     manager = WorkflowManager(db)
     manager.cancel_workflow(workflow_id, actor_id=current_user.id)
     return {"status": "cancelled"}
@@ -58,6 +70,17 @@ def approve_workflow(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        return {"status": "error", "message": "Workflow not found"}
+
+    is_member = db.query(UserOrganization).filter(
+        UserOrganization.user_id == current_user.id,
+        UserOrganization.organization_id == workflow.organization_id
+    ).first()
+    if not is_member:
+        raise AuthorizationError(message="Not authorized for this organization")
+
     manager = WorkflowManager(db)
     manager.approve_patch(workflow_id, actor_id=current_user.id)
     return {"status": "approved, workflow unblocked"}
