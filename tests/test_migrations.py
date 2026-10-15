@@ -1,8 +1,10 @@
-import unittest
 import os
 import sys
+import unittest
 from unittest.mock import patch
+
 from alembic.config import Config
+
 from alembic import command
 
 # Ensure environment variables are set for settings

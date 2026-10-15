@@ -1,14 +1,14 @@
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
-from gossipmesh.models.user import User
-from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.service_account import ServiceAccount, APIKey
 from gossipmesh.api import deps
 from gossipmesh.api.main import app
+from gossipmesh.models.organization import Organization, UserOrganization
+from gossipmesh.models.service_account import APIKey, ServiceAccount
+from gossipmesh.models.user import User
 
 
 # Create dummy verify function to avoid passlib bcrypt issues in tests
@@ -37,7 +37,7 @@ class TestServiceAccounts(unittest.TestCase):
         def side_effect(obj):
             if isinstance(obj, ServiceAccount):
                 obj.id = 1
-
+            return
 
         self.mock_db_session.add.return_value = None
         self.mock_db_session.commit.return_value = None
@@ -80,7 +80,7 @@ class TestServiceAccounts(unittest.TestCase):
             if isinstance(obj, APIKey):
                 obj.id = 1
                 obj.created_at = datetime.now(timezone.utc)
-
+            return
 
         self.mock_db_session.refresh.side_effect = side_effect
 
