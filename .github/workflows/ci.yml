@@ -176,9 +176,10 @@ jobs:
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:

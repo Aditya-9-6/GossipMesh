@@ -6,29 +6,29 @@ Byzantine multi-model consensus, cross-repo schema synchronization, and
 adversarial red-team pre-flight audits.
 """
 
-from .auction import AgentBid, TaskAuctioneer
-from .bridge import CrossRepoBridge, WireContract
+from .node import GossipNode, GossipMessage, GossipTopic
+from .memetic import MemeticKnowledgeBase, KnowledgeMeme
 from .consensus import ByzantineConsensusEngine, ModelVote
-from .memetic import KnowledgeMeme, MemeticKnowledgeBase
-from .node import GossipMessage, GossipNode, GossipTopic
-from .oracle import BenchmarkRecord, PerformanceOracle
 from .red_team import RedTeamAuditor, VulnerabilityProbe
+from .bridge import CrossRepoBridge, WireContract
+from .oracle import PerformanceOracle, BenchmarkRecord
+from .auction import TaskAuctioneer, AgentBid
 
 __version__ = "0.1.0"
 __all__ = [
-    "AgentBid",
-    "BenchmarkRecord",
-    "ByzantineConsensusEngine",
-    "CrossRepoBridge",
-    "GossipMessage",
     "GossipNode",
+    "GossipMessage",
     "GossipTopic",
-    "KnowledgeMeme",
     "MemeticKnowledgeBase",
+    "KnowledgeMeme",
+    "ByzantineConsensusEngine",
     "ModelVote",
-    "PerformanceOracle",
     "RedTeamAuditor",
-    "TaskAuctioneer",
     "VulnerabilityProbe",
+    "CrossRepoBridge",
     "WireContract",
+    "PerformanceOracle",
+    "BenchmarkRecord",
+    "TaskAuctioneer",
+    "AgentBid",
 ]

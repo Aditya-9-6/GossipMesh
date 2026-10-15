@@ -3,8 +3,7 @@ Heterogeneous Multi-Model Byzantine Consensus Engine.
 Audits code proposals across multiple model personas and enforces quorum consensus.
 """
 
-from typing import Any
-
+from typing import List, Dict, Any, Optional
 
 class ModelVote:
     def __init__(
@@ -12,9 +11,9 @@ class ModelVote:
         model_name: str,
         verdict: str,
         score: int,
-        concerns: list[str] | None = None,
-        suggestions: list[str] | None = None,
-        confidence_scores: list[int] | None = None,
+        concerns: Optional[List[str]] = None,
+        suggestions: Optional[List[str]] = None,
+        confidence_scores: Optional[List[int]] = None,
     ):
         self.model_name = model_name
         self.verdict = verdict.upper()  # APPROVE, REVISE, REJECT
@@ -23,7 +22,7 @@ class ModelVote:
         self.suggestions = suggestions or []
         self.confidence_scores = confidence_scores or []
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "model_name": self.model_name,
             "verdict": self.verdict,
@@ -33,16 +32,15 @@ class ModelVote:
             "confidence_scores": self.confidence_scores,
         }
 
-
 class ConsensusResult:
     def __init__(
         self,
         is_approved: bool,
         consensus_score: float,
         approval_ratio: float,
-        votes: list[ModelVote],
-        combined_concerns: list[str],
-        combined_suggestions: list[str],
+        votes: List[ModelVote],
+        combined_concerns: List[str],
+        combined_suggestions: List[str],
         avg_confidence_score: float = 100.0,
     ):
         self.is_approved = is_approved
@@ -53,7 +51,7 @@ class ConsensusResult:
         self.combined_suggestions = combined_suggestions
         self.avg_confidence_score = avg_confidence_score
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "is_approved": self.is_approved,
             "consensus_score": round(self.consensus_score, 1),
@@ -64,21 +62,14 @@ class ConsensusResult:
             "avg_confidence_score": round(self.avg_confidence_score, 1),
         }
 
-
 class ByzantineConsensusEngine:
     """Enforces Byzantine Fault Tolerant quorum across multi-model peer audits."""
-
-    def __init__(
-        self,
-        quorum_threshold: float = 0.66,
-        min_score_threshold: int = 85,
-        model_weights: dict[str, float] | None = None,
-    ):
+    def __init__(self, quorum_threshold: float = 0.66, min_score_threshold: int = 85, model_weights: Optional[Dict[str, float]] = None):
         self.quorum_threshold = quorum_threshold
         self.min_score_threshold = min_score_threshold
         self.model_weights = model_weights
 
-    def evaluate(self, votes: list[ModelVote]) -> ConsensusResult:
+    def evaluate(self, votes: List[ModelVote]) -> ConsensusResult:
         if not votes:
             return ConsensusResult(
                 is_approved=False,
@@ -87,48 +78,29 @@ class ByzantineConsensusEngine:
                 votes=[],
                 combined_concerns=["No model votes submitted"],
                 combined_suggestions=[],
-                avg_confidence_score=0.0,
+                avg_confidence_score=0.0
             )
 
         if self.model_weights:
             total_weight = sum(self.model_weights.get(v.model_name, 1.0) for v in votes)
-            approvals_weight = sum(
-                self.model_weights.get(v.model_name, 1.0)
-                for v in votes
-                if v.verdict == "APPROVE" and v.score >= self.min_score_threshold
-            )
-            approval_ratio = (
-                approvals_weight / total_weight if total_weight > 0 else 0.0
-            )
-            avg_score = (
-                sum(v.score * self.model_weights.get(v.model_name, 1.0) for v in votes)
-                / total_weight
-                if total_weight > 0
-                else 0.0
-            )
+            approvals_weight = sum(self.model_weights.get(v.model_name, 1.0) for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
+            approval_ratio = approvals_weight / total_weight if total_weight > 0 else 0.0
+            avg_score = sum(v.score * self.model_weights.get(v.model_name, 1.0) for v in votes) / total_weight if total_weight > 0 else 0.0
         else:
-            approvals = sum(
-                1
-                for v in votes
-                if v.verdict == "APPROVE" and v.score >= self.min_score_threshold
-            )
+            approvals = sum(1 for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
             approval_ratio = approvals / len(votes)
             avg_score = sum(v.score for v in votes) / len(votes)
 
         all_concerns = list(dict.fromkeys(c for v in votes for c in v.concerns))
         all_suggestions = list(dict.fromkeys(s for v in votes for s in v.suggestions))
 
-        is_approved = (approval_ratio >= self.quorum_threshold) and (
-            avg_score >= self.min_score_threshold
-        )
+        is_approved = (approval_ratio >= self.quorum_threshold) and (avg_score >= self.min_score_threshold)
 
         all_confidences = []
         for v in votes:
             all_confidences.extend(v.confidence_scores)
 
-        avg_confidence = (
-            sum(all_confidences) / len(all_confidences) if all_confidences else 100.0
-        )
+        avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 100.0
 
         return ConsensusResult(
             is_approved=is_approved,
