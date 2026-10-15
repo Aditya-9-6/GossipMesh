@@ -15,7 +15,8 @@ class GitHubIntegration:
             "exp": int(time.time()) + (10 * 60),
             "iss": self.app_id
         }
-        return jwt.encode(payload, self.private_key, algorithm="RS256")
+        encoded = jwt.encode(payload, self.private_key, algorithm="RS256")
+        return encoded if isinstance(encoded, str) else encoded.decode("utf-8")
 
     def get_app_client(self) -> Github:
         """Returns a Github client authenticated as the App."""
@@ -25,7 +26,7 @@ class GitHubIntegration:
 
     def get_installation_client(self, installation_id: int) -> Github:
         """Returns a Github client authenticated as a specific installation."""
-        app_client = self.get_app_client()
+        self.get_app_client()
         # In a real app we'd fetch the installation access token from the API
         # Using PyGithub's built-in AppAuth
         auth = Auth.AppAuth(

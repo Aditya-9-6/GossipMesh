@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 import uuid
 import urllib.parse
@@ -17,6 +18,10 @@ from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.db.redis import redis_client
 from pydantic import BaseModel
+import base64
+import hashlib
+import jwt
+from gossipmesh.models.user import UserOIDCCredential
 
 router = APIRouter()
 
@@ -267,3 +272,184 @@ def github_refresh_token(
         db.commit()
 
         return {"status": "success", "message": "GitHub token refreshed successfully"}
+
+
+@router.get("/oidc/login")
+def oidc_login(request: Request) -> Any:
+    if not settings.OIDC_DISCOVERY_URL or not settings.OIDC_CLIENT_ID or not settings.OIDC_REDIRECT_URI:
+        raise HTTPException(status_code=500, detail="OIDC is not configured")
+
+    state = str(uuid.uuid4())
+    nonce = str(uuid.uuid4())
+    code_verifier = base64.urlsafe_b64encode(os.urandom(32)).decode('utf-8').rstrip('=')
+    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode('utf-8')).digest()).decode('utf-8').rstrip('=')
+
+    redis_client.setex(f"oidc_state:{state}", 300, f"{nonce}:{code_verifier}")
+
+    with httpx.Client() as client:
+        try:
+            discovery_response = client.get(settings.OIDC_DISCOVERY_URL)
+            discovery_response.raise_for_status()
+            discovery_data = discovery_response.json()
+            auth_endpoint = discovery_data.get("authorization_endpoint")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch OIDC discovery document: {e}")
+
+    params = {
+        "client_id": settings.OIDC_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": settings.OIDC_REDIRECT_URI,
+        "scope": "openid profile email",
+        "state": state,
+        "nonce": nonce,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256"
+    }
+
+    url = f"{auth_endpoint}?{urllib.parse.urlencode(params)}"
+    return RedirectResponse(url)
+
+
+@router.get("/oidc/callback")
+def oidc_callback(
+    request: Request,
+    state: str,
+    code: str,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    if not settings.OIDC_DISCOVERY_URL or not settings.OIDC_CLIENT_ID or not settings.OIDC_CLIENT_SECRET or not settings.OIDC_REDIRECT_URI:
+        raise HTTPException(status_code=500, detail="OIDC is not configured")
+
+    redis_key = f"oidc_state:{state}"
+    state_data = redis_client.get(redis_key)
+    if not state_data:
+        raise AuthenticationError(message="Invalid or expired state parameter")
+    redis_client.delete(redis_key)
+
+    nonce, code_verifier = state_data.decode("utf-8").split(":") if isinstance(state_data, bytes) else state_data.split(":")
+
+    with httpx.Client() as client:
+        try:
+            discovery_response = client.get(settings.OIDC_DISCOVERY_URL)
+            discovery_response.raise_for_status()
+            discovery_data = discovery_response.json()
+            token_endpoint = discovery_data.get("token_endpoint")
+            jwks_uri = discovery_data.get("jwks_uri")
+        except Exception as e:
+            raise AuthenticationError(message=f"Failed to fetch OIDC discovery document: {e}")
+
+        # Exchange code for token
+        token_response = client.post(
+            token_endpoint,
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.OIDC_REDIRECT_URI,
+                "client_id": settings.OIDC_CLIENT_ID,
+                "client_secret": settings.OIDC_CLIENT_SECRET,
+                "code_verifier": code_verifier
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        token_data = token_response.json()
+        if "error" in token_data:
+            raise AuthenticationError(message=token_data.get("error_description", "Failed to exchange code"))
+
+        id_token = token_data.get("id_token")
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+
+        if not id_token:
+            raise AuthenticationError(message="No id_token received")
+
+        try:
+            jwks_client: Any = jwt.PyJWKClient(jwks_uri)  # type: ignore
+            signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+            claims = jwt.decode(
+                id_token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=settings.OIDC_CLIENT_ID,
+                issuer=discovery_data.get("issuer")
+            )
+        except Exception as e:
+            raise AuthenticationError(message=f"Failed to validate ID token: {e}")
+
+        if claims.get("nonce") != nonce:
+            raise AuthenticationError(message="Invalid nonce")
+
+        email = claims.get("email")
+        if not email:
+             raise AuthenticationError(message="OIDC claims did not contain an email")
+
+        sub = claims.get("sub")
+        issuer = claims.get("iss")
+
+        # Match or create user
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            user = User(email=email, hashed_password=None, is_active=True)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+        # Map OIDC Credentials
+        credential = db.query(UserOIDCCredential).filter(UserOIDCCredential.user_id == user.id, UserOIDCCredential.issuer == issuer).first()
+        if not credential:
+            credential = UserOIDCCredential(
+                user_id=user.id,
+                sub=sub,
+                issuer=issuer,
+                encrypted_access_token=encrypt_string(access_token),
+                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
+                encrypted_id_token=encrypt_string(id_token)
+            )
+            db.add(credential)
+        else:
+            credential.sub = str(sub)
+            credential.encrypted_access_token = encrypt_string(access_token)
+            if refresh_token:
+                credential.encrypted_refresh_token = encrypt_string(refresh_token)
+            if id_token:
+                credential.encrypted_id_token = encrypt_string(id_token)
+
+        # Handle Organization Mapping via Groups/Roles if present
+        roles = claims.get("groups", claims.get("roles", []))
+        if isinstance(roles, list) and roles:
+            for role_name in roles:
+                org = db.query(Organization).filter(Organization.name == role_name).first()
+                if org:
+                    user_org = db.query(UserOrganization).filter(
+                        UserOrganization.user_id == user.id,
+                        UserOrganization.organization_id == org.id
+                    ).first()
+                    if not user_org:
+                        user_org = UserOrganization(
+                            user_id=user.id,
+                            organization_id=org.id,
+                            role="member"
+                        )
+                        db.add(user_org)
+
+        db.commit()
+
+        # Audit event
+        audit_event = AuditEvent(
+            action="oidc_login",
+            actor_id=user.id,
+            details={
+                "sub": sub,
+                "issuer": issuer,
+                "roles_mapped": roles
+            }
+        )
+        db.add(audit_event)
+        db.commit()
+
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        return {
+            "access_token": create_access_token(
+                user.id, expires_delta=access_token_expires
+            ),
+            "token_type": "bearer",
+        }

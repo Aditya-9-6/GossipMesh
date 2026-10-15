@@ -1,3 +1,4 @@
+from typing import Any
 from typing import AsyncGenerator
 import time
 from openai import AsyncOpenAI
@@ -16,9 +17,9 @@ class OpenAIProvider(BaseProvider):
         return "openai"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        start_time = time.time()
+        time.time()
 
-        formatted_messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        formatted_messages: list[Any] = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
         response = await self.client.chat.completions.create(
             model=request.model,
@@ -28,12 +29,12 @@ class OpenAIProvider(BaseProvider):
             stop=request.stop_sequences
         )
 
-        end_time = time.time()
+        time.time()
 
         usage = Usage(
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-            total_tokens=response.usage.total_tokens,
+            prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
+            completion_tokens=response.usage.completion_tokens if response.usage else 0,
+            total_tokens=response.usage.total_tokens if response.usage else 0,
             cost_estimate_usd=0.0 # To be implemented properly via a pricing table
         )
 
@@ -44,9 +45,9 @@ class OpenAIProvider(BaseProvider):
             raw_response=response.model_dump()
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
-        formatted_messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        stream = await self.client.chat.completions.create(
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
+        formatted_messages: list[Any] = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        stream: Any = await self.client.chat.completions.create(
             model=request.model,
             messages=formatted_messages,
             temperature=request.temperature,

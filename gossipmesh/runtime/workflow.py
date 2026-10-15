@@ -10,7 +10,7 @@ class WorkflowManager:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_workflow(self, organization_id: int, repository_id: int, actor_id: int = None) -> Workflow:
+    def create_workflow(self, organization_id: int, repository_id: int, actor_id: int | None = None) -> Workflow:
         try:
             workflow = Workflow(
                 organization_id=organization_id,
@@ -35,7 +35,7 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def add_job(self, workflow_id: int, agent_name: str, actor_id: int = None) -> Job:
+    def add_job(self, workflow_id: int, agent_name: str, actor_id: int | None = None) -> Job:
         try:
             job = Job(
                 workflow_id=workflow_id,
@@ -62,7 +62,7 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def create_workflow_with_job(self, organization_id: int, repository_id: int, agent_name: str, actor_id: int = None) -> tuple[Workflow, Job]:
+    def create_workflow_with_job(self, organization_id: int, repository_id: int, agent_name: str, actor_id: int | None = None) -> tuple[Workflow, Job]:
         try:
             workflow = Workflow(
                 organization_id=organization_id,
@@ -104,7 +104,7 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def update_job_status(self, job_id: int, status: str, state: dict = None, actor_id: int = None):
+    def update_job_status(self, job_id: int, status: str, state: dict | None = None, actor_id: int | None = None):
         try:
             job = self.db.query(Job).filter(Job.id == job_id).first()
             if job:
@@ -157,7 +157,7 @@ class WorkflowManager:
 
         self.db.flush()
 
-    def cancel_workflow(self, workflow_id: int, actor_id: int = None):
+    def cancel_workflow(self, workflow_id: int, actor_id: int | None = None):
         try:
             workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
             if workflow and workflow.status not in ("completed", "failed"):
@@ -180,7 +180,7 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def approve_patch(self, workflow_id: int, actor_id: int = None):
+    def approve_patch(self, workflow_id: int, actor_id: int | None = None):
         """Unblocks a workflow that requires human patch approval."""
         try:
             workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()

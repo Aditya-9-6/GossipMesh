@@ -1,3 +1,4 @@
+from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, Integer, String, JSON
 from sqlalchemy.orm import Session
@@ -7,12 +8,12 @@ from gossipmesh.models.base import Base
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
-    id = Column(String, primary_key=True)
-    repo_id = Column(Integer, index=True)
-    filepath = Column(String, index=True)
-    content = Column(String)
-    embedding = Column(Vector(1536))
-    metadata_json = Column(JSON)
+    id: Any = Column(String, primary_key=True)
+    repo_id: Any = Column(Integer, index=True)
+    filepath: Any = Column(String, index=True)
+    content: Any = Column(String)
+    embedding: Any = Column(Vector(1536))
+    metadata_json: Any = Column(JSON)
 
 class PGVectorStore:
     """A minimal abstraction over a pgvector backed SQLAlchemy model."""

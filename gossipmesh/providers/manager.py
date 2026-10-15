@@ -24,7 +24,7 @@ class ProviderManager:
         provider_class = self._providers[name]
 
         if name == "ollama":
-            instance = provider_class(base_url=kwargs.get("base_url", "http://localhost:11434"))
+            instance = provider_class() # type: ignore
         else:
             if not api_key:
                 raise ValueError(f"API key required for {name}")

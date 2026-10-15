@@ -1,7 +1,8 @@
-import unittest
 import os
-import tempfile
 import shutil
+import tempfile
+import unittest
+
 from gossipmesh.runtime.sandbox import SandboxEnvironment
 
 class TestSandboxEnvironment(unittest.TestCase):
@@ -33,19 +34,19 @@ class TestSandboxEnvironment(unittest.TestCase):
             self.sandbox.write_file("/tmp/test_traversal.txt", "traversal data")
 
     def test_run_command_string(self):
-        code, stdout, stderr = self.sandbox.run_command("echo hello")
+        code, stdout, _stderr = self.sandbox.run_command("echo hello")
         self.assertEqual(code, 0)
         self.assertEqual(stdout.strip(), "hello")
 
     def test_run_command_list(self):
-        code, stdout, stderr = self.sandbox.run_command(["echo", "hello list"])
+        code, stdout, _stderr = self.sandbox.run_command(["echo", "hello list"])
         self.assertEqual(code, 0)
         self.assertEqual(stdout.strip(), "hello list")
 
     def test_run_command_shell_injection(self):
         # If shell=True, this would execute `echo injected`, and we'd see 'hello' and 'injected'.
         # With shell=False and shlex.split, this gets treated as arguments to `echo`.
-        code, stdout, stderr = self.sandbox.run_command("echo hello ; echo injected")
+        code, stdout, _stderr = self.sandbox.run_command("echo hello ; echo injected")
         self.assertEqual(code, 0)
         # Should literally output 'hello ; echo injected'
         self.assertEqual(stdout.strip(), "hello ; echo injected")

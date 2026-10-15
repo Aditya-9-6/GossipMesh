@@ -58,9 +58,8 @@ CATALOG = [
 
 def get_existing_issues():
     """Fetch existing issue titles and creation timestamps."""
-    issues_info = []
     try:
-        cmd = ["gh", "issue", "list", "--repo", "GossipMesh/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
+        cmd = ["gh", "issue", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         issues = json.loads(result.stdout)
         return issues
@@ -215,9 +214,13 @@ def create_issue(item):
 3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
 
+    labels_list = [area, difficulty, "hacktoberfest", "advancement"]
+    for lbl in labels_list:
+        subprocess.run(["gh", "label", "create", lbl, "--repo", "Aditya-9-6/GossipMesh", "--force"], capture_output=True)
+
     labels = f"{area},{difficulty},hacktoberfest,advancement"
     cmd = [
-        "gh", "issue", "create", "--repo", "GossipMesh/GossipMesh",
+        "gh", "issue", "create", "--repo", "Aditya-9-6/GossipMesh",
         "--title", title,
         "--body", body,
         "--label", labels

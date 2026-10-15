@@ -73,12 +73,12 @@ class GossipNode:
     Decentralized Gossip Peer Node.
     Communicates via a shared ledger directory (file-backed mesh) or local bus.
     """
-    def __init__(self, node_id: str, mesh_dir: Optional[str] = None):
+    def __init__(self, node_id: str, mesh_dir: str | None = None):
         self.node_id = node_id
         if mesh_dir:
             self.mesh_dir = Path(mesh_dir).resolve()
         elif os.environ.get("GOSSIPMESH_DIR"):
-            self.mesh_dir = Path(os.environ.get("GOSSIPMESH_DIR")).resolve()
+            self.mesh_dir = Path(os.environ.get("GOSSIPMESH_DIR", "")).resolve()
         else:
             # Fallback to shared Google Drive or User home
             drive_mesh = Path("G:/My Drive/.gossip_mesh")
@@ -94,7 +94,7 @@ class GossipNode:
         self.clock_seq = 0
         self.seen_messages: set = set()
         self.subscriptions: Dict[str, List[Callable[[GossipMessage], None]]] = {}
-        self._message_cache = deque(maxlen=10000)
+        self._message_cache: deque[GossipMessage] = deque(maxlen=10000)
 
         # Initial anti-entropy catchup
         self._load_seen_history()
@@ -162,7 +162,7 @@ class GossipNode:
         Runs anti-entropy synchronization: scans the shared ledger for newly
         arrived gossip messages from other peer nodes.
         """
-        new_messages = []
+        new_messages: list[GossipMessage] = []
         if not self.log_file.exists():
             return new_messages
 
