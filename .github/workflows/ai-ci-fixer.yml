@@ -1,0 +1,171 @@
+name: AI CI Test Fixer Bot
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull Request number to fix"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: ai-fixer-${{ github.event.issue.number || github.event.inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  fix-ci:
+    name: Autonomous CI Fixer & Conflict Resolver
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request && contains(github.event.comment.body, '/fix'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App Token (Higher Rate Limits)
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Resolve PR Metadata
+        id: meta
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUM="${{ github.event.inputs.pr_number }}"
+          else
+            PR_NUM="${{ github.event.issue.number }}"
+          fi
+
+          echo "Fetching details for PR #$PR_NUM..."
+          PR_DATA=$(gh pr view "$PR_NUM" --json headRefName,headRepositoryOwner,title)
+          HEAD_REF=$(echo "$PR_DATA" | jq -r .headRefName)
+          TITLE=$(echo "$PR_DATA" | jq -r .title)
+
+          echo "pr_num=$PR_NUM" >> $GITHUB_OUTPUT
+          echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+
+          gh pr comment "$PR_NUM" --body "🤖 **GossipMesh CI Auto-Fixer & Conflict Resolver** is analyzing branch \`$HEAD_REF\` against latest \`main\`..."
+
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.head_ref }}
+          fetch-depth: 0
+
+      - name: Fetch and Merge Base Branch (Conflict Detection)
+        env:
+          HEAD_REF: ${{ steps.meta.outputs.head_ref }}
+        run: |
+          git config --global user.name "Aditya Dahale"
+          git config --global user.email "aditya-9-6@users.noreply.github.com"
+          git fetch origin main
+          echo "Attempting merge with origin/main to test for conflicts..."
+          if ! git merge origin/main --no-edit; then
+            echo "⚠️ Merge conflicts detected with origin/main. AI Fixer will resolve conflict markers."
+          else
+            echo "Clean merge with origin/main completed."
+          fi
+
+      - name: Ensure Latest AI Fixer Script Present
+        run: |
+          git checkout origin/main -- scripts/ai_ci_fixer.py || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies & Tools
+        run: |
+          pip install ruff mypy
+          pip install -e .[api,dev] || pip install -e . || true
+
+      - name: Run Autonomous CI Repair & Conflict Agent
+        id: repair
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_SOLVER_KEY || secrets.GEMINI_API_KEY }}
+          GEMINI_SOLVER_KEY: ${{ secrets.GEMINI_SOLVER_KEY || secrets.GEMINI_API_KEY }}
+          GEMINI_REVIEWER_KEY: ${{ secrets.GEMINI_REVIEWER_KEY || secrets.GEMINI_ISSUE_KEY }}
+          GEMINI_KEY_POOL: ${{ secrets.GEMINI_KEY_POOL || '' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY || '' }}
+          NVIDIA_API_KEY_2: ${{ secrets.NVIDIA_API_KEY_2 || '' }}
+          PR_NUM: ${{ steps.meta.outputs.pr_num }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 scripts/ai_ci_fixer.py \
+            --pr-number "$PR_NUM" \
+            --workspace . \
+            --max-iterations 6
+
+      - name: Commit and Push Fix
+        env:
+          HEAD_REF: ${{ steps.meta.outputs.head_ref }}
+          PR_NUM: ${{ steps.meta.outputs.pr_num }}
+          AUTH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "Aditya Dahale"
+          git config --global user.email "aditya-9-6@users.noreply.github.com"
+          
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes needed or produced."
+            echo "has_changes=false" >> $GITHUB_ENV
+          else
+            git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true
+            git add -A
+            git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true
+            git commit -m "fix(ci): autonomous repair & conflict resolution for PR #${PR_NUM}" -m "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>"
+            git remote set-url origin "https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }}.git"
+            git push origin "$HEAD_REF"
+            COMMIT_SHA=$(git rev-parse --short HEAD)
+            echo "has_changes=true" >> $GITHUB_ENV
+            echo "commit_sha=$COMMIT_SHA" >> $GITHUB_ENV
+          fi
+
+      - name: Re-trigger CI Checks
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUM: ${{ steps.meta.outputs.pr_num }}
+          HEAD_REF: ${{ steps.meta.outputs.head_ref }}
+        run: |
+          echo "Re-triggering failed CI runs for PR #$PR_NUM on $HEAD_REF..."
+          FAILED_RUNS=$(gh run list --pr "$PR_NUM" --limit 5 --json databaseId,conclusion --jq '.[] | select(.conclusion=="failure") | .databaseId')
+          if [ -n "$FAILED_RUNS" ]; then
+            for r in $FAILED_RUNS; do
+              echo "Re-running failed workflow run $r..."
+              gh run rerun "$r" --failed || true
+            done
+          fi
+          gh workflow run ci.yml --ref "$HEAD_REF" 2>/dev/null || true
+
+      - name: Comment Resolution on PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUM: ${{ steps.meta.outputs.pr_num }}
+          HEAD_REF: ${{ steps.meta.outputs.head_ref }}
+        run: |
+          if [ -f "ci_fix_summary.md" ]; then
+            gh pr comment "$PR_NUM" --body-file "ci_fix_summary.md"
+          elif [ "$has_changes" = "true" ]; then
+            gh pr comment "$PR_NUM" --body "✅ **CI Fix Applied!** Pushed commit \`$commit_sha\` to \`$HEAD_REF\` and re-triggered CI validation."
+          fi

@@ -3,6 +3,12 @@ name: Auto-Approve PR Workflows
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["GossipMesh CI & Quality Gate", "AI CI Test Fixer Bot"]
+    types: [requested]
 
 permissions:
   actions: write
@@ -18,7 +24,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          echo "Auto-approving CI test workflows for PR #${{ github.event.pull_request.number }}..."
+          echo "Auto-approving CI test workflows..."
           for i in {1..8}; do
             sleep 4
             RUNS=$(gh api "repos/${{ github.repository }}/actions/runs?status=action_required" --jq '.workflow_runs[].id')
