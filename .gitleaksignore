@@ -1,0 +1,5 @@
+# Ignore the accidental leak in README.md from an earlier commit
+905578b2a0796bf3791375881017586a554d4510:README.md:sidekiq-secret:42
+905578b2a0796bf3791375881017586a554d4510:README.md:aws-access-token:221
+905578b2a0796bf3791375881017586a554d4510:README.md:aws-access-token:223
+905578b2a0796bf3791375881017586a554d4510:README.md:aws-access-token:259
