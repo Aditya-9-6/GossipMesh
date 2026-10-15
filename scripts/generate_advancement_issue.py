@@ -57,7 +57,6 @@ CATALOG = [
 
 def get_existing_issues():
     """Fetch existing issue titles and creation timestamps."""
-    issues_info = []
     try:
         cmd = ["gh", "issue", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -230,7 +229,7 @@ def create_issue(item):
         return False
 
 def main():
-    workspace = Path(".").resolve()
+    workspace = Path.cwd()
     manual_title = os.environ.get("INPUT_TITLE", "").strip()
     manual_area = os.environ.get("INPUT_AREA", "auto").strip()
     manual_diff = os.environ.get("INPUT_DIFFICULTY", "good first issue").strip()

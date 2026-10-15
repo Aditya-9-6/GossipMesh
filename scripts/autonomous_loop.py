@@ -35,7 +35,7 @@ DEFAULT_KEYS = []
 
 class KeyPool:
     """Manages round-robin rotation and dynamic failover across Gemini API keys."""
-    def __init__(self, initial_keys: list[str] = None):
+    def __init__(self, initial_keys: list[str] | None = None):
         self.keys = []
         pool_env = os.environ.get("GEMINI_KEY_POOL", "")
         extra_keys = [k.strip() for k in pool_env.split(",") if k.strip()]
@@ -301,7 +301,7 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
             print(f"[🚀] Permission granted! Merging PR #{pr_num} into main...", flush=True)
             run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace, check=False)
             run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
-            merge_out = run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace)
+            run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace)
             print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
             run_cmd(["git", "checkout", "main"], cwd=workspace)
             run_cmd(["git", "pull", "origin", "main"], cwd=workspace)

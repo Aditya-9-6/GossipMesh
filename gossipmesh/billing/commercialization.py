@@ -18,9 +18,7 @@ class StripeBillingEngine:
         return False
 
     def process_webhook(self, payload: dict) -> bool:
-        if payload.get("event") == "charge.succeeded":
-            return True
-        return False
+        return payload.get("event") == "charge.succeeded"
 
 class SubscriptionPlanManager:
     """Manages subscription plans and trials."""

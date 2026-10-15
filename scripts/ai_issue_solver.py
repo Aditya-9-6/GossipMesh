@@ -297,7 +297,7 @@ def main():
     workspace_root = Path(args.workspace).resolve()
     print(f"[*] Solving Issue #{args.issue_number}: {args.issue_title}")
 
-    keywords = [w for w in (args.issue_title + " " + args.issue_body).split() if len(w) > 3]
+    [w for w in (args.issue_title + " " + args.issue_body).split() if len(w) > 3]
     
     print("[*] Inspecting repository context...")
     all_files = get_git_files(workspace_root)

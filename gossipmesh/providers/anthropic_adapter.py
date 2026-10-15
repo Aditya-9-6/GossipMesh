@@ -22,7 +22,7 @@ class AnthropicProvider(BaseProvider):
         return "anthropic"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        start_time = time.time()
+        time.time()
 
         # Anthropic separates system prompts from the main messages list
         system_prompt = next((msg.content for msg in request.messages if msg.role == "system"), "")
@@ -37,7 +37,7 @@ class AnthropicProvider(BaseProvider):
             stop_sequences=request.stop_sequences or []
         )
 
-        end_time = time.time()
+        time.time()
 
         usage = Usage(
             prompt_tokens=response.usage.input_tokens,

@@ -280,7 +280,7 @@ def extract_ast_metadata(diff: str) -> str:
     added_lines = []
     for line in diff.splitlines():
         # filter out git diff headers
-        if line.startswith('diff --git') or line.startswith('index ') or line.startswith('@@ ') or line.startswith('--- ') or line.startswith('+++ ') or line.startswith('new file mode') or line.startswith('deleted file mode'):
+        if line.startswith(('diff --git', 'index ', '@@ ', '--- ', '+++ ', 'new file mode', 'deleted file mode')):
             continue
 
         if line.startswith('+') and not line.startswith('+++'):
@@ -314,8 +314,8 @@ def extract_ast_metadata(diff: str) -> str:
         # Fallback to naive approach for partial snippets.
         lines = diff.splitlines()
         for line in lines:
-            clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
-            if clean_line.startswith("def ") or clean_line.startswith("class ") or clean_line.startswith("async def "):
+            clean_line = line[1:].lstrip() if line.startswith(('+', '-')) else ""
+            if clean_line.startswith(("def ", "class ", "async def ")):
                 summary.append(clean_line.strip())
 
     if not summary:
@@ -363,7 +363,7 @@ def set_commit_status(head_sha: str, state: str, description: str, context: str 
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15):
             print(f"[OK] Commit status set to {state} ({context})")
     except Exception as e:
         print(f"[Warning] Failed to set commit status: {e}", file=sys.stderr)

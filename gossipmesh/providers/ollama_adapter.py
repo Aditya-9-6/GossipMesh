@@ -23,7 +23,7 @@ class OllamaProvider(BaseProvider):
         return "ollama"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        start_time = time.time()
+        time.time()
 
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
@@ -45,7 +45,7 @@ class OllamaProvider(BaseProvider):
             response.raise_for_status()
             data = response.json()
 
-        end_time = time.time()
+        time.time()
 
         usage = Usage(
             prompt_tokens=data.get("prompt_eval_count", 0),

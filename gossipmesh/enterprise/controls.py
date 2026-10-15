@@ -73,9 +73,7 @@ class DataRetentionPolicy:
         self.policies[resource_type] = days
 
     def apply_policy(self, resource_type: str) -> bool:
-        if resource_type in self.policies:
-            return True
-        return False
+        return resource_type in self.policies
 
 
 class DataExporter:

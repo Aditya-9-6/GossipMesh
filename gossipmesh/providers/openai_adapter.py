@@ -23,7 +23,7 @@ class OpenAIProvider(BaseProvider):
         return "openai"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        start_time = time.time()
+        time.time()
 
         formatted_messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
@@ -35,7 +35,7 @@ class OpenAIProvider(BaseProvider):
             stop=request.stop_sequences
         )
 
-        end_time = time.time()
+        time.time()
 
         usage = Usage(
             prompt_tokens=response.usage.prompt_tokens,

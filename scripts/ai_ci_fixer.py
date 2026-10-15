@@ -198,7 +198,7 @@ def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
     except Exception:
         pass
 
-    return sorted(list(found))
+    return sorted(found)
 
 def get_pr_diff(workspace: Path) -> str:
     """Gets git diff against origin/main or HEAD~1."""
@@ -337,7 +337,7 @@ Instructions:
 {latest_summary}
 
 ### 📂 Files Repaired
-{chr(10).join(f"- `{f}`" for f in sorted(list(all_repaired_files)))}
+{chr(10).join(f"- `{f}`" for f in sorted(all_repaired_files))}
 
 ### 🧪 Diagnostic Verification
 - Local build & test status after fix: **{'PASSED (Clean)' if post_code == 0 else 'WARNING (Some checks still reporting errors)'}**

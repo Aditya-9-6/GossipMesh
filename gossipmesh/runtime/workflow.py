@@ -32,7 +32,7 @@ class WorkflowManager:
         self.db.refresh(job)
         return job
 
-    def update_job_status(self, job_id: int, status: str, state: dict = None):
+    def update_job_status(self, job_id: int, status: str, state: dict | None = None):
         job = self.db.query(Job).filter(Job.id == job_id).first()
         if job:
             job.status = status

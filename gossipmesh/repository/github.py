@@ -25,7 +25,7 @@ class GitHubIntegration:
 
     def get_installation_client(self, installation_id: int) -> Github:
         """Returns a Github client authenticated as a specific installation."""
-        app_client = self.get_app_client()
+        self.get_app_client()
         # In a real app we'd fetch the installation access token from the API
         # Using PyGithub's built-in AppAuth
         auth = Auth.AppAuth(
