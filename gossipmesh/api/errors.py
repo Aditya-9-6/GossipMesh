@@ -10,15 +10,8 @@ async def gossipmesh_exception_handler(request: Request, exc: GossipMeshExceptio
     # from the request unless sanitized. For now, log the exception info.
     logger.error(f"GossipMeshException: {exc.error_code} - {exc.message} - Details: {exc.details}")
 
-    headers = {}
-    if exc.error_code == "RATE_LIMIT_ERROR" and exc.details:
-        headers["X-RateLimit-Limit"] = str(exc.details.get("limit", ""))
-        headers["X-RateLimit-Remaining"] = str(exc.details.get("remaining", 0))
-        headers["X-RateLimit-Reset"] = str(exc.details.get("reset", ""))
-
     return JSONResponse(
         status_code=exc.status_code,
-        headers=headers if headers else None,
         content={
             "error": {
                 "code": exc.error_code,

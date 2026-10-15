@@ -3,8 +3,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from httpx import Response
 import httpx
 from gossipmesh.integrations.github_pr import GitHubPRService
-from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
-import asyncio
+from gossipmesh.core.exceptions import RateLimitError
 
 class TestGitHubPRService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

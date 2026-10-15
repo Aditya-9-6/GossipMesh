@@ -8,10 +8,11 @@ from gossipmesh.models.project import Project
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.models.sso import OrganizationSAMLConfig
 from gossipmesh.models.provider import ProviderCredential
-from gossipmesh.models.repository import Repository, IndexState
+from gossipmesh.models.repository import Repository, IndexState, GithubAppInstallation
 from gossipmesh.models.runtime import Workflow, Job, Budget, Artifact
 from gossipmesh.models.service_account import ServiceAccount, APIKey
 from gossipmesh.repository.vector_store import DocumentChunk
+from gossipmesh.models.session import UserSession, RefreshToken
 
 __all__ = [
     "Base",
@@ -25,6 +26,7 @@ __all__ = [
     "ProviderCredential",
     "Repository",
     "IndexState",
+    "GithubAppInstallation",
     "Workflow",
     "Job",
     "Budget",
@@ -32,5 +34,7 @@ __all__ = [
     "ServiceAccount",
     "APIKey",
     "DocumentChunk",
+    "UserSession",
+    "RefreshToken",
     "OrganizationSAMLConfig",
 ]

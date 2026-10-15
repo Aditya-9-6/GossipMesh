@@ -16,7 +16,7 @@ class OllamaProvider(BaseProvider):
         return "ollama"
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        start_time = time.time()
+        time.time()
 
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
@@ -38,7 +38,7 @@ class OllamaProvider(BaseProvider):
             response.raise_for_status()
             data = response.json()
 
-        end_time = time.time()
+        time.time()
 
         usage = Usage(
             prompt_tokens=data.get("prompt_eval_count", 0),
@@ -54,7 +54,7 @@ class OllamaProvider(BaseProvider):
             raw_response=data
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
         async with httpx.AsyncClient() as client:

@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import httpx
 
 from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
@@ -31,7 +31,7 @@ class GitHubPRService:
 
         for attempt in range(self.max_retries):
             try:
-                async with httpx.AsyncClient(**client_kwargs) as client:
+                async with httpx.AsyncClient(timeout=client_kwargs['timeout']) as client:
                     response = await client.request(method, url, headers=headers, **kwargs)
 
                     if response.status_code in (403, 429):
@@ -65,7 +65,7 @@ class GitHubPRService:
     async def _get_paginated(self, url: str, **kwargs) -> List[Dict[str, Any]]:
         """Fetch all pages of a paginated GitHub API endpoint."""
         results = []
-        next_url = url
+        next_url: str | None = url
 
         while next_url:
             response = await self._request("GET", next_url, **kwargs)
@@ -139,3 +139,19 @@ class GitHubPRService:
             "commits": commits,
             "files_metadata": files
         }
+
+    async def post_pr_review_comment(self, owner: str, repo: str, pull_number: int, comment_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Posts an individual PR review comment.
+        """
+        url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/comments"
+        response = await self._request("POST", url, json=comment_payload)
+        return response.json()
+
+    async def post_pr_review(self, owner: str, repo: str, pull_number: int, review_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Posts a PR review with inline comments.
+        """
+        url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+        response = await self._request("POST", url, json=review_payload)
+        return response.json()

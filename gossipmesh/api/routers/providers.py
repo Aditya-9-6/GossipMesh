@@ -13,7 +13,6 @@ from gossipmesh.core.security import encrypt_string, decrypt_string
 from gossipmesh.core.exceptions import AuthorizationError, ValidationError
 from gossipmesh.providers.manager import ProviderManager
 from gossipmesh.providers.models import ProviderHealth
-from gossipmesh.api.rate_limit import rate_limit
 
 router = APIRouter()
 
@@ -51,11 +50,7 @@ def _get_provider_manager_for_org(db: Session, org_id: int) -> ProviderManager:
         _MANAGER_CACHE[org_id] = manager
     return manager
 
-@router.post(
-    "/register",
-    status_code=201,
-    dependencies=[Depends(rate_limit(limit_type="provider_register", limit=5, window=60))]
-)
+@router.post("/register", status_code=201)
 def register_provider(
     registration: ProviderRegistration,
     organization_id: int,
@@ -104,11 +99,7 @@ def register_provider(
     except ValueError as e:
         raise ValidationError(message=str(e))
 
-@router.get(
-    "/health",
-    response_model=Dict[str, ProviderHealth],
-    dependencies=[Depends(rate_limit(limit_type="provider_health", limit=20, window=60))]
-)
+@router.get("/health", response_model=Dict[str, ProviderHealth])
 async def get_providers_health(
     organization_id: int,
     current_user: User = Depends(deps.get_current_user),
