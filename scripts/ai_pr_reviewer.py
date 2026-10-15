@@ -6,6 +6,7 @@ zero-allocation memory invariants, and high test coverage.
 Outputs structured JSON and Markdown reports with system impact assessment.
 """
 
+import ast
 import os
 import sys
 import json
@@ -14,12 +15,14 @@ import urllib.request
 import urllib.error
 import subprocess
 import time
+import hashlib
 import datetime
 from pathlib import Path
 
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gossipmesh.memetic import MemeticKnowledgeBase
+import json
 
 from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
@@ -264,8 +267,7 @@ def get_pr_diff(workspace: Path) -> str:
         pass
     return "No git diff available."
 
-
-import ast
+import re
 
 def extract_ast_metadata(diff: str) -> str:
     """Extracts a structural summary from the diff using true AST parsing."""
@@ -360,7 +362,7 @@ def set_commit_status(head_sha: str, state: str, description: str, context: str 
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15):
             print(f"[OK] Commit status set to {state} ({context})")
     except Exception as e:
         print(f"[Warning] Failed to set commit status: {e}", file=sys.stderr)

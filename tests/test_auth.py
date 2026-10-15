@@ -1,3 +1,4 @@
+import tests  # Initialize env vars
 import unittest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
@@ -119,7 +120,7 @@ class TestAuth(unittest.TestCase):
         mock_redis.setex.assert_called_once()
 
     @patch('gossipmesh.api.routers.auth.jwt.decode')
-    @patch('gossipmesh.api.routers.auth.PyJWKClient')
+    @patch('gossipmesh.api.routers.auth.jwt.PyJWKClient')
     @patch('gossipmesh.api.routers.auth.httpx.Client.post')
     @patch('gossipmesh.api.routers.auth.httpx.Client.get')
     @patch('gossipmesh.api.routers.auth.redis_client')
@@ -160,8 +161,9 @@ class TestAuth(unittest.TestCase):
         # Mock DB logic
         from gossipmesh.models.user import User
         from gossipmesh.models.organization import Organization
+        from gossipmesh.models.audit import AuditEvent
 
-        mock_user = User(id=1, email="testoidc@example.com")
+
         self.mock_db.query.return_value.filter.return_value.first.side_effect = [
             None, # First query: User
             None, # Second query: UserOIDCCredential

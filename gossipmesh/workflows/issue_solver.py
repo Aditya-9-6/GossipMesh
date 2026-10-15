@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ class IssueSolverWorkflow:
     Orchestrates the Issue Solver workflow (Milestone 7).
     """
 
-    def __init__(self, issue_data: dict[str, Any]):
+    def __init__(self, issue_data: Dict[str, Any]):
         self.issue_data = issue_data
 
     async def execute(self):
@@ -17,7 +17,9 @@ class IssueSolverWorkflow:
         Main entry point for the issue solver workflow.
         """
         issue_number = self.issue_data.get("number")
-        logger.info(f"Starting Issue solver workflow for Issue #{issue_number}")
+        logger.info(
+            f"Starting Issue solver workflow for Issue #{issue_number}"
+        )
 
         plan = await self.create_plan()
         if plan:
@@ -70,3 +72,4 @@ class IssueSolverWorkflow:
         Creates a PR with the generated patch (no automatic merge).
         """
         logger.info("Creating PR with the generated patch.")
+        pass

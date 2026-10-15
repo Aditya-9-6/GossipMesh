@@ -1,5 +1,6 @@
 import unittest
 import os
+import sys
 from unittest.mock import patch
 from alembic.config import Config
 from alembic import command
@@ -14,6 +15,7 @@ os.environ["POSTGRES_PORT"] = "5432"
 os.environ["POSTGRES_DB"] = "test"
 
 # Make sure imports that rely on settings happen after env setup
+import gossipmesh.core.config
 from gossipmesh.core.config import Settings
 
 class TestMigrations(unittest.TestCase):

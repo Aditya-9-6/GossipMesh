@@ -4,11 +4,14 @@ from fastapi.security import OAuth2PasswordBearer
 import jwt
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
+from datetime import timedelta, datetime, timezone
 
 from gossipmesh.db.session import SessionLocal
 from gossipmesh.core.config import settings
 from gossipmesh.models.user import User
+from gossipmesh.models.session import UserSession
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
+from gossipmesh.db.redis import redis_client
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login/access-token"
@@ -20,9 +23,6 @@ def get_db() -> Generator:
         yield db
     finally:
         db.close()
-
-from datetime import timedelta
-from gossipmesh.models.session import UserSession
 
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
@@ -43,14 +43,27 @@ def get_current_user(
 
         user_id = payload.get("sub")
         session_id = payload.get("sid")
+        jti = payload.get("jti")
+        iat = payload.get("iat")
 
         if user_id is None:
             raise AuthenticationError(message="Could not validate credentials")
 
+        # Check session invalidation (PR logic)
         if session_id:
             session = db.query(UserSession).filter(UserSession.id == session_id).first()
             if not session or not session.is_active:
                 raise AuthenticationError(message="Session is inactive")
+
+        # Check token blocklist (Main logic)
+        if jti and redis_client.exists(f"revoked_token:{jti}"):
+            raise AuthenticationError(message="Token has been revoked")
+
+        # Check session invalidation (Main logic - password change)
+        if iat:
+            invalidated_before = redis_client.get(f"sessions_invalidated_before:{user_id}")
+            if invalidated_before and float(iat) < float(invalidated_before):
+                raise AuthenticationError(message="Session has been invalidated")
 
     except (jwt.InvalidTokenError, ValidationError):
         raise AuthenticationError(message="Could not validate credentials")
@@ -58,6 +71,8 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise AuthenticationError(message="User not found")
+    if not user.is_active:
+        raise AuthorizationError(message="Inactive user")
     return user
 
 
@@ -68,7 +83,6 @@ def get_scim_token(
     from fastapi import Header
     from gossipmesh.models.service_account import APIKey
     from gossipmesh.core.security import verify_password
-    from datetime import datetime, timezone
 
     if not authorization:
         raise AuthenticationError(message="Bearer token required")
@@ -95,4 +109,3 @@ def get_scim_token(
     if api_key:
         return api_key
     raise AuthenticationError(message="Invalid SCIM token")
-
