@@ -284,7 +284,7 @@ def call_ai_model(prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
 
     raise RuntimeError("All AI model providers exhausted without response.")
 
-def detect_and_resolve_conflicts(workspace: Path) -> list[str]:
+def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -> list[str]:
     conflicted_files = set()
     try:
         status_res = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True)
@@ -324,6 +324,7 @@ def detect_and_resolve_conflicts(workspace: Path) -> list[str]:
             continue
 
         print(f"[*] Resolving Git merge conflicts in {rel_path} via AI...", flush=True)
+        user_inst_block = f"\n=== USER SPECIFIC INSTRUCTIONS ===\n{user_instructions}\nYou MUST follow these instructions while resolving the conflict.\n" if user_instructions else ""
         prompt = f"""Resolve the Git merge conflicts in `{rel_path}`.
 
 CRITICAL INSTRUCTIONS:
@@ -332,7 +333,7 @@ CRITICAL INSTRUCTIONS:
 3. Completely remove all conflict markers (`<<<<<<< HEAD`, `=======`, `>>>>>>> ...`).
 4. Ensure the resulting file is 100% syntactically valid Python.
 5. Return the COMPLETE, entire resolved file content in the JSON schema.
-
+{user_inst_block}
 === CONFLICTED FILE: {rel_path} ===
 {conflicted_text}
 """
@@ -486,13 +487,24 @@ def main():
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
     parser.add_argument("--error-log-file", default="", help="Optional pre-captured error log file")
     parser.add_argument("--review-feedback-file", default="", help="Optional reviewer feedback markdown file")
+    parser.add_argument("--user-instructions", default="", help="Optional user instructions from comment or workflow dispatch")
+    parser.add_argument("--user-instructions-file", default="", help="Optional file containing user instructions")
     parser.add_argument("--max-iterations", type=int, default=6, help="Maximum self-healing passes")
     args = parser.parse_args()
 
     workspace = Path(args.workspace).resolve()
     print(f"[*] Starting Autonomous CI Fixer & Conflict Resolver for PR #{args.pr_number} in {workspace}...")
 
-    conflicts_resolved = detect_and_resolve_conflicts(workspace)
+    # Load any user instructions
+    user_instructions = args.user_instructions.strip()
+    if args.user_instructions_file and Path(args.user_instructions_file).is_file():
+        file_inst = Path(args.user_instructions_file).read_text(encoding="utf-8").strip()
+        if file_inst:
+            user_instructions = f"{user_instructions}\n{file_inst}".strip() if user_instructions else file_inst
+    if user_instructions:
+        print(f"[*] 🗣️ User Instructions provided:\n{user_instructions}", flush=True)
+
+    conflicts_resolved = detect_and_resolve_conflicts(workspace, user_instructions=user_instructions)
     if conflicts_resolved:
         print(f"[OK] Automatically resolved merge conflicts in: {conflicts_resolved}", flush=True)
 
@@ -545,11 +557,13 @@ def main():
         prompt_header = f"""Pull Request #{args.pr_number} has failing Python checks or tests (Pass {iteration}/{max_iterations}).
 Your goal: Fix all lint errors, type errors, and broken tests so that all diagnostics pass 100% GREEN."""
 
+        user_inst_block = f"\n=== USER GUIDANCE & SPECIFIC INSTRUCTIONS ===\n{user_instructions}\nStrictly adhere to and implement these instructions.\n" if user_instructions else ""
+
         prompt = f"""{prompt_header}
 
 === CI DIAGNOSTIC ERROR LOG ===
 {error_log[:15000] if error_log else "None (compilation clean). Focus on reviewer feedback."}
-
+{user_inst_block}
 {f"=== ARCHITECTURAL REVIEW FEEDBACK ==={chr(10)}{review_feedback[:10000]}" if review_feedback else ""}
 
 === CURRENT GIT DIFF ===
@@ -609,12 +623,13 @@ Instructions:
     else:
         status_label = "⚠️ **CHECKS STILL REPORTING ERRORS**"
 
+    user_inst_section = f"\n### 🗣️ User Instructions Addressed\n> {user_instructions}\n" if user_instructions else ""
     summary_file = workspace / "ci_fix_summary.md"
     summary_content = f"""## 🛠️ Autonomous CI Test Fixer Report (GossipMesh Python)
 
 **Target**: Pull Request #{args.pr_number}
 **Status**: {status_label}
-
+{user_inst_section}
 ### 📋 Resolution Summary
 {latest_summary or "CI diagnostics analyzed."}
 
