@@ -1,16 +1,9 @@
+from typing import AsyncGenerator
 import time
-from collections.abc import AsyncGenerator
-
 from anthropic import AsyncAnthropic
 
 from gossipmesh.providers.base import BaseProvider
-from gossipmesh.providers.models import (
-    GenerationRequest,
-    GenerationResponse,
-    ProviderHealth,
-    Usage,
-)
-
+from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
 class AnthropicProvider(BaseProvider):
     def __init__(self, api_key: str):
@@ -57,7 +50,7 @@ class AnthropicProvider(BaseProvider):
             raw_response={"id": response.id, "type": response.type}
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         system_prompt = next((msg.content for msg in request.messages if msg.role == "system"), "")
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages if msg.role != "system"]
 

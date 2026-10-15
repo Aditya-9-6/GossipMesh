@@ -2,11 +2,12 @@
 Billing and commercialization for GossipMesh.
 Milestone 9 Implementation.
 """
+from typing import Dict, List, Any
 
 class StripeBillingEngine:
     """Handles Stripe billing integration."""
     def __init__(self):
-        self.customers: dict[str, float] = {} # customer_id -> balance
+        self.customers: Dict[str, float] = {} # customer_id -> balance
 
     def add_funds(self, customer_id: str, amount: float):
         self.customers[customer_id] = self.customers.get(customer_id, 0.0) + amount
@@ -18,12 +19,14 @@ class StripeBillingEngine:
         return False
 
     def process_webhook(self, payload: dict) -> bool:
-        return payload.get("event") == "charge.succeeded"
+        if payload.get("event") == "charge.succeeded":
+            return True
+        return False
 
 class SubscriptionPlanManager:
     """Manages subscription plans and trials."""
     def __init__(self):
-        self.plans: dict[str, dict] = {}
+        self.plans: Dict[str, dict] = {}
 
     def create_plan(self, plan_name: str, features: list) -> bool:
         if plan_name in self.plans:
@@ -37,7 +40,7 @@ class SubscriptionPlanManager:
 class SeatManager:
     """Manages seat allocation for organizations."""
     def __init__(self):
-        self.org_seats: dict[str, list[str]] = {}
+        self.org_seats: Dict[str, List[str]] = {}
 
     def allocate_seat(self, org_id: str, user_id: str) -> bool:
         if org_id not in self.org_seats:
@@ -56,7 +59,7 @@ class SeatManager:
 class MeteredUsageTracker:
     """Tracks metered usage for billing."""
     def __init__(self):
-        self.usage: dict[str, dict[str, int]] = {}
+        self.usage: Dict[str, Dict[str, int]] = {}
 
     def record_usage(self, tenant_id: str, resource: str, amount: int) -> bool:
         if tenant_id not in self.usage:
@@ -70,7 +73,7 @@ class MeteredUsageTracker:
 class EnterpriseContractManager:
     """Manages custom enterprise contracts."""
     def __init__(self):
-        self.contracts: dict[str, dict] = {}
+        self.contracts: Dict[str, dict] = {}
 
     def create_contract(self, org_id: str, terms: dict) -> bool:
         if org_id in self.contracts:

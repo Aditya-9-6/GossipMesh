@@ -1,10 +1,8 @@
-import os
-import shutil
-import tempfile
 import unittest
-
+import os
+import tempfile
+import shutil
 from gossipmesh.runtime.sandbox import SandboxEnvironment
-
 
 class TestSandboxEnvironment(unittest.TestCase):
     def setUp(self):

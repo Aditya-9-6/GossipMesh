@@ -1,9 +1,7 @@
-import logging
-
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
-
 from gossipmesh.core.exceptions import GossipMeshException
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +23,7 @@ async def gossipmesh_exception_handler(request: Request, exc: GossipMeshExceptio
 
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # Log the full exception stack trace for debugging
-    logger.exception(f"Unhandled exception: {exc!s}")
+    logger.exception(f"Unhandled exception: {str(exc)}")
 
     # Do not expose internal error details to the client
     return JSONResponse(

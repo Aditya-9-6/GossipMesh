@@ -1,5 +1,4 @@
-from celery import Celery
-
+from celery import Celery  # type: ignore
 from gossipmesh.core.config import settings
 
 celery_app = Celery(

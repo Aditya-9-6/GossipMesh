@@ -3,8 +3,7 @@ Decentralized Task Auction & Contract Net Protocol.
 Selects optimal agent personas for tasks via competitive capability bidding.
 """
 
-from typing import Any
-
+from typing import List, Dict, Any, Optional
 
 class AgentBid:
     def __init__(self, agent_id: str, specialty: str, bid_score: float, rationale: str):
@@ -13,7 +12,7 @@ class AgentBid:
         self.bid_score = max(0.0, min(100.0, bid_score))
         self.rationale = rationale
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "specialty": self.specialty,
@@ -31,7 +30,7 @@ class TaskAuctioneer:
         "systems_specialist": {"simd": 2.0, "ebpf": 2.0, "streaming": 1.5, "zero-allocation": 2.0, "buffer": 1.0, "memory": 1.0, "cache": 1.0},
     }
 
-    def generate_bids(self, task_title: str, task_body: str) -> list[AgentBid]:
+    def generate_bids(self, task_title: str, task_body: str) -> List[AgentBid]:
         """Calculates domain fitness bids across standard specialized agent roles."""
         text = f"{task_title} {task_body}".lower()
         bids = []
@@ -44,7 +43,7 @@ class TaskAuctioneer:
 
         return bids
 
-    def elect_winner(self, bids: list[AgentBid]) -> AgentBid | None:
+    def elect_winner(self, bids: List[AgentBid]) -> Optional[AgentBid]:
         if not bids:
             return None
         return max(bids, key=lambda b: b.bid_score)

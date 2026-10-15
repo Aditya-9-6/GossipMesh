@@ -1,16 +1,9 @@
+from typing import AsyncGenerator
 import time
-from collections.abc import AsyncGenerator
-
 import google.generativeai as genai
 
 from gossipmesh.providers.base import BaseProvider
-from gossipmesh.providers.models import (
-    GenerationRequest,
-    GenerationResponse,
-    ProviderHealth,
-    Usage,
-)
-
+from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
@@ -65,7 +58,7 @@ class GeminiProvider(BaseProvider):
             raw_response={"prompt_feedback": str(response.prompt_feedback)}
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 

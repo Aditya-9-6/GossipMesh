@@ -1,10 +1,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
-
 from fastapi.testclient import TestClient
 
-from gossipmesh.api import deps
 from gossipmesh.api.main import app
+from gossipmesh.api import deps
 from gossipmesh.core.config import settings
 
 client = TestClient(app)
@@ -59,8 +58,13 @@ class TestRepositoriesAPI(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
-            response.json()["error"]["message"],
-            "Not authorized for this organization"
+            response.json(),
+            {
+                "error": {
+                    "code": "AUTHORIZATION_ERROR",
+                    "message": "Not authorized for this organization"
+                }
+            }
         )
         # Ensure that the background task was NOT queued
         mock_add_task.assert_not_called()

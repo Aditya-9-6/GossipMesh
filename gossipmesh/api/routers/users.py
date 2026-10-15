@@ -1,14 +1,15 @@
 from typing import Any
-
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-
+from sqlalchemy.orm import Session
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
+from pydantic import BaseModel, ConfigDict
 
 router = APIRouter()
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     email: str
     is_active: bool

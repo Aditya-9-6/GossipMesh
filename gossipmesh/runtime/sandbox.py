@@ -1,9 +1,9 @@
 import os
-import shlex
 import shutil
-import subprocess
 import tempfile
-
+import subprocess
+import shlex
+from typing import Optional, Tuple, Union, List
 
 class SandboxEnvironment:
     """
@@ -11,7 +11,7 @@ class SandboxEnvironment:
     In a full production environment, this would wrap Docker or Firecracker microVMs.
     """
     def __init__(self):
-        self.workspace_dir: str | None = None
+        self.workspace_dir: Optional[str] = None
 
     def __enter__(self):
         self.workspace_dir = tempfile.mkdtemp(prefix="gossipmesh_sandbox_")
@@ -21,7 +21,7 @@ class SandboxEnvironment:
         if self.workspace_dir and os.path.exists(self.workspace_dir):
             shutil.rmtree(self.workspace_dir)
 
-    def run_command(self, cmd: str | list[str], timeout: int = 30) -> tuple[int, str, str]:
+    def run_command(self, cmd: Union[str, List[str]], timeout: int = 30) -> Tuple[int, str, str]:
         """Runs a command within the sandbox workspace."""
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")

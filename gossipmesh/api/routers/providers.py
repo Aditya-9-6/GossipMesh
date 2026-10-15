@@ -1,17 +1,16 @@
 import threading
 from collections import OrderedDict
-from typing import Any
-
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from typing import Any, Dict, List
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from gossipmesh.api import deps
-from gossipmesh.core.exceptions import AuthorizationError, ValidationError
-from gossipmesh.core.security import decrypt_string, encrypt_string
-from gossipmesh.models.organization import UserOrganization
-from gossipmesh.models.provider import ProviderCredential
 from gossipmesh.models.user import User
+from gossipmesh.models.provider import ProviderCredential
+from gossipmesh.models.organization import UserOrganization
+from gossipmesh.core.security import encrypt_string, decrypt_string
+from gossipmesh.core.exceptions import AuthorizationError, ValidationError
 from gossipmesh.providers.manager import ProviderManager
 from gossipmesh.providers.models import ProviderHealth
 
@@ -100,7 +99,7 @@ def register_provider(
     except ValueError as e:
         raise ValidationError(message=str(e))
 
-@router.get("/health", response_model=dict[str, ProviderHealth])
+@router.get("/health", response_model=Dict[str, ProviderHealth])
 async def get_providers_health(
     organization_id: int,
     current_user: User = Depends(deps.get_current_user),

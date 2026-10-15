@@ -1,17 +1,10 @@
-import json
+from typing import AsyncGenerator
 import time
-from collections.abc import AsyncGenerator
-
 import httpx
+import json
 
 from gossipmesh.providers.base import BaseProvider
-from gossipmesh.providers.models import (
-    GenerationRequest,
-    GenerationResponse,
-    ProviderHealth,
-    Usage,
-)
-
+from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
 class OllamaProvider(BaseProvider):
     def __init__(self, base_url: str = "http://localhost:11434"):
@@ -61,30 +54,31 @@ class OllamaProvider(BaseProvider):
             raw_response=data
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
-        async with httpx.AsyncClient() as client, client.stream(
-            "POST",
-            f"{self.base_url}/api/chat",
-            json={
-                "model": request.model,
-                "messages": messages,
-                "stream": True,
-                "options": {
-                    "temperature": request.temperature,
-                    "num_predict": request.max_tokens,
-                    "stop": request.stop_sequences
-                }
-            },
-            timeout=300.0
-        ) as response:
-            response.raise_for_status()
-            async for chunk in response.aiter_lines():
-                if chunk:
-                    data = json.loads(chunk)
-                    if "message" in data and "content" in data["message"]:
-                        yield data["message"]["content"]
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": request.model,
+                    "messages": messages,
+                    "stream": True,
+                    "options": {
+                        "temperature": request.temperature,
+                        "num_predict": request.max_tokens,
+                        "stop": request.stop_sequences
+                    }
+                },
+                timeout=300.0
+            ) as response:
+                response.raise_for_status()
+                async for chunk in response.aiter_lines():
+                    if chunk:
+                        data = json.loads(chunk)
+                        if "message" in data and "content" in data["message"]:
+                            yield data["message"]["content"]
 
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()

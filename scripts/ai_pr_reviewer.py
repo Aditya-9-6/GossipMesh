@@ -6,22 +6,26 @@ zero-allocation memory invariants, and high test coverage.
 Outputs structured JSON and Markdown reports with system impact assessment.
 """
 
-import argparse
-import datetime
-import json
+import ast
 import os
-import subprocess
 import sys
-import time
-import urllib.error
+import json
+import argparse
 import urllib.request
+import urllib.error
+import subprocess
+import time
+import hashlib
+import datetime
 from pathlib import Path
 
 # Add parent directory to path to import gossipmesh
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.memetic import MemeticKnowledgeBase
+import json
+
 from gossipmesh.red_team import RedTeamAuditor
+from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.semantic_cache import SemanticCache
 
 DEFAULT_MODEL = "gemini-2.5-pro"
@@ -30,7 +34,7 @@ FALLBACK_MODELS = [
     "gemini-1.5-pro",
 ]
 
-REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance HTTP/HTTPS proxy and security engine in Python).
+REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance AI Agent SaaS platform in Python).
 
 Your primary mission is to ENFORCE STRICT ARCHITECTURAL STANDARDS AND PREVENT SPAGHETTI CODE as the codebase scales at hyper-speed.
 
@@ -44,18 +48,15 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
    - Async/thread lifecycle safety: All launched threads/tasks must terminate cleanly upon context cancellation (`ctx.Done()`). No leaks.
    - Finally/ContextManager hygiene: Mutex unlocks and resource closes must be deferred immediately with zero resource leaks inside hot unbounded loops.
 3. Memory & High Throughput Invariants:
-   - Zero-allocation hot paths: Use `object pools for buffers. Avoid allocating large lists or copying payloads in the proxy stream forwarding path.
+   - Zero-allocation hot paths: Use `object pools for buffers. Avoid allocating large lists or copying payloads in the AI workflow execution path.
    - Streaming compliance: Read and forward payloads via streaming readers/writers (Python streaming APIs) without buffering entire multi-megabyte streams in RAM.
 4. Security & Hardening:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
 
    - Enterprise Privacy & Secrets Policy Check: Ensure no PII, API keys, or sensitive credentials are leaked in the code or tests.
-5. Go Idiomatic Standards & Test Coverage:
-   - Error wrapping using `%w` and proper sentinel error checking with `errors.Is`/`errors.As`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution (`t.Parallel()`).
 5. Python Idiomatic Standards & Test Coverage:
-   - Error wrapping using `from e` and proper sentinel error checking with `isinstance`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and concurrent execution .
+   - Error wrapping and proper exception handling using `try...except`.
+   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and proper asyncio usage.
 
 EVALUATION & VERDICT:
 - If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
@@ -71,12 +72,12 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
   "score": 95,
   "executive_summary": "Concise summary of the PR and overall architectural quality.",
   "anti_spaghetti_audit": "Detailed evaluation of code modularity, function sizing, decoupling, and maintainability.",
-  "security_concurrency_audit": "Detailed analysis of data race freedom, goroutine lifecycle, mutex safety, and security posture.",
+  "security_concurrency_audit": "Detailed analysis of data race freedom, asyncio task lifecycle, mutex safety, and security posture.",
   "performance_memory_audit": "Evaluation of buffer pooling (sync.Pool), zero-allocation hot paths, and streaming throughput.",
   "test_coverage_audit": "Evaluation of test coverage, edge cases, error conditions, and concurrency tests.",
 
   "privacy_security_audit": "Enterprise Privacy & Secrets Policy Check: strict verification that no PII, API keys, or sensitive credentials are leaked.",
-  "system_impact": "Detailed assessment of the PR's effect on the DevProxy system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Aditya-9-6.",
+  "system_impact": "Detailed assessment of the PR's effect on the GossipMesh system (impacted subsystems, throughput, latency, security posture, operational reliability). If approved, cc @Maintainers.",
   "roi_metrics": {
     "estimated_review_time_saved_minutes": 15,
     "defects_prevented": 2
@@ -266,9 +267,7 @@ def get_pr_diff(workspace: Path) -> str:
         pass
     return "No git diff available."
 
-
-import ast
-
+import re
 
 def extract_ast_metadata(diff: str) -> str:
     """Extracts a structural summary from the diff using true AST parsing."""
@@ -280,7 +279,7 @@ def extract_ast_metadata(diff: str) -> str:
     added_lines = []
     for line in diff.splitlines():
         # filter out git diff headers
-        if line.startswith(('diff --git', 'index ', '@@ ', '--- ', '+++ ', 'new file mode', 'deleted file mode')):
+        if line.startswith('diff --git') or line.startswith('index ') or line.startswith('@@ ') or line.startswith('--- ') or line.startswith('+++ ') or line.startswith('new file mode') or line.startswith('deleted file mode'):
             continue
 
         if line.startswith('+') and not line.startswith('+++'):
@@ -314,8 +313,8 @@ def extract_ast_metadata(diff: str) -> str:
         # Fallback to naive approach for partial snippets.
         lines = diff.splitlines()
         for line in lines:
-            clean_line = line[1:].lstrip() if line.startswith(('+', '-')) else ""
-            if clean_line.startswith(("def ", "class ", "async def ")):
+            clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
+            if clean_line.startswith("def ") or clean_line.startswith("class ") or clean_line.startswith("async def "):
                 summary.append(clean_line.strip())
 
     if not summary:
@@ -586,7 +585,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
 
-**cc @Aditya-9-6** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
+**cc @Maintainers** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
 ### 🌐 Architectural System Impact Report
 {system_impact}
@@ -612,7 +611,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ---
 ### 🚦 Next Steps: Maintainer Sign-Off Required
-**@Aditya-9-6**: All automated quality gates, anti-spaghetti checks, and performance benchmarks have passed cleanly.
+**@Maintainers**: All automated quality gates, anti-spaghetti checks, and performance benchmarks have passed cleanly.
 To complete the merge into `main`:
 - **Approve this Pull Request**, OR
 - Comment **`/merge`** on this PR.

@@ -1,11 +1,10 @@
-import logging
+import os
 import sys
-
+import logging
 from alembic.config import Config
-from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine
-
 from gossipmesh.core.config import settings
 
 logging.basicConfig(level=logging.INFO)

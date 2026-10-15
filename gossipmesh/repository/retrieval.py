@@ -1,12 +1,11 @@
-from typing import Any
-
+from typing import List, Dict, Any
 
 class HybridRetriever:
     def __init__(self, vector_store, architecture_graph):
         self.vector_store = vector_store
         self.graph = architecture_graph
 
-    def search(self, query: str, repo_id: int, top_k: int = 5) -> list[dict[str, Any]]:
+    def search(self, query: str, repo_id: int, top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Performs a hybrid search combining vector similarity and graph relationships.
         """

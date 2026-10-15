@@ -1,16 +1,18 @@
-from datetime import datetime
-
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String
+from sqlalchemy import String, Integer, ForeignKey, DateTime, Float, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-
+from datetime import datetime
 from gossipmesh.models.base import Base
+from gossipmesh.models.mixins import SoftDeleteMixin
 
 
-class Workflow(Base):
+class Workflow(SoftDeleteMixin, Base):
     __tablename__ = "workflows"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+
+    __mapper_args__ = {"version_id_col": version_id}
     organization_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), nullable=False, index=True
     )
@@ -28,10 +30,13 @@ class Workflow(Base):
     jobs = relationship("Job", back_populates="workflow")
 
 
-class Job(Base):
+class Job(SoftDeleteMixin, Base):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+
+    __mapper_args__ = {"version_id_col": version_id}
     workflow_id: Mapped[int] = mapped_column(ForeignKey("workflows.id"), nullable=False)
     agent_name: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")
@@ -41,7 +46,7 @@ class Job(Base):
     workflow = relationship("Workflow", back_populates="jobs")
 
 
-class Budget(Base):
+class Budget(SoftDeleteMixin, Base):
     __tablename__ = "budgets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -54,7 +59,7 @@ class Budget(Base):
     organization = relationship("Organization")
 
 
-class Artifact(Base):
+class Artifact(SoftDeleteMixin, Base):
     __tablename__ = "artifacts"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

@@ -11,12 +11,13 @@ Features:
 """
 
 import json
-import os
 import subprocess
+import os
+
 import sys
 import time
-import urllib.error
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -213,6 +214,10 @@ def create_issue(item):
 3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
 
+    labels_list = [area, difficulty, "hacktoberfest", "advancement"]
+    for lbl in labels_list:
+        subprocess.run(["gh", "label", "create", lbl, "--repo", "Aditya-9-6/GossipMesh", "--force"], capture_output=True)
+
     labels = f"{area},{difficulty},hacktoberfest,advancement"
     cmd = [
         "gh", "issue", "create", "--repo", "Aditya-9-6/GossipMesh",
@@ -229,7 +234,7 @@ def create_issue(item):
         return False
 
 def main():
-    workspace = Path.cwd()
+    workspace = Path(".").resolve()
     manual_title = os.environ.get("INPUT_TITLE", "").strip()
     manual_area = os.environ.get("INPUT_AREA", "auto").strip()
     manual_diff = os.environ.get("INPUT_DIFFICULTY", "good first issue").strip()

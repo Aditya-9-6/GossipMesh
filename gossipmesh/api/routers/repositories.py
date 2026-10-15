@@ -1,15 +1,18 @@
-import logging
 from typing import Any
-
-from fastapi import APIRouter, BackgroundTasks, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi import BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from gossipmesh.api import deps
-from gossipmesh.core.exceptions import AuthorizationError
-from gossipmesh.models.organization import UserOrganization
 from gossipmesh.models.user import User
+from gossipmesh.models.organization import UserOrganization
+from gossipmesh.models.repository import Repository, IndexState
 from gossipmesh.repository.github import GitHubIntegration
+from gossipmesh.core.config import settings
+from gossipmesh.core.exceptions import AuthorizationError
+import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -38,7 +41,7 @@ def sync_repository(
         # We need a proper RSA key for PyGithub, mock it safely here to prevent crash
         # In real use, this should come from a secure vault or settings (e.g. settings.GITHUB_APP_PRIVATE_KEY)
         mock_rsa_key = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOQIBAAJAVY6qupT3\n-----END RSA PRIVATE KEY-----"
-        GitHubIntegration(app_id="12345", private_key=mock_rsa_key)
+        github = GitHubIntegration(app_id="12345", private_key=mock_rsa_key)
         try:
             # We mock the response because the JWT requires a valid key to not crash during tests/real calls.
             # In a full integration, `github.sync_repository` is called.

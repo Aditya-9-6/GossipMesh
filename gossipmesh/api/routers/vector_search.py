@@ -1,14 +1,13 @@
-from typing import Any
-
+from typing import Any, List
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from gossipmesh.api import deps
-from gossipmesh.core.exceptions import AuthorizationError
+from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
 from gossipmesh.models.repository import Repository
-from gossipmesh.models.user import User
+from gossipmesh.core.exceptions import AuthorizationError
 from gossipmesh.repository.retrieval import HybridRetriever
 from gossipmesh.repository.vector_store import PGVectorStore
 

@@ -5,17 +5,17 @@ Revises: ceba0964d996
 Create Date: 2026-10-10 18:30:59.666875
 
 """
-from collections.abc import Sequence
-
-import sqlalchemy as sa
+from typing import Sequence, Union
 
 from alembic import op
+import sqlalchemy as sa
+
 
 # revision identifiers, used by Alembic.
 revision: str = '69f7dd34d83e'
-down_revision: str | Sequence[str] | None = 'ceba0964d996'
-branch_labels: str | Sequence[str] | None = None
-depends_on: str | Sequence[str] | None = None
+down_revision: Union[str, Sequence[str], None] = 'ceba0964d996'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:

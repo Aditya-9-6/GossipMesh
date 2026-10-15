@@ -5,8 +5,7 @@ and memory exhaustion before PR creation.
 """
 
 import re
-from typing import Any
-
+from typing import List, Dict, Any
 
 class VulnerabilityProbe:
     def __init__(
@@ -23,7 +22,7 @@ class VulnerabilityProbe:
         self.attack_vector = attack_vector
         self.exploit_test_stub = exploit_test_stub
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "category": self.category,
             "severity": self.severity,
@@ -41,7 +40,7 @@ class RedTeamAuditor:
             "severity": "HIGH",
             "regex": r"(sync\.(RWMutex|Mutex)|\.Lock\(\))",
             "message": "Potential mutex bottleneck detected on high-throughput hot path.",
-            "test_stub": "// Concurrent Stress Test:\n// Run 1,000 goroutines recording concurrently to expose contention."
+            "test_stub": "// Concurrent Stress Test:\n// Run 1,000 asyncio tasks recording concurrently to expose contention."
         },
         {
             "category": "Unbounded Heap Allocation",
@@ -73,9 +72,9 @@ class RedTeamAuditor:
         }
     ]
 
-    def audit_diff(self, diff_content: str, language: str = "go") -> list[VulnerabilityProbe]:
+    def audit_diff(self, diff_content: str, language: str = "go") -> List[VulnerabilityProbe]:
         """Audits a code diff against adversarial rules and edge cases."""
-        probes: list[VulnerabilityProbe] = []
+        probes: List[VulnerabilityProbe] = []
 
         for rule in self.STATIC_RULES:
             if re.search(rule["regex"], diff_content):
