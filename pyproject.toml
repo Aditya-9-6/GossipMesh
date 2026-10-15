@@ -94,3 +94,20 @@ exclude_lines = [
     "raise ImportError",
 ]
 ignore_errors = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+follow_imports = "silent"
+check_untyped_defs = false
+disallow_untyped_defs = false
+warn_return_any = false
+warn_unused_configs = true
+disable_error_code = ["arg-type", "union-attr", "override", "call-arg", "assignment", "import-untyped", "annotation-unchecked"]
