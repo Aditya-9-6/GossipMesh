@@ -1,14 +1,12 @@
 import unittest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import StaleDataError
-import os
 
 from gossipmesh.models.base import Base
 from gossipmesh.models.runtime import Workflow, Job
 from gossipmesh.models.repository import Repository
 from gossipmesh.models.organization import Organization
-from gossipmesh.models.user import User
 
 class TestConcurrency(unittest.TestCase):
     def setUp(self):

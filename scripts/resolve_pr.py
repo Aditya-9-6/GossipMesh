@@ -18,6 +18,8 @@ def clean_tree(tree_sha: str) -> str:
     raw = res.stdout
     if not raw:
         return tree_sha
+    if b'\r' not in raw and b'G:' not in raw:
+        return tree_sha
 
     entries = []
     for chunk in raw.split(b'\0'):
@@ -26,7 +28,7 @@ def clean_tree(tree_sha: str) -> str:
         meta, name = chunk.split(b'\t', 1)
         mode, obj_type, sha = meta.split(b' ')
         clean_name = name.rstrip(b'\r')
-        if clean_name == b'G:' or clean_name == b'G':
+        if clean_name.startswith(b'G:') or clean_name == b'G' or clean_name == b'.gossip_mesh':
             continue
 
         if obj_type == b'tree':
@@ -47,7 +49,7 @@ def sanitize_branch(branch_name: str) -> str:
         print(f"[*] Pruned corrupted entries from tree {tree_sha} -> {clean_root}")
         commit_res = run_cmd([
             'git', 'commit-tree', clean_root, '-p', head_sha,
-            '-m', 'fix(repo): strip carriage returns and G: drive from git tree objects'
+            '-m', "fix(repo): strip carriage returns and G: drive from git tree objects\n\nCo-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>"
         ])
         new_commit = commit_res.stdout.strip()
         run_cmd(['git', 'update-ref', f'refs/heads/{branch_name}', new_commit])
@@ -90,9 +92,15 @@ def resolve_pr(pr_number: int, head_ref: str):
         print(f"[!] Conflicted files: {conflicted_files}")
 
         for cf in conflicted_files:
-            print(f"[*] Resolving {cf} using origin/main version...")
-            run_cmd(['git', 'checkout', 'origin/main', '--', cf])
-            run_cmd(['git', 'add', cf])
+            print(f"[*] Resolving {cf}...")
+            chk = subprocess.run(['git', 'cat-file', '-e', f"origin/main:{cf}"], capture_output=True)
+            if chk.returncode == 0:
+                print(f"    Restoring {cf} from origin/main...")
+                run_cmd(['git', 'checkout', 'origin/main', '--', cf])
+                run_cmd(['git', 'add', cf])
+            else:
+                print(f"    Removing {cf} (not present in origin/main)...")
+                run_cmd(['git', 'rm', '-f', cf], check=False)
 
         # Check if conflicts resolved
         unresolved = [line.strip() for line in run_cmd(['git', 'diff', '--name-only', '--diff-filter=U']).stdout.splitlines() if line.strip()]

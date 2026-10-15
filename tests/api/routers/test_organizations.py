@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
+from fastapi.testclient import TestClient
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.user import User

@@ -27,7 +27,7 @@ class GeminiProvider(BaseProvider):
         return converted
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        start_time = time.time()
+        time.time()
 
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
@@ -41,7 +41,7 @@ class GeminiProvider(BaseProvider):
             )
         )
 
-        end_time = time.time()
+        time.time()
 
         usage = Usage(
             prompt_tokens=self.count_tokens(" ".join([m.content for m in request.messages])),
@@ -58,7 +58,7 @@ class GeminiProvider(BaseProvider):
             raw_response={"prompt_feedback": str(response.prompt_feedback)}
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 

@@ -22,8 +22,21 @@ class PRReviewJob:
         pr_number = self.pr_data.get("number")
         logger.info(f"Starting PR review workflow for PR #{pr_number}")
 
+        owner = self.pr_data.get("owner", "dummy_owner")
+        repo = self.pr_data.get("repo", "dummy_repo")
+
         service = PRReviewService()
-        integration = GitHubIntegration()
+
+        # Instantiate GitHubPRService (mock token for job)
+        from gossipmesh.integrations.github_pr import GitHubPRService
+        github_pr_service = GitHubPRService(token="dummy_token")
+
+        integration = GitHubIntegration(
+            owner=owner,
+            repo=repo,
+            pr_number=pr_number,
+            github_pr_service=github_pr_service
+        )
 
         # Simulate PR review steps
         findings = await service.extract_security_findings()

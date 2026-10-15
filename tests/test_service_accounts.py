@@ -65,7 +65,7 @@ class TestServiceAccounts(unittest.TestCase):
                 return account
             elif model == UserOrganization:
                 return user_org
-            return None
+
 
         query_mock = MagicMock()
         filter_mock = MagicMock()

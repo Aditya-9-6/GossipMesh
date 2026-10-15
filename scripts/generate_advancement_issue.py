@@ -58,7 +58,6 @@ CATALOG = [
 
 def get_existing_issues():
     """Fetch existing issue titles and creation timestamps."""
-    issues_info = []
     try:
         cmd = ["gh", "issue", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)

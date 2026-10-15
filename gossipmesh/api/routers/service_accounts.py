@@ -187,6 +187,8 @@ def revoke_api_key(
         raise HTTPException(status_code=404, detail="API key not found")
 
     account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Service account not found")
     _ensure_org_access(db, current_user.id, account.organization_id)
 
     api_key.is_revoked = True
