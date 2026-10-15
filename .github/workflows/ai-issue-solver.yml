@@ -60,7 +60,7 @@ jobs:
 
           ISSUE_DATA=$(gh issue view "$ISSUE_NUM" --json title,body,number)
           TITLE=$(echo "$ISSUE_DATA" | jq -r .title)
-          
+
           echo "num=$ISSUE_NUM" >> $GITHUB_OUTPUT
           echo "title=$TITLE" >> $GITHUB_OUTPUT
 

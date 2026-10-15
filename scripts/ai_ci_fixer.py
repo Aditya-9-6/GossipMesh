@@ -350,6 +350,7 @@ CRITICAL INSTRUCTIONS:
         except Exception as e:
             print(f"[!] Conflict resolution failed for {rel_path}: {e}", file=sys.stderr)
 
+    # Resolve any remaining unmerged paths
     try:
         remaining_res = subprocess.run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=workspace, capture_output=True, text=True)
         remaining = [l.strip() for l in remaining_res.stdout.splitlines() if l.strip()]
@@ -405,18 +406,21 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
     print("[*] Running local diagnostic checks (ruff check, mypy, unittest)...", flush=True)
     out_lines = []
 
+    # Check ruff
     ruff_res = subprocess.run(["ruff", "check", "."], cwd=workspace, capture_output=True, text=True)
     if ruff_res.returncode != 0:
         out_lines.append("=== RUFF LINT ERRORS ===")
         out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
         out_lines.append("")
 
+    # Check mypy
     mypy_res = subprocess.run(["mypy", "gossipmesh/"], cwd=workspace, capture_output=True, text=True)
     if mypy_res.returncode != 0:
         out_lines.append("=== MYPY TYPE ERRORS ===")
         out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
         out_lines.append("")
 
+    # Check unittest
     test_res = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True)
     if test_res.returncode != 0:
         out_lines.append("=== PYTHON TEST FAILURES ===")
@@ -425,6 +429,7 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
 
     local_errors = bool(out_lines)
 
+    # Check remote GitHub CI failures as extra diagnostic context only if local tests failed
     if pr_number and local_errors:
         remote_ci = fetch_remote_ci_errors(pr_number, workspace)
         if remote_ci:
@@ -477,6 +482,7 @@ def get_pr_diff(workspace: Path) -> str:
     return "No git diff available."
 
 def extract_instructions_from_pr(pr_number: str, workspace: Path) -> str:
+    """Extracts custom user instructions from the latest /fix comment on the PR."""
     try:
         res = subprocess.run([
             "gh", "pr", "view", pr_number, "--json", "comments"
@@ -508,6 +514,7 @@ def main():
     workspace = Path(args.workspace).resolve()
     print(f"[*] Starting Autonomous CI Fixer & Conflict Resolver for PR #{args.pr_number} in {workspace}...")
 
+    # Load any user instructions (CLI, file, or automatically from PR comments)
     user_instructions = args.user_instructions.strip()
     if args.user_instructions_file and Path(args.user_instructions_file).is_file():
         file_inst = Path(args.user_instructions_file).read_text(encoding="utf-8").strip()

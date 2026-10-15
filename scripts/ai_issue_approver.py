@@ -237,7 +237,7 @@ Instructions:
 
         comment = f"""### 🏛️ Architectural Gatekeeper: Issue Approved ✅
 
-**Necessity Score**: **{score}/100**  
+**Necessity Score**: **{score}/100**
 **Verdict**: **APPROVED FOR IMPLEMENTATION**
 
 #### 📋 Architectural Evaluation
@@ -257,7 +257,7 @@ Instructions:
     # Action 2: NEEDS CHANGES (Autonomous Collaborative Refinement)
     elif verdict == "NEEDS_CHANGES":
         print(f"[*] Issue #{issue_number} requires refinement. Updating specification...", flush=True)
-        
+
         # If the AI provided a refined body, update the issue directly!
         if refined_body:
             new_title = refined_title if refined_title else title
@@ -271,7 +271,7 @@ Instructions:
 
         comment = f"""### 🏛️ Architectural Gatekeeper: Issue Refined & Upgraded 🔄
 
-**Necessity Score**: **{score}/100**  
+**Necessity Score**: **{score}/100**
 **Verdict**: **CHANGES APPLIED / SPECIFICATION REFINED**
 
 #### 🔍 Architectural Review Feedback
@@ -290,7 +290,7 @@ Instructions:
         print(f"[*] Issue #{issue_number} rejected as unnecessary (Score: {score}/100). Closing...", flush=True)
         comment = f"""### 🛑 Architectural Gatekeeper: Issue Closed (Unnecessary / Not Planned)
 
-**Necessity Score**: **{score}/100**  
+**Necessity Score**: **{score}/100**
 **Verdict**: **REJECTED AS UNNECESSARY**
 
 #### 🔍 Evaluation Rationale

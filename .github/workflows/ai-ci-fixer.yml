@@ -161,7 +161,7 @@ jobs:
         run: |
           git config --global user.name "Aditya Dahale"
           git config --global user.email "aditya-9-6@users.noreply.github.com"
-          
+
           ORIGIN_SHA=$(git rev-parse "origin/$HEAD_REF" 2>/dev/null || echo "")
           CURRENT_SHA=$(git rev-parse HEAD)
 
