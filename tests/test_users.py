@@ -1,3 +1,4 @@
+import tests
 import unittest
 
 from fastapi.testclient import TestClient

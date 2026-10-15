@@ -9,6 +9,7 @@ Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tes
 import os
 import sys
 import json
+import re
 import argparse
 import urllib.request
 import urllib.error

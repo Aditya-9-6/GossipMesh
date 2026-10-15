@@ -91,4 +91,3 @@ def get_scim_token(
     if api_key:
         return api_key
     raise AuthenticationError(message="Invalid SCIM token")
-

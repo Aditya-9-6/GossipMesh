@@ -112,4 +112,3 @@ disallow_untyped_defs = false
 warn_return_any = false
 warn_unused_configs = true
 disable_error_code = ["arg-type", "union-attr", "override", "call-arg", "assignment", "import-untyped", "annotation-unchecked"]
-

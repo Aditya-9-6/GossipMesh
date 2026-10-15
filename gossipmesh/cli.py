@@ -7,7 +7,7 @@ import sys
 import json
 import argparse
 from pathlib import Path
-from .node import GossipNode
+from .node import GossipNode, GossipTopic
 from .memetic import MemeticKnowledgeBase
 from .red_team import RedTeamAuditor
 
