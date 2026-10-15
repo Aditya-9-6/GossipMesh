@@ -22,19 +22,37 @@ def get_db() -> Generator:
     finally:
         db.close()
 
+from datetime import timedelta
+from gossipmesh.models.session import UserSession
+
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
 ) -> User:
     try:
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            audience=settings.JWT_AUDIENCE,
+            issuer=settings.JWT_ISSUER,
+            leeway=timedelta(seconds=10)
         )
-        token_data = payload.get("sub")
+        token_type = payload.get("type")
+        if token_type != "access":
+            raise AuthenticationError(message="Invalid token type")
+
+        user_id = payload.get("sub")
+        session_id = payload.get("sid")
         jti = payload.get("jti")
         iat = payload.get("iat")
 
-        if token_data is None:
+        if user_id is None:
             raise AuthenticationError(message="Could not validate credentials")
+
+        if session_id:
+            session = db.query(UserSession).filter(UserSession.id == session_id).first()
+            if not session or not session.is_active:
+                raise AuthenticationError(message="Session is inactive")
 
         # Check token blocklist
         if jti and redis_client.exists(f"revoked_token:{jti}"):
@@ -42,14 +60,14 @@ def get_current_user(
 
         # Check session invalidation (password change)
         if iat:
-            invalidated_before = redis_client.get(f"sessions_invalidated_before:{token_data}")
+            invalidated_before = redis_client.get(f"sessions_invalidated_before:{user_id}")
             if invalidated_before and float(iat) < float(invalidated_before):
                 raise AuthenticationError(message="Session has been invalidated")
 
     except (jwt.InvalidTokenError, ValidationError):
         raise AuthenticationError(message="Could not validate credentials")
 
-    user = db.query(User).filter(User.id == token_data).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise AuthenticationError(message="User not found")
     if not user.is_active:
