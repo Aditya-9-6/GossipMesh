@@ -309,6 +309,16 @@ def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -
     print(f"[*] ⚠️ Detected {len(conflicted_files)} conflicted file(s): {sorted(list(conflicted_files))}", flush=True)
     for rel_path in sorted(list(conflicted_files)):
         target_file = workspace / rel_path
+        if rel_path.startswith(".github/") or rel_path.startswith("scripts/ai_") or rel_path.startswith("scripts/auto_merge") or rel_path == "fix_conflict.py":
+            print(f"[*] Preserving master workflow/tooling from origin/main for {rel_path}...", flush=True)
+            code = subprocess.run(["git", "checkout", "origin/main", "--", rel_path], cwd=workspace).returncode
+            if code == 0:
+                subprocess.run(["git", "add", rel_path], cwd=workspace)
+            else:
+                subprocess.run(["git", "rm", "-f", rel_path], cwd=workspace)
+            resolved.append(rel_path)
+            continue
+
         if not target_file.is_file():
             print(f"[*] Handling deleted/missing conflicted file {rel_path} by restoring from origin/main...", flush=True)
             subprocess.run(["git", "checkout", "origin/main", "--", rel_path], cwd=workspace)
