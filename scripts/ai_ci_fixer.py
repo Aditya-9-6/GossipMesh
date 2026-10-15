@@ -9,6 +9,7 @@ Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tes
 import os
 import sys
 import json
+import re
 import argparse
 import urllib.request
 import urllib.error
@@ -142,7 +143,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
 
 def run_diagnostics(workspace: Path) -> tuple[int, str]:
     """Runs compiler and test suite, returning exit code and combined error output."""
-    print("[*] Running local diagnostic checks (black, flake8, pytest)...", flush=True)
+    print("[*] Running local diagnostic checks (black, go vet, go test)...", flush=True)
     out_lines = []
 
     # Check black
@@ -156,7 +157,7 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
         out_lines.append("=== BLACK FORMATTING ERRORS ===")
         out_lines.append(f"Unformatted files:\n{fmt_res.stderr.strip()}\n")
 
-    # Check flake8
+    # Check go vet
     vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True)
     if vet_res.returncode != 0:
         out_lines.append("=== FLAKE8 COMPILATION / STATIC ANALYSIS ERRORS ===")
@@ -164,7 +165,7 @@ def run_diagnostics(workspace: Path) -> tuple[int, str]:
         out_lines.append(vet_res.stderr.strip() or vet_res.stdout.strip())
         out_lines.append("")
 
-    # Check pytest
+    # Check go test
     test_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True)
     if test_res.returncode != 0:
         out_lines.append("=== PYTHON TEST FAILURES ===")

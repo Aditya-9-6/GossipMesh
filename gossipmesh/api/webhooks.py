@@ -1,20 +1,14 @@
-from fastapi import APIRouter, Request
-from fastapi import BackgroundTasks
-from fastapi import Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Request, BackgroundTasks
 import logging
 import hashlib
 import hmac
 import os
 import json
 
-from gossipmesh.api import deps
 from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
 from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
 from gossipmesh.core.exceptions import AuthenticationError, ValidationError
-from gossipmesh.models.repository import GithubAppInstallation
-from gossipmesh.models.audit import AuditEvent
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +49,10 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
 
 
 @router.post("/github")
-async def github_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db)
-):
+async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
-    Handle incoming GitHub webhooks.
-    Supported events: pull_request, issues, issue_comment, workflow_run, installation, installation_repositories
+    Handle incoming GitHub webhooks for Milestone 6 and 7.
+    Supported events: pull_request, issues, issue_comment, workflow_run
     """
     event = request.headers.get("X-GitHub-Event")
     if not event:
@@ -79,106 +69,8 @@ async def github_webhook(
 
     logger.info(f"Received GitHub webhook event: {event}")
 
-    if event == "installation":
-        action = payload.get("action")
-        installation_data = payload.get("installation", {})
-        installation_id = installation_data.get("id")
-        account = installation_data.get("account", {})
-
-        if action == "created":
-            installation = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == installation_id).first()
-            if not installation:
-                installation = GithubAppInstallation(
-                    installation_id=installation_id,
-                    account_name=account.get("login"),
-                    target_type=account.get("type"),
-                    target_id=account.get("id"),
-                    repository_selection=installation_data.get("repository_selection", "all"),
-                    permissions=installation_data.get("permissions", {})
-                )
-                db.add(installation)
-                db.commit()
-
-                audit = AuditEvent(
-                    action="github_app_installation_created",
-                    details={"installation_id": installation_id, "account": account.get("login")}
-                )
-                db.add(audit)
-                db.commit()
-            else:
-                logger.info(f"Installation {installation_id} already exists, ignoring duplicate created event.")
-
-        elif action == "deleted":
-            installation = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == installation_id).first()
-            if installation:
-                db.delete(installation)
-                db.commit()
-
-                audit = AuditEvent(
-                    action="github_app_installation_deleted",
-                    details={"installation_id": installation_id, "account": account.get("login")}
-                )
-                db.add(audit)
-                db.commit()
-
-        elif action == "suspend":
-            installation = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == installation_id).first()
-            if installation:
-                suspended_at_str = payload.get("installation", {}).get("suspended_at")
-                if suspended_at_str:
-                    from datetime import datetime
-                    # replace Z with +00:00 for fromisoformat compatibility
-                    installation.suspended_at = datetime.fromisoformat(suspended_at_str.replace("Z", "+00:00"))
-                else:
-                    installation.suspended_at = None
-                installation.suspended_by = payload.get("installation", {}).get("suspended_by", {}).get("login")
-                db.commit()
-
-                audit = AuditEvent(
-                    action="github_app_installation_suspended",
-                    details={"installation_id": installation_id, "account": account.get("login")}
-                )
-                db.add(audit)
-                db.commit()
-
-        elif action == "unsuspend":
-            installation = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == installation_id).first()
-            if installation:
-                installation.suspended_at = None
-                installation.suspended_by = None
-                db.commit()
-
-                audit = AuditEvent(
-                    action="github_app_installation_unsuspended",
-                    details={"installation_id": installation_id, "account": account.get("login")}
-                )
-                db.add(audit)
-                db.commit()
-
-    elif event == "installation_repositories":
-        action = payload.get("action")
-        installation_data = payload.get("installation", {})
-        installation_id = installation_data.get("id")
-
-        if action in ["added", "removed"]:
-            installation = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == installation_id).first()
-            if installation:
-                installation.repository_selection = installation_data.get("repository_selection", installation.repository_selection)
-                db.commit()
-
-                audit = AuditEvent(
-                    action=f"github_app_installation_repositories_{action}",
-                    details={
-                        "installation_id": installation_id,
-                        "repositories_added": [r.get("full_name") for r in payload.get("repositories_added", [])],
-                        "repositories_removed": [r.get("full_name") for r in payload.get("repositories_removed", [])]
-                    }
-                )
-                db.add(audit)
-                db.commit()
-
     # Milestone 6: PR Review
-    elif event == "pull_request":
+    if event == "pull_request":
         action = payload.get("action")
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})

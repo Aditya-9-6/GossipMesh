@@ -1,6 +1,8 @@
 import json
 import math
+import re
 from pathlib import Path
+from collections import Counter
 import hashlib
 
 class SemanticCache:

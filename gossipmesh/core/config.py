@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import PostgresDsn
+from pydantic import PostgresDsn, RedisDsn
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "GossipMesh SaaS"
@@ -20,14 +20,6 @@ class Settings(BaseSettings):
 
     REDIS_HOST: str = "localhost"
     REDIS_PORT: str = "6379"
-
-    GITHUB_CLIENT_ID: str | None = None
-    GITHUB_CLIENT_SECRET: str | None = None
-
-    OIDC_CLIENT_ID: str | None = None
-    OIDC_CLIENT_SECRET: str | None = None
-    OIDC_DISCOVERY_URL: str | None = None
-    OIDC_REDIRECT_URI: str | None = None
 
     @property
     def DATABASE_URI(self) -> PostgresDsn | str:
