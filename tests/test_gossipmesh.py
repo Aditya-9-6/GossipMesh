@@ -2,18 +2,18 @@
 Comprehensive Unit Test Suite for GossipMesh.
 """
 
-import shutil
 import tempfile
-import unittest
+import shutil
 from pathlib import Path
+import unittest
 
-from gossipmesh.auction import TaskAuctioneer
-from gossipmesh.bridge import CrossRepoBridge
-from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
-from gossipmesh.memetic import MemeticKnowledgeBase
 from gossipmesh.node import GossipNode, GossipTopic
-from gossipmesh.oracle import PerformanceOracle
+from gossipmesh.memetic import MemeticKnowledgeBase
+from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.red_team import RedTeamAuditor
+from gossipmesh.bridge import CrossRepoBridge
+from gossipmesh.oracle import PerformanceOracle
+from gossipmesh.auction import TaskAuctioneer
 
 class TestGossipMesh(unittest.TestCase):
     def setUp(self):
@@ -155,8 +155,8 @@ class TestGossipMesh(unittest.TestCase):
 
 
     def test_node_cleanup_ledger(self):
-        import json
         import time
+        import json
         node = GossipNode("node_cleaner", mesh_dir=self.test_dir)
 
         # Publish two messages, one recent, one artificially expired
@@ -244,15 +244,15 @@ class TestGossipMesh(unittest.TestCase):
         self.assertEqual(winner.specialty, "crypto_specialist")
 
     def test_node_cleanup_ledger_error(self):
-        import contextlib
         import io
+        import contextlib
         from unittest.mock import patch
 
         node = GossipNode("test_node", mesh_dir=self.test_dir)
         # Create an empty file so the initial exists() check passes
         node.log_file.touch()
 
-        with patch("builtins.open", side_effect=OSError("Permission denied")):
+        with patch("builtins.open", side_effect=IOError("Permission denied")):
             f = io.StringIO()
             with contextlib.redirect_stdout(f):
                 node.cleanup_ledger()
