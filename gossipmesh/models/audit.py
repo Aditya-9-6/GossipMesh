@@ -1,9 +1,7 @@
-from datetime import datetime
-
-from sqlalchemy import JSON, DateTime, Integer, String
+from sqlalchemy import String, Integer, JSON, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
-
+from datetime import datetime
 from gossipmesh.models.base import Base
 
 
@@ -15,6 +13,4 @@ class AuditEvent(Base):
     actor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

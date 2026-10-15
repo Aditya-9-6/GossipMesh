@@ -4,8 +4,8 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, M
 
 __all__ = [
     "BaseProvider",
+    "ProviderManager",
     "GenerationRequest",
     "GenerationResponse",
     "Message",
-    "ProviderManager",
 ]

@@ -6,8 +6,7 @@ Survivors of evolutionary natural selection are injected into LLM system prompts
 
 import json
 from pathlib import Path
-from typing import Any
-
+from typing import Dict, List, Optional, Any
 
 class KnowledgeMeme:
     def __init__(
@@ -42,7 +41,7 @@ class KnowledgeMeme:
         self.fitness_score = max(0.0, self.fitness_score - delta)
         self.failed_applications += 1
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "meme_id": self.meme_id,
             "title": self.title,
@@ -56,7 +55,7 @@ class KnowledgeMeme:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "KnowledgeMeme":
+    def from_dict(cls, data: Dict[str, Any]) -> "KnowledgeMeme":
         return cls(
             meme_id=data["meme_id"],
             title=data["title"],
@@ -69,13 +68,11 @@ class KnowledgeMeme:
             failed_applications=data.get("failed_applications", 0),
         )
 
-
 class MemeticKnowledgeBase:
     """Persistent ledger of evolving architectural memes."""
-
-    def __init__(self, storage_path: Path | None = None):
+    def __init__(self, storage_path: Optional[Path] = None):
         self.storage_path = storage_path or Path("G:/My Drive/.gossip_mesh/memes.json")
-        self.memes: dict[str, KnowledgeMeme] = {}
+        self.memes: Dict[str, KnowledgeMeme] = {}
         self._load()
 
         # Seed foundational high-fitness patterns if empty
@@ -96,9 +93,7 @@ class MemeticKnowledgeBase:
         try:
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
             serializable = [m.to_dict() for m in self.memes.values()]
-            self.storage_path.write_text(
-                json.dumps(serializable, indent=2), encoding="utf-8"
-            )
+            self.storage_path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
         except Exception:
             pass
 
@@ -140,7 +135,7 @@ class MemeticKnowledgeBase:
                 correct_pattern="Binary search mid-points (min_mtu + current_mtu) / 2 upon fragmentation.",
                 repo="spryzen",
                 fitness_score=4.0,
-            ),
+            )
         ]
         for s in seeds:
             self.memes[s.meme_id] = s
@@ -153,7 +148,7 @@ class MemeticKnowledgeBase:
         rule: str,
         anti_pattern: str,
         correct_pattern: str,
-        repo: str = "global",
+        repo: str = "global"
     ) -> KnowledgeMeme:
         if meme_id in self.memes:
             m = self.memes[meme_id]
@@ -163,9 +158,7 @@ class MemeticKnowledgeBase:
             m.correct_pattern = correct_pattern
             m.repo = repo
         else:
-            m = KnowledgeMeme(
-                meme_id, title, rule, anti_pattern, correct_pattern, repo=repo
-            )
+            m = KnowledgeMeme(meme_id, title, rule, anti_pattern, correct_pattern, repo=repo)
             self.memes[meme_id] = m
         self.save()
         return m
@@ -180,15 +173,11 @@ class MemeticKnowledgeBase:
             self.memes[meme_id].penalize(delta)
             self.save()
 
-    def get_top_memes(
-        self, repo: str = "global", min_fitness: float = 1.0, limit: int = 10
-    ) -> list[KnowledgeMeme]:
+    def get_top_memes(self, repo: str = "global", min_fitness: float = 1.0, limit: int = 10) -> List[KnowledgeMeme]:
         """Returns surviving high-fitness memes for prompt injection, filtered by repo."""
         candidates = [
-            m
-            for m in self.memes.values()
-            if m.fitness_score >= min_fitness
-            and (m.repo == repo or m.repo == "global" or repo == "global")
+            m for m in self.memes.values()
+            if m.fitness_score >= min_fitness and (m.repo == repo or m.repo == "global" or repo == "global")
         ]
         candidates.sort(key=lambda m: m.fitness_score, reverse=True)
         return candidates[:limit]

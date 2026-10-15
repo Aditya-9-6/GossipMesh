@@ -1,6 +1,6 @@
+import unittest
 import ast
 import os
-import unittest
 from pathlib import Path
 
 
@@ -40,7 +40,6 @@ class TestArchitecture(unittest.TestCase):
                                         node.module.startswith(prefix),
                                         f"Architectural violation in {filepath}: imported from {node.module}",
                                     )
-
 
 if __name__ == "__main__":
     unittest.main()

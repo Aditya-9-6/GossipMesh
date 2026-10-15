@@ -31,7 +31,7 @@ class GitHubPRService:
 
         for attempt in range(self.max_retries):
             try:
-                async with httpx.AsyncClient(**client_kwargs) as client:
+                async with httpx.AsyncClient(timeout=client_kwargs['timeout']) as client:
                     response = await client.request(method, url, headers=headers, **kwargs)
 
                     if response.status_code in (403, 429):
@@ -65,7 +65,7 @@ class GitHubPRService:
     async def _get_paginated(self, url: str, **kwargs) -> List[Dict[str, Any]]:
         """Fetch all pages of a paginated GitHub API endpoint."""
         results = []
-        next_url = url
+        next_url: str | None = url
 
         while next_url:
             response = await self._request("GET", next_url, **kwargs)

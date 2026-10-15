@@ -1,26 +1,21 @@
+from sqlalchemy.orm import Session
+from gossipmesh.models.runtime import Workflow, Job
+from gossipmesh.models.audit import AuditEvent
+from gossipmesh.runtime.budget import BudgetManager
 import logging
 
-from sqlalchemy.orm import Session
-
-from gossipmesh.models.audit import AuditEvent
-from gossipmesh.models.runtime import Job, Workflow
-from gossipmesh.runtime.budget import BudgetManager
-
 logger = logging.getLogger(__name__)
-
 
 class WorkflowManager:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_workflow(
-        self, organization_id: int, repository_id: int, actor_id: int = None
-    ) -> Workflow:
+    def create_workflow(self, organization_id: int, repository_id: int, actor_id: int | None = None) -> Workflow:
         try:
             workflow = Workflow(
                 organization_id=organization_id,
                 repository_id=repository_id,
-                status="pending",
+                status="pending"
             )
             self.db.add(workflow)
             self.db.flush()
@@ -29,7 +24,7 @@ class WorkflowManager:
                 action="workflow_created",
                 actor_id=actor_id,
                 organization_id=organization_id,
-                details={"workflow_id": workflow.id},
+                details={"workflow_id": workflow.id}
             )
             self.db.add(audit)
 
@@ -40,21 +35,23 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def add_job(self, workflow_id: int, agent_name: str, actor_id: int = None) -> Job:
+    def add_job(self, workflow_id: int, agent_name: str, actor_id: int | None = None) -> Job:
         try:
-            job = Job(workflow_id=workflow_id, agent_name=agent_name, status="pending")
+            job = Job(
+                workflow_id=workflow_id,
+                agent_name=agent_name,
+                status="pending"
+            )
             self.db.add(job)
             self.db.flush()
 
-            workflow = (
-                self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
-            )
+            workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
             if workflow:
                 audit = AuditEvent(
                     action="job_added",
                     actor_id=actor_id,
                     organization_id=workflow.organization_id,
-                    details={"job_id": job.id, "workflow_id": workflow_id},
+                    details={"job_id": job.id, "workflow_id": workflow_id}
                 )
                 self.db.add(audit)
 
@@ -65,23 +62,21 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def create_workflow_with_job(
-        self,
-        organization_id: int,
-        repository_id: int,
-        agent_name: str,
-        actor_id: int = None,
-    ) -> tuple[Workflow, Job]:
+    def create_workflow_with_job(self, organization_id: int, repository_id: int, agent_name: str, actor_id: int | None = None) -> tuple[Workflow, Job]:
         try:
             workflow = Workflow(
                 organization_id=organization_id,
                 repository_id=repository_id,
-                status="pending",
+                status="pending"
             )
             self.db.add(workflow)
             self.db.flush()
 
-            job = Job(workflow_id=workflow.id, agent_name=agent_name, status="pending")
+            job = Job(
+                workflow_id=workflow.id,
+                agent_name=agent_name,
+                status="pending"
+            )
             self.db.add(job)
             self.db.flush()
 
@@ -89,7 +84,7 @@ class WorkflowManager:
                 action="workflow_created",
                 actor_id=actor_id,
                 organization_id=organization_id,
-                details={"workflow_id": workflow.id},
+                details={"workflow_id": workflow.id}
             )
             self.db.add(audit_wf)
 
@@ -97,7 +92,7 @@ class WorkflowManager:
                 action="job_added",
                 actor_id=actor_id,
                 organization_id=organization_id,
-                details={"job_id": job.id, "workflow_id": workflow.id},
+                details={"job_id": job.id, "workflow_id": workflow.id}
             )
             self.db.add(audit_job)
 
@@ -109,9 +104,7 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def update_job_status(
-        self, job_id: int, status: str, state: dict = None, actor_id: int = None
-    ):
+    def update_job_status(self, job_id: int, status: str, state: dict | None = None, actor_id: int | None = None):
         try:
             job = self.db.query(Job).filter(Job.id == job_id).first()
             if job:
@@ -120,17 +113,13 @@ class WorkflowManager:
                     job.state = state
                 self.db.flush()
 
-                workflow = (
-                    self.db.query(Workflow)
-                    .filter(Workflow.id == job.workflow_id)
-                    .first()
-                )
+                workflow = self.db.query(Workflow).filter(Workflow.id == job.workflow_id).first()
                 if workflow:
                     audit = AuditEvent(
                         action="job_status_updated",
                         actor_id=actor_id,
                         organization_id=workflow.organization_id,
-                        details={"job_id": job.id, "status": status},
+                        details={"job_id": job.id, "status": status}
                     )
                     self.db.add(audit)
 
@@ -160,7 +149,7 @@ class WorkflowManager:
         if "failed" in statuses:
             workflow.status = "failed"
         elif "blocked" in statuses:
-            workflow.status = "blocked"  # Awaiting human approval
+             workflow.status = "blocked" # Awaiting human approval
         elif all(s == "completed" for s in statuses):
             workflow.status = "completed"
         elif "running" in statuses:
@@ -168,11 +157,9 @@ class WorkflowManager:
 
         self.db.flush()
 
-    def cancel_workflow(self, workflow_id: int, actor_id: int = None):
+    def cancel_workflow(self, workflow_id: int, actor_id: int | None = None):
         try:
-            workflow = (
-                self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
-            )
+            workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
             if workflow and workflow.status not in ("completed", "failed"):
                 workflow.status = "cancelled"
                 jobs = self.db.query(Job).filter(Job.workflow_id == workflow_id).all()
@@ -185,7 +172,7 @@ class WorkflowManager:
                     action="workflow_cancelled",
                     actor_id=actor_id,
                     organization_id=workflow.organization_id,
-                    details={"workflow_id": workflow.id},
+                    details={"workflow_id": workflow.id}
                 )
                 self.db.add(audit)
                 self.db.commit()
@@ -193,25 +180,21 @@ class WorkflowManager:
             self.db.rollback()
             raise
 
-    def approve_patch(self, workflow_id: int, actor_id: int = None):
+    def approve_patch(self, workflow_id: int, actor_id: int | None = None):
         """Unblocks a workflow that requires human patch approval."""
         try:
-            workflow = (
-                self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
-            )
+            workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
             if workflow and workflow.status == "blocked":
                 workflow.status = "running"
                 self.db.flush()
 
-                BudgetManager(self.db).record_spend(
-                    workflow.organization_id, 1.0, commit=False
-                )
+                BudgetManager(self.db).record_spend(workflow.organization_id, 1.0, commit=False)
 
                 audit = AuditEvent(
                     action="workflow_approved",
                     actor_id=actor_id,
                     organization_id=workflow.organization_id,
-                    details={"workflow_id": workflow.id},
+                    details={"workflow_id": workflow.id}
                 )
                 self.db.add(audit)
 
