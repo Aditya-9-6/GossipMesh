@@ -3,9 +3,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
 from gossipmesh.models.base import Base
+from gossipmesh.models.mixins import SoftDeleteMixin
 
 
-class Workflow(Base):
+class Workflow(SoftDeleteMixin, Base):
     __tablename__ = "workflows"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -29,7 +30,7 @@ class Workflow(Base):
     jobs = relationship("Job", back_populates="workflow")
 
 
-class Job(Base):
+class Job(SoftDeleteMixin, Base):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -45,7 +46,7 @@ class Job(Base):
     workflow = relationship("Workflow", back_populates="jobs")
 
 
-class Budget(Base):
+class Budget(SoftDeleteMixin, Base):
     __tablename__ = "budgets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -58,7 +59,7 @@ class Budget(Base):
     organization = relationship("Organization")
 
 
-class Artifact(Base):
+class Artifact(SoftDeleteMixin, Base):
     __tablename__ = "artifacts"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

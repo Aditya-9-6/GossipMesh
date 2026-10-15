@@ -13,7 +13,8 @@ client = TestClient(app)
 class TestSSO(unittest.TestCase):
     def setUp(self):
         # We'll use the real in-memory sqlite mock_db_session provided by conftest
-                # But we need to instantiate it or use the fixture properly.
+        # But we need to instantiate it or use the fixture properly.
+        # Given this is unittest style, we need to do dependency injection overrides manually.
         pass
 
     def tearDown(self):

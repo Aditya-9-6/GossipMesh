@@ -1,4 +1,5 @@
 import os
+import logging
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -7,6 +8,7 @@ from sqlalchemy import pool
 from alembic import context
 from gossipmesh.core.config import settings
 from gossipmesh.models.base import Base
+from gossipmesh.models import user, organization, audit, provider
 
 config = context.config
 
