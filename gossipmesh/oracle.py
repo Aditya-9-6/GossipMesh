@@ -4,7 +4,7 @@ Tracks time-series benchmark metrics and vetoes regressions on hot paths.
 """
 
 import time
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any
 
 class BenchmarkRecord:
     def __init__(self, metric_name: str, ns_per_op: float, bytes_per_op: int, allocs_per_op: int, commit: str = ""):

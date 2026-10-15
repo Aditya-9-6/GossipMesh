@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import httpx
 
 from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
@@ -77,7 +77,7 @@ class GitHubPRService:
 
             # Extract next url from Link header
             link_header = response.headers.get("link")
-            next_url: str | None = None
+            next_url = None
             if link_header:
                 links = link_header.split(",")
                 for link in links:
@@ -139,3 +139,19 @@ class GitHubPRService:
             "commits": commits,
             "files_metadata": files
         }
+
+    async def post_pr_review_comment(self, owner: str, repo: str, pull_number: int, comment_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Posts an individual PR review comment.
+        """
+        url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/comments"
+        response = await self._request("POST", url, json=comment_payload)
+        return response.json()
+
+    async def post_pr_review(self, owner: str, repo: str, pull_number: int, review_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Posts a PR review with inline comments.
+        """
+        url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+        response = await self._request("POST", url, json=review_payload)
+        return response.json()

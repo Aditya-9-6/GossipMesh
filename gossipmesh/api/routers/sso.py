@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.sso import OrganizationSAMLConfig
-from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.core.security import encrypt_string, decrypt_string
 from gossipmesh.auth.sso.saml_adapter import SAMLAdapter
