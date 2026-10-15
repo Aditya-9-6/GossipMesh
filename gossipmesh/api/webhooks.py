@@ -14,6 +14,7 @@ from gossipmesh.models.audit import AuditEvent
 from gossipmesh.models.jobs import BackgroundJob
 
 from gossipmesh.worker.tasks import process_pr_review, process_issue_solver, process_ci_fixer
+
 from gossipmesh.core.exceptions import AuthenticationError, ValidationError, AuthorizationError
 
 logger = logging.getLogger(__name__)

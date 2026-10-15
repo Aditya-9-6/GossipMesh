@@ -1,8 +1,6 @@
 from typing import Any
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi import BackgroundTasks
-from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
