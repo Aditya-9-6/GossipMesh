@@ -28,7 +28,7 @@ def clean_tree(tree_sha: str) -> str:
         meta, name = chunk.split(b'\t', 1)
         mode, obj_type, sha = meta.split(b' ')
         clean_name = name.rstrip(b'\r')
-        if clean_name == b'G:' or clean_name == b'G':
+        if clean_name.startswith(b'G:') or clean_name == b'G' or clean_name == b'.gossip_mesh':
             continue
         
         if obj_type == b'tree':
@@ -49,7 +49,7 @@ def sanitize_branch(branch_name: str) -> str:
         print(f"[*] Pruned corrupted entries from tree {tree_sha} -> {clean_root}")
         commit_res = run_cmd([
             'git', 'commit-tree', clean_root, '-p', head_sha,
-            '-m', 'fix(repo): strip carriage returns and G: drive from git tree objects'
+            '-m', "fix(repo): strip carriage returns and G: drive from git tree objects\n\nCo-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>"
         ])
         new_commit = commit_res.stdout.strip()
         run_cmd(['git', 'update-ref', f'refs/heads/{branch_name}', new_commit])
