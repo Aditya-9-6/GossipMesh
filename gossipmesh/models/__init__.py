@@ -12,6 +12,7 @@ from gossipmesh.models.repository import Repository, IndexState, GithubAppInstal
 from gossipmesh.models.runtime import Workflow, Job, Budget, Artifact
 from gossipmesh.models.service_account import ServiceAccount, APIKey
 from gossipmesh.repository.vector_store import DocumentChunk
+from gossipmesh.models.session import UserSession, RefreshToken
 
 __all__ = [
     "Base",
@@ -33,5 +34,7 @@ __all__ = [
     "ServiceAccount",
     "APIKey",
     "DocumentChunk",
+    "UserSession",
+    "RefreshToken",
     "OrganizationSAMLConfig",
 ]

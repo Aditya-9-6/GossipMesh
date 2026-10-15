@@ -58,6 +58,7 @@ class TestRepositoriesAPI(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
+
             response.json(),
             {
                 "error": {
