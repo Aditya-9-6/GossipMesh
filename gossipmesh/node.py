@@ -3,14 +3,16 @@ P2P Epidemic Gossip Protocol Node.
 Implements vector clocks, anti-entropy synchronization, and decentralized message dissemination.
 """
 
-import os
 import json
+import os
 import time
 import uuid
 from collections import deque
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Any
+from typing import Any
+
 
 class GossipTopic(str, Enum):
     ANTI_PATTERNS = "anti_patterns"
@@ -22,16 +24,17 @@ class GossipTopic(str, Enum):
     TASK_AUCTIONS = "task_auctions"
     HEARTBEATS = "heartbeats"
 
+
 class GossipMessage:
     def __init__(
         self,
         topic: str,
         origin_node: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         repo: str = "global",
-        message_id: Optional[str] = None,
-        vector_clock: Optional[Dict[str, int]] = None,
-        timestamp: Optional[float] = None,
+        message_id: str | None = None,
+        vector_clock: dict[str, int] | None = None,
+        timestamp: float | None = None,
         ttl: int = 10,
     ):
         self.message_id = message_id or str(uuid.uuid4())
@@ -43,7 +46,7 @@ class GossipMessage:
         self.timestamp = timestamp or time.time()
         self.ttl = ttl
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "topic": self.topic,
@@ -56,7 +59,7 @@ class GossipMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "GossipMessage":
         return cls(
             topic=data.get("topic", "general"),
             origin_node=data.get("origin_node", "unknown"),
@@ -68,12 +71,14 @@ class GossipMessage:
             ttl=data.get("ttl", 10),
         )
 
+
 class GossipNode:
     """
     Decentralized Gossip Peer Node.
     Communicates via a shared ledger directory (file-backed mesh) or local bus.
     """
-    def __init__(self, node_id: str, mesh_dir: Optional[str] = None):
+
+    def __init__(self, node_id: str, mesh_dir: str | None = None):
         self.node_id = node_id
         if mesh_dir:
             self.mesh_dir = Path(mesh_dir).resolve()
@@ -93,7 +98,7 @@ class GossipNode:
 
         self.clock_seq = 0
         self.seen_messages: set = set()
-        self.subscriptions: Dict[str, List[Callable[[GossipMessage], None]]] = {}
+        self.subscriptions: dict[str, list[Callable[[GossipMessage], None]]] = {}
         self._message_cache = deque(maxlen=10000)
 
         # Initial anti-entropy catchup
@@ -113,7 +118,9 @@ class GossipNode:
                                 mid = data.get("message_id")
                                 if mid:
                                     self.seen_messages.add(mid)
-                                    self._message_cache.append(GossipMessage.from_dict(data))
+                                    self._message_cache.append(
+                                        GossipMessage.from_dict(data)
+                                    )
                             except Exception:
                                 pass
             except Exception:
@@ -126,7 +133,13 @@ class GossipNode:
             self.subscriptions[t_val] = []
         self.subscriptions[t_val].append(handler)
 
-    def publish(self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10) -> GossipMessage:
+    def publish(
+        self,
+        topic: GossipTopic,
+        payload: dict[str, Any],
+        repo: str = "global",
+        ttl: int = 10,
+    ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh."""
         t_val = topic.value if isinstance(topic, GossipTopic) else str(topic)
         self.clock_seq += 1
@@ -157,7 +170,7 @@ class GossipNode:
 
         return msg
 
-    def sync(self) -> List[GossipMessage]:
+    def sync(self) -> list[GossipMessage]:
         """
         Runs anti-entropy synchronization: scans the shared ledger for newly
         arrived gossip messages from other peer nodes.
@@ -186,7 +199,9 @@ class GossipNode:
                                     try:
                                         handler(msg)
                                     except Exception as e:
-                                        print(f"[{self.node_id}] Gossip dispatch error: {e}")
+                                        print(
+                                            f"[{self.node_id}] Gossip dispatch error: {e}"
+                                        )
                     except Exception:
                         pass
         except Exception as e:
@@ -212,9 +227,15 @@ class GossipNode:
         except Exception:
             pass
 
-    def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
+    def get_recent_messages(
+        self, topic: GossipTopic | None = None, limit: int = 50
+    ) -> list[GossipMessage]:
         """Fetches the latest gossip messages from the in-memory cache."""
-        t_val = topic.value if isinstance(topic, GossipTopic) else (str(topic) if topic else None)
+        t_val = (
+            topic.value
+            if isinstance(topic, GossipTopic)
+            else (str(topic) if topic else None)
+        )
 
         filtered = []
         for msg in reversed(self._message_cache):

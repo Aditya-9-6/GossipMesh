@@ -8,6 +8,7 @@ class GitHubIntegration:
     def __init__(self, app_id: str, private_key: str):
         self.app_id = app_id
         self.private_key = private_key
+        self.app_auth = Auth.AppAuth(self.app_id, self.private_key)
 
     def _generate_jwt(self) -> str:
         payload = {
@@ -25,13 +26,9 @@ class GitHubIntegration:
 
     def get_installation_client(self, installation_id: int) -> Github:
         """Returns a Github client authenticated as a specific installation."""
-        app_client = self.get_app_client()
         # In a real app we'd fetch the installation access token from the API
-        # Using PyGithub's built-in AppAuth
-        auth = Auth.AppAuth(
-            self.app_id,
-            self.private_key,
-        ).get_installation_auth(installation_id)
+        # Using PyGithub's built-in AppAuth with instance caching
+        auth = self.app_auth.get_installation_auth(installation_id)
         return Github(auth=auth)
 
     def sync_repository(self, full_name: str, installation_id: int):
@@ -45,3 +42,21 @@ class GitHubIntegration:
             "default_branch": repo.default_branch,
             "clone_url": repo.clone_url
         }
+
+    def generate_installation_token(self, installation_id: int):
+        """Generates an installation token with expiration."""
+        # Using PyGithub's AppAuth for installation authentication natively handles tokens
+        # and caching across multiple calls since it is persisted on the class instance.
+        installation_auth = self.app_auth.get_installation_auth(installation_id)
+        # By calling token property, PyGithub will automatically create one or return cached
+        token_str = installation_auth.token
+        return token_str
+
+    def validate_repository_access(self, installation_id: int, repository_name: str) -> bool:
+        """Validates that the installation has access to a specific repository."""
+        try:
+            client = self.get_installation_client(installation_id)
+            repo = client.get_repo(repository_name)
+            return repo.name is not None
+        except Exception:
+            return False

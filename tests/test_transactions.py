@@ -1,15 +1,18 @@
 import unittest
 from unittest.mock import patch
-from gossipmesh.models.runtime import Workflow, Job, Budget
-from gossipmesh.models.audit import AuditEvent
-from gossipmesh.runtime.workflow import WorkflowManager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from gossipmesh.models.audit import AuditEvent
 from gossipmesh.models.base import Base
+from gossipmesh.models.runtime import Budget, Job, Workflow
+from gossipmesh.runtime.workflow import WorkflowManager
+
 
 class TestTransactions(unittest.TestCase):
     def setUp(self):
-        engine = create_engine('sqlite:///:memory:')
+        engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)
         Session = sessionmaker(bind=engine)
         self.session = Session()
@@ -22,7 +25,9 @@ class TestTransactions(unittest.TestCase):
         workflow = Workflow(organization_id=1, repository_id=1, status="blocked")
         self.session.add(workflow)
 
-        budget = Budget(organization_id=1, monthly_limit_usd=100.0, current_spend_usd=0.0)
+        budget = Budget(
+            organization_id=1, monthly_limit_usd=100.0, current_spend_usd=0.0
+        )
         self.session.add(budget)
         self.session.commit()
 
@@ -37,10 +42,14 @@ class TestTransactions(unittest.TestCase):
         # Verify rollback
         self.session.expire_all()
         wf = self.session.query(Workflow).filter(Workflow.id == workflow.id).first()
-        self.assertEqual(wf.status, "blocked") # Not changed to running
+        self.assertEqual(wf.status, "blocked")  # Not changed to running
 
         # Verify no audit event is saved
-        audit = self.session.query(AuditEvent).filter(AuditEvent.action == "workflow_approved").first()
+        audit = (
+            self.session.query(AuditEvent)
+            .filter(AuditEvent.action == "workflow_approved")
+            .first()
+        )
         self.assertIsNone(audit)
 
         # Verify budget didn't update
@@ -51,9 +60,16 @@ class TestTransactions(unittest.TestCase):
         manager = WorkflowManager(self.session)
 
         # We can just patch db.add or flush
-        with patch.object(self.session, 'flush', side_effect=Exception("DB flush failed")):
+        with patch.object(
+            self.session, "flush", side_effect=Exception("DB flush failed")
+        ):
             with self.assertRaises(Exception):
-                manager.create_workflow_with_job(organization_id=1, repository_id=1, agent_name="agent-1", actor_id=99)
+                manager.create_workflow_with_job(
+                    organization_id=1,
+                    repository_id=1,
+                    agent_name="agent-1",
+                    actor_id=99,
+                )
 
         # Verify rollback
         self.session.expire_all()
@@ -65,6 +81,7 @@ class TestTransactions(unittest.TestCase):
 
         audits = self.session.query(AuditEvent).all()
         self.assertEqual(len(audits), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
