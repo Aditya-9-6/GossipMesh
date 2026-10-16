@@ -37,7 +37,6 @@ def get_current_user(
             issuer=settings.JWT_ISSUER,
             leeway=timedelta(seconds=10)
         )
-
         token_type = payload.get("type")
         if token_type != "access":
             raise AuthenticationError(message="Invalid token type")
