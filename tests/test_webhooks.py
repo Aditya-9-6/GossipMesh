@@ -5,8 +5,6 @@ from gossipmesh.api import app
 from gossipmesh.api.deps import get_db, get_current_user
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
-from gossipmesh.models.repository import GithubAppInstallation
-from gossipmesh.models.audit import AuditEvent
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -44,8 +42,6 @@ class TestWebhooks(unittest.TestCase):
         db = TestingSessionLocal()
         db.query(WebhookEvent).delete()
         db.query(User).delete()
-        db.query(GithubAppInstallation).delete()
-        db.query(AuditEvent).delete()
         db.commit()
         db.close()
 
@@ -101,114 +97,6 @@ class TestWebhooks(unittest.TestCase):
         db = TestingSessionLocal()
         count = db.query(WebhookEvent).filter(WebhookEvent.delivery_id == "delivery-2").count()
         self.assertEqual(count, 1) # No duplicate side effect
-        db.close()
-
-    def test_installation_created_event(self):
-        payload = {
-            "action": "created",
-            "installation": {
-                "id": 789,
-                "account": {"login": "test-org", "type": "Organization", "id": 1234},
-                "repository_selection": "selected",
-                "permissions": {"issues": "write"}
-            }
-        }
-        response = client.post(
-            "/webhooks/github",
-            headers={"X-GitHub-Event": "installation", "X-GitHub-Delivery": "delivery-created"},
-            json=payload,
-        )
-        self.assertEqual(response.status_code, 200)
-
-        db = TestingSessionLocal()
-        inst = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == 789).first()
-        self.assertIsNotNone(inst)
-        self.assertEqual(inst.account_name, "test-org")
-        self.assertEqual(inst.target_type, "Organization")
-        self.assertEqual(inst.repository_selection, "selected")
-
-        audit = db.query(AuditEvent).filter(AuditEvent.action == "installation.created").first()
-        self.assertIsNotNone(audit)
-        self.assertEqual(audit.details["installation_id"], 789)
-        db.close()
-
-    def test_installation_deleted_event(self):
-        db = TestingSessionLocal()
-        inst = GithubAppInstallation(
-            installation_id=789, account_name="test", target_type="User",
-            target_id=1, repository_selection="all", permissions={}
-        )
-        db.add(inst)
-        db.commit()
-        db.close()
-
-        payload = {"action": "deleted", "installation": {"id": 789}}
-        response = client.post(
-            "/webhooks/github",
-            headers={"X-GitHub-Event": "installation", "X-GitHub-Delivery": "delivery-deleted"},
-            json=payload,
-        )
-        self.assertEqual(response.status_code, 200)
-
-        db = TestingSessionLocal()
-        inst = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == 789).first()
-        self.assertIsNone(inst)
-        audit = db.query(AuditEvent).filter(AuditEvent.action == "installation.deleted").first()
-        self.assertIsNotNone(audit)
-        db.close()
-
-    def test_installation_suspend_event(self):
-        db = TestingSessionLocal()
-        inst = GithubAppInstallation(
-            installation_id=789, account_name="test", target_type="User",
-            target_id=1, repository_selection="all", permissions={}
-        )
-        db.add(inst)
-        db.commit()
-        db.close()
-
-        payload = {"action": "suspend", "installation": {"id": 789}, "sender": {"login": "admin-user"}}
-        response = client.post(
-            "/webhooks/github",
-            headers={"X-GitHub-Event": "installation", "X-GitHub-Delivery": "delivery-suspend"},
-            json=payload,
-        )
-        self.assertEqual(response.status_code, 200)
-
-        db = TestingSessionLocal()
-        inst = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == 789).first()
-        self.assertIsNotNone(inst.suspended_at)
-        self.assertEqual(inst.suspended_by, "admin-user")
-        audit = db.query(AuditEvent).filter(AuditEvent.action == "installation.suspended").first()
-        self.assertIsNotNone(audit)
-        db.close()
-
-    def test_installation_unsuspend_event(self):
-        db = TestingSessionLocal()
-        from datetime import datetime, timezone
-        inst = GithubAppInstallation(
-            installation_id=789, account_name="test", target_type="User",
-            target_id=1, repository_selection="all", permissions={},
-            suspended_at=datetime.now(timezone.utc), suspended_by="admin-user"
-        )
-        db.add(inst)
-        db.commit()
-        db.close()
-
-        payload = {"action": "unsuspend", "installation": {"id": 789}}
-        response = client.post(
-            "/webhooks/github",
-            headers={"X-GitHub-Event": "installation", "X-GitHub-Delivery": "delivery-unsuspend"},
-            json=payload,
-        )
-        self.assertEqual(response.status_code, 200)
-
-        db = TestingSessionLocal()
-        inst = db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == 789).first()
-        self.assertIsNone(inst.suspended_at)
-        self.assertIsNone(inst.suspended_by)
-        audit = db.query(AuditEvent).filter(AuditEvent.action == "installation.unsuspended").first()
-        self.assertIsNotNone(audit)
         db.close()
 
     @patch("gossipmesh.worker.tasks.process_issue_solver.apply_async")

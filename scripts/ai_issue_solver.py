@@ -15,14 +15,15 @@ import subprocess
 import time
 import hashlib
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
 
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, AI agent platform architecture, secure sandbox runtimes, and FastAPI backends.
@@ -196,14 +197,23 @@ def get_relevant_files(workspace_root: Path, query_text: str) -> str:
                 
     return "\n\n".join(context_files)
 
-def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
-    """Calls Gemini REST API with fallback and retries across supported models."""
+def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache", keys: list = None) -> dict:
+    """Calls Gemini REST API with fallback, retries across supported models, and multi-key rotation."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
     for m in ordered:
         if m not in models_to_try:
             models_to_try.append(m)
-    
+
+    key_pool = list(keys) if keys else ([api_key] if api_key else [])
+    if load_gemini_keys:
+        for k in load_gemini_keys():
+            if k and k not in key_pool:
+                key_pool.append(k)
+
+    if not key_pool:
+        raise ValueError("No Gemini API keys available")
+
     # Check cache
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
@@ -218,75 +228,78 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
             pass
 
     last_err = None
-    for current_model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
-        
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": SYSTEM_PROMPT},
-                        {"text": prompt}
-                    ]
+    for current_key in key_pool:
+        key_masked = f"...{current_key[-6:]}" if len(current_key) > 6 else "key"
+        for current_model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": SYSTEM_PROMPT},
+                            {"text": prompt}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "responseMimeType": "application/json"
                 }
-            ],
-            "generationConfig": {
-                "temperature": 0.2,
-                "responseMimeType": "application/json"
             }
-        }
-        
-        print(f"[*] Attempting generation with model: {current_model}...", flush=True)
-        max_attempts = 3
-        for attempt in range(1, max_attempts + 1):
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=90) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    
-                    # Parse JSON response
-                    try:
-                        parsed_response = json.loads(text_response, strict=False)
-                    except json.JSONDecodeError:
-                        if text_response.startswith("```"):
-                            lines = text_response.splitlines()
-                            if lines[0].startswith("```"):
-                                lines = lines[1:]
-                            if lines and lines[-1].startswith("```"):
-                                lines = lines[:-1]
-                            text_response = "\n".join(lines).strip()
-                        parsed_response = json.loads(text_response, strict=False)
 
-                    try:
-                        cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
-                    except Exception:
-                        pass
+            print(f"[*] [Gemini] Querying {current_model} with key {key_masked}...", flush=True)
+            max_attempts = 2
+            for attempt in range(1, max_attempts + 1):
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=90) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-                    return parsed_response
-            except urllib.error.HTTPError as e:
-                err_msg = e.read().decode("utf-8", errors="replace")
-                print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:200]}", file=sys.stderr)
-                last_err = err_msg
-                # If model is deprecated / not found, do not waste retries
-                if e.code == 404:
+                        # Parse JSON response
+                        try:
+                            parsed_response = json.loads(text_response, strict=False)
+                        except json.JSONDecodeError:
+                            if text_response.startswith("```"):
+                                lines = text_response.splitlines()
+                                if lines[0].startswith("```"):
+                                    lines = lines[1:]
+                                if lines and lines[-1].startswith("```"):
+                                    lines = lines[:-1]
+                                text_response = "\n".join(lines).strip()
+                            parsed_response = json.loads(text_response, strict=False)
+
+                        try:
+                            cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
+                        except Exception:
+                            pass
+
+                        return parsed_response
+                except urllib.error.HTTPError as e:
+                    err_msg = e.read().decode("utf-8", errors="replace")
+                    print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:200]}", file=sys.stderr)
+                    last_err = err_msg
+                    if e.code == 404:
+                        break
+                    if e.code == 429:
+                        print(f"[*] Rate limited on key {key_masked}. Rotating to next key/model...", flush=True)
+                        break
+                    if e.code in (500, 502, 503, 504) and attempt < max_attempts:
+                        time.sleep(1 * attempt)
+                        continue
                     break
-                if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
-                    time.sleep(1 * attempt)
-                    continue
-                break
-            except Exception as e:
-                print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
-                last_err = str(e)
-                if attempt < max_attempts:
-                    time.sleep(1 * attempt)
-                    continue
-                break
+                except Exception as e:
+                    print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
+                    last_err = str(e)
+                    if attempt < max_attempts:
+                        time.sleep(1 * attempt)
+                        continue
+                    break
 
     raise RuntimeError(f"Failed to obtain solution from Gemini API across models {models_to_try}. Last error: {last_err}")
 
