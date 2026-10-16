@@ -138,7 +138,7 @@ Track and enforce per-repository and per-organization limits for AI runs, PRs, t
 
 Persist daily and weekly metrics: issues processed, PRs created, CI pass rate, merged/rejected/reverted PRs, review scores, false positives, cost, latency, and approval rate. Expose them through CLI or API.
 
-## Task 17 — Canary mode
+## Task 17 — Canary mode (Completed)
 
 Allow automation only for selected repositories and labels, with daily limits, human approval, no force-push, no auto-merge, separate metrics, and immediate shutdown.
 
