@@ -296,28 +296,17 @@ def main():
                     print("[RATE-LIMIT DELAY] Sleeping 1s to protect GitHub secondary rate limit...")
                     time.sleep(1)
 
-    # 3. Pull from Enterprise SaaS Implementation Plan (docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md)
-    try:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from plan_advancement_engine import parse_implementation_plan, audit_codebase_completion, get_next_pending_task, create_github_issue
-        plan_tasks = parse_implementation_plan(workspace)
-        audit_codebase_completion(plan_tasks, workspace)
-        while created_count < count:
-            next_task = get_next_pending_task(plan_tasks)
-            if not next_task:
-                print("[*] All Enterprise SaaS Plan tasks are complete or in progress.")
-                break
-            print(f"[*] Advancing Enterprise SaaS Plan: Task {next_task.num} — {next_task.name}...")
-            iss_num = create_github_issue(next_task, workspace)
-            if iss_num:
+    # 3. Pull from curated catalog
+    for item in CATALOG:
+        if created_count >= count:
+            break
+        if item["title"] not in existing_titles:
+            if create_issue(item):
+                existing_titles.add(item["title"])
                 created_count += 1
-                next_task.status = "IN_PROGRESS"
                 if created_count < count:
-                    time.sleep(2)
-            else:
-                break
-    except Exception as e:
-        print(f"[WARN] Enterprise SaaS Plan engine error: {e}", file=sys.stderr)
+                    print("[RATE-LIMIT DELAY] Sleeping 1s to protect GitHub secondary rate limit...")
+                    time.sleep(1)
 
     # 4. If catalog exhausted and more requested, dynamically generate via Gemini AI
     if created_count < count:

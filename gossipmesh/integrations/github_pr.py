@@ -2,16 +2,22 @@ import logging
 import asyncio
 from typing import Any, Dict, List, Optional
 import httpx
-from sqlalchemy.orm import Session
 
 from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError, AuthorizationError
-from gossipmesh.integrations.github_client import GitHubAPIClient
 
 logger = logging.getLogger(__name__)
 
-class GitHubPRService(GitHubAPIClient):
-    def __init__(self, token: str, max_retries: int = 3, timeout: float = 10.0, db: Optional[Session] = None, actor_id: Optional[int] = None, organization_id: Optional[int] = None, permissions: Optional[Dict[str, str]] = None):
-        super().__init__(token=token, max_retries=max_retries, timeout=timeout, db=db, actor_id=actor_id, organization_id=organization_id)
+class GitHubPRService:
+    def __init__(
+        self,
+        token: str,
+        max_retries: int = 3,
+        timeout: float = 10.0,
+        permissions: Optional[Dict[str, str]] = None
+    ):
+        self.token = token
+        self.max_retries = max_retries
+        self.timeout = timeout
         self.permissions = permissions
         self.base_url = "https://api.github.com"
         self.headers = {
@@ -21,6 +27,11 @@ class GitHubPRService(GitHubAPIClient):
         }
 
     def _check_permissions(self, required_permissions: Dict[str, str]) -> None:
+        """
+        Validates that the provided permissions dictionary contains the required scopes.
+        Raises AuthorizationError if the check fails.
+        If self.permissions is None, the check is skipped.
+        """
         if self.permissions is None:
             return
 
@@ -32,11 +43,13 @@ class GitHubPRService(GitHubAPIClient):
                     details={"required": required_permissions, "granted": self.permissions}
                 )
 
+            # If required is read, granted can be read or write
             if required_level == "read" and granted_level not in ("read", "write"):
                 raise AuthorizationError(
                     f"Insufficient permission for '{scope}'. Required: {required_level}, Granted: {granted_level}",
                     details={"required": required_permissions, "granted": self.permissions}
                 )
+            # If required is write, granted must be write
             elif required_level == "write" and granted_level != "write":
                 raise AuthorizationError(
                     f"Insufficient permission for '{scope}'. Required: {required_level}, Granted: {granted_level}",
@@ -44,6 +57,7 @@ class GitHubPRService(GitHubAPIClient):
                 )
 
     async def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Make an HTTP request with retry, timeout, and rate limit handling."""
         headers = dict(self.headers)
         if "headers" in kwargs:
             headers.update(kwargs.pop("headers"))
@@ -54,7 +68,7 @@ class GitHubPRService(GitHubAPIClient):
 
         for attempt in range(self.max_retries):
             try:
-                async with httpx.AsyncClient(timeout=client_kwargs["timeout"]) as client:
+                async with httpx.AsyncClient(timeout=client_kwargs['timeout']) as client:
                     response = await client.request(method, url, headers=headers, **kwargs)
 
                     if response.status_code in (403, 429):
@@ -86,8 +100,9 @@ class GitHubPRService(GitHubAPIClient):
         raise GitHubIntegrationError("Max retries exceeded")
 
     async def _get_paginated(self, url: str, **kwargs) -> List[Dict[str, Any]]:
+        """Fetch all pages of a paginated GitHub API endpoint."""
         results = []
-        next_url = url
+        next_url: str | None = url
 
         while next_url:
             response = await self._request("GET", next_url, **kwargs)
@@ -97,6 +112,7 @@ class GitHubPRService(GitHubAPIClient):
             else:
                 results.append(data)
 
+            # Extract next url from Link header
             link_header = response.headers.get("link")
             next_url = None
             if link_header:
@@ -109,12 +125,14 @@ class GitHubPRService(GitHubAPIClient):
         return results
 
     async def get_pr_metadata(self, owner: str, repo: str, pull_number: int) -> Dict[str, Any]:
+        """Get basic pull request metadata."""
         self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
         response = await self._request("GET", url)
         return response.json()
 
     async def get_pr_diff(self, owner: str, repo: str, pull_number: int) -> str:
+        """Get pull request unified diff."""
         self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
         headers = {"Accept": "application/vnd.github.v3.diff"}
@@ -122,16 +140,22 @@ class GitHubPRService(GitHubAPIClient):
         return response.text
 
     async def get_pr_files(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
+        """Get list of changed files in the pull request."""
         self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/files"
         return await self._get_paginated(url)
 
     async def get_pr_commits(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
+        """Get list of commits in the pull request."""
         self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/commits"
         return await self._get_paginated(url)
 
     async def get_pr_details(self, owner: str, repo: str, pull_number: int) -> Dict[str, Any]:
+        """
+        Get comprehensive details about a pull request including metadata,
+        diff, files, and commits.
+        """
         metadata = await self.get_pr_metadata(owner, repo, pull_number)
         diff = await self.get_pr_diff(owner, repo, pull_number)
         files = await self.get_pr_files(owner, repo, pull_number)
@@ -158,29 +182,39 @@ class GitHubPRService(GitHubAPIClient):
         }
 
     async def post_pr_review_comment(self, owner: str, repo: str, pull_number: int, comment_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Posts an individual PR review comment.
+        """
         self._check_permissions({"pull_requests": "write"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/comments"
         response = await self._request("POST", url, json=comment_payload)
         return response.json()
 
     async def post_pr_review(self, owner: str, repo: str, pull_number: int, review_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Posts a PR review with inline comments.
+        """
         self._check_permissions({"pull_requests": "write"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
         response = await self._request("POST", url, json=review_payload)
         return response.json()
 
     async def create_pr(self, owner: str, repo: str, pr_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Creates a pull request."""
         self._check_permissions({"pull_requests": "write"})
         raise NotImplementedError("Creating a pull request is not implemented yet")
 
     async def set_commit_status(self, owner: str, repo: str, sha: str, status_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Sets a commit status."""
         self._check_permissions({"statuses": "write"})
         raise NotImplementedError("Setting a commit status is not implemented yet")
 
     async def get_workflow_logs(self, owner: str, repo: str, run_id: int) -> str:
+        """Gets workflow logs for a given run ID."""
         self._check_permissions({"actions": "read"})
         raise NotImplementedError("Getting workflow logs is not implemented yet")
 
     async def create_branch(self, owner: str, repo: str, ref: str, sha: str) -> Dict[str, Any]:
+        """Creates a branch/reference."""
         self._check_permissions({"contents": "write"})
         raise NotImplementedError("Creating a branch is not implemented yet")
