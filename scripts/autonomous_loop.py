@@ -84,10 +84,17 @@ GLOBAL_POOL = KeyPool(DEFAULT_KEYS)
 
 def run_cmd(cmd, cwd=None, check=False):
     """Runs a shell command and returns stdout."""
-    res = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str), capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if check and res.returncode != 0:
-        raise RuntimeError(f"Command failed ({res.returncode}): {cmd}\nStderr: {res.stderr}\nStdout: {res.stdout}")
-    return res.stdout.strip()
+    try:
+        res = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str), capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if check and res.returncode != 0:
+            raise RuntimeError(f"Command failed ({res.returncode}): {cmd}\nStderr: {res.stderr}\nStdout: {res.stdout}")
+        return res.stdout.strip()
+    except FileNotFoundError:
+        return ""
+    except Exception as e:
+        if check:
+            raise e
+        return ""
 
 def get_open_advancement_issues(workspace: Path):
     """Fetches open advancement issues, filtering out those that already have active or merged PRs."""
@@ -165,12 +172,14 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     print("[*] Tidying Python files with python -m compileall ....", flush=True)
     run_cmd(["python", "-m", "compileall", "."], cwd=workspace, check=False)
 
-    print("[*] Formatting Python codebase with black...", flush=True)
-    run_cmd(["black", "."], cwd=workspace, check=False)
+    print("[*] Formatting Python codebase with ruff...", flush=True)
+    run_cmd(["ruff", "format", "."], cwd=workspace, check=False)
 
-    print("[*] Verifying Python linting & static analysis (flake8)...", flush=True)
-    vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    check_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    print("[*] Verifying Python linting & static analysis (ruff check)...", flush=True)
+    vet_res = subprocess.run(["ruff", "check", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    check_res = subprocess.run(["python", "-m", "pytest", "-q"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if check_res.returncode != 0:
+        check_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
     if vet_res.returncode != 0 or check_res.returncode != 0:
         print(f"[!] CI failed. Calling AI CI Fixer...", flush=True)

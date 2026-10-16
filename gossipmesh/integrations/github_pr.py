@@ -1,66 +1,17 @@
 import logging
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import httpx
+from sqlalchemy.orm import Session
 
+from gossipmesh.integrations.github_client import GitHubAPIClient
 from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
-class GitHubPRService:
-    def __init__(self, token: str, max_retries: int = 3, timeout: float = 10.0):
-        self.token = token
-        self.max_retries = max_retries
-        self.timeout = timeout
-        self.base_url = "https://api.github.com"
-        self.headers = {
-            "Accept": "application/vnd.github.v3+json",
-            "Authorization": f"Bearer {self.token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-        }
-
-    async def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
-        """Make an HTTP request with retry, timeout, and rate limit handling."""
-        headers = dict(self.headers)
-        if "headers" in kwargs:
-            headers.update(kwargs.pop("headers"))
-
-        client_kwargs = {
-            "timeout": httpx.Timeout(self.timeout)
-        }
-
-        for attempt in range(self.max_retries):
-            try:
-                async with httpx.AsyncClient(timeout=client_kwargs['timeout']) as client:
-                    response = await client.request(method, url, headers=headers, **kwargs)
-
-                    if response.status_code in (403, 429):
-                        remaining = response.headers.get("x-ratelimit-remaining")
-                        if remaining == "0" or response.status_code == 429:
-                            raise RateLimitError(
-                                message="GitHub API rate limit exceeded",
-                                details={"reset": response.headers.get("x-ratelimit-reset")}
-                            )
-
-                    if response.status_code >= 500:
-                        if attempt == self.max_retries - 1:
-                            response.raise_for_status()
-                        await asyncio.sleep(2 ** attempt)
-                        continue
-
-                    response.raise_for_status()
-                    return response
-            except (httpx.TimeoutException, httpx.RequestError) as e:
-                if attempt == self.max_retries - 1:
-                    raise GitHubIntegrationError(f"Request failed: {str(e)}")
-                await asyncio.sleep(2 ** attempt)
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code >= 500 and attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                raise GitHubIntegrationError(f"HTTP error: {e.response.status_code} - {e.response.text}")
-
-        raise GitHubIntegrationError("Max retries exceeded")
+class GitHubPRService(GitHubAPIClient):
+    def __init__(self, token: str, max_retries: int = 3, timeout: float = 10.0, db: Optional[Session] = None, actor_id: Optional[int] = None, organization_id: Optional[int] = None):
+        super().__init__(token=token, max_retries=max_retries, timeout=timeout, db=db, actor_id=actor_id, organization_id=organization_id)
 
     async def _get_paginated(self, url: str, **kwargs) -> List[Dict[str, Any]]:
         """Fetch all pages of a paginated GitHub API endpoint."""
