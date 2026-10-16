@@ -38,4 +38,3 @@ __all__ = [
     "RefreshToken",
     "OrganizationSAMLConfig",
 ]
-from gossipmesh.models.jobs import BackgroundJob

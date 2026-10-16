@@ -1,7 +1,7 @@
 """Add SAML SSO models
 
 Revision ID: c19a0a1f0a2d
-Revises: def6dd2b0f44
+Revises: a89d06daa614
 Create Date: 2024-10-13 18:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'c19a0a1f0a2d'
-down_revision = 'def6dd2b0f44'
+down_revision = 'a89d06daa614'
 branch_labels = None
 depends_on = None
 
