@@ -5,16 +5,17 @@ import hashlib
 import hmac
 import os
 import json
+import uuid
 from sqlalchemy.orm import Session
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.models.repository import GithubAppInstallation
+from gossipmesh.models.jobs import BackgroundJob
 
-from gossipmesh.jobs.pr_review import PRReviewJob
-from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
-from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
+from gossipmesh.worker.tasks import process_pr_review, process_issue_solver, process_ci_fixer
+
 from gossipmesh.core.exceptions import AuthenticationError, ValidationError, AuthorizationError
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
 
 
 
-def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTasks, db: Session):
+def dispatch_webhook(event: str, payload: dict, db: Session):
     action = payload.get("action")
     if event == "installation":
         installation = payload.get("installation", {})
@@ -119,24 +120,80 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
     elif event == "pull_request":
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
-            job = PRReviewJob(pr_data)
-            background_tasks.add_task(job.execute)
+            task_id = str(uuid.uuid4())
+            job_record = BackgroundJob(
+                task_id=task_id,
+                task_name="process_pr_review"
+            )
+            db.add(job_record)
+            db.commit()
+            process_pr_review.apply_async(args=[pr_data], task_id=task_id)
+
+    # Milestone 7: Issue Solver
+    elif event == "issues":
+        if action == "opened":
+            issue_data = payload.get("issue", {})
+            task_id = str(uuid.uuid4())
+            job_record = BackgroundJob(
+                task_id=task_id,
+                task_name="process_issue_solver"
+            )
+            db.add(job_record)
+            db.commit()
+            process_issue_solver.apply_async(args=[issue_data], task_id=task_id)
+
+    # Milestone 7: CI Fixer (Triggered by workflow_run completion)
+    elif event == "workflow_run":
+        run_data = payload.get("workflow_run", {})
+        if action == "completed" and run_data.get("conclusion") == "failure":
+            task_id = str(uuid.uuid4())
+            job_record = BackgroundJob(
+                task_id=task_id,
+                task_name="process_ci_fixer"
+            )
+            db.add(job_record)
+            db.commit()
+            process_ci_fixer.apply_async(args=[run_data], task_id=task_id)
+
+    elif event == "issue_comment":
+        if action == "created":
+            # Handle human approval workflow or explicit commands
+            comment_body = payload.get("comment", {}).get("body", "")
+            if "/approve" in comment_body:
+                logger.info("Human approval received via comment.")
+                # Trigger approval state transition logic here
+        if action in ["opened", "synchronize", "reopened"]:
+            pr_data = payload.get("pull_request", {})
+
+            job_record = BackgroundJob(task_id=task_id, task_name="process_pr_review")
+            db.add(job_record)
+            db.commit()
+
+            process_pr_review.apply_async(args=[pr_data], task_id=task_id)
 
     # Milestone 7: Issue Solver
     elif event == "issues":
         action = payload.get("action")
         if action == "opened":
             issue_data = payload.get("issue", {})
-            workflow = IssueSolverWorkflow(issue_data)
-            background_tasks.add_task(workflow.execute)
+
+            job_record = BackgroundJob(task_id=task_id, task_name="process_issue_solver")
+            db.add(job_record)
+            db.commit()
+
+            process_issue_solver.apply_async(args=[issue_data], task_id=task_id)
 
     # Milestone 7: CI Fixer (Triggered by workflow_run completion)
     elif event == "workflow_run":
         action = payload.get("action")
         run_data = payload.get("workflow_run", {})
         if action == "completed" and run_data.get("conclusion") == "failure":
-            ci_workflow = CIFixerWorkflow(run_data)
-            background_tasks.add_task(ci_workflow.execute)
+
+            job_record = BackgroundJob(task_id=task_id, task_name="process_ci_fixer")
+            db.add(job_record)
+            db.commit()
+
+            process_ci_fixer.apply_async(args=[run_data], task_id=task_id)
 
     elif event == "issue_comment":
         action = payload.get("action")
@@ -197,7 +254,7 @@ async def github_webhook(
         raise e
 
     try:
-        dispatch_webhook(event, payload, background_tasks, db)
+        dispatch_webhook(event, payload, db)
         webhook_record.status = "processed"
     except Exception as e:
         webhook_record.status = "failed"
@@ -226,7 +283,7 @@ async def replay_github_webhook(
         raise HTTPException(status_code=404, detail="Webhook event not found")
 
     try:
-        dispatch_webhook(event_record.event, event_record.payload, background_tasks, db)
+        dispatch_webhook(event_record.event, event_record.payload, db)
         event_record.replayed_at = func.now()
         event_record.replayed_by = current_user.id
 

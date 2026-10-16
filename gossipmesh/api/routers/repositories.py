@@ -1,7 +1,6 @@
 from typing import Any
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi import BackgroundTasks
-from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -12,6 +11,8 @@ from gossipmesh.models.repository import Repository, IndexState, GithubAppInstal
 from gossipmesh.repository.github import GitHubIntegration
 from gossipmesh.core.config import settings
 from gossipmesh.core.exceptions import AuthorizationError
+from gossipmesh.models.jobs import BackgroundJob
+from gossipmesh.worker.tasks import sync_repository_task
 import logging
 
 router = APIRouter()
@@ -25,7 +26,6 @@ class SyncRequest(BaseModel):
 @router.post("/sync", status_code=202)
 def sync_repository(
     request: SyncRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ) -> Any:
@@ -45,14 +45,20 @@ def sync_repository(
     if not installation:
         raise AuthorizationError(message="Installation does not belong to the requested organization")
 
-    def _sync_task(full_name: str, installation_id: int, org_id: int):
-        github = GitHubIntegration()
-        try:
-            logger.info(f"Syncing {full_name} for installation {installation_id}")
-            result = github.sync_repository(full_name, installation_id)
-            logger.info(f"Sync successful for {full_name}: {result}")
-        except Exception as e:
-            logger.error(f"Sync failed: {e}")
+    task_id = str(uuid.uuid4())
 
-    background_tasks.add_task(_sync_task, request.full_name, request.installation_id, request.organization_id)
-    return {"status": "accepted", "message": "Repository sync queued"}
+    job_record = BackgroundJob(
+        task_id=task_id,
+        task_name="sync_repository_task",
+        organization_id=request.organization_id,
+        user_id=current_user.id
+    )
+    db.add(job_record)
+    db.commit()
+
+    sync_repository_task.apply_async(
+        args=[request.full_name, request.installation_id, request.organization_id],
+        task_id=task_id
+    )
+
+    return {"status": "accepted", "message": "Repository sync queued", "job_id": task_id}
