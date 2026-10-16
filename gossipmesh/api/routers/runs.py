@@ -5,7 +5,7 @@ import datetime
 
 from gossipmesh.api import deps
 
-router = APIRouter(prefix="/runs", tags=["runs"])
+router = APIRouter(prefix="", tags=["runs"])
 
 # Model for run tracking
 class Run(BaseModel):

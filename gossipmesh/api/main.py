@@ -89,7 +89,6 @@ app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organiza
 app.include_router(providers.router, prefix=f"{settings.API_V1_STR}/providers", tags=["providers"])
 app.include_router(repositories.router, prefix=f"{settings.API_V1_STR}/repositories", tags=["repositories"])
 app.include_router(runtime.router, prefix=f"{settings.API_V1_STR}/runtime", tags=["runtime"])
-app.include_router(runs.router, prefix="", tags=["runs"])
 app.include_router(artifacts.router, prefix=f"{settings.API_V1_STR}/artifacts", tags=["artifacts"])
 app.include_router(enterprise.router, prefix=f"{settings.API_V1_STR}/enterprise", tags=["enterprise"])
 app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector_search", tags=["vector_search"])
@@ -97,7 +96,7 @@ app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/servi
 
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
-app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(runs.router, prefix=f"{settings.API_V1_STR}/runs", tags=["runs"])
 
 app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
 app.add_exception_handler(Exception, global_exception_handler) # type: ignore
