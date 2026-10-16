@@ -1,5 +1,3 @@
-# gossipmesh/patch_validator.py
-
 import os
 import sys
 import json
@@ -10,6 +8,7 @@ import re
 import ast
 import difflib
 from pathlib import Path
+
 
 class PatchValidator:
 
@@ -96,12 +95,13 @@ class PatchValidator:
             if not any(file_path.startswith(path) for path in self.authorized_paths):
                 raise ValueError(f"Unauthorized file access: {file_path}")
 
+
 # Example usage
 if __name__ == "__main__":
     validator = PatchValidator(
         authorized_paths=["gossipmesh/"]
-        forbidden_files=["secrets.json", "private_keys.txt"],
-        max_file_count=100,
-        max_file_size=1024 * 1024,
-        max_diff_size=1024 * 1024 * 10
+        , forbidden_files=["secrets.json", "private_keys.txt"]
+        , max_file_count=100
+        , max_file_size=1024 * 1024
+        , max_diff_size=1024 * 1024 * 10
     )
