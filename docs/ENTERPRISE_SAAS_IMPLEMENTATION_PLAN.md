@@ -362,7 +362,7 @@ Implement scheduled indexing, queued reviews, priority rules, customer plan limi
 
 Define typed interfaces for generation, structured JSON, embeddings, health, token usage, errors, cancellation, and timeouts. Implement Gemini first.
 
-## Task 66 — Additional providers
+## [x] Task 66 — Additional providers
 
 Add adapters for OpenAI, Anthropic, Azure OpenAI, Ollama, OpenRouter, Bedrock, Vertex AI, or compatible endpoints without coupling business logic to one provider.
 
