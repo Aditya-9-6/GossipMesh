@@ -11,9 +11,7 @@ from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
-from gossipmesh.models.jobs import BackgroundJob
-
-from gossipmesh.worker.tasks import process_pr_review, process_issue_solver, process_ci_fixer
+from gossipmesh.models.runtime import Job as BackgroundJob
 
 from gossipmesh.core.exceptions import AuthenticationError, ValidationError, AuthorizationError
 
@@ -55,18 +53,78 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
 
 
 def dispatch_webhook(event: str, payload: dict, db: Session):
+    action = payload.get("action")
+    if event == "installation":
+        installation = payload.get("installation", {})
+        account = installation.get("account", {})
+        inst_id = installation.get("id")
+
+        if action == "created":
+            record = GithubAppInstallation(
+                installation_id=inst_id,
+                account_name=account.get("login", ""),
+                target_type=account.get("type", "Unknown"),
+                target_id=account.get("id", 0),
+                repository_selection=installation.get("repository_selection", "all"),
+                permissions=installation.get("permissions", {})
+            )
+            db.add(record)
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.created",
+                details={"installation_id": inst_id, "account": account.get("login")}
+            )
+            db.add(audit)
+
+        elif action == "deleted":
+            db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == inst_id).delete()
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.deleted",
+                details={"installation_id": inst_id}
+            )
+            db.add(audit)
+
+        elif action == "suspend":
+            sender_login = payload.get("sender", {}).get("login")
+            db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == inst_id).update({
+                "suspended_at": func.now(),
+                "suspended_by": sender_login
+            })
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.suspended",
+                details={"installation_id": inst_id, "suspended_by": sender_login}
+            )
+            db.add(audit)
+
+        elif action == "unsuspend":
+            db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == inst_id).update({
+                "suspended_at": None,
+                "suspended_by": None
+            })
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.unsuspended",
+                details={"installation_id": inst_id}
+            )
+            db.add(audit)
+
     task_id = str(uuid.uuid4())
 
     if event == "pull_request":
-        action = payload.get("action")
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
 
-            job_record = BackgroundJob(task_id=task_id, task_name="process_pr_review")
+            job_record = BackgroundJob(agent_name="process_pr_review", workflow_id=1)
             db.add(job_record)
             db.commit()
 
-            process_pr_review.apply_async(args=[pr_data], task_id=task_id)
+            pass # temporarily disabled due to merge conflict removed tasks
 
     # Milestone 7: Issue Solver
     elif event == "issues":
@@ -74,11 +132,11 @@ def dispatch_webhook(event: str, payload: dict, db: Session):
         if action == "opened":
             issue_data = payload.get("issue", {})
 
-            job_record = BackgroundJob(task_id=task_id, task_name="process_issue_solver")
+            job_record = BackgroundJob(agent_name="process_issue_solver", workflow_id=1)
             db.add(job_record)
             db.commit()
 
-            process_issue_solver.apply_async(args=[issue_data], task_id=task_id)
+            pass # temporarily disabled due to merge conflict removed tasks
 
     # Milestone 7: CI Fixer (Triggered by workflow_run completion)
     elif event == "workflow_run":
@@ -86,11 +144,11 @@ def dispatch_webhook(event: str, payload: dict, db: Session):
         run_data = payload.get("workflow_run", {})
         if action == "completed" and run_data.get("conclusion") == "failure":
 
-            job_record = BackgroundJob(task_id=task_id, task_name="process_ci_fixer")
+            job_record = BackgroundJob(agent_name="process_ci_fixer", workflow_id=1)
             db.add(job_record)
             db.commit()
 
-            process_ci_fixer.apply_async(args=[run_data], task_id=task_id)
+            pass # temporarily disabled due to merge conflict removed tasks
 
     elif event == "issue_comment":
         action = payload.get("action")
