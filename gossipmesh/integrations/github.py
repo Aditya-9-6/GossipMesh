@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List
+from typing import Dict, List
 from gossipmesh.models.pr_review import SecurityFinding, TestResult
 from gossipmesh.integrations.github_pr import GitHubPRService
 
@@ -8,30 +8,24 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubIntegration:
+
     def __init__(self, owner: str, repo: str, pr_number: int, github_pr_service: GitHubPRService):
         self.owner = owner
         self.repo = repo
         self.pr_number = pr_number
         self.github_pr_service = github_pr_service
 
-    def _parse_unified_diff(self, diff: str) -> dict[str, dict[str, set[int]]]:
-        """Parses a unified diff to find modified (added) and deleted lines per file."""
+    def _parse_unified_diff(self, diff: str) -> Dict[str, Dict[str, set[int]]]:
         valid_lines = {"RIGHT": {}, "LEFT": {}}
         current_file = None
         current_right_line = 0
         current_left_line = 0
 
         for line in diff.split("\n"):
-            if line.startswith("--- a/"):
-                current_file = line[6:]
-            elif line.startswith("+++ b/"):
+            if line.startswith("--- a/") or line.startswith("+++ b/") or line.startswith("+++ /dev/null"):
                 current_file = line[6:]
                 valid_lines["RIGHT"][current_file] = set()
                 valid_lines["LEFT"][current_file] = set()
-            elif line.startswith("+++ /dev/null"):
-                if current_file:
-                    valid_lines["RIGHT"][current_file] = set()
-                    valid_lines["LEFT"][current_file] = set()
             elif line.startswith("@@"):
                 match = re.search(r"-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
                 if match:
@@ -52,12 +46,7 @@ class GitHubIntegration:
         return valid_lines
 
     async def generate_inline_comments(self, findings: List[SecurityFinding]):
-        """
-        Generates inline review comments on the PR based on findings.
-        """
-        logger.info(
-            f"Generating inline comments for {len(findings)} findings."
-        )
+        logger.info(f"Generating inline comments for {len(findings)} findings.")
 
         diff = await self.github_pr_service.get_pr_diff(self.owner, self.repo, self.pr_number)
         valid_lines = self._parse_unified_diff(diff)
@@ -179,13 +168,7 @@ class GitHubIntegration:
                 logger.error(f"Failed to post fallback review summary: {e}")
 
     async def post_review_report(self, findings: List[SecurityFinding], test_results: TestResult):
-        """
-        Posts the final review report summary.
-        """
         logger.info("Posting review report.")
 
     async def handle_human_approval(self):
-        """
-        Manages the human approval workflow state.
-        """
         logger.info("Awaiting human approval workflow logic.")
