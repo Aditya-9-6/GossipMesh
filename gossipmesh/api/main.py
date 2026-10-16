@@ -3,20 +3,19 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime
 from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
 from gossipmesh.core.logging import setup_logging
 
 setup_logging()
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
-from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim
+from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine
+from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
+from gossipmesh.core.exceptions import GossipMeshException
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +48,70 @@ async def lifespan(app: FastAPI):
 
     yield
     # Cleanup on shutdown can go here if needed
-from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
-from gossipmesh.core.exceptions import GossipMeshException
+
+openapi_tags = [
+    {
+        "name": "auth",
+        "description": "Authentication and user authorization via JWT and SCIM tokens. Includes login, registration, and session management.",
+    },
+    {
+        "name": "users",
+        "description": "User profile and settings operations.",
+    },
+    {
+        "name": "organizations",
+        "description": "Multi-tenant organization management, including roles, invitations, and member access.",
+    },
+    {
+        "name": "providers",
+        "description": "AI provider credential management and health checks (e.g. OpenAI, Anthropic, Gemini).",
+    },
+    {
+        "name": "repositories",
+        "description": "Repository configurations, webhook endpoints, and version control integrations.",
+    },
+    {
+        "name": "runtime",
+        "description": "Runtime APIs including workflow orchestrations and sandboxed executions.",
+    },
+    {
+        "name": "artifacts",
+        "description": "Management of generated artifacts and assets.",
+    },
+    {
+        "name": "enterprise",
+        "description": "Enterprise specific controls, compliance, and features.",
+    },
+    {
+        "name": "vector_search",
+        "description": "Operations relating to vector indexing and retrieval for repository intelligence.",
+    },
+    {
+        "name": "service-accounts",
+        "description": "Service account generation, API key management, and related settings.",
+    },
+    {
+        "name": "sso",
+        "description": "Single Sign-On adapters and integrations for standard enterprise authentication.",
+    },
+    {
+        "name": "scim",
+        "description": "SCIM 2.0 endpoints for user and group provisioning from external identity providers.",
+    },
+    {
+        "name": "runs",
+        "description": "Tracking metrics, durations, and details for different automated runs and jobs.",
+    }
+]
 
 app = FastAPI(
-    title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url=f"{settings.API_V1_STR}/docs",
+    redoc_url=f"{settings.API_V1_STR}/redoc",
+    description="Enterprise API for GossipMesh providing features like tenant isolation, provider health checking, multi-tenant authentication, API rate limiting, and structured errors. See [Documentation](https://github.com/Aditya-9-6/GossipMesh) for more details.",
+    openapi_tags=openapi_tags,
     lifespan=lifespan
 )
 
@@ -75,8 +133,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    import logging
-    logger = logging.getLogger(__name__)
     logger.exception("Unhandled exception")
     return JSONResponse(
         status_code=500,
@@ -95,10 +151,14 @@ app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector_s
 app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
+app.include_router(runs.router, prefix=f"{settings.API_V1_STR}", tags=["runs"])
 
 app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
 app.add_exception_handler(Exception, global_exception_handler) # type: ignore
 
-@app.get("/health")
+@app.get("/health", tags=["system"])
 def health_check():
+    """
+    Check the basic health status of the API service.
+    """
     return {"status": "healthy"}
