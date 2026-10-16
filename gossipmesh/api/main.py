@@ -1,21 +1,23 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from gossipmesh.core.config import settings
-from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
-from gossipmesh.core.logging import setup_logging
-
-setup_logging()
-from contextlib import asynccontextmanager
-import logging
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs
+from sqlalchemy import create_engine
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import create_engine
+
+from gossipmesh.core.config import settings
+from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
+from gossipmesh.core.logging import setup_logging
+from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs
 from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
 from gossipmesh.core.exceptions import GossipMeshException
+
+setup_logging()
 
 logger = logging.getLogger(__name__)
 
