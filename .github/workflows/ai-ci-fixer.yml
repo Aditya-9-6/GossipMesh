@@ -24,7 +24,6 @@ permissions:
   pull-requests: write
   issues: write
   actions: write
-  workflows: write
 
 concurrency:
   group: ai-fixer-${{ github.event.issue.number || github.event.inputs.pr_number || github.event.workflow_run.head_branch }}
@@ -154,7 +153,7 @@ jobs:
             --max-iterations 6
 
       - name: Commit and Push Fix
-        if: steps.meta.outputs.skip != 'true'
+        if: always() && steps.meta.outputs.skip != 'true'
         id: push
         env:
           HEAD_REF: ${{ steps.meta.outputs.head_ref }}

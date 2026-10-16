@@ -28,9 +28,9 @@ class TestJobsAPI(unittest.TestCase):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=1, status="success", result={"key": "val"})
         def mock_query(model):
             mock_query_obj = MagicMock()
-            if model.__name__ == 'BackgroundJob':
+            if getattr(model, '__tablename__', None) == 'background_jobs':
                 mock_query_obj.filter.return_value.first.return_value = mock_job
-            elif model.__name__ == 'UserOrganization':
+            elif getattr(model, '__tablename__', None) == 'user_organizations':
                 mock_query_obj.filter.return_value.first.return_value = None
             return mock_query_obj
         self.mock_db.query.side_effect = mock_query
@@ -44,9 +44,9 @@ class TestJobsAPI(unittest.TestCase):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=99, status="success")
         def mock_query(model):
             mock_query_obj = MagicMock()
-            if model.__name__ == 'BackgroundJob':
+            if getattr(model, '__tablename__', None) == 'background_jobs':
                 mock_query_obj.filter.return_value.first.return_value = mock_job
-            elif model.__name__ == 'UserOrganization':
+            elif getattr(model, '__tablename__', None) == 'user_organizations':
                 mock_query_obj.filter.return_value.first.return_value = None
             return mock_query_obj
         self.mock_db.query.side_effect = mock_query
@@ -60,9 +60,9 @@ class TestJobsAPI(unittest.TestCase):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=1, status="running")
         def mock_query(model):
             mock_query_obj = MagicMock()
-            if model.__name__ == 'BackgroundJob':
+            if getattr(model, '__tablename__', None) == 'background_jobs':
                 mock_query_obj.filter.return_value.first.return_value = mock_job
-            elif model.__name__ == 'UserOrganization':
+            elif getattr(model, '__tablename__', None) == 'user_organizations':
                 mock_query_obj.filter.return_value.first.return_value = None
             return mock_query_obj
         self.mock_db.query.side_effect = mock_query
@@ -77,9 +77,9 @@ class TestJobsAPI(unittest.TestCase):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=1, status="success")
         def mock_query(model):
             mock_query_obj = MagicMock()
-            if model.__name__ == 'BackgroundJob':
+            if getattr(model, '__tablename__', None) == 'background_jobs':
                 mock_query_obj.filter.return_value.first.return_value = mock_job
-            elif model.__name__ == 'UserOrganization':
+            elif getattr(model, '__tablename__', None) == 'user_organizations':
                 mock_query_obj.filter.return_value.first.return_value = None
             return mock_query_obj
         self.mock_db.query.side_effect = mock_query
