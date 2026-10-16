@@ -23,12 +23,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 MAX_RETRIES = 5
 
 
-async def async_dispatch(event: str, payload: Dict[str, Any]):
+async def async_dispatch(event: str, payload: Dict[str, Any], db: Session | None = None):
     if event == "pull_request":
         action = payload.get("action")
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
-            job = PRReviewJob(pr_data)
+            # We use a dummy workflow_id = 1 for the scope of Milestones without full webhook state machine integration
+            job = PRReviewJob(pr_data, workflow_id=1, db=db)
             await job.execute()
 
     elif event == "issues":
@@ -66,7 +67,7 @@ def process_webhook_event(self, webhook_event_id: int):
         db.commit()
 
         try:
-            asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload))
+            asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload, db=db))
 
             webhook_record.status = "processed"
             db.commit()

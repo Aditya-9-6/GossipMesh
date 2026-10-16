@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 import datetime
 
 from gossipmesh.api.main import app
-from gossipmesh.database import Base
+from gossipmesh.models.base import Base
 
 # Initialize the database engine and session
 engine = create_engine("sqlite:///:memory:", echo=False)
@@ -26,8 +26,8 @@ def test_track_run():
         "workflow_type": "CI",
         "run_id": "123456",
         "status": "success",
-        "start_time": datetime.datetime(2024, 1, 1, 12, 0),
-        "end_time": datetime.datetime(2024, 1, 1, 12, 30),
+        "start_time": datetime.datetime(2024, 1, 1, 12, 0).isoformat(),
+        "end_time": datetime.datetime(2024, 1, 1, 12, 30).isoformat(),
         "failure_reason": "None",
         "branch": "main",
         "commit_sha": "abc123",
@@ -38,7 +38,8 @@ def test_track_run():
     }
 
     # Send a POST request to track the run
-    response = client.post("/runs/", json=run_data)
+    from gossipmesh.core.config import settings
+    response = client.post(f"{settings.API_V1_STR}/runs/", json=run_data)
 
     # Assert that the response status code is 200 OK
     assert response.status_code == 200

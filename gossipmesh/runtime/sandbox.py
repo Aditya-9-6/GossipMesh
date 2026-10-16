@@ -4,6 +4,7 @@ import tempfile
 import subprocess
 import shlex
 from typing import Optional, Tuple, Union, List
+from gossipmesh.core.exceptions import SandboxError
 
 class SandboxEnvironment:
     """
@@ -42,7 +43,7 @@ class SandboxEnvironment:
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-            return -1, stdout, "Command timed out\n" + stderr
+            raise SandboxError(message="Command timed out", details={"stderr": stderr})
 
     def write_file(self, filepath: str, content: str):
         if not self.workspace_dir:
