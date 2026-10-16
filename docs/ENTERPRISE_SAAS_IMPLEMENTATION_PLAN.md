@@ -138,7 +138,7 @@ Track and enforce per-repository and per-organization limits for AI runs, PRs, t
 
 Persist daily and weekly metrics: issues processed, PRs created, CI pass rate, merged/rejected/reverted PRs, review scores, false positives, cost, latency, and approval rate. Expose them through CLI or API.
 
-## Task 17 — Canary mode (Completed)
+## Task 17 — Canary mode
 
 Allow automation only for selected repositories and labels, with daily limits, human approval, no force-push, no auto-merge, separate metrics, and immediate shutdown.
 
@@ -362,7 +362,7 @@ Implement scheduled indexing, queued reviews, priority rules, customer plan limi
 
 Define typed interfaces for generation, structured JSON, embeddings, health, token usage, errors, cancellation, and timeouts. Implement Gemini first.
 
-## [x] Task 66 — Additional providers
+## Task 66 — Additional providers
 
 Add adapters for OpenAI, Anthropic, Azure OpenAI, Ollama, OpenRouter, Bedrock, Vertex AI, or compatible endpoints without coupling business logic to one provider.
 
