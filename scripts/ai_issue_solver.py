@@ -188,7 +188,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
     for m in ordered:
         if m not in models_to_try:
             models_to_try.append(m)
-    
+
     # Check cache
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
@@ -205,7 +205,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
     last_err = None
     for current_model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
-        
+
         payload = {
             "contents": [
                 {
@@ -220,7 +220,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
                 "responseMimeType": "application/json"
             }
         }
-        
+
         print(f"[*] Attempting generation with model: {current_model}...", flush=True)
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
@@ -234,7 +234,7 @@ def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir
                 with urllib.request.urlopen(req, timeout=90) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    
+
                     # Parse JSON response
                     try:
                         parsed_response = json.loads(text_response, strict=False)
@@ -293,7 +293,7 @@ def main():
     print(f"[*] Solving Issue #{args.issue_number}: {args.issue_title}")
 
 
-    
+
     print("[*] Inspecting repository context...")
     all_files = get_git_files(workspace_root)
     overview = get_repo_overview(workspace_root, all_files)
@@ -340,7 +340,7 @@ Instructions:
         rel_path = f["path"]
         content = f["content"]
         target_path = workspace_root / rel_path
-        
+
         target_path.parent.mkdir(parents=True, exist_ok=True)
         target_path.write_text(content, encoding="utf-8")
         print(f"    [+] Wrote: {rel_path}")

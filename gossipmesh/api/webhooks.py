@@ -10,6 +10,7 @@ from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
+from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
 
 from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
@@ -19,6 +20,8 @@ from gossipmesh.core.exceptions import AuthenticationError, ValidationError, Aut
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+
 def verify_github_signature(request: Request, payload: bytes) -> bool:
     """
     Verify the signature of the incoming GitHub webhook payload.
@@ -27,9 +30,7 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
     if not secret:
         # If secret is not configured, we allow it for development only
         if os.environ.get("ENVIRONMENT") == "development":
-            logger.warning(
-                "GITHUB_WEBHOOK_SECRET is not set, skipping signature verification in development"
-            )
+            logger.warning("GITHUB_WEBHOOK_SECRET is not set, skipping signature verification in development")
             return True
         else:
             logger.error("GITHUB_WEBHOOK_SECRET is not set in a non-development environment")
@@ -40,9 +41,7 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
         logger.error("Missing X-Hub-Signature-256 header")
         return False
 
-    hash_object = hmac.new(
-        secret.encode("utf-8"), msg=payload, digestmod=hashlib.sha256
-    )
+    hash_object = hmac.new(secret.encode("utf-8"), msg=payload, digestmod=hashlib.sha256)
     expected_signature = "sha256=" + hash_object.hexdigest()
 
     if not hmac.compare_digest(expected_signature, signature_header):
@@ -50,7 +49,6 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
         return False
 
     return True
-
 
 
 def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTasks):
@@ -86,12 +84,9 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
                 logger.info("Human approval received via comment.")
                 # Trigger approval state transition logic here
 
+
 @router.post("/github")
-async def github_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db)
-):
+async def github_webhook(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(deps.get_db)):
     """
     Handle incoming GitHub webhooks for Milestone 6 and 7.
     Supported events: pull_request, issues, issue_comment, workflow_run
@@ -105,6 +100,10 @@ async def github_webhook(
         raise ValidationError(message="Missing X-GitHub-Delivery header")
 
     payload_bytes = await request.body()
+    MAX_PAYLOAD_SIZE = 25 * 1024 * 1024
+    if len(payload_bytes) > MAX_PAYLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Payload too large")
+
     if not verify_github_signature(request, payload_bytes):
         raise AuthenticationError(message="Invalid signature")
 
@@ -122,12 +121,7 @@ async def github_webhook(
         return {"status": "already_processed", "event": event}
 
     # Store event
-    webhook_record = WebhookEvent(
-        delivery_id=delivery_id,
-        event=event,
-        payload=payload,
-        status="pending"
-    )
+    webhook_record = WebhookEvent(delivery_id=delivery_id, event=event, payload=payload, status="pending")
     db.add(webhook_record)
     try:
         db.commit()
@@ -147,12 +141,13 @@ async def github_webhook(
     db.commit()
     return {"status": "accepted", "event": event}
 
+
 @router.post("/github/replay/{event_id}")
 async def replay_github_webhook(
     event_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ):
     """
     Administrator-only webhook replay mechanism.
@@ -173,7 +168,7 @@ async def replay_github_webhook(
         audit = AuditEvent(
             action="webhook.replayed",
             actor_id=current_user.id,
-            details={"event_id": event_id, "delivery_id": event_record.delivery_id}
+            details={"event_id": event_id, "delivery_id": event_record.delivery_id},
         )
         db.add(audit)
         db.commit()
