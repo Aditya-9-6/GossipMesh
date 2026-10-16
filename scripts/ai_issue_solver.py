@@ -22,19 +22,16 @@ FALLBACK_MODELS = [
     "gemini-1.5-pro",
 ]
 
-SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, HTTP/HTTPS MITM interception, WebSocket streaming, and developer debugging tools.
-You are working on GossipMesh, a high-performance, developer-first HTTP/HTTPS debugging proxy and security engine written in Python.
+SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, AI agent platform architecture, secure sandbox runtimes, and fastAPI backends.
+You are working on GossipMesh, a high-performance, developer-first AI Agent SaaS platform written in Python.
 
 CORE ARCHITECTURE GUIDELINES:
 1. High throughput and low memory footprint: prefer streaming buffers, zero-allocation pooling (sync.Pool) on hot request/response paths.
 2. Concurrency safety: ensure data race freedom using proper sync primitives or lock-free circular ring buffers.
-3. Idiomatic Python: clean error handling, context cancellation propagation, no unhandled goroutine leaks, adhere to standard Go naming and conventions.
-4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in _test.py) with the standard `testing` package.
-5. Code style: clean comments, adherence to standard black formatting.
-6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., pkg/proxy/<feature>.py) instead of rewriting existing complex files.
+3. Idiomatic Python: clean error handling, context cancellation propagation, no unhandled task leaks, adhere to standard Python naming and conventions.
 4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in test_*.py) with the standard `testing` package.
 5. Code style: clean comments, adherence to standard black formatting.
-6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., pkg/proxy/<feature>.go) instead of rewriting existing complex files.
+6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., gossipmesh/<feature>.py) instead of rewriting existing complex files.
 
 You will be given a GitHub issue with its title, description, and repository context.
 Analyze the requirements and generate the exact file changes needed to implement the feature or fix the bug.
@@ -326,10 +323,8 @@ GitHub Issue #{args.issue_number}: {args.issue_title}
 Instructions:
 1. Implement the feature or fix specified in the issue.
 2. Adhere to GossipMesh performance and concurrency invariants.
-3. Write clean, idiomatic Go code with accompanying unit tests (test_*.py).
 3. Write clean, idiomatic Python code with accompanying unit tests (test_*.py).
 4. Output your response as valid JSON adhering to the specified schema.
-"""
 
     print("[*] Requesting solution from Gemini AI...")
     result = call_gemini(api_key, prompt)

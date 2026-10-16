@@ -61,8 +61,8 @@ class TestAuth(unittest.TestCase):
             data={"username": "test@example.com", "password": "wrongpassword"}
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Incorrect email or password")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["error"]["message"], "Incorrect email or password")
         mock_verify.assert_called_once_with("wrongpassword", "mocked_hash")
 
     def test_login_user_not_found(self):
@@ -73,8 +73,8 @@ class TestAuth(unittest.TestCase):
             data={"username": "nonexistent@example.com", "password": "password123"}
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Incorrect email or password")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["error"]["message"], "Incorrect email or password")
 
     @patch('gossipmesh.api.routers.auth.verify_password')
     def test_login_inactive_user(self, mock_verify):
@@ -93,8 +93,8 @@ class TestAuth(unittest.TestCase):
             data={"username": "test@example.com", "password": "password123"}
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Inactive user")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"]["message"], "Inactive user")
         mock_verify.assert_called_once_with("password123", "mocked_hash")
 
 if __name__ == '__main__':
