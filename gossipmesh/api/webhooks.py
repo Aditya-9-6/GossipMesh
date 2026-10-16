@@ -10,6 +10,7 @@ from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
+from gossipmesh.models.repository import GithubAppInstallation
 
 from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
@@ -53,9 +54,69 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
 
 
 
-def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTasks):
-    if event == "pull_request":
-        action = payload.get("action")
+def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTasks, db: Session):
+    action = payload.get("action")
+    if event == "installation":
+        installation = payload.get("installation", {})
+        account = installation.get("account", {})
+        inst_id = installation.get("id")
+
+        if action == "created":
+            record = GithubAppInstallation(
+                installation_id=inst_id,
+                account_name=account.get("login", ""),
+                target_type=account.get("type", "Unknown"),
+                target_id=account.get("id", 0),
+                repository_selection=installation.get("repository_selection", "all"),
+                permissions=installation.get("permissions", {})
+            )
+            db.add(record)
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.created",
+                details={"installation_id": inst_id, "account": account.get("login")}
+            )
+            db.add(audit)
+
+        elif action == "deleted":
+            db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == inst_id).delete()
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.deleted",
+                details={"installation_id": inst_id}
+            )
+            db.add(audit)
+
+        elif action == "suspend":
+            sender_login = payload.get("sender", {}).get("login")
+            db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == inst_id).update({
+                "suspended_at": func.now(),
+                "suspended_by": sender_login
+            })
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.suspended",
+                details={"installation_id": inst_id, "suspended_by": sender_login}
+            )
+            db.add(audit)
+
+        elif action == "unsuspend":
+            db.query(GithubAppInstallation).filter(GithubAppInstallation.installation_id == inst_id).update({
+                "suspended_at": None,
+                "suspended_by": None
+            })
+            db.flush()
+
+            audit = AuditEvent(
+                action="installation.unsuspended",
+                details={"installation_id": inst_id}
+            )
+            db.add(audit)
+
+    elif event == "pull_request":
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
             job = PRReviewJob(pr_data)
@@ -136,7 +197,7 @@ async def github_webhook(
         raise e
 
     try:
-        dispatch_webhook(event, payload, background_tasks)
+        dispatch_webhook(event, payload, background_tasks, db)
         webhook_record.status = "processed"
     except Exception as e:
         webhook_record.status = "failed"
@@ -165,7 +226,7 @@ async def replay_github_webhook(
         raise HTTPException(status_code=404, detail="Webhook event not found")
 
     try:
-        dispatch_webhook(event_record.event, event_record.payload, background_tasks)
+        dispatch_webhook(event_record.event, event_record.payload, background_tasks, db)
         event_record.replayed_at = func.now()
         event_record.replayed_by = current_user.id
 
