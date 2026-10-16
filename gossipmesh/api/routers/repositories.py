@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
-from gossipmesh.models.repository import Repository, IndexState
+from gossipmesh.models.repository import Repository, IndexState, GithubAppInstallation
 from gossipmesh.repository.github import GitHubIntegration
 from gossipmesh.core.config import settings
 from gossipmesh.core.exceptions import AuthorizationError
@@ -36,6 +36,14 @@ def sync_repository(
     ).first()
     if not is_member:
         raise AuthorizationError(message="Not authorized for this organization")
+
+    # Validate that an installation belongs to the requested organization.
+    installation = db.query(GithubAppInstallation).filter(
+        GithubAppInstallation.installation_id == request.installation_id,
+        GithubAppInstallation.organization_id == request.organization_id
+    ).first()
+    if not installation:
+        raise AuthorizationError(message="Installation does not belong to the requested organization")
 
     task_id = str(uuid.uuid4())
 

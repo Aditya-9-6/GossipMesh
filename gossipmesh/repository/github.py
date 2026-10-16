@@ -5,34 +5,21 @@ from github.Installation import Installation
 from gossipmesh.core.config import settings
 
 class GitHubIntegration:
-    def __init__(self, app_id: str, private_key: str):
-        self.app_id = app_id
-        self.private_key = private_key
+    def __init__(self, app_id: str | None = None, private_key: str | None = None):
+        self.app_id = app_id or settings.GITHUB_APP_ID
+        self.private_key = private_key or settings.GITHUB_APP_PRIVATE_KEY
+        if not self.app_id or not self.private_key:
+            raise ValueError("GitHub App ID and private key must be provided or configured in settings.")
 
-    def _generate_jwt(self) -> str:
-        payload = {
-            "iat": int(time.time()) - 60,
-            "exp": int(time.time()) + (10 * 60),
-            "iss": self.app_id
-        }
-        encoded = jwt.encode(payload, self.private_key, algorithm="RS256")
-        return encoded if isinstance(encoded, str) else encoded.decode("utf-8")
+        self.app_auth = Auth.AppAuth(self.app_id, self.private_key)
 
     def get_app_client(self) -> Github:
         """Returns a Github client authenticated as the App."""
-        token = self._generate_jwt()
-        auth = Auth.Token(token)
-        return Github(auth=auth)
+        return Github(auth=self.app_auth)
 
     def get_installation_client(self, installation_id: int) -> Github:
         """Returns a Github client authenticated as a specific installation."""
-        self.get_app_client()
-        # In a real app we'd fetch the installation access token from the API
-        # Using PyGithub's built-in AppAuth
-        auth = Auth.AppAuth(
-            self.app_id,
-            self.private_key,
-        ).get_installation_auth(installation_id)
+        auth = self.app_auth.get_installation_auth(installation_id)
         return Github(auth=auth)
 
     def sync_repository(self, full_name: str, installation_id: int):
