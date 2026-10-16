@@ -25,13 +25,13 @@ class UserOrganization(Base):
     organization_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), primary_key=True
     )
-    role: Mapped[str] = mapped_column(
+    role_type: Mapped[str] = mapped_column(
         String, nullable=False, default="member"
     )  # admin, member, owner
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="active"
     )  # active, invited, suspended
-    role: Mapped[str] = mapped_column(
+    role_type: Mapped[str] = mapped_column(
         String, nullable=False, default="member"
     )  # admin, member, etc
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
