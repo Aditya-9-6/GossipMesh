@@ -29,8 +29,8 @@ class TestRepositoriesAPI(unittest.TestCase):
         # Clear dependency overrides
         app.dependency_overrides.clear()
 
-    @patch("fastapi.BackgroundTasks.add_task")
-    def test_sync_repository_success(self, mock_add_task):
+    @patch("gossipmesh.api.routers.repositories.sync_repository_task.apply_async")
+    def test_sync_repository_success(self, mock_apply_async):
         payload = {
             "full_name": "test/repo",
             "installation_id": 123,
@@ -39,15 +39,14 @@ class TestRepositoriesAPI(unittest.TestCase):
         response = client.post(f"{settings.API_V1_STR}/repositories/sync", json=payload)
 
         self.assertEqual(response.status_code, 202)
-        self.assertEqual(
-            response.json(),
-            {"status": "accepted", "message": "Repository sync queued"}
-        )
+        self.assertEqual(response.json()["status"], "accepted")
+        self.assertEqual(response.json()["message"], "Repository sync queued")
+        self.assertIn("job_id", response.json())
         # Ensure that the background task was queued exactly once
-        mock_add_task.assert_called_once()
+        mock_apply_async.assert_called_once()
 
-    @patch("fastapi.BackgroundTasks.add_task")
-    def test_sync_repository_unauthorized(self, mock_add_task):
+    @patch("gossipmesh.api.routers.repositories.sync_repository_task.apply_async")
+    def test_sync_repository_unauthorized(self, mock_apply_async):
         self.mock_db.query.return_value.filter.return_value.first.return_value = None
         payload = {
             "full_name": "test/repo",
@@ -68,7 +67,7 @@ class TestRepositoriesAPI(unittest.TestCase):
             }
         )
         # Ensure that the background task was NOT queued
-        mock_add_task.assert_not_called()
+        mock_apply_async.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()
