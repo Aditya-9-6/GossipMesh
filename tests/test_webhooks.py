@@ -78,8 +78,8 @@ class TestWebhooks(unittest.TestCase):
             response.json()["error"]["message"], "Missing X-GitHub-Event header"
         )
 
-    @patch("gossipmesh.worker.tasks.process_pr_review.apply_async")
-    def test_pull_request_event(self, mock_apply_async):
+    @patch("gossipmesh.jobs.pr_review.PRReviewJob.execute")
+    def test_pull_request_event(self, mock_execute):
         payload = {"action": "opened", "pull_request": {"number": 123}}
         response = client.post(
             "/webhooks/github",
@@ -98,8 +98,8 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual(event.status, "processed")
         db.close()
 
-    @patch("gossipmesh.worker.tasks.process_issue_solver.apply_async")
-    def test_webhook_idempotency(self, mock_apply_async):
+    @patch("gossipmesh.workflows.issue_solver.IssueSolverWorkflow.execute")
+    def test_webhook_idempotency(self, mock_execute):
         payload = {"action": "opened", "issue": {"number": 456}}
         headers = {"X-GitHub-Event": "issues", "X-GitHub-Delivery": "delivery-2"}
 
@@ -118,8 +118,8 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual(count, 1) # No duplicate side effect
         db.close()
 
-    @patch("gossipmesh.worker.tasks.process_issue_solver.apply_async")
-    def test_replay_endpoint_admin_only(self, mock_apply_async):
+    @patch("gossipmesh.workflows.issue_solver.IssueSolverWorkflow.execute")
+    def test_replay_endpoint_admin_only(self, mock_execute):
         # Create user and event
         db = TestingSessionLocal()
         user = User(email="admin@test.com", is_active=True, is_superuser=True)

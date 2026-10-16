@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 # Set up required environment variables before any tests run
-os.environ["ENCRYPTION_KEY"] = "b_wH5yL7g3XQz8T1kVcZp6sN0mR9dE2fA4uYxWqVjMw="
+os.environ["ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
 os.environ["SECRET_KEY"] = "supersecretkey_please_change_in_production"
 os.environ["POSTGRES_USER"] = "testuser"
 os.environ["POSTGRES_PASSWORD"] = "testpass"

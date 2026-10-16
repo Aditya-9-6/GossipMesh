@@ -373,12 +373,12 @@ def call_ai_model(prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
     raise RuntimeError("All AI model providers (Gemini, Cohere, HuggingFace, NVIDIA NIM, OpenRouter) exhausted without response.")
 
 def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -> list[str]:
-    conflicts_resolved = set()
+    conflicted_files = set()
     try:
         status_res = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True)
         for line in status_res.stdout.splitlines():
             if line and line[:2] in ("UU", "AA", "UD", "DU", "AU", "UA", "DD"):
-                conflicts_resolved.add(line[3:].strip().replace("\\", "/"))
+                conflicted_files.add(line[3:].strip().replace("\\", "/"))
     except Exception:
         pass
 
@@ -386,16 +386,16 @@ def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -
         try:
             content = p.read_text(encoding="utf-8", errors="ignore")
             if "<<<<<<< HEAD" in content or ("=======" in content and ">>>>>>>" in content):
-                conflicts_resolved.add(str(p.relative_to(workspace)).replace("\\", "/"))
+                conflicted_files.add(str(p.relative_to(workspace)).replace("\\", "/"))
         except Exception:
             pass
 
     resolved = []
-    if not conflicts_resolved:
+    if not conflicted_files:
         return resolved
 
-    print(f"[*] ⚠️ Detected {len(conflicts_resolved)} conflicted file(s): {sorted(list(conflicts_resolved))}", flush=True)
-    for rel_path in sorted(list(conflicts_resolved)):
+    print(f"[*] ⚠️ Detected {len(conflicted_files)} conflicted file(s): {sorted(list(conflicted_files))}", flush=True)
+    for rel_path in sorted(list(conflicted_files)):
         target_file = workspace / rel_path
         if rel_path.startswith(".github/") or rel_path.startswith("scripts/ai_") or rel_path.startswith("scripts/auto_merge") or rel_path == "fix_conflict.py":
             print(f"[*] Preserving master workflow/tooling from origin/main for {rel_path}...", flush=True)
