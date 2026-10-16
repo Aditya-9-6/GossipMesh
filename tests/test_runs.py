@@ -1,7 +1,7 @@
-# tests/test_runs.py
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import datetime
 
 from gossipmesh.api.main import app
 from gossipmesh.database import Base
@@ -26,8 +26,8 @@ def test_track_run():
         "workflow_type": "CI",
         "run_id": "123456",
         "status": "success",
-        "start_time": "2024-01-01T12:00:00",
-        "end_time": "2024-01-01T12:30:00",
+        "start_time": datetime.datetime(2024, 1, 1, 12, 0),
+        "end_time": datetime.datetime(2024, 1, 1, 12, 30),
         "failure_reason": "None",
         "branch": "main",
         "commit_sha": "abc123",
@@ -47,5 +47,3 @@ def test_track_run():
     assert response.json() == {
         "message": "Run tracked successfully"
     }
-
-# Add more test cases as needed

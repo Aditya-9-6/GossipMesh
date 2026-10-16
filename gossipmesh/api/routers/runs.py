@@ -1,7 +1,7 @@
-# gossipmesh/api/routers/runs.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import datetime
 
 from gossipmesh.api import deps
 from gossipmesh.api.errors import handle_exceptions
@@ -17,8 +17,8 @@ class Run(BaseModel):
     workflow_type: str
     run_id: str
     status: str
-    start_time: datetime
-    end_time: datetime
+    start_time: datetime.datetime
+    end_time: datetime.datetime
     failure_reason: str
     branch: str
     commit_sha: str
@@ -37,9 +37,7 @@ def get_db_session(db: Session = Depends(get_db)):
 def track_run(run: Run, db: Session = Depends(get_db_session)):
     # Implement logic to track the run details in the database
     # This is a placeholder, replace with actual database interaction code
-    print(f"Tracking run: {run}")
+    print(f"Tracking run: {{run}}")
     return {
         "message": "Run tracked successfully"
     }
-
-# Add unit tests for the new behavior in tests/test_runs.py
