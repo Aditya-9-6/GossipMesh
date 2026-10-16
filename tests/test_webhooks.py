@@ -1,4 +1,5 @@
 import unittest
+from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from gossipmesh.api import app
@@ -52,6 +53,24 @@ class TestWebhooks(unittest.TestCase):
             del os.environ["ENVIRONMENT"]
         app.dependency_overrides = {get_db: override_get_db} # Reset other overrides
 
+    @patch("gossipmesh.api.webhooks.process_webhook_event.apply_async")
+    def test_concurrent_delivery(self, mock_apply):
+        from sqlalchemy.exc import IntegrityError
+        from sqlalchemy.orm import Session
+        headers = {"X-GitHub-Event": "issues", "X-GitHub-Delivery": "delivery-concurrent-mock"}
+        payload = {"action": "opened", "issue": {"number": 999}}
+
+        # First request succeeds
+        response1 = client.post("/webhooks/github", headers=headers, json=payload)
+        self.assertEqual(response1.status_code, 200)
+        self.assertEqual(response1.json()["status"], "accepted")
+
+        # Second request simulates IntegrityError when adding
+        with patch.object(Session, "flush", side_effect=IntegrityError("Mock Error", "params", "orig")):
+            response2 = client.post("/webhooks/github", headers=headers, json=payload)
+            self.assertEqual(response2.status_code, 200)
+            self.assertEqual(response2.json()["status"], "already_processed")
+
     def test_missing_event_header(self):
         response = client.post("/webhooks/github", json={})
         self.assertEqual(response.status_code, 422)
@@ -59,8 +78,8 @@ class TestWebhooks(unittest.TestCase):
             response.json()["error"]["message"], "Missing X-GitHub-Event header"
         )
 
-    @patch("gossipmesh.worker.tasks.process_pr_review.apply_async")
-    def test_pull_request_event(self, mock_apply_async):
+    @patch("gossipmesh.jobs.pr_review.PRReviewJob.execute")
+    def test_pull_request_event(self, mock_execute):
         payload = {"action": "opened", "pull_request": {"number": 123}}
         response = client.post(
             "/webhooks/github",
@@ -79,8 +98,8 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual(event.status, "processed")
         db.close()
 
-    @patch("gossipmesh.worker.tasks.process_issue_solver.apply_async")
-    def test_webhook_idempotency(self, mock_apply_async):
+    @patch("gossipmesh.workflows.issue_solver.IssueSolverWorkflow.execute")
+    def test_webhook_idempotency(self, mock_execute):
         payload = {"action": "opened", "issue": {"number": 456}}
         headers = {"X-GitHub-Event": "issues", "X-GitHub-Delivery": "delivery-2"}
 
@@ -99,8 +118,8 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual(count, 1) # No duplicate side effect
         db.close()
 
-    @patch("gossipmesh.worker.tasks.process_issue_solver.apply_async")
-    def test_replay_endpoint_admin_only(self, mock_apply_async):
+    @patch("gossipmesh.workflows.issue_solver.IssueSolverWorkflow.execute")
+    def test_replay_endpoint_admin_only(self, mock_execute):
         # Create user and event
         db = TestingSessionLocal()
         user = User(email="admin@test.com", is_active=True, is_superuser=True)
@@ -146,6 +165,99 @@ class TestWebhooks(unittest.TestCase):
         self.assertIsNotNone(replayed_event.replayed_at)
         self.assertEqual(replayed_event.replayed_by, user_id)
         db.close()
+
+    @patch("gossipmesh.worker.tasks.webhook_dispatch.SessionLocal")
+    @patch("gossipmesh.worker.tasks.webhook_dispatch.async_dispatch")
+    def test_process_webhook_event_success(self, mock_dispatch, mock_session_local):
+        from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
+        mock_session_local.return_value = TestingSessionLocal()
+
+        db = TestingSessionLocal()
+        event = WebhookEvent(delivery_id="delivery-task-1", event="issues", payload={"action": "opened"}, status="pending")
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        event_id = event.id
+        db.close()
+
+        process_webhook_event(event_id)
+
+        db = TestingSessionLocal()
+        updated_event = db.query(WebhookEvent).filter(WebhookEvent.id == event_id).first()
+        self.assertEqual(updated_event.status, "processed")
+        self.assertEqual(updated_event.retries, 0)
+        db.close()
+
+    @patch("gossipmesh.worker.tasks.webhook_dispatch.SessionLocal")
+    @patch("gossipmesh.worker.tasks.webhook_dispatch.async_dispatch")
+    @patch("gossipmesh.worker.tasks.webhook_dispatch.process_webhook_event.retry")
+    def test_process_webhook_event_failure_and_retry(self, mock_retry, mock_dispatch, mock_session_local):
+        from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
+        mock_session_local.return_value = TestingSessionLocal()
+        mock_dispatch.side_effect = Exception("Test failure")
+        mock_retry.side_effect = Exception("Retry triggered")
+
+        db = TestingSessionLocal()
+        event = WebhookEvent(delivery_id="delivery-task-2", event="issues", payload={"action": "opened"}, status="pending")
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        event_id = event.id
+        db.close()
+
+        with self.assertRaises(Exception) as context:
+            process_webhook_event(event_id)
+
+        self.assertTrue("Retry triggered" in str(context.exception))
+
+        db = TestingSessionLocal()
+        updated_event = db.query(WebhookEvent).filter(WebhookEvent.id == event_id).first()
+        self.assertEqual(updated_event.status, "failed")
+        self.assertEqual(updated_event.retries, 1)
+        self.assertIsNotNone(updated_event.next_retry_at)
+        db.close()
+
+    @patch("gossipmesh.worker.tasks.webhook_dispatch.SessionLocal")
+    @patch("gossipmesh.worker.tasks.webhook_dispatch.async_dispatch")
+    def test_process_webhook_event_dead_letter(self, mock_dispatch, mock_session_local):
+        from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
+        mock_session_local.return_value = TestingSessionLocal()
+        mock_dispatch.side_effect = Exception("Test failure")
+
+        db = TestingSessionLocal()
+        event = WebhookEvent(delivery_id="delivery-task-3", event="issues", payload={"action": "opened"}, status="pending", retries=4)
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        event_id = event.id
+        db.close()
+
+        process_webhook_event(event_id)
+
+        db = TestingSessionLocal()
+        updated_event = db.query(WebhookEvent).filter(WebhookEvent.id == event_id).first()
+        self.assertEqual(updated_event.status, "dead_letter")
+        self.assertEqual(updated_event.retries, 5)
+        db.close()
+
+    def test_malformed_payload(self):
+        response = client.post(
+            "/webhooks/github",
+            headers={"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-malformed"},
+            content=b"not a valid json"
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["error"]["message"], "Invalid JSON payload")
+
+    def test_payload_size_limit(self):
+        payload_bytes = b"A" * (25 * 1024 * 1024 + 1)
+        response = client.post(
+            "/webhooks/github",
+            headers={"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-size-limit", "Content-Type": "application/json"},
+            content=payload_bytes
+        )
+        self.assertEqual(response.status_code, 413)
+        pass  # Detail string or format could be different
 
 if __name__ == "__main__":
     unittest.main()
