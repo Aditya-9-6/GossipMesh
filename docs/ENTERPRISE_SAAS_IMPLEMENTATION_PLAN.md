@@ -170,7 +170,7 @@ Add explicit Pydantic request and response models to all routes. Remove public r
 
 Add request IDs to response headers, structured logs, jobs, audit events, and error responses. Never use arbitrary user input as identity.
 
-## Task 24 — API documentation
+## Task 24 — API documentation (Completed)
 
 Make OpenAPI accurate, version API contracts, document authentication, errors, rate limits, pagination, and webhook behavior.
 
