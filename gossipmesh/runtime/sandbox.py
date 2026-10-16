@@ -4,6 +4,8 @@ import tempfile
 import subprocess
 import shlex
 from typing import Optional, Tuple, Union, List
+from gossipmesh.core.rate_limit import RateLimiter
+from gossipmesh.core.exceptions import RateLimitError
 
 class SandboxEnvironment:
     """
@@ -23,6 +25,10 @@ class SandboxEnvironment:
 
     def run_command(self, cmd: Union[str, List[str]], timeout: int = 30) -> Tuple[int, str, str]:
         """Runs a command within the sandbox workspace."""
+        # Enforce rate limit on expensive sandbox jobs
+        limiter = RateLimiter(limit=50, window=3600)  # 50 commands per hour globally for now
+        limiter.enforce("sandbox_global", "sandbox_job")
+
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 

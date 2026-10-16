@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Request, BackgroundTasks
+from fastapi import APIRouter, Request
+from fastapi import BackgroundTasks
 import logging
 import hashlib
 import hmac
@@ -9,6 +10,8 @@ from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
 from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
 from gossipmesh.core.exceptions import AuthenticationError, ValidationError
+from gossipmesh.api.rate_limit import rate_limit
+from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,10 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
     return True
 
 
-@router.post("/github")
+@router.post(
+    "/github",
+    dependencies=[Depends(rate_limit(limit_type="webhook", limit=100, window=60))]
+)
 async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Handle incoming GitHub webhooks for Milestone 6 and 7.
@@ -74,6 +80,9 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         action = payload.get("action")
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
+
+            # Rate limit PR review creation (org-aware logic in the job itself or rely on the webhook limit)
+            # Webhook level rate limit already applies
             job = PRReviewJob(pr_data)
             background_tasks.add_task(job.execute)
 

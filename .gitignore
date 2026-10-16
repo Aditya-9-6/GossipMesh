@@ -41,3 +41,4 @@ build/
 # Database
 *.db
 *.sqlite3
+.coverage
