@@ -38,7 +38,7 @@ def test_track_run():
     }
 
     # Send a POST request to track the run
-    response = client.post("/runs/", json=run_data)
+    response = client.post("/api/v1/runs/", json=run_data)
 
     # Assert that the response status code is 200 OK
     assert response.status_code == 200

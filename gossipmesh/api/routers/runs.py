@@ -4,7 +4,6 @@ from pydantic import BaseModel
 import datetime
 
 from gossipmesh.api import deps
-from gossipmesh.api.errors import global_exception_handler as handle_exceptions
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -30,7 +29,7 @@ class Run(BaseModel):
 def track_run(run: Run, db: Session = Depends(deps.get_db)):
     # Implement logic to track the run details in the database
     # This is a placeholder, replace with actual database interaction code
-    print(f"Tracking run: {{run}}")
+    print(f"Tracking run: {run}")
     return {
         "message": "Run tracked successfully"
     }
