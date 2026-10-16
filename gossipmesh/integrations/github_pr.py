@@ -4,19 +4,90 @@ from typing import Any, Dict, List, Optional
 import httpx
 from sqlalchemy.orm import Session
 
+from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError, AuthorizationError
 from gossipmesh.integrations.github_client import GitHubAPIClient
-from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
 class GitHubPRService(GitHubAPIClient):
-    def __init__(self, token: str, max_retries: int = 3, timeout: float = 10.0, db: Optional[Session] = None, actor_id: Optional[int] = None, organization_id: Optional[int] = None):
+    def __init__(self, token: str, max_retries: int = 3, timeout: float = 10.0, db: Optional[Session] = None, actor_id: Optional[int] = None, organization_id: Optional[int] = None, permissions: Optional[Dict[str, str]] = None):
         super().__init__(token=token, max_retries=max_retries, timeout=timeout, db=db, actor_id=actor_id, organization_id=organization_id)
+        self.permissions = permissions
+        self.base_url = "https://api.github.com"
+        self.headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": f"Bearer {self.token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+
+    def _check_permissions(self, required_permissions: Dict[str, str]) -> None:
+        if self.permissions is None:
+            return
+
+        for scope, required_level in required_permissions.items():
+            granted_level = self.permissions.get(scope)
+            if not granted_level:
+                raise AuthorizationError(
+                    f"Missing required permission scope: '{scope}'",
+                    details={"required": required_permissions, "granted": self.permissions}
+                )
+
+            if required_level == "read" and granted_level not in ("read", "write"):
+                raise AuthorizationError(
+                    f"Insufficient permission for '{scope}'. Required: {required_level}, Granted: {granted_level}",
+                    details={"required": required_permissions, "granted": self.permissions}
+                )
+            elif required_level == "write" and granted_level != "write":
+                raise AuthorizationError(
+                    f"Insufficient permission for '{scope}'. Required: {required_level}, Granted: {granted_level}",
+                    details={"required": required_permissions, "granted": self.permissions}
+                )
+
+    async def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        headers = dict(self.headers)
+        if "headers" in kwargs:
+            headers.update(kwargs.pop("headers"))
+
+        client_kwargs = {
+            "timeout": httpx.Timeout(self.timeout)
+        }
+
+        for attempt in range(self.max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=client_kwargs["timeout"]) as client:
+                    response = await client.request(method, url, headers=headers, **kwargs)
+
+                    if response.status_code in (403, 429):
+                        remaining = response.headers.get("x-ratelimit-remaining")
+                        if remaining == "0" or response.status_code == 429:
+                            raise RateLimitError(
+                                message="GitHub API rate limit exceeded",
+                                details={"reset": response.headers.get("x-ratelimit-reset")}
+                            )
+
+                    if response.status_code >= 500:
+                        if attempt == self.max_retries - 1:
+                            response.raise_for_status()
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+
+                    response.raise_for_status()
+                    return response
+            except (httpx.TimeoutException, httpx.RequestError) as e:
+                if attempt == self.max_retries - 1:
+                    raise GitHubIntegrationError(f"Request failed: {str(e)}")
+                await asyncio.sleep(2 ** attempt)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code >= 500 and attempt < self.max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise GitHubIntegrationError(f"HTTP error: {e.response.status_code} - {e.response.text}")
+
+        raise GitHubIntegrationError("Max retries exceeded")
 
     async def _get_paginated(self, url: str, **kwargs) -> List[Dict[str, Any]]:
-        """Fetch all pages of a paginated GitHub API endpoint."""
         results = []
-        next_url: str | None = url
+        next_url = url
 
         while next_url:
             response = await self._request("GET", next_url, **kwargs)
@@ -26,7 +97,6 @@ class GitHubPRService(GitHubAPIClient):
             else:
                 results.append(data)
 
-            # Extract next url from Link header
             link_header = response.headers.get("link")
             next_url = None
             if link_header:
@@ -39,33 +109,29 @@ class GitHubPRService(GitHubAPIClient):
         return results
 
     async def get_pr_metadata(self, owner: str, repo: str, pull_number: int) -> Dict[str, Any]:
-        """Get basic pull request metadata."""
+        self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
         response = await self._request("GET", url)
         return response.json()
 
     async def get_pr_diff(self, owner: str, repo: str, pull_number: int) -> str:
-        """Get pull request unified diff."""
+        self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
         headers = {"Accept": "application/vnd.github.v3.diff"}
         response = await self._request("GET", url, headers=headers)
         return response.text
 
     async def get_pr_files(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
-        """Get list of changed files in the pull request."""
+        self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/files"
         return await self._get_paginated(url)
 
     async def get_pr_commits(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
-        """Get list of commits in the pull request."""
+        self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/commits"
         return await self._get_paginated(url)
 
     async def get_pr_details(self, owner: str, repo: str, pull_number: int) -> Dict[str, Any]:
-        """
-        Get comprehensive details about a pull request including metadata,
-        diff, files, and commits.
-        """
         metadata = await self.get_pr_metadata(owner, repo, pull_number)
         diff = await self.get_pr_diff(owner, repo, pull_number)
         files = await self.get_pr_files(owner, repo, pull_number)
@@ -92,17 +158,29 @@ class GitHubPRService(GitHubAPIClient):
         }
 
     async def post_pr_review_comment(self, owner: str, repo: str, pull_number: int, comment_payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Posts an individual PR review comment.
-        """
+        self._check_permissions({"pull_requests": "write"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/comments"
         response = await self._request("POST", url, json=comment_payload)
         return response.json()
 
     async def post_pr_review(self, owner: str, repo: str, pull_number: int, review_payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Posts a PR review with inline comments.
-        """
+        self._check_permissions({"pull_requests": "write"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
         response = await self._request("POST", url, json=review_payload)
         return response.json()
+
+    async def create_pr(self, owner: str, repo: str, pr_payload: Dict[str, Any]) -> Dict[str, Any]:
+        self._check_permissions({"pull_requests": "write"})
+        raise NotImplementedError("Creating a pull request is not implemented yet")
+
+    async def set_commit_status(self, owner: str, repo: str, sha: str, status_payload: Dict[str, Any]) -> Dict[str, Any]:
+        self._check_permissions({"statuses": "write"})
+        raise NotImplementedError("Setting a commit status is not implemented yet")
+
+    async def get_workflow_logs(self, owner: str, repo: str, run_id: int) -> str:
+        self._check_permissions({"actions": "read"})
+        raise NotImplementedError("Getting workflow logs is not implemented yet")
+
+    async def create_branch(self, owner: str, repo: str, ref: str, sha: str) -> Dict[str, Any]:
+        self._check_permissions({"contents": "write"})
+        raise NotImplementedError("Creating a branch is not implemented yet")

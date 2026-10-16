@@ -3,7 +3,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from httpx import Response
 import httpx
 from gossipmesh.integrations.github_pr import GitHubPRService
-from gossipmesh.core.exceptions import RateLimitError
+from gossipmesh.core.exceptions import RateLimitError, AuthorizationError
 
 class TestGitHubPRService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -139,6 +139,49 @@ class TestGitHubPRService(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(details["file_status"], {"modified.txt": "modified", "new_name.txt": "renamed"})
             self.assertEqual(details["renamed_files"], {"old_name.txt": "new_name.txt"})
             self.assertEqual(len(details["commits"]), 2)
+
+    async def test_get_pr_metadata_insufficient_permissions(self):
+        service = GitHubPRService(token="test_token", permissions={})
+        with self.assertRaises(AuthorizationError) as context:
+            await service.get_pr_metadata("owner", "repo", 42)
+
+        self.assertIn("Missing required permission scope", str(context.exception))
+
+    async def test_post_pr_review_comment_insufficient_permissions(self):
+        service = GitHubPRService(token="test_token", permissions={"pull_requests": "read"})
+        with self.assertRaises(AuthorizationError) as context:
+            await service.post_pr_review_comment("owner", "repo", 42, {})
+
+        self.assertIn("Insufficient permission", str(context.exception))
+
+    async def test_create_pr_insufficient_permissions(self):
+        service = GitHubPRService(token="test_token", permissions={"pull_requests": "read"})
+        with self.assertRaises(AuthorizationError) as context:
+            await service.create_pr("owner", "repo", {})
+
+        self.assertIn("Insufficient permission", str(context.exception))
+
+    async def test_set_commit_status_insufficient_permissions(self):
+        service = GitHubPRService(token="test_token", permissions={"statuses": "read"})
+        with self.assertRaises(AuthorizationError) as context:
+            await service.set_commit_status("owner", "repo", "sha123", {})
+
+        self.assertIn("Insufficient permission", str(context.exception))
+
+    async def test_get_workflow_logs_insufficient_permissions(self):
+        service = GitHubPRService(token="test_token", permissions={})
+        with self.assertRaises(AuthorizationError) as context:
+            await service.get_workflow_logs("owner", "repo", 123)
+
+        self.assertIn("Missing required permission scope", str(context.exception))
+
+    async def test_create_branch_insufficient_permissions(self):
+        service = GitHubPRService(token="test_token", permissions={"contents": "read"})
+        with self.assertRaises(AuthorizationError) as context:
+            await service.create_branch("owner", "repo", "ref123", "sha123")
+
+        self.assertIn("Insufficient permission", str(context.exception))
+
 
 if __name__ == '__main__':
     unittest.main()
