@@ -31,6 +31,9 @@ class UserOrganization(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default="active"
     )  # active, invited, suspended
+    role: Mapped[str] = mapped_column(
+        String, nullable=False, default="member"
+    )  # admin, member, etc
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user = relationship("User", back_populates="organizations")

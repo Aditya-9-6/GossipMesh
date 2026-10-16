@@ -26,7 +26,14 @@ class TestJobsAPI(unittest.TestCase):
 
     def test_get_job_status_success(self):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=1, status="success", result={"key": "val"})
-        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_job
+        def mock_query(model):
+            mock_query_obj = MagicMock()
+            if model.__name__ == 'BackgroundJob':
+                mock_query_obj.filter.return_value.first.return_value = mock_job
+            elif model.__name__ == 'UserOrganization':
+                mock_query_obj.filter.return_value.first.return_value = None
+            return mock_query_obj
+        self.mock_db.query.side_effect = mock_query
 
         response = client.get(f"{settings.API_V1_STR}/jobs/123")
         self.assertEqual(response.status_code, 200)
@@ -35,7 +42,14 @@ class TestJobsAPI(unittest.TestCase):
 
     def test_get_job_status_unauthorized(self):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=99, status="success")
-        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_job
+        def mock_query(model):
+            mock_query_obj = MagicMock()
+            if model.__name__ == 'BackgroundJob':
+                mock_query_obj.filter.return_value.first.return_value = mock_job
+            elif model.__name__ == 'UserOrganization':
+                mock_query_obj.filter.return_value.first.return_value = None
+            return mock_query_obj
+        self.mock_db.query.side_effect = mock_query
 
         response = client.get(f"{settings.API_V1_STR}/jobs/123")
         self.assertEqual(response.status_code, 403)
@@ -44,7 +58,14 @@ class TestJobsAPI(unittest.TestCase):
     @patch("gossipmesh.api.routers.jobs.celery_app.control.revoke")
     def test_cancel_job_success(self, mock_revoke):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=1, status="running")
-        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_job
+        def mock_query(model):
+            mock_query_obj = MagicMock()
+            if model.__name__ == 'BackgroundJob':
+                mock_query_obj.filter.return_value.first.return_value = mock_job
+            elif model.__name__ == 'UserOrganization':
+                mock_query_obj.filter.return_value.first.return_value = None
+            return mock_query_obj
+        self.mock_db.query.side_effect = mock_query
 
         response = client.post(f"{settings.API_V1_STR}/jobs/123/cancel")
         self.assertEqual(response.status_code, 200)
@@ -54,7 +75,14 @@ class TestJobsAPI(unittest.TestCase):
 
     def test_cancel_job_completed_error(self):
         mock_job = BackgroundJob(task_id="123", task_name="test_task", user_id=1, status="success")
-        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_job
+        def mock_query(model):
+            mock_query_obj = MagicMock()
+            if model.__name__ == 'BackgroundJob':
+                mock_query_obj.filter.return_value.first.return_value = mock_job
+            elif model.__name__ == 'UserOrganization':
+                mock_query_obj.filter.return_value.first.return_value = None
+            return mock_query_obj
+        self.mock_db.query.side_effect = mock_query
 
         response = client.post(f"{settings.API_V1_STR}/jobs/123/cancel")
         self.assertEqual(response.status_code, 400)
