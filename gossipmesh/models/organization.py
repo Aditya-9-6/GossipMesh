@@ -1,6 +1,3 @@
-# GossipMesh Organization Model
-
-from typing import List, Optional
 import enum
 from sqlalchemy import Boolean, ForeignKey, String, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +18,6 @@ class OrganizationRole(str, enum.Enum):
 
 
 class Organization(SoftDeleteMixin, Base):
-    """Enhanced Organization model with database relationships and enum types."""
     __tablename__ = "organizations"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -33,14 +29,8 @@ class Organization(SoftDeleteMixin, Base):
     projects = relationship("Project", back_populates="organization")
     saml_config = relationship("OrganizationSAMLConfig", back_populates="organization", uselist=False, cascade="all, delete-orphan")
 
-    def __init__(self, name: str, members: List[str] = None, role: Optional[str] = None):
-        self.name = name
-        self.members = members or []
-        self.role = role
-
 
 class UserOrganization(Base):
-    """User-Organization relationship model."""
     __tablename__ = "user_organizations"
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
@@ -60,7 +50,6 @@ class UserOrganization(Base):
 
 
 class OrganizationInvitation(Base):
-    """Organization invitation model."""
     __tablename__ = "organization_invitations"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

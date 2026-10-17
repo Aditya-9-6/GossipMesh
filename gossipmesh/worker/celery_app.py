@@ -7,12 +7,6 @@ celery_app = Celery(
     backend=settings.REDIS_URI
 )
 
-import os
-
-if os.environ.get("CELERY_EAGER", "1").lower() in ("1", "true", "yes"):
-    celery_app.conf.task_always_eager = True
-    celery_app.conf.task_eager_propagates = True
-
 celery_app.conf.task_routes = {
     "gossipmesh.worker.tasks.*": "main-queue"
 }

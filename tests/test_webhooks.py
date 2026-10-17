@@ -166,15 +166,11 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual(replayed_event.replayed_by, user_id)
         db.close()
 
-    @patch("gossipmesh.core.concurrency_limit.redis_client")
     @patch("gossipmesh.worker.tasks.webhook_dispatch.SessionLocal")
     @patch("gossipmesh.worker.tasks.webhook_dispatch.async_dispatch")
-    def test_process_webhook_event_success(self, mock_dispatch, mock_session_local, mock_redis):
+    def test_process_webhook_event_success(self, mock_dispatch, mock_session_local):
         from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
         mock_session_local.return_value = TestingSessionLocal()
-
-        # Mock eval to return success (1)
-        mock_redis.eval.return_value = 1
 
         db = TestingSessionLocal()
         event = WebhookEvent(delivery_id="delivery-task-1", event="issues", payload={"action": "opened"}, status="pending")
@@ -192,12 +188,10 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual(updated_event.retries, 0)
         db.close()
 
-    @patch("gossipmesh.core.concurrency_limit.redis_client")
     @patch("gossipmesh.worker.tasks.webhook_dispatch.SessionLocal")
     @patch("gossipmesh.worker.tasks.webhook_dispatch.async_dispatch")
     @patch("gossipmesh.worker.tasks.webhook_dispatch.process_webhook_event.retry")
-    def test_process_webhook_event_failure_and_retry(self, mock_retry, mock_dispatch, mock_session_local, mock_redis):
-        mock_redis.eval.return_value = 1
+    def test_process_webhook_event_failure_and_retry(self, mock_retry, mock_dispatch, mock_session_local):
         from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
         mock_session_local.return_value = TestingSessionLocal()
         mock_dispatch.side_effect = Exception("Test failure")
@@ -223,13 +217,11 @@ class TestWebhooks(unittest.TestCase):
         self.assertIsNotNone(updated_event.next_retry_at)
         db.close()
 
-    @patch("gossipmesh.core.concurrency_limit.redis_client")
     @patch("gossipmesh.worker.tasks.webhook_dispatch.SessionLocal")
     @patch("gossipmesh.worker.tasks.webhook_dispatch.async_dispatch")
-    def test_process_webhook_event_dead_letter(self, mock_dispatch, mock_session_local, mock_redis):
+    def test_process_webhook_event_dead_letter(self, mock_dispatch, mock_session_local):
         from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
         mock_session_local.return_value = TestingSessionLocal()
-        mock_redis.eval.return_value = 1
         mock_dispatch.side_effect = Exception("Test failure")
 
         db = TestingSessionLocal()

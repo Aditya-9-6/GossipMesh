@@ -50,7 +50,3 @@ class SandboxError(GossipMeshException):
 class RateLimitError(GossipMeshException):
     def __init__(self, message: str = "Rate limit exceeded", details: Optional[Dict[str, Any]] = None):
         super().__init__(message, status_code=429, error_code="RATE_LIMIT_ERROR", details=details)
-
-class ConcurrencyLimitError(GossipMeshException):
-    def __init__(self, message: str = "Concurrency limit exceeded", details: Optional[Dict[str, Any]] = None):
-        super().__init__(message, status_code=429, error_code="CONCURRENCY_LIMIT_ERROR", details=details)
