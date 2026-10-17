@@ -69,6 +69,7 @@ def process_webhook_event(self, webhook_event_id: int):
         db.commit()
 
         try:
+<<<<<<< HEAD
             payload = webhook_record.payload or {}
             org_id = None
 
@@ -96,6 +97,9 @@ def process_webhook_event(self, webhook_event_id: int):
 =======
                 asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload))
 >>>>>>> b7b8fe0218e4445c90d5bb67c2cf017b66cdd67f
+=======
+            asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload, db=db))
+>>>>>>> b9bd3f04893d5e47964258f0651333180623246a
 
             webhook_record.status = "processed"
             db.commit()

@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 # GossipMesh Organization Model
 
 from typing import List, Optional
+=======
+>>>>>>> b9bd3f04893d5e47964258f0651333180623246a
 import enum
 from sqlalchemy import Boolean, ForeignKey, String, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship

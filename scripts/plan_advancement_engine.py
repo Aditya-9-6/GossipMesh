@@ -215,7 +215,11 @@ def format_issue_content(task: PlanTask) -> Tuple[str, str]:
     body = f"""## 🚀 Enterprise SaaS Implementation Task: Task {task.num} — {task.name}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 **Phase**: {task.phase}  
+=======
+**Phase**: {task.phase}
+>>>>>>> b9bd3f04893d5e47964258f0651333180623246a
 =======
 **Phase**: {task.phase}
 >>>>>>> b9bd3f04893d5e47964258f0651333180623246a
@@ -230,8 +234,13 @@ def format_issue_content(task: PlanTask) -> Tuple[str, str]:
 
 ### ⚙️ Jules Task Operating Rules & Mandate
 <<<<<<< HEAD
+<<<<<<< HEAD
 > **Repository**: https://github.com/Aditya-9-6/GossipMesh  
 > 
+=======
+> **Repository**: https://github.com/Aditya-9-6/GossipMesh
+>
+>>>>>>> b9bd3f04893d5e47964258f0651333180623246a
 =======
 > **Repository**: https://github.com/Aditya-9-6/GossipMesh
 >
