@@ -155,22 +155,29 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         "--issue-body", issue_body,
         "--workspace", str(workspace)
     ]
-    res = subprocess.run(solver_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    print(res.stdout, flush=True)
-    if res.returncode != 0:
-        print(f"[!] Solver failed: {res.stderr}", file=sys.stderr, flush=True)
+    try:
+        res = subprocess.run(solver_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        print(res.stdout, flush=True)
+        if res.returncode != 0:
+            print(f"[!] Solver failed: {res.stderr}", file=sys.stderr, flush=True)
+            return False
+    except subprocess.TimeoutExpired:
+        print(f"[!] Solver timed out after 300s on issue #{issue_num}", file=sys.stderr, flush=True)
         return False
 
     # Pre-commit Quality Assurance Gate
-    print("[*] Tidying Python files with python -m compileall ....", flush=True)
-    run_cmd(["python", "-m", "compileall", "."], cwd=workspace, check=False)
+    venv_py = workspace / ".venv" / "Scripts" / "python.exe"
+    py_bin = str(venv_py) if venv_py.exists() else sys.executable
+
+    print(f"[*] Tidying Python files with {py_bin} -m compileall ....", flush=True)
+    run_cmd([py_bin, "-m", "compileall", "."], cwd=workspace, check=False)
 
     print("[*] Formatting Python codebase with black...", flush=True)
     run_cmd(["black", "."], cwd=workspace, check=False)
 
     print("[*] Verifying Python linting & static analysis (flake8)...", flush=True)
     vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    check_res = subprocess.run(["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    check_res = subprocess.run([py_bin, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
     if vet_res.returncode != 0 or check_res.returncode != 0:
         print(f"[!] CI failed. Calling AI CI Fixer...", flush=True)
@@ -179,8 +186,11 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
             "--pr-number", str(issue_num), # Fake PR number if it is not created yet
             "--workspace", str(workspace)
         ]
-        fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        print(fix_res.stdout, flush=True)
+        try:
+            fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+            print(fix_res.stdout, flush=True)
+        except subprocess.TimeoutExpired:
+            print(f"[!] AI CI Fixer timed out after 300s on issue #{issue_num}", file=sys.stderr, flush=True)
 
 
     branch_name = f"ai/solve-issue-{issue_num}"

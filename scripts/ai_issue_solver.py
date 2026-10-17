@@ -14,13 +14,15 @@ import urllib.error
 import subprocess
 import time
 import hashlib
+import re
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-2.5-pro"
-FALLBACK_MODELS = [
-    "gemini-2.5-pro",
-    "gemini-1.5-pro",
-]
+scripts_dir = Path(__file__).resolve().parent
+if str(scripts_dir) not in sys.path:
+    sys.path.insert(0, str(scripts_dir))
+
+from ai_provider import call_ai_model, load_llm_keys
+
 
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, AI agent platform architecture, secure sandbox runtimes, and fastAPI backends.
 You are working on GossipMesh, a high-performance, developer-first AI Agent SaaS platform written in Python.
@@ -156,124 +158,79 @@ def summarize_go_file(filepath: str, workspace_root: Path, raw_content: str) -> 
         return f"// Error parsing go file: {e}\n{raw_content}"
 
 def get_relevant_files(workspace_root: Path, query_text: str) -> str:
-    """Uses VectorDB RAG to find semantically relevant files for context."""
+    """Uses VectorDB RAG or fast keyword heuristic to find semantically relevant files for context."""
     context_files = []
-    
-    # Initialize and index workspace if not already done
-    db = VectorDB()
-    if not db.embeddings:
-        print("[*] VectorDB is empty. Indexing workspace...")
-        db.index_workspace(workspace_root)
+    results = []
+    try:
+        db = VectorDB()
+        if db.embeddings:
+            print("[*] Querying VectorDB for relevant context files...", flush=True)
+            results = db.search(query_text, top_k=3)
+    except Exception as e:
+        print(f"[Warning] VectorDB search failed: {e}", flush=True)
 
-    print("[*] Querying VectorDB for relevant context files...")
-    results = db.search(query_text, top_k=3)
+    # If no RAG results, fall back to fast git ls-files keyword matching
+    if not results:
+        all_files = get_git_files(workspace_root)
+        keywords = set(re.findall(r"\w+", query_text.lower()))
+        scored = []
+        for f in all_files:
+            if not f.endswith(".py") or f.startswith("tests/"):
+                continue
+            path_words = set(re.findall(r"\w+", f.lower()))
+            overlap = len(keywords.intersection(path_words))
+            if overlap > 0:
+                scored.append((overlap, f))
+        scored.sort(reverse=True)
+        for _, path in scored[:3]:
+            try:
+                full_path = workspace_root / path
+                if full_path.exists():
+                    results.append((path, full_path.read_text(encoding="utf-8", errors="replace"), 1.0))
+            except Exception:
+                pass
 
     for path, content, score in results:
-        print(f"    [+] RAG hit: {path} (Similarity: {score:.2f})")
+        print(f"    [+] Context hit: {path} (Score: {score:.2f})", flush=True)
         if path.endswith(".py"):
-             summarized = summarize_python_file(content)
+            summarized = summarize_python_file(content)
         elif path.endswith(".go"):
-             summarized = summarize_go_file(path, workspace_root, content)
+            summarized = summarize_go_file(path, workspace_root, content)
         else:
-             summarized = content
+            summarized = content[:4000]
 
         context_files.append(f"=== Existing File: {path} ===\n{summarized}")
                 
     return "\n\n".join(context_files)
 
-def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
-    """Calls Gemini REST API with fallback and retries across supported models."""
-    ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
-    models_to_try = []
-    for m in ordered:
-        if m not in models_to_try:
-            models_to_try.append(m)
-
-    # Check cache
+def call_gemini(api_key: str, prompt: str, model: str = None, cache_dir: str = ".pyssip_mesh/cache") -> dict:
+    """Dispatches to resilient multi-provider AI orchestrator with caching."""
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
+    cache_key = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     cache_file = cache_path / f"{cache_key}.json"
 
     if cache_file.exists():
         try:
-            print("[*] Cache hit! Returning cached Gemini response...", flush=True)
+            print("[*] Cache hit! Returning cached response...", flush=True)
             return json.loads(cache_file.read_text(encoding="utf-8"))
         except Exception:
             pass
 
-    last_err = None
-    for current_model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+    keys = [api_key] if api_key else []
+    result = call_ai_model(
+        prompt=prompt,
+        system_prompt=SYSTEM_PROMPT,
+        gemini_keys=keys,
+        max_tokens=4096
+    )
 
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": SYSTEM_PROMPT},
-                        {"text": prompt}
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.2,
-                "responseMimeType": "application/json"
-            }
-        }
+    try:
+        cache_file.write_text(json.dumps(result), encoding="utf-8")
+    except Exception:
+        pass
 
-        print(f"[*] Attempting generation with model: {current_model}...", flush=True)
-        max_attempts = 3
-        for attempt in range(1, max_attempts + 1):
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=90) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-                    # Parse JSON response
-                    try:
-                        parsed_response = json.loads(text_response, strict=False)
-                    except json.JSONDecodeError:
-                        if text_response.startswith("```"):
-                            lines = text_response.splitlines()
-                            if lines[0].startswith("```"):
-                                lines = lines[1:]
-                            if lines and lines[-1].startswith("```"):
-                                lines = lines[:-1]
-                            text_response = "\n".join(lines).strip()
-                        parsed_response = json.loads(text_response, strict=False)
-
-                    try:
-                        cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
-                    except Exception:
-                        pass
-
-                    return parsed_response
-            except urllib.error.HTTPError as e:
-                err_msg = e.read().decode("utf-8", errors="replace")
-                print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:200]}", file=sys.stderr)
-                last_err = err_msg
-                # If model is deprecated / not found, do not waste retries
-                if e.code == 404:
-                    break
-                if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
-                    time.sleep(1 * attempt)
-                    continue
-                break
-            except Exception as e:
-                print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
-                last_err = str(e)
-                if attempt < max_attempts:
-                    time.sleep(1 * attempt)
-                    continue
-                break
-
-    raise RuntimeError(f"Failed to obtain solution from Gemini API across models {models_to_try}. Last error: {last_err}")
+    return result
 
 def main():
     parser = argparse.ArgumentParser(description="GossipMesh AI Issue Solver")

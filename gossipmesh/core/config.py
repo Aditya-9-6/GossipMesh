@@ -6,20 +6,20 @@ class Settings(BaseSettings):
     VERSION: str = "0.2.0"
     API_V1_STR: str = "/api/v1"
 
-    SECRET_KEY: str
+    SECRET_KEY: str = "dev-secret-key-for-local-testing-only-12345"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_ISSUER: str = "gossipmesh"
     JWT_AUDIENCE: str = "gossipmesh-api"
 
-    ENCRYPTION_KEY: str
+    ENCRYPTION_KEY: str = "dev-encryption-key-for-local-testing-only-12345"
 
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_HOST: str
-    POSTGRES_PORT: str
-    POSTGRES_DB: str
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: str = "5432"
+    POSTGRES_DB: str = "gossipmesh"
 
     REDIS_HOST: str = "localhost"
     REDIS_PORT: str = "6379"

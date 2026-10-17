@@ -214,7 +214,11 @@ def format_issue_content(task: PlanTask) -> Tuple[str, str]:
     title = f"feat(plan): Task {task.num} — {task.name}"
     body = f"""## 🚀 Enterprise SaaS Implementation Task: Task {task.num} — {task.name}
 
+<<<<<<< HEAD
 **Phase**: {task.phase}  
+=======
+**Phase**: {task.phase}
+>>>>>>> b9bd3f04893d5e47964258f0651333180623246a
 **Specification Source**: `docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md`
 
 ---
@@ -225,8 +229,13 @@ def format_issue_content(task: PlanTask) -> Tuple[str, str]:
 ---
 
 ### ⚙️ Jules Task Operating Rules & Mandate
+<<<<<<< HEAD
 > **Repository**: https://github.com/Aditya-9-6/GossipMesh  
 > 
+=======
+> **Repository**: https://github.com/Aditya-9-6/GossipMesh
+>
+>>>>>>> b9bd3f04893d5e47964258f0651333180623246a
 > Work only on this task. First inspect the existing repository and explain the relevant files. Do not rewrite unrelated code. Do not remove existing functionality without documenting a migration path. Add tests for all new behavior. Run the complete test suite before finishing. If the task cannot be safely completed, stop and explain why instead of creating fake implementations.
 
 ---
