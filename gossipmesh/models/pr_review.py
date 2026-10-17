@@ -13,6 +13,11 @@ class SecurityFinding:
     evidence: Optional[str] = None
     confidence_score: Optional[int] = None
     is_ai_generated: bool = False
+    fingerprint: str = ""
+    remediation: str = ""
+    source_scanner: str = ""
+    end_line: Optional[int] = None
+    github_comment_id: Optional[str] = None
 
 @dataclass
 class TestResult:
