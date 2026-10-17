@@ -91,7 +91,11 @@ def process_webhook_event(self, webhook_event_id: int):
             limiter = ConcurrencyLimiter(limit=5)
 
             with limiter.limit_concurrency(identifier=org_id, operation_type="webhook_dispatch"):
+<<<<<<< HEAD
                 asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload, db=db))
+=======
+                asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload))
+>>>>>>> b7b8fe0218e4445c90d5bb67c2cf017b66cdd67f
 
             webhook_record.status = "processed"
             db.commit()
