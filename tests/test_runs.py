@@ -38,25 +38,8 @@ def test_track_run():
     }
 
     # Send a POST request to track the run
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    response = client.post("/api/v1/runs/", json=run_data)
-=======
     from gossipmesh.core.config import settings
     response = client.post(f"{settings.API_V1_STR}/runs/", json=run_data)
->>>>>>> b9bd3f04893d5e47964258f0651333180623246a
-=======
-    response = client.post("/runs/", json=run_data)
->>>>>>> b7b8fe0218e4445c90d5bb67c2cf017b66cdd67f
-=======
-    response = client.post("/runs/", json=run_data)
->>>>>>> b7b8fe0218e4445c90d5bb67c2cf017b66cdd67f
-=======
-    from gossipmesh.core.config import settings
-    response = client.post(f"{settings.API_V1_STR}/runs/", json=run_data)
->>>>>>> b9bd3f04893d5e47964258f0651333180623246a
 
     # Assert that the response status code is 200 OK
     assert response.status_code == 200
