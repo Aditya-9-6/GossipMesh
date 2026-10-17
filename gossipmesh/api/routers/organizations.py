@@ -20,12 +20,14 @@ class OrganizationResponse(BaseModel):
 class OrganizationCreate(BaseModel):
     name: str
 
+from gossipmesh.models.organization import OrganizationRole
+
 class InvitationCreate(BaseModel):
     email: EmailStr
-    role: Literal["admin", "member"] = "member"
+    role: OrganizationRole = OrganizationRole.developer
 
 class RoleUpdate(BaseModel):
-    role: Literal["admin", "member"]
+    role: OrganizationRole
 
 class ProjectCreate(BaseModel):
     name: str
@@ -41,7 +43,7 @@ def require_org_admin(org_id: int, db: Session, current_user: User):
     user_org = db.query(UserOrganization).filter(
         UserOrganization.organization_id == org_id,
         UserOrganization.user_id == current_user.id,
-        UserOrganization.role == "admin",
+        UserOrganization.role.in_([OrganizationRole.organization_admin, OrganizationRole.owner]),
         UserOrganization.is_suspended == False
     ).first()
     if not user_org:
@@ -73,7 +75,7 @@ def create_organization(
     db.commit()
     db.refresh(org)
 
-    user_org = UserOrganization(user_id=current_user.id, organization_id=org.id, role="admin")
+    user_org = UserOrganization(user_id=current_user.id, organization_id=org.id, role=OrganizationRole.owner)
     db.add(user_org)
 
     log_audit_event(db, "organization.created", current_user.id, org.id, {"name": org.name})
