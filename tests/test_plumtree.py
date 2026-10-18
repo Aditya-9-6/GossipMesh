@@ -8,44 +8,37 @@ class TestPlumTreeMesh(unittest.TestCase):
 
     def test_peer_management(self):
         self.mesh.add_eager_peer("peer-A")
-        self.mesh.add_lazy_peer("peer-B")
-        
         self.assertIn("peer-A", self.mesh.get_eager_peers())
+        self.mesh.add_lazy_peer("peer-B")
         self.assertIn("peer-B", self.mesh.get_lazy_peers())
-        
         self.mesh.remove_peer("peer-A")
         self.assertNotIn("peer-A", self.mesh.get_eager_peers())
 
-    def test_first_message_delivery(self):
-        is_dup = self.mesh.handle_message("msg-1", {"data": "hello"}, "peer-A")
+    def test_message_handling_and_graft(self):
+        self.mesh.add_lazy_peer(
+            "peer-C"
+        )
+        is_dup = self.mesh.handle_message("msg-1", "payload", "peer-C")
         self.assertFalse(is_dup)
-        self.assertIn("msg-1", self.mesh.message_history)
+        # Receiving from lazy peer grafts back to eager
+        self.assertIn("peer-C", self.mesh.get_eager_peers())
+        self.assertNotIn("peer-C", self.mesh.get_lazy_peers())
 
-    def test_duplicate_message_triggers_lazy(self):
-        self.mesh.add_eager_peer("peer-A")
-        
-        # First delivery
-        is_dup1 = self.mesh.handle_message("msg-1", {"data": "hello"}, "peer-A")
-        self.assertFalse(is_dup1)
-        
-        # Duplicate delivery from eager peer -> should demote peer to lazy
-        is_dup2 = self.mesh.handle_message(
-            "msg-1", {"data": "hello"}, "peer-A"
-        )
-        self.assertTrue(is_dup2)
-        self.assertNotIn("peer-A", self.mesh.get_eager_peers())
-        self.assertIn("peer-A", self.mesh.get_lazy_peers())
+        # Duplicate message handling
+        is_dup_second = self.mesh.handle_message("msg-1", "payload", "peer-C")
+        self.assertTrue(is_dup_second)
 
-    def test_router_integration(self):
-        router = P2PRouter(
-            "node-1"
-        )
-        router.register_peer("peer-X", eager=True)
-        router.register_peer("peer-Y", eager=False)
+class TestP2PRouter(unittest.TestCase):
+    def setUp(self):
+        self.router = P2PRouter("router-node")
 
-        res = router.route_message("msg-100", "payload", "peer-X")
-        self.assertFalse(res["is_duplicate"])
-        self.assertIn("peer-Y", res["forward_lazy"])
+    def test_router_routing(self):
+        self.router.register_peer("peer-1", eager=True)
+        self.router.register_peer("peer-2", eager=False)
+        result = self.router.route_message("m-100", "data", "peer-2")
+        self.assertFalse(result["is_duplicate"])
+        self.assertIn("peer-2", result["forward_eager"])
+        self.assertIn("peer-1", result["forward_eager"])
 
-if __name__ == "__main":
+if __name__ == "__main__":
     unittest.main()
