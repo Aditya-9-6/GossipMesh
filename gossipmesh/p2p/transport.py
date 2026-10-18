@@ -1,4 +1,6 @@
 import logging
+import asyncio
+import json
 from typing import List, Any, Optional, Callable, Dict
 from gossipmesh.p2p.fanout import AdaptiveFanoutController
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
@@ -58,25 +60,39 @@ class GossipTransport:
         self.telemetry.received_bytes += size_bytes
         self.telemetry.received_messages += 1
 
-        if not self.rate_limiter.check_and_consume(peer_id):
+        allowed = self.rate_limiter.check_and_consume(peer_id)
+        if asyncio.iscoroutine(allowed):
+            allowed = await allowed
+
+        if not allowed:
             self.telemetry.dropped_messages += 1
             logger.warning(f"Node {self.node_id} rate-limited and dropped payload from {peer_id}")
             return None
+
+        parsed_payload = raw_payload
+        if isinstance(raw_payload, bytes):
+            try:
+                parsed_payload = json.loads(raw_payload.decode('utf-8'))
+            except Exception:
+                pass
 
         if topic and topic in self.handlers:
             for handler in self.handlers[topic]:
                 try:
                     if asyncio.iscoroutinefunction(handler):
-                        await handler(raw_payload)
+                        await handler(parsed_payload)
                     else:
-                        handler(raw_payload)
+                        handler(parsed_payload)
                 except Exception as e:
                     logger.error(f"Error in handler for topic {topic}: {e}")
 
-        return raw_payload
+        return parsed_payload
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
+        metrics_obj = self.rate_limiter.get_metrics()
+        if asyncio.iscoroutine(metrics_obj):
+            metrics_obj = await metrics_obj
         return {
             "transport": self.telemetry.to_dict(),
-            "rate_limiter": self.rate_limiter.get_metrics().to_dict()
+            "rate_limiter": metrics_obj.to_dict()
         }
