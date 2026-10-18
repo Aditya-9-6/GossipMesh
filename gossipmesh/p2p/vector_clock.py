@@ -26,9 +26,9 @@ class VectorClock:
             s_val = self.clock.get(k, 0)
             o_val = other.clock.get(k, 0)
             if s_val > o_val:
-                other_le_self = False
-            if s_val < o_val:
                 self_le_other = False
+            if s_val < o_val:
+                other_le_self = False
 
         if self.clock == other.clock:
             return "EQUAL"
