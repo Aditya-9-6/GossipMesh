@@ -24,13 +24,15 @@ class FountainEncoder:
         return chunks
 
     def generate_packet(self) -> Tuple[List[int], bytes]:
-        coeffs = [random.randint(1, self.field_size - 1) for _ in range(self.k)]
+        # Ensure field_size <= 256 for standard byte storage or clip/modulo safely into 0-255
+        actual_field_size = min(self.field_size, 256)
+        coeffs = [random.randint(1, max(1, actual_field_size - 1)) for _ in range(self.k)]
         coded_chunk = bytearray(self.chunk_size)
         for i, coeff in enumerate(coeffs):
             chunk = self.chunks[i]
             for b_idx in range(self.chunk_size):
-                val = (coded_chunk[b_idx] + coeff * chunk[b_idx]) % self.field_size
-                coded_chunk[b_idx] = val
+                val = (coded_chunk[b_idx] + coeff * chunk[b_idx]) % actual_field_size
+                coded_chunk[b_idx] = val & 0xFF
         return coeffs, bytes(coded_chunk)
 
 
@@ -39,7 +41,7 @@ class FountainDecoder:
     def __init__(self, k: int, chunk_size: int = 64, field_size: int = 256):
         self.k = k
         self.chunk_size = chunk_size
-        self.field_size = field_size
+        self.field_size = min(field_size, 256)
         self.received_coeffs: List[List[int]] = []
         self.received_chunks: List[bytearray] = []
 

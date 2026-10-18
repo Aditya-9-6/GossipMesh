@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import json
-from typing import List, Any, Optional, Callable, Dict
+from typing import List, Any, Dict, Optional
 from gossipmesh.p2p.fanout import AdaptiveFanoutController
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 
@@ -9,19 +9,13 @@ logger = logging.getLogger(__name__)
 
 class TransportTelemetry:
     def __init__(self):
-        self.sent_messages = 0
-        self.sent_bytes = 0
-        self.received_messages = 0
-        self.received_bytes = 0
-        self.dropped_messages = 0
+        self.packets_sent = 0
+        self.packets_received = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "sent_messages": self.sent_messages,
-            "sent_bytes": self.sent_bytes,
-            "received_messages": self.received_messages,
-            "received_bytes": self.received_bytes,
-            "dropped_messages": self.dropped_messages,
+            "packets_sent": self.packets_sent,
+            "packets_received": self.packets_received,
         }
 
 class GossipTransport:
@@ -30,7 +24,6 @@ class GossipTransport:
         self.node_id = node_id
         self.fanout_controller = AdaptiveFanoutController(initial_fanout=initial_fanout)
         self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
-        self.handlers: Dict[str, List[Callable[[Any], Any]]] = {}
         self.telemetry = TransportTelemetry()
 
     def select_peers(self, all_peers: List[str], is_duplicate: bool = False) -> List[str]:
@@ -40,59 +33,35 @@ class GossipTransport:
         logger.debug(f"Node {self.node_id} selected {len(selected)} peers with fanout {current_fanout}")
         return selected
 
-    def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
-        if topic not in self.handlers:
-            self.handlers[topic] = []
-        self.handlers[topic].append(handler)
+    async def receive_payload(self, peer_id: str, payload: Any) -> Optional[Any]:
+        allowed = await self.rate_limiter.acquire(peer_id)
+        if not allowed:
+            return None
+        self.telemetry.packets_received += 1
+        
+        if isinstance(payload, bytes):
+            try:
+                return json.loads(payload.decode('utf-8'))
+            except Exception:
+                return payload.decode('utf-8', errors='ignore')
+        elif isinstance(payload, str):
+            try:
+                return json.loads(payload)
+            except Exception:
+                return {"raw": payload}
+        return payload
 
     async def send_payload(self, peer_id: str, payload: Any) -> bool:
-        serialized = str(payload).encode('utf-8') if isinstance(payload, (dict, list, str)) else bytes(payload)
-        b_len = len(serialized)
-        self.telemetry.sent_messages += 1
-        self.telemetry.sent_bytes += b_len
-        logger.debug(f"Node {self.node_id} sent payload to {peer_id} ({b_len} bytes)")
+        self.telemetry.packets_sent += 1
         return True
-
-    async def receive_payload(
-        self, peer_id: str, raw_payload: Any, topic: Optional[str] = None
-    ) -> Optional[Any]:
-        size_bytes = len(str(raw_payload))
-        self.telemetry.received_bytes += size_bytes
-        self.telemetry.received_messages += 1
-
-        allowed = self.rate_limiter.check_and_consume(peer_id)
-        if asyncio.iscoroutine(allowed):
-            allowed = await allowed
-
-        if not allowed:
-            self.telemetry.dropped_messages += 1
-            logger.warning(f"Node {self.node_id} rate-limited and dropped payload from {peer_id}")
-            return None
-
-        parsed_payload = raw_payload
-        if isinstance(raw_payload, bytes):
-            try:
-                parsed_payload = json.loads(raw_payload.decode('utf-8'))
-            except Exception:
-                pass
-
-        if topic and topic in self.handlers:
-            for handler in self.handlers[topic]:
-                try:
-                    if asyncio.iscoroutinefunction(handler):
-                        await handler(parsed_payload)
-                    else:
-                        handler(parsed_payload)
-                except Exception as e:
-                    logger.error(f"Error in handler for topic {topic}: {e}")
-
-        return parsed_payload
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
         metrics_obj = self.rate_limiter.get_metrics()
         if asyncio.iscoroutine(metrics_obj):
             metrics_obj = await metrics_obj
+        
+        rate_limiter_dict = metrics_obj.to_dict() if hasattr(metrics_obj, "to_dict") else dict(metrics_obj)
         return {
             "transport": self.telemetry.to_dict(),
-            "rate_limiter": metrics_obj.to_dict()
+            "rate_limiter": rate_limiter_dict
         }
