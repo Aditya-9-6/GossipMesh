@@ -1,4 +1,4 @@
-import random
+import asyncio
 import logging
 from typing import List, Dict, Any
 from gossipmesh.p2p.metrics import PeerMetricsRegistry, PeerMetricsTracker
@@ -44,7 +44,7 @@ class AdaptiveTransport:
         return selected
 
 class AdaptiveGossipTransport:
-    """Transport supporting backpressure-aware adaptive gossip distribution."""
+    """Backpressure-aware gossip transport using queue depth and RTT metrics."""
     def __init__(self, base_fanout: int = 8, threshold_queue: int = 50, threshold_rtt: float = 0.2):
         self.base_fanout = base_fanout
         self.threshold_queue = threshold_queue
