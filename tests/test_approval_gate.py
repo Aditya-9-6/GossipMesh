@@ -31,9 +31,9 @@ app.dependency_overrides[get_db] = override_get_db
 from gossipmesh.api.deps import get_current_user
 def override_get_current_user():
     db = TestingSessionLocal()
-    user = db.query(User).filter(User.username == "testuser").first()
+    user = db.query(User).filter(User.email == "test@example.com").first()
     if not user:
-        user = User(username="testuser", email="test@example.com", hashed_password="fakepass")
+        user = User(email="test@example.com", hashed_password="fakepass")
         db.add(user)
         db.commit()
         db.refresh(user)
