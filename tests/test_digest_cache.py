@@ -15,10 +15,10 @@ class TestLRUDigestCache(unittest.TestCase):
         cache = LRUDigestCache(max_size=2, default_ttl=60.0)
         cache.add("msg1")
         cache.add("msg2")
+        # Access msg1 so that msg2 becomes the least recently used
         self.assertTrue(cache.contains("msg1"))
-        self.assertTrue(cache.contains("msg2"))
         
-        # Adding msg3 should evict the least recently used, which is msg2 (since msg1 was accessed)
+        # Adding msg3 should evict the least recently used, which is msg2
         cache.add("msg3")
         self.assertTrue(cache.contains("msg1"))
         self.assertFalse(cache.contains("msg2"))

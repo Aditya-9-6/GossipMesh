@@ -48,16 +48,13 @@ class DedupCache:
             self._evict_expired(now)
 
             if message_id in self._index:
-                # Check if existing index entry points to a valid slot
                 idx = self._index[message_id]
                 item = self._buffer[idx]
                 if item is not None and item[1] > now:
                     return False
                 else:
-                    # Expired in place
                     self._index.pop(message_id, None)
 
-            # If buffer is full, evict the oldest item at tail
             if self._size >= self.capacity:
                 old_item = self._buffer[self._tail]
                 if old_item is not None:
@@ -66,7 +63,6 @@ class DedupCache:
                 self._tail = (self._tail + 1) % self.capacity
                 self._size -= 1
 
-            # Insert new item at head
             self._buffer[self._head] = (message_id, expire_at)
             self._index[message_id] = self._head
             self._head = (self._head + 1) % self.capacity
@@ -80,6 +76,7 @@ class DedupCache:
 
         now = time.time()
         with self._lock:
+            self._evict_expired(now)
             if message_id not in self._index:
                 return False
             idx = self._index[message_id]

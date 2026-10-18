@@ -21,7 +21,7 @@ class LRUDigestCache:
             else:
                 break
         for k in keys_to_delete:
-            self._cache.popitem(last=False)
+            self._cache.pop(k, None)
 
     def add(self, message_id: str, ttl: Optional[float] = None) -> None:
         now = time.time()
