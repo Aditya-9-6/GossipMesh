@@ -59,7 +59,6 @@ class CompressedBloomFilter:
             
             if self.count >= self.capacity:
                 self.clear_unlocked()
-                # Recalculate indexes after clear if needed, or proceed
                 indexes = list(self._hashes(item))
 
             for bit_index in indexes:
