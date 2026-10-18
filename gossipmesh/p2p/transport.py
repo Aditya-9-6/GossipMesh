@@ -38,8 +38,7 @@ every 1000 messages or 300 seconds without dropping streams."""
     def _trigger_rotation_unlocked(self) -> bytes:
         self.message_count = 0
         self.created_at = time.time()
-        pub, _ = self.rotator.rotate()
-        return pub
+        return self.rotator.rotate()
 
     def trigger_rotation(self) -> bytes:
         with self._lock:
@@ -86,6 +85,13 @@ class TransportTelemetry:
     def to_dict(self) -> Dict[str, Any]:
         with self._lock:
             return {
+                "transport": {
+                    "sent_messages": self.sent_count,
+                    "received_messages": self.received_count,
+                    "dropped_messages": self.dropped_count,
+                    "sent_bytes": self.sent_bytes,
+                    "received_bytes": self.received_bytes
+                },
                 "sent_count": self.sent_count,
                 "received_count": self.received_count,
                 "dropped_count": self.dropped_count,
@@ -131,7 +137,6 @@ class GossipTransport:
                     return await handler(payload)
                 return handler(payload)
             except Exception:
-                logging.exception("Error in message handler for topic %s", topic)
                 return None
         return payload
 
@@ -179,22 +184,11 @@ class TransportSocketReader:
         self.expected_magic = expected_magic
 
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        try:
-            header_bytes = await self.reader.readexactly(40)
-        except (asyncio.IncompleteReadError, ConnectionError, OSError):
-            return None
-        
-        parsed = ZeroCopyPacketParser.parse_header(header_bytes)
-        if not parsed:
-            return None
-        
-        magic, msg_type, msg_id, payload_len = parsed
+        header_bytes = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
+        view = memoryview(header_bytes)
+        magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(view)
         if magic != self.expected_magic:
-            return None
-
-        try:
-            payload_bytes = await self.reader.readexactly(payload_len)
-        except (asyncio.IncompleteReadError, ConnectionError, OSError):
-            return None
-
-        return (msg_type, msg_id, memoryview(payload_bytes))
+            raise ValueError(f"Invalid magic: {magic} != {self.expected_magic}")
+        payload_bytes = await self.reader.readexactly(payload_len)
+        payload_view = memoryview(payload_bytes)
+        return (msg_type, msg_id, payload_view)
