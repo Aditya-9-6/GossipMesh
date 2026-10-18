@@ -101,5 +101,5 @@ class TestGossipDedupFilter(unittest.TestCase):
         self.assertEqual(metrics["duplicates_filtered"], expected_duplicates)
 
 
-if __name__ == "__main覚えて__":
+if __name__ == "__main__":
     unittest.main()
