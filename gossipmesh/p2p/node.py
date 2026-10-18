@@ -155,26 +155,11 @@ class GossipNode:
     def cleanup_ledger(self):
         if not self.mesh_dir.exists():
             return
-        now = time.time()
         for file_path in self.mesh_dir.glob("*.json"):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    if now - data.get("timestamp", now) > 86400:
-                        file_path.unlink()
+                    if data.get("timestamp", 0) < time.time() - 86400:
+                        file_path.unlink(missing_ok=True)
             except Exception:
                 continue
-
-class P2PGossipMeshNode(GossipNode):
-    """Extended DHT-backed Gossip Mesh Node preserving backward compatibility with DhtSubmodule."""
-    def __init__(self, node_id: str, host: str = "127.0.0.1", port: int = 8000, mesh_dir: str | None = None):
-        super().__init__(node_id=node_id, mesh_dir=mesh_dir)
-        self.host = host
-        self.port = port
-        self.dht_table: Dict[str, str] = {}
-
-    def register_dht_route(self, key: str, value: str):
-        self.dht_table[key] = value
-
-    def lookup_dht_route(self, key: str) -> Optional[str]:
-        return self.dht_table.get(key)
