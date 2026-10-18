@@ -3,6 +3,7 @@ from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives import serialization
 from typing import Tuple, Optional
 
 class EphemeralSessionKeyRotator:
@@ -18,7 +19,8 @@ class EphemeralSessionKeyRotator:
 
     def get_public_bytes(self) -> bytes:
         return self.public_key.public_bytes(
-            encoding=serialization_encoding_raw() if hasattr(serialization_encoding_raw, '__call__') else _get_raw_bytes(self.public_key)
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw
         )
 
     def derive_session_key(self, peer_public_bytes: bytes) -> bytes:
@@ -42,13 +44,6 @@ class EphemeralSessionKeyRotator:
         self.session_key = None
         self.message_counter = 0
         return self.private_key, self.get_public_bytes()
-
-def _get_raw_bytes(pub_key: x25519.X25519PublicKey) -> bytes:
-    from cryptography.hazmat.primitives import serialization
-    return pub_key.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw
-    )
 
 def encrypt_payload(session_key: bytes, plaintext: bytes) -> bytes:
     aesgcm = AESGCM(session_key)
