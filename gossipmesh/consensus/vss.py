@@ -75,7 +75,7 @@ class VerifiableSecretSharing:
     """Feldman's Verifiable Secret Sharing Scheme over elliptic curve."""
     @staticmethod
     def generate_polynomial(secret: int, threshold: int) -> List[int]:
-        """Generates random polynomial coefficients where a_0 is the secret."""
+        """Generates random polynomial coefficients where a_0 is the secret and degree is threshold - 1 (length is threshold)."""
         coeffs = [secret]
         for _ in range(threshold - 1):
             coeffs.append(secrets.randbelow(CURVE_ORDER - 1) + 1)
