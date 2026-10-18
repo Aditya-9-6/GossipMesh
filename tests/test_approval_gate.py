@@ -48,6 +48,7 @@ def setup_overrides():
 client = TestClient(app)
 
 def test_approval_gate_lifecycle():
+    Base.metadata.create_all(bind=engine)
     response = client.post(
         "/api/v1/approvals/",
         json={
