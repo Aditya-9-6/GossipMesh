@@ -1,3 +1,6 @@
+import hashlib
+from typing import List
+
 from gossipmesh.node import GossipNode, GossipTopic, GossipMessage
 from gossipmesh.p2p.dht import KademliaDHT, KademliaNode
 
