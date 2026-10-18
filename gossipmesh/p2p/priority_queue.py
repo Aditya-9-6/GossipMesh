@@ -1,7 +1,7 @@
 import time
 import heapq
 import threading
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 class PriorityQueueMessage:
     def __init__(self, priority: int, payload: Any, age_increment: int = 1):
