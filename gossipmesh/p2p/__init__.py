@@ -17,6 +17,13 @@ from gossipmesh.p2p.congestion import (
     SlidingWindowCongestionController,
     StreamCongestionManager,
 )
+from gossipmesh.p2p.priority_queue import (
+    MessagePriority,
+    PrioritizedMessage,
+    PriorityQueueConfig,
+    WeightedPriorityQueue,
+)
+from gossipmesh.p2p.router import GossipMessageRouter
 
 __all__ = [
     "GossipMessageCache",
@@ -42,5 +49,11 @@ __all__ = [
     "NetworkJitterEstimator",
     "SlidingWindowCongestionController",
     "StreamCongestionManager",
+    "MessagePriority",
+    "PrioritizedMessage",
+    "PriorityQueueConfig",
+    "WeightedPriorityQueue",
+    "GossipMessageRouter",
 ]
+
 
