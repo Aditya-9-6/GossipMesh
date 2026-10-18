@@ -28,7 +28,6 @@ class TestVectorClock(unittest.TestCase):
         peer_clock = {"node-A": 3, "node-B": 3, "node-D": 1}
 
         d = vc.delta(peer_clock)
-        # node-A (5 > 3 -> included), node-B (3 > 3 -> excluded), node-C (2 > 0 -> included)
         self.assertEqual(d, {"node-A": 5, "node-C": 2})
 
     def test_equal_comparison(self):
