@@ -44,11 +44,11 @@ class TransportTelemetry:
         self.dropped_messages = 0
         self._lock = threading.Lock()
 
-    def record_sent(self):
+    def record_sent(self, size_bytes: int = 0):
         with self._lock:
             self.sent_messages += 1
 
-    def record_received(self):
+    def record_received(self, size_bytes: int = 0):
         with self._lock:
             self.received_messages += 1
 
@@ -66,15 +66,15 @@ class TransportTelemetry:
 
 class GossipTransport:
     """Gossip transport layer handling peer routing, rate limiting, and telemetry."""
-    def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None):
+    def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None, reputation_engine: Optional[LeakyBucketReputation] = None):
         self.node_id = node_id
         self.rate_limiter = PeerRateLimiter(config)
-        self.reputation = LeakyBucketReputation()
+        self.reputation = reputation_engine or LeakyBucketReputation()
         self.telemetry = TransportTelemetry()
-        self.handlers: Dict[str, Callable[[Any], None]] = {}
+        self.handlers: Dict[str, Callable[[Any], Any]] = {}
         self._lock = threading.Lock()
 
-    def register_handler(self, topic: str, handler: Callable[[Any], None]) -> None:
+    def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
         with self._lock:
             self.handlers[topic] = handler
 
@@ -85,11 +85,12 @@ class GossipTransport:
             return None
 
         if not self.rate_limiter.allow(peer_id):
+            self.reputation.add_penalty(peer_id, 10.0)
             self.telemetry.record_dropped()
             logging.warning(f"Rate limited payload from peer {peer_id}")
             return None
 
-        self.telemetry.record_received()
+        self.telemetry.record_received(len(str(payload)))
 
         parsed_payload = payload
         if isinstance(payload, bytes):
@@ -103,7 +104,9 @@ class GossipTransport:
             except Exception:
                 pass
 
-        handler = self.handlers.get(topic)
+        with self._lock:
+            handler = self.handlers.get(topic)
+
         if handler:
             try:
                 if asyncio.iscoroutinefunction(handler):
@@ -116,11 +119,42 @@ class GossipTransport:
         return parsed_payload
 
     async def send_payload(self, peer_id: str, payload: Any) -> bool:
-        self.telemetry.record_sent()
+        if self.reputation.is_quarantined(peer_id):
+            self.telemetry.record_dropped()
+            return False
+        self.telemetry.record_sent(len(str(payload)))
         return True
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
         return {
             "transport": self.telemetry.get_metrics(),
+            "reputation": self.reputation.get_metrics(),
             "node_id": self.node_id
         }
+
+class TransportSocketReader:
+    """Low-level transport socket reader with zero-allocation memoryview parsing pipelines."""
+    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 1196246355) -> None:
+        self.reader = reader
+        self.expected_magic = expected_magic
+
+    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
+        # Read fixed header size (magic: 4, msg_type: 1, msg_id: 32, payload_len: 4) = 41 bytes
+        header_size = 41
+        try:
+            header_data = await self.reader.readexactly(header_size)
+        except asyncio.IncompleteReadError:
+            return None
+
+        buf = memoryview(header_data)
+        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(buf)
+        
+        if magic != self.expected_magic:
+            raise ValueError(f"Invalid packet magic: {hex(magic)}, expected {hex(self.expected_magic)}")
+
+        try:
+            payload_data = await self.reader.readexactly(payload_len)
+        except asyncio.IncompleteReadError:
+            raise ValueError("Incomplete packet payload")
+
+        return (msg_type, msg_id, memoryview(payload_data))
