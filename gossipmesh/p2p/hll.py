@@ -58,12 +58,10 @@ class WindowedHyperLogLog:
 
         with self._lock:
             self._slide_window(ts)
-            if ts >= self.timestamps[idx]:
-                if rho > self.registers[idx]:
-                    self.registers[idx] = rho
-                self.timestamps[idx] = ts
-            elif self.timestamps[idx] == 0.0:
+            if rho > self.registers[idx]:
                 self.registers[idx] = rho
+                self.timestamps[idx] = ts
+            elif rho == self.registers[idx] and (self.timestamps[idx] == 0.0 or ts >= self.timestamps[idx]):
                 self.timestamps[idx] = ts
 
     def count(self, current_time: Optional[float] = None) -> int:
@@ -87,6 +85,15 @@ class WindowedHyperLogLog:
                 return 0
 
             estimate = alpha * (m ** 2) / raw_sum
+            
+            # Apply corrections for small and large range estimations
+            if estimate <= 2.5 * m:
+                zeros = self.registers.count(0)
+                if zeros > 0:
+                    estimate = m * math.log(m / zeros)
+            elif estimate > (1.0 / 30.0) * (2.0 ** 32):
+                estimate = -(2.0 ** 32) * math.log(1.0 - estimate / (2.0 ** 32))
+
             return int(round(estimate))
 
     def merge(self, other: 'WindowedHyperLogLog', current_time: Optional[float] = None) -> None:
@@ -95,8 +102,9 @@ class WindowedHyperLogLog:
             self._slide_window(now)
             other._slide_window(now)
             for i in range(self.num_registers):
-                if other.timestamps[i] > self.timestamps[i]:
+                if other.registers[i] > self.registers[i]:
                     self.registers[i] = other.registers[i]
                     self.timestamps[i] = other.timestamps[i]
-                elif other.timestamps[i] == self.timestamps[i] and other.registers[i] > self.registers[i]:
-                    self.registers[i] = other.registers[i]
+                elif other.registers[i] == self.registers[i]:
+                    if other.timestamps[i] > self.timestamps[i]:
+                        self.timestamps[i] = other.timestamps[i]
