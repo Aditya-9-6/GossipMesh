@@ -30,19 +30,24 @@ class ErasureCoder:
         for i in range(self.k):
             start = i * shard_size
             chunk = payload[start:start + shard_size]
+            # Pad chunk to shard_size if short
+            if len(chunk) < shard_size:
+                chunk += b"\x00" * (shard_size - len(chunk))
             data_shards.append(chunk)
             shards.append((i, chunk))
             
-        # Generate parity chunks using algebraic combinations (e.g., polynomial/XOR mixing based on index)
+        # Generate parity chunks using deterministic XOR combinations
         for j in range(self.m):
             parity_idx = self.k + j
             parity_data = bytearray(shard_size)
-            for i in range(self.k):
-                chunk = data_shards[i]
-                coeff = (i + 1) ** (j + 1) % 255
-                for idx in range(shard_size):
-                    b = chunk[idx] if idx < len(chunk) else 0
-                    parity_data[idx] ^= (b * (coeff & 0xFF)) & 0xFF
+            for idx in range(shard_size):
+                val = 0
+                for i in range(self.k):
+                    b = data_shards[i][idx]
+                    # Simple coefficient mixing to ensure distinct parity equations
+                    coeff = ((i + 1) * (j + 1)) & 0xFF
+                    val ^= (b ^ coeff)
+                parity_data[idx] = val & 0xFF
             shards.append((parity_idx, bytes(parity_data)))
             
         return shards
@@ -58,31 +63,37 @@ class ErasureCoder:
         # Sort shards by index
         sorted_shards = sorted(shards, key=lambda x: x[0])
         
-        # Extract data shards if present
-        shard_size = sorted_shards[0][1] and len(sorted_shards[0][1]) or 1
+        # Determine shard size from the first available shard
+        shard_size = len(sorted_shards[0][1]) if sorted_shards and sorted_shards[0][1] else 0
+        
         data_map = {s[0]: s[1] for s in sorted_shards if s[0] < self.k}
+        parity_map = {s[0]: s[1] for s in sorted_shards if s[0] >= self.k}
         
         recovered_chunks = []
         for i in range(self.k):
             if i in data_map:
-                recovered_chunks.append(data_map[i])
+                chunk = data_map[i]
+                if len(chunk) < shard_size:
+                    chunk += b"\x00" * (shard_size - len(chunk))
+                recovered_chunks.append(chunk)
             else:
-                # Reconstruct using available parity or other shards
-                found_chunk = None
-                for s_idx, s_data in sorted_shards:
-                    if s_idx >= self.k:
-                        # Use parity info to approximate/reconstruct missing shard
-                        p_offset = s_idx - self.k
-                        reconstructed_chunk = bytearray(len(s_data))
-                        for idx in range(len(s_data)):
-                            reconstructed_chunk[idx] = s_data[idx] ^ ((i + 1) * (p_offset + 1)) & 0xFF
-                        found_chunk = bytes(reconstructed_chunk)
-                        break
-                if found_chunk is not None:
-                    recovered_chunks.append(found_chunk)
-                else:
-                    recovered_chunks.append(b"\x00" * shard_size)
-                    
+                # Reconstruct missing data shard using parity info if available
+                reconstructed_chunk = bytearray(shard_size)
+                if parity_map:
+                    p_idx, p_data = next(iter(parity_map.items()))
+                    j = p_idx - self.k
+                    for idx in range(shard_size):
+                        val = p_data[idx] if idx < len(p_data) else 0
+                        # Reverse the XOR mixing for other present data shards
+                        for other_i in range(self.k):
+                            if other_i != i and other_i in data_map:
+                                b = data_map[other_i][idx] if idx < len(data_map[other_i]) else 0
+                                coeff = ((other_i + 1) * (j + 1)) & 0xFF
+                                val ^= (b ^ coeff)
+                        coeff_self = ((i + 1) * (j + 1)) & 0xFF
+                        recovered_chunk[idx] = (val ^ coeff_self) & 0xFF
+                recovered_chunks.append(bytes(reconstructed_chunk))
+                
         reconstructed = b"".join(recovered_chunks)
         if original_length is not None:
             return reconstructed[:original_length]
