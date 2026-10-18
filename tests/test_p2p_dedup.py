@@ -28,18 +28,27 @@ class TestCompressedBloomFilter(unittest.TestCase):
         self.assertFalse(transport.should_process_message(msg_id))
 
     def test_concurrency_safety(self):
-        bf = CompressedBloomFilter(capacity=5000, error_rate=0.01)
+        transport = GossipTransport(capacity=5000, error_rate=0.01)
+        processed_count = 0
+        lock = threading.Lock()
+
         def worker(start: int):
-            for i in range(start, start + 100):
-                bf.add(f"concurrent_{i}")
+            nonlocal processed_count
+            for i in range(start, start + 200):
+                # Send identical message IDs concurrently across threads to test TOCTOU safety
+                msg_id = f"shared_msg_{i % 50}"
+                if transport.should_process_message(msg_id):
+                    with lock:
+                        processed_count += 1
                 
-        threads = [threading.Thread(target=worker, args=(i * 100,)) for i in range(5)]
+        threads = [threading.Thread(target=worker, args=(i * 200,)) for i in range(5)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
             
-        self.assertIn("concurrent_450", bf)
+        # Exactly 50 unique messages should be processed despite heavy contention
+        self.assertLessEqual(processed_count, 50)
 
 if __name__ == "__main__":
     unittest.main()

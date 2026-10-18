@@ -7,11 +7,8 @@ class GossipTransport:
         self.dedup_filter = CompressedBloomFilter(capacity=capacity, error_rate=error_rate)
 
     def should_process_message(self, message_id: str) -> bool:
-        """Checks if a message ID has been seen before. If not, records it and returns True."""
-        if message_id in self.dedup_filter:
-            return False
-        self.dedup_filter.add(message_id)
-        return True
+        """Checks if a message ID has been seen before. If not, records it and returns True atomically."""
+        return self.dedup_filter.check_and_add(message_id)
 
     def reset_dedup(self) -> None:
         self.dedup_filter.clear()
