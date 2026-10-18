@@ -120,6 +120,16 @@ def get_open_advancement_issues(workspace: Path):
                 except Exception:
                     pass
 
+        # Also inspect remote branches to prevent race conditions among parallel workers
+        remote_branches_out = run_cmd(["git", "ls-remote", "--heads", "origin", "refs/heads/ai/solve-issue-*"], cwd=workspace)
+        for line in remote_branches_out.splitlines():
+            if "refs/heads/ai/solve-issue-" in line:
+                try:
+                    cand = int(line.split("refs/heads/ai/solve-issue-")[-1].split("-")[0])
+                    active_issue_nums.add(cand)
+                except Exception:
+                    pass
+
         valid_issues = [iss for iss in all_issues if iss.get("number") not in active_issue_nums]
         return valid_issues
     except Exception as e:
@@ -460,37 +470,29 @@ def handle_pr_comments(workspace: Path):
         print(f"[Warning] Failed to check PR comments: {e}", file=sys.stderr, flush=True)
 
 
-def run_loop_iteration(workspace: Path):
+def run_loop_iteration(workspace: Path, worker_id: int = 1):
     """Executes a single cycle of the autonomous loop."""
-    print(f"\n--- [Autonomous GossipMesh Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
-    issues = get_open_advancement_issues(workspace)
-    if not issues:
-        pass
+    print(f"\n--- [Autonomous GossipMesh Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Worker {worker_id} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
 
     # Check for requested PR reviews/fixes
     handle_pr_comments(workspace)
 
-    # Check if there are ANY open issues first, before filtering for /solve
-    try:
-        out = run_cmd(["gh", "issue", "list", "--repo", REPO, "--label", "advancement", "--state", "open", "--json", "number"], cwd=workspace)
-        all_open_issues = json.loads(out) if out else []
-    except Exception as e:
-        print(f"[Warning] Failed to fetch issues: {e}", file=sys.stderr, flush=True)
-        all_open_issues = []
-
-    if not all_open_issues:
-        print("[*] No open advancement issues found. Generating one...", flush=True)
-        generate_new_issue(workspace)
-        time.sleep(5)
-
-    # Now get issues that are ready to be solved (have /solve comment and no PR)
+    # Fetch available advancement issues not currently locked by an active PR or remote branch
     issues = get_open_advancement_issues(workspace)
 
     if not issues:
-        print("[!] No issues ready to solve (waiting for '/solve' comment).", flush=True)
+        print("[*] All currently open advancement issues already have active PRs or remote branches. Generating a new task from the enterprise plan...", flush=True)
+        generate_new_issue(workspace)
+        time.sleep(5)
+        issues = get_open_advancement_issues(workspace)
+
+    if not issues:
+        print("[!] No issues ready to solve (waiting for new issue or PR merge).", flush=True)
         return
 
-    target = issues[0]
+    # Deterministic work partitioning across parallel workers
+    idx = (worker_id - 1) % len(issues)
+    target = issues[idx]
     solve_issue(workspace, target["number"], target["title"], target.get("body", ""))
 
 def main():
@@ -499,6 +501,7 @@ def main():
     parser.add_argument("--once", action="store_true", help="Run once and exit instead of continuous daemon")
     parser.add_argument("--iterations", type=int, default=0, help="Number of advancement cycles to run (0 for continuous daemon)")
     parser.add_argument("--interval", type=int, default=10, help="Interval in seconds between cycles (default: 10s)")
+    parser.add_argument("--worker-id", type=int, default=1, help="Worker matrix ID (1-based)")
     parser.add_argument("--add-keys", nargs="*", default=[], help="Additional Gemini API keys to add to the round-robin pool")
     args = parser.parse_args()
 
@@ -510,24 +513,24 @@ def main():
     print(f"[*] GossipMesh Multi-Agent Engine initialized with {len(GLOBAL_POOL)} API keys in active rotation.", flush=True)
 
     if args.once:
-        run_loop_iteration(workspace)
+        run_loop_iteration(workspace, worker_id=args.worker_id)
     elif args.iterations > 0:
-        print(f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, interval: {args.interval}s)...", flush=True)
+        print(f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, interval: {args.interval}s, worker: {args.worker_id})...", flush=True)
         for i in range(args.iterations):
             print(f"\n=======================================================", flush=True)
-            print(f"[*] Advancement Batch Cycle {i+1}/{args.iterations}", flush=True)
+            print(f"[*] Advancement Batch Cycle {i+1}/{args.iterations} (Worker {args.worker_id})", flush=True)
             print(f"=======================================================", flush=True)
             try:
-                run_loop_iteration(workspace)
+                run_loop_iteration(workspace, worker_id=args.worker_id)
             except Exception as e:
                 print(f"[Error in cycle {i+1}]: {e}", file=sys.stderr, flush=True)
             if i + 1 < args.iterations:
                 time.sleep(args.interval)
     else:
-        print(f"[*] Starting GossipMesh Continuous Autonomous Daemon (interval: {args.interval}s)...", flush=True)
+        print(f"[*] Starting GossipMesh Continuous Autonomous Daemon (interval: {args.interval}s, worker: {args.worker_id})...", flush=True)
         while True:
             try:
-                run_loop_iteration(workspace)
+                run_loop_iteration(workspace, worker_id=args.worker_id)
             except Exception as e:
                 print(f"[Error in loop]: {e}", file=sys.stderr, flush=True)
             print(f"[*] Sleeping for {args.interval} seconds until next iteration...", flush=True)

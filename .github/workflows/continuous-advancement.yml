@@ -23,7 +23,7 @@ permissions:
 jobs:
   advance:
     name: Autonomous Engine (Worker ${{ matrix.worker }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         worker: [1, 2, 3, 4, 5]
@@ -37,16 +37,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Install uv & Setup Python
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Install Dependencies
         run: |
-          pip install --upgrade pip
-          pip install -e .[api,dev]
+          uv venv --allow-existing
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+          uv pip install -e ".[api,dev]"
 
       - name: Configure Git User Identity
         run: |
@@ -66,5 +68,5 @@ jobs:
           HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
         run: |
-          ITER="${{ github.event.inputs.iterations || '2' }}"
-          python3 scripts/autonomous_loop.py --workspace . --interval 5 --iterations "$ITER"
+          ITER="${{ github.event.inputs.iterations || '3' }}"
+          python3 scripts/autonomous_loop.py --workspace . --worker-id ${{ matrix.worker }} --interval 5 --iterations "$ITER"
