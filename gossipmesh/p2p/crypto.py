@@ -1,6 +1,7 @@
 import os
 import threading
 from typing import Tuple
+import hashlib
 
 class EphemeralSessionKeyRotator:
     """Manages ephemeral session keys and cryptographic rotation."""
@@ -17,13 +18,23 @@ class EphemeralSessionKeyRotator:
     def derive_session_key(self, peer_public_bytes: bytes) -> bytes:
         with self._lock:
             combined = self._current_key + peer_public_bytes
-            import hashlib
             self._current_key = hashlib.sha256(combined).digest()
             return self._current_key
+
+    def initialize_session(self, peer_public_bytes: bytes) -> bytes:
+        return self.derive_session_key(peer_public_bytes)
 
     def get_current_key(self) -> bytes:
         with self._lock:
             return self._current_key
+
+    @property
+    def current_key(self) -> bytes:
+        return self.get_current_key()
+
+    @property
+    def session_key(self) -> bytes:
+        return self.get_current_key()
 
     def rotate_key(self) -> bytes:
         with self._lock:
@@ -39,6 +50,8 @@ class EphemeralSessionKeyRotator:
 
 def encrypt_payload(key: bytes, plaintext: bytes) -> bytes:
     """Encrypts plaintext bytes with key using XOR stream cipher for zero-copy efficiency."""
+    if not key:
+        key = b'\x00' * 32
     extended_key = (key * (len(plaintext) // len(key) + 1))[:len(plaintext)]
     return bytes(a ^ b for a, b in zip(plaintext, extended_key))
 

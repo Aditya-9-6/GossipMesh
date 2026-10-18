@@ -51,14 +51,14 @@ every 1000 messages or 300 seconds without dropping streams."""
             self.message_count += 1
             if self._should_rotation_unlocked():
                 self._trigger_rotation_unlocked()
-            return encrypt_payload(self.rotator.get_current_key(), plaintext)
+            return encrypt_payload(self.rotator.current_key, plaintext)
 
     def receive_message(self, ciphertext: bytes) -> bytes:
         with self._lock:
             self.message_count += 1
             if self._should_rotation_unlocked():
                 self._trigger_rotation_unlocked()
-            return decrypt_payload(ciphertext, self.rotator.get_current_key())
+            return decrypt_payload(ciphertext, self.rotator.current_key)
 
 
 class TransportTelemetry:
@@ -92,87 +92,77 @@ class TransportTelemetry:
                 "received_count": self.received_count,
                 "dropped_count": self.dropped_count,
                 "bytes_sent": self.bytes_sent,
-                "bytes_received": self.bytes_received,
+                "bytes_received": self.bytes_received
             }
 
 
-class TransportSocketReader:
-    """Reads zero-copy packet structures from an asyncio stream reader."""
-    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
-        self.reader = reader
-        self.expected_magic = expected_magic
-
-    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        header_bytes = await self.reader.readexactly(45)
-        buf = memoryview(header_bytes)
-        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(buf, expected_magic=self.expected_magic)
-        payload_bytes = await self.reader.readexactly(payload_len)
-        return magic, msg_id, memoryview(payload_bytes)
-
-
 class GossipTransport:
-    """Main GossipMesh transport layer integrating erasure coding, rate limiting, and handlers."""
-    def __init__(self, node_id: str, k: int = 4, m: int = 2, config: Optional[RateLimitConfig] = None) -> None:
+    """High-performance Gossip Transport Layer combining rate limiting, encryption, erasure coding and telemetry."""
+    def __init__(self, node_id: str, k: int = 4, m: int = 2, config: Optional[RateLimitConfig] = None):
         self.node_id = node_id
         self.k = k
         self.m = m
-        self.telemetry = TransportTelemetry()
         self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
+        self.telemetry = TransportTelemetry()
         self.erasure_coder = ErasureCoder(k=k, m=m)
-        self.handlers: Dict[str, Callable[[Any], None]] = {}
+        self.session = P2PSessionTransport()
+        self.handlers: Dict[str, List[Callable[[Any], None]]] = {}
         self._lock = threading.Lock()
 
     def register_handler(self, topic: str, handler: Callable[[Any], None]) -> None:
         with self._lock:
-            self.handlers[topic] = handler
+            if topic not in self.handlers:
+                self.handlers[topic] = []
+            self.handlers[topic].append(handler)
 
-    async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], use_erasure: bool = False) -> bool:
+    async def send_payload(self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm", use_erasure: bool = False) -> bool:
+        if not self.rate_limiter.acquire(peer_id):
+            self.telemetry.record_dropped()
+            return False
+
         if isinstance(payload, dict):
-            data = json.dumps(payload).encode('utf-8')
-        elif isinstance(payload, str):
-            data = payload.encode('utf-8')
-        elif isinstance(payload, int):
-            data = str(payload).encode('utf-8')
+            data = json.dumps(payload).encode("utf-8")
         elif isinstance(payload, bytes):
             data = payload
         else:
-            data = bytes(payload)
+            data = str(payload).encode("utf-8")
 
         if use_erasure:
             fragments = self.erasure_coder.encode(data)
-            total_size = sum(len(f[1]) for f in fragments)
+            total_size = sum(len(f_bytes) for _, f_bytes in fragments)
             self.telemetry.record_sent(total_size)
-        else:
-            self.telemetry.record_sent(len(data))
+            return True
+
+        ciphertext = self.session.send_message(data)
+        self.telemetry.record_sent(len(ciphertext))
         return True
 
-    async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = 'default') -> Optional[Any]:
-        if not self.rate_limiter.allow(peer_id):
+    async def receive_payload(self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm") -> Optional[Union[bytes, Dict[str, Any]]]:
+        if not self.rate_limiter.acquire(peer_id):
             self.telemetry.record_dropped()
             return None
 
         if isinstance(payload, bytes):
             try:
-                payload = json.loads(payload.decode('utf-8'))
+                parsed_payload = json.loads(payload.decode("utf-8"))
             except Exception:
-                pass
+                parsed_payload = payload
+            size = len(payload)
+        else:
+            parsed_payload = payload
+            size = len(json.dumps(payload))
 
-        if isinstance(payload, (bytes, str, dict, int)):
-            size = len(json.dumps(payload)) if isinstance(payload, dict) else len(str(payload))
-            self.telemetry.record_received(size)
+        self.telemetry.record_received(size)
 
-        handler = self.handlers.get(topic)
-        if handler:
-            try:
-                if asyncio.iscoroutinefunction(handler):
-                    await handler(payload)
-                else:
-                    handler(payload)
-            except Exception as e:
-                logger.error(f"Error in handler for topic {topic}: {e}")
-        return payload
+        with self._lock:
+            topic_handlers = self.handlers.get(topic, [])
+            for h in topic_handlers:
+                try:
+                    h(parsed_payload)
+                except Exception as exc:
+                    logger.error(f"Error in handler for topic {topic}: {exc}")
+
+        return parsed_payload
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
-        metrics = self.telemetry.to_dict()
-        metrics["rate_limiter_stats"] = self.rate_limiter.get_stats()
-        return metrics
+        return self.telemetry.to_dict()
