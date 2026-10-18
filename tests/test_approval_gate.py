@@ -30,7 +30,7 @@ def override_get_current_user():
     db = TestingSessionLocal()
     user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
     if not user:
-        user = User(email="approver@gossipmesh.test", hashed_password="fakepass", is_active=True, full_name="test_approver")
+        user = User(email="approver@gossipmesh.test", hashed_password="fakepass", is_active=True)
         db.add(user)
         db.commit()
         db.refresh(user)
