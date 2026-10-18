@@ -12,11 +12,14 @@ class HyperLogLogDigest:
         self.registers = registers if registers is not None else [0] * self.m
 
     def _hash(self, item: str) -> int:
-        # Lightweight hash fallback avoiding external dependencies like mmh3 if missing
-        h = 0
+        # Murmur3-like robust mixing hash for realistic distribution in tests
+        h = 17
         for char in item:
             h = (h * 31 + ord(char)) & 0xFFFFFFFF
-        return h
+        h = (h ^ (h >> 16)) * 0x85ebca6b
+        h = (h ^ (h >> 13)) * 0xc2b2ae35
+        h = h ^ (h >> 16)
+        return h & 0xFFFFFFFF
 
     def add(self, item: str) -> None:
         h = self._hash(item)
@@ -36,6 +39,8 @@ class HyperLogLogDigest:
         m = self.m
         alpha = 0.7213 / (1.0 + 1.079 / m) if m >= 128 else 0.673
         raw_sum = sum(2.0 ** (-r) for r in self.registers)
+        if raw_sum == 0:
+            return 0.0
         estimate = alpha * (m ** 2) / raw_sum
         
         # Small range correction (LinearCounting)
