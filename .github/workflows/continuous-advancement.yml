@@ -24,6 +24,7 @@ jobs:
   advance:
     name: Autonomous Engine (Worker ${{ matrix.worker }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 240
     strategy:
       matrix:
         worker: [1, 2, 3, 4, 5]
@@ -68,5 +69,13 @@ jobs:
           HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
         run: |
-          ITER="${{ github.event.inputs.iterations || '3' }}"
-          python3 scripts/autonomous_loop.py --workspace . --worker-id ${{ matrix.worker }} --interval 5 --iterations "$ITER"
+          ITER="${{ github.event.inputs.iterations || '30' }}"
+          python3 scripts/autonomous_loop.py --workspace . --worker-id ${{ matrix.worker }} --interval 5 --iterations "$ITER" --max-minutes 180
+
+      - name: Chain Next 24/7 Cloud Advancement Batch
+        if: always() && matrix.worker == 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[*] Chaining next 24/7 autonomous advancement batch in GitHub Actions Cloud..."
+          gh workflow run continuous-advancement.yml --ref main || true

@@ -502,6 +502,7 @@ def main():
     parser.add_argument("--iterations", type=int, default=0, help="Number of advancement cycles to run (0 for continuous daemon)")
     parser.add_argument("--interval", type=int, default=10, help="Interval in seconds between cycles (default: 10s)")
     parser.add_argument("--worker-id", type=int, default=1, help="Worker matrix ID (1-based)")
+    parser.add_argument("--max-minutes", type=int, default=0, help="Maximum runtime in minutes before graceful handoff (0 for unlimited)")
     parser.add_argument("--add-keys", nargs="*", default=[], help="Additional Gemini API keys to add to the round-robin pool")
     args = parser.parse_args()
 
@@ -512,10 +513,12 @@ def main():
 
     print(f"[*] GossipMesh Multi-Agent Engine initialized with {len(GLOBAL_POOL)} API keys in active rotation.", flush=True)
 
+    start_time = time.time()
+
     if args.once:
         run_loop_iteration(workspace, worker_id=args.worker_id)
     elif args.iterations > 0:
-        print(f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, interval: {args.interval}s, worker: {args.worker_id})...", flush=True)
+        print(f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, max: {args.max_minutes}m, interval: {args.interval}s, worker: {args.worker_id})...", flush=True)
         for i in range(args.iterations):
             print(f"\n=======================================================", flush=True)
             print(f"[*] Advancement Batch Cycle {i+1}/{args.iterations} (Worker {args.worker_id})", flush=True)
@@ -524,15 +527,25 @@ def main():
                 run_loop_iteration(workspace, worker_id=args.worker_id)
             except Exception as e:
                 print(f"[Error in cycle {i+1}]: {e}", file=sys.stderr, flush=True)
+
+            if args.max_minutes > 0 and (time.time() - start_time) >= (args.max_minutes * 60):
+                print(f"[*] Target runtime ({args.max_minutes} mins) reached. Gracefully concluding batch.", flush=True)
+                break
+
             if i + 1 < args.iterations:
                 time.sleep(args.interval)
     else:
-        print(f"[*] Starting GossipMesh Continuous Autonomous Daemon (interval: {args.interval}s, worker: {args.worker_id})...", flush=True)
+        print(f"[*] Starting GossipMesh Continuous Autonomous Daemon (interval: {args.interval}s, max: {args.max_minutes}m, worker: {args.worker_id})...", flush=True)
         while True:
             try:
                 run_loop_iteration(workspace, worker_id=args.worker_id)
             except Exception as e:
                 print(f"[Error in loop]: {e}", file=sys.stderr, flush=True)
+
+            if args.max_minutes > 0 and (time.time() - start_time) >= (args.max_minutes * 60):
+                print(f"[*] Target runtime ({args.max_minutes} mins) reached. Gracefully concluding continuous cycle.", flush=True)
+                break
+
             print(f"[*] Sleeping for {args.interval} seconds until next iteration...", flush=True)
             time.sleep(args.interval)
 
