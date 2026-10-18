@@ -4,9 +4,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from gossipmesh.api import app
-from gossipmesh.api import deps
-from gossipmesh.models.base import Base
+from gossipmesh.api.deps import get_db
+from gossipmesh.db.base import Base
 from gossipmesh.models.user import User
+from gossipmesh.api.deps import get_current_user
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -14,8 +15,6 @@ engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base.metadata.create_all(bind=engine)
 
 def override_get_db():
     db = TestingSessionLocal()
@@ -25,24 +24,20 @@ def override_get_db():
         db.close()
 
 def override_get_current_user():
-    db = TestingSessionLocal()
-    Base.metadata.create_all(bind=engine)
-    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
-    if not user:
-        user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    db.close()
-    return user
+    return User(id=1, username="test_user", email="test@example.com", is_active=True)
 
-app.dependency_overrides[deps.get_db] = override_get_db
-app.dependency_overrides[deps.get_current_user] = override_get_current_user
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
 
 client = TestClient(app)
 
-def test_approval_gate_lifecycle():
+@pytest.fixture(autouse=True)
+def setup_database():
     Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+def test_approval_gate_lifecycle():
     response = client.post(
         "/api/v1/approvals/",
         json={
@@ -55,20 +50,20 @@ def test_approval_gate_lifecycle():
     )
     assert response.status_code == 201
     data = response.json()
+    assert data["action_type"] == "push_commit"
     assert data["status"] == "pending"
-    assert "id" in data
     approval_id = data["id"]
 
-    # Test get approval gate
-    get_response = client.get(f"/api/v1/approvals/{approval_id}", headers={"Authorization": "Bearer test-token"})
-    assert get_response.status_code == 200
-    assert get_response.json()["status"] == "pending"
+    # Get approval gate
+    get_resp = client.get(f"/api/v1/approvals/{approval_id}", headers={"Authorization": "Bearer test-token"})
+    assert get_resp.status_code == 200
+    assert get_resp.json()["id"] == approval_id
 
-    # Test decide approval gate
-    decision_response = client.post(
+    # Decide approval gate
+    decide_resp = client.post(
         f"/api/v1/approvals/{approval_id}/decision",
         json={"decision": "approved"},
         headers={"Authorization": "Bearer test-token"}
     )
-    assert decision_response.status_code == 200
-    assert decision_response.json()["status"] == "approved"
+    assert decide_resp.status_code == 200
+    assert decide_resp.json()["status"] == "approved"
