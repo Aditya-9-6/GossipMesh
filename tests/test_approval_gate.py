@@ -35,8 +35,13 @@ def override_get_current_user():
     db.close()
     return user
 
-app.dependency_overrides[deps.get_db] = override_get_db
-app.dependency_overrides[deps.get_current_user] = override_get_current_user
+@pytest.fixture(autouse=True)
+def setup_overrides():
+    app.dependency_overrides[deps.get_db] = override_get_db
+    app.dependency_overrides[deps.get_current_user] = override_get_current_user
+    yield
+    app.dependency_overrides.pop(deps.get_db, None)
+    app.dependency_overrides.pop(deps.get_current_user, None)
 
 client = TestClient(app)
 
