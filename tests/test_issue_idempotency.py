@@ -13,21 +13,20 @@ def test_payload_hash_consistency():
     
     assert hash1 == hash2
 
-def test_idempotency_check_no_prior_attempts(db: Session):
-    result = IssueIdempotencyManager.check_existing_pr_or_branch(db, "test/repo", 999)
+def test_idempotency_check_no_prior_attempts(mock_db_session: Session):
+    result = IssueIdempotencyManager.check_existing_pr_or_branch(mock_db_session, "test/repo", 999)
     assert result["can_proceed"] is True
     assert result["branch_exists"] is False
     assert result["pr_exists"] is False
     assert result["prior_attempts_count"] == 0
 
-def test_idempotency_check_with_prior_attempt(db: Session):
+def test_idempotency_check_with_prior_attempt(mock_db_session: Session):
     repo_full_name = "test/repo"
     issue_number = 123
     
-    # Record a prior attempt
-    IssueIdempotencyManager.record_attempt(db, repo_full_name, issue_number, details={"status": "success"})
+    IssueIdempotencyManager.record_attempt(mock_db_session, repo_full_name, issue_number, details={"status": "success"})
     
-    result = IssueIdempotencyManager.check_existing_pr_or_branch(db, repo_full_name, issue_number)
+    result = IssueIdempotencyManager.check_existing_pr_or_branch(mock_db_session, repo_full_name, issue_number)
     assert result["can_proceed"] is False
     assert result["branch_exists"] is True
     assert result["pr_exists"] is True

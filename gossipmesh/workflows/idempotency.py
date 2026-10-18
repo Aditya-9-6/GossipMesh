@@ -1,6 +1,7 @@
 import hashlib
+import json
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
@@ -14,14 +15,14 @@ class IssueIdempotencyManager:
     @staticmethod
     def compute_payload_hash(payload: Dict[str, Any]) -> str:
         """Compute a deterministic hash of the issue/webhook payload."""
-        canonical_str = str(sorted(payload.items()))
+        canonical_str = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha256(canonical_str.encode('utf-8')).hexdigest()
 
     @staticmethod
     def is_event_processed(db: Session, event_id: str) -> bool:
         """Check if an external event ID has already been successfully processed."""
         existing = db.query(WebhookEvent).filter(
-            WebhookEvent.event_id == event_id,
+            WebhookEvent.id == event_id,
             WebhookEvent.status == "processed"
         ).first()
         return existing is not None
@@ -38,7 +39,6 @@ class IssueIdempotencyManager:
         """
         branch_name = f"gossipmesh/issue-{issue_number}"
         
-        # Check audit log or database for prior successful run or PR creation attempts
         prior_attempts = db.query(AuditEvent).filter(
             AuditEvent.action == "issue_solver_completed",
             AuditEvent.details["repo_full_name"].as_string() == repo_full_name,
@@ -56,7 +56,6 @@ class IssueIdempotencyManager:
         }
 
     @staticmethod
-    
     def record_attempt(
         db: Session,
         repo_full_name: str,
@@ -65,15 +64,23 @@ class IssueIdempotencyManager:
         details: Optional[Dict[str, Any]] = None
     ) -> None:
         """Record an idempotency marker / audit event for an issue solver attempt."""
-        event_details = {
+        event_details: Dict[str, Any] = {
             "repo_full_name": repo_full_name,
             "issue_number": issue_number,
-            ...(details or {})
         }
-        audit = AuditEvent(
-            user_id=actor_id,
-            action="issue_solver_completed",
-            details=event_details
-        )
+        if details:
+            event_details.update(details)
+        
+        audit_kwargs: Dict[str, Any] = {
+            "action": "issue_solver_completed",
+            "details": event_details
+        }
+        if actor_id is not None:
+            if hasattr(AuditEvent, "user_id"):
+                audit_kwargs["user_id"] = actor_id
+            elif hasattr(AuditEvent, "actor_id"):
+                audit_kwargs["actor_id"] = actor_id
+
+        audit = AuditEvent(**audit_kwargs)
         db.add(audit)
         db.commit()

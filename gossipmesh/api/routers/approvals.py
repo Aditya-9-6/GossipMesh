@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -36,10 +36,10 @@ class ApprovalResponse(BaseModel):
     expires_at: datetime
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 @router.post("/", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_approval_gate(
     req: ApprovalCreateRequest,
     db: Session = Depends(deps.get_db),
@@ -70,7 +70,6 @@ def get_approval_gate(
     if not gate:
         raise HTTPException(status_code=404, detail="Approval gate not found")
     
-    # Check expiration
     if gate.status == "pending" and gate.expires_at < datetime.now(timezone.utc):
         gate.status = "expired"
         db.commit()
