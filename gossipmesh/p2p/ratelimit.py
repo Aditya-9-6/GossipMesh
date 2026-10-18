@@ -12,13 +12,10 @@ class RateLimitConfig:
     max_bytes_per_sec: float = 1048576.0  # 1 MB/s
     max_peers: int = 1000
     window_size_seconds: float = 60.0
-    
-    # Aliases for test compatibility
     max_rate_per_sec: Optional[float] = None
     burst_capacity: Optional[float] = None
     max_bandwidth_bytes_per_sec: Optional[float] = None
     burst_bandwidth_bytes: Optional[float] = None
-    max_tracked_peers: Optional[int] = None
 
     def __post_init__(self):
         if self.max_rate_per_sec is not None:
@@ -27,11 +24,8 @@ class RateLimitConfig:
             object.__setattr__(self, 'max_tokens', self.burst_capacity)
         if self.max_bandwidth_bytes_per_sec is not None:
             object.__setattr__(self, 'max_bytes_per_sec', self.max_bandwidth_bytes_per_sec)
-        if self.burst_bandwidth_bytes is not None:
-            if self.max_bytes_per_sec == 1048576.0 and self.burst_bandwidth_bytes != 1048576.0:
-                object.__setattr__(self, 'max_bytes_per_sec', self.burst_bandwidth_bytes)
-        if self.max_tracked_peers is not None:
-            object.__setattr__(self, 'max_peers', self.max_tracked_peers)
+        elif self.burst_bandwidth_bytes is not None:
+            object.__setattr__(self, 'max_bytes_per_sec', self.burst_bandwidth_bytes)
 
 @dataclass
 class RateLimitMetrics:
@@ -51,20 +45,21 @@ class RateLimitMetrics:
 
     def to_dict(self) -> Dict[str, int]:
         return {
-            "allowed_count": self.allowed_count,
-            "dropped_count": self.dropped_count,
-            "allowed_bytes": self.allowed_bytes,
-            "dropped_bytes": self.dropped_bytes,
             "allowed_messages": self.allowed_count,
             "dropped_messages": self.dropped_count,
+            "allowed_bytes": self.allowed_bytes,
+            "dropped_bytes": self.dropped_bytes,
+            "allowed_count": self.allowed_count,
+            "dropped_count": self.dropped_count,
         }
 
 class TokenBucket:
     """Mathematical token bucket with continuous O(1) time refill."""
     def __init__(self, capacity: float, refill_rate: float, initial_tokens: Optional[float] = None):
-        self.capacity = capacity
-        self.refill_rate = refill_rate
-        self.tokens = capacity if initial_tokens is None else min(initial_tokens, capacity)
+        self.capacity = max(0.0, capacity)
+        self.refill_rate = max(0.0, refill_rate)
+        initial = capacity if initial_tokens is None else min(initial_tokens, capacity)
+        self.tokens = max(0.0, initial)
         self.last_refill_timestamp = time.monotonic()
 
     def _refill(self, now: float) -> None:
@@ -89,8 +84,12 @@ class TokenBucket:
 class PeerEntry:
     """Encapsulates rate and bandwidth buckets for an individual peer."""
     def __init__(self, config: RateLimitConfig, now: float):
-        self.rate_bucket = TokenBucket(capacity=config.max_tokens, refill_rate=config.refill_rate, initial_tokens=config.max_tokens)
-        self.bandwidth_bucket = TokenBucket(capacity=config.max_bytes_per_sec, refill_rate=config.max_bytes_per_sec, initial_tokens=config.max_bytes_per_sec)
+        rate_cap = config.max_tokens if config.burst_capacity is None else config.burst_capacity
+        rate_refill = config.refill_rate if config.max_rate_per_sec is None else config.max_rate_per_sec
+        bw_cap = config.max_bytes_per_sec
+        
+        self.rate_bucket = TokenBucket(capacity=rate_cap, refill_rate=rate_refill, initial_tokens=rate_cap)
+        self.bandwidth_bucket = TokenBucket(capacity=bw_cap, refill_rate=bw_cap, initial_tokens=bw_cap)
         self.last_seen = now
 
 class PeerRateLimiter:
@@ -101,10 +100,6 @@ Enforces frequency and bandwidth thresholds in O(1) time."""
         self._peers: OrderedDict[str, PeerEntry] = OrderedDict()
         self._lock = asyncio.Lock()
         self.metrics = RateLimitMetrics()
-
-    @property
-    def peers(self) -> OrderedDict[str, PeerEntry]:
-        return self._peers
 
     def _evict_lru_if_full(self) -> None:
         while len(self._peers) >= self.config.max_peers:
@@ -131,22 +126,24 @@ Returns (is_allowed, reason)."""
             
             if not peer.rate_bucket.can_consume(1.0, now):
                 self.metrics.record_dropped(payload_size_bytes)
-                return False, "RATE_LIMIT_EXCEEDED"
+                return False, "rate_limit_exceeded"
             
             if not peer.bandwidth_bucket.can_consume(float(payload_size_bytes), now):
                 self.metrics.record_dropped(payload_size_bytes)
-                return False, "BANDWIDTH_LIMIT_EXCEEDED"
+                return False, "bandwidth_limit_exceeded"
             
             peer.rate_bucket.consume(1.0, now)
             peer.bandwidth_bucket.consume(float(payload_size_bytes), now)
             self.metrics.record_allowed(payload_size_bytes)
-            return True, "ALLOWED"
+            return True, "allowed"
 
     async def get_metrics(self) -> Dict[str, Any]:
         """Returns local telemetry metrics and active peer count."""
         async with self._lock:
             res = self.metrics.to_dict()
-            res["active_peers"] = len(self._peers)
+            count = len(self._peers)
+            res["active_peers"] = count
+            res["tracked_peers_count"] = count
             return res
 
     async def reset_peer(self, peer_id: str) -> None:
