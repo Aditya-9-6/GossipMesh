@@ -43,7 +43,7 @@ class ApprovalResponse(BaseModel):
 def create_approval_gate(
     req: ApprovalCreateRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user),
 ):
     expires_at = datetime.now(timezone.utc) + timedelta(hours=req.expires_in_hours)
     gate = ApprovalGate(
@@ -64,7 +64,7 @@ def create_approval_gate(
 def get_approval_gate(
     approval_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user),
 ):
     gate = db.query(ApprovalGate).filter(ApprovalGate.id == approval_id).first()
     if not gate:
@@ -83,7 +83,7 @@ def decide_approval(
     approval_id: int,
     req: ApprovalDecisionRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user),
 ):
     gate = db.query(ApprovalGate).filter(ApprovalGate.id == approval_id).first()
     if not gate:

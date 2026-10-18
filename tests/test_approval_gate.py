@@ -28,17 +28,19 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
-    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
-    if not user:
-        user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    db.close()
-    return user
+    try:
+        user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
+        if not user:
+            user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+    finally:
+        db.close()
 
 app.dependency_overrides[deps.get_db] = override_get_db
-app.dependency_overrides[deps.get_current_active_user] = override_get_current_user
+app.dependency_overrides[deps.get_current_user] = override_get_current_user
 
 client = TestClient(app)
 
@@ -74,3 +76,52 @@ def test_approval_gate_lifecycle():
     assert decide_data["status"] == "approved"
     assert decide_data["approver_id"] is not None
     assert decide_data["approved_at"] is not None
+
+def test_approval_gate_not_found():
+    res = client.get("/approvals/999999")
+    assert res.status_code == 404
+
+    res_decide = client.post(
+        "/approvals/999999/decision",
+        json={"decision": "approved"}
+    )
+    assert res_decide.status_code == 404
+
+def test_approval_gate_invalid_decision():
+    response = client.post(
+        "/approvals/",
+        json={
+            "action_type": "push_commit",
+            "expires_in_hours": 1
+        }
+    )
+    assert response.status_code == 201
+    approval_id = response.json()["id"]
+
+    res_decide = client.post(
+        f"/approvals/{approval_id}/decision",
+        json={"decision": "invalid_choice"}
+    )
+    assert res_decide.status_code == 400
+
+def test_approval_gate_expired():
+    db = TestingSessionLocal()
+    try:
+        expired_gate = ApprovalGate(
+            action_type="push_commit",
+            status="pending",
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1)
+        )
+        db.add(expired_gate)
+        db.commit()
+        db.refresh(expired_gate)
+        expired_id = expired_gate.id
+    finally:
+        db.close()
+
+    # Attempt to decide on expired gate
+    res_decide = client.post(
+        f"/approvals/{expired_id}/decision",
+        json={"decision": "approved"}
+    )
+    assert res_decide.status_code == 400
