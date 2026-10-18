@@ -15,11 +15,12 @@ class TestZeroCopyParserAndTransport(unittest.TestCase):
         wire_data = ZeroCopyPacketParser.serialize_header(magic, msg_type, msg_id, payload)
         buf = memoryview(wire_data)
 
-        parsed_magic, parsed_type, parsed_id, parsed_payload = ZeroCopyPacketParser.parse_header(buf)
+        parsed_magic, parsed_type, parsed_id, parsed_len, parsed_payload = ZeroCopyPacketParser.parse_header(buf)
 
         self.assertEqual(parsed_magic, magic)
         self.assertEqual(parsed_type, msg_type)
         self.assertTrue(parsed_id.startswith("test-msg-uuid"))
+        self.assertEqual(parsed_len, len(payload))
         self.assertEqual(bytes(parsed_payload), payload)
 
     def test_parser_buffer_too_small(self):
@@ -31,7 +32,7 @@ class TestZeroCopyParserAndTransport(unittest.TestCase):
         magic = 0x474D4553
         msg_type = 2
         msg_id = "node-uuid-987654321098765432109876"
-        payload = b"transport test payload"
+        payload = b"transport test payload with variable length"
         wire_data = ZeroCopyPacketParser.serialize_header(magic, msg_type, msg_id, payload)
 
         async def run_test():
@@ -45,6 +46,7 @@ class TestZeroCopyParserAndTransport(unittest.TestCase):
             t_type, t_id, t_view = res
             self.assertEqual(t_type, msg_type)
             self.assertTrue(t_id.startswith("node-uuid"))
+            self.assertEqual(bytes(t_view), payload)
 
         asyncio.run(run_test())
 
@@ -52,7 +54,7 @@ class TestZeroCopyParserAndTransport(unittest.TestCase):
         magic = 0xBADDEAD
         msg_type = 1
         msg_id = "bad-magic-uuid-123456789012345678"
-        wire_data = ZeroCopyPacketParser.serialize_header(magic, msg_type, msg_id, b"")
+        wire_data = ZeroCopyPacketParser.serialize_header(magic, msg_type, msg_id, b"payload")
 
         async def run_test():
             reader = asyncio.StreamReader()

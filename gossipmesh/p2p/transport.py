@@ -2,12 +2,66 @@ import asyncio
 import json
 import logging
 import time
+import threading
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
+from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
 
 logger = logging.getLogger(__name__)
+
+class P2PSessionTransport:
+    """Manages peer-to-peer transport streams with automatic key rotation
+    every 1000 messages or 300 seconds without dropping streams."""
+    
+    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
+        self.rotator = EphemeralSessionKeyRotator()
+        self.max_messages = max_messages
+        self.max_time_seconds = max_time_seconds
+        self._lock = threading.Lock()
+        self.creation_time = time.time()
+
+    def initialize_session(self, peer_public_bytes: bytes):
+        with self._lock:
+            self.rotator.derive_session_key(peer_public_bytes)
+            self.creation_time = time.time()
+
+    def _should_rotation_unlocked(self) -> bool:
+        if self.rotator.message_counter >= self.max_messages:
+            return True
+        if (time.time() - self.creation_time) >= self.max_time_seconds:
+            return True
+        return False
+
+    def should_rotate(self) -> bool:
+        with self._lock:
+            return self._should_rotation_unlocked()
+
+    def _trigger_rotation_unlocked(self) -> bytes:
+        _, new_pub_bytes = self.rotator.rotate()
+        self.creation_time = time.time()
+        return new_pub_bytes
+
+    def trigger_rotation(self) -> bytes:
+        with self._lock:
+            return self._trigger_rotation_unlocked()
+
+    def send_message(self, plaintext: bytes) -> bytes:
+        with self._lock:
+            if self._should_rotation_unlocked():
+                self._trigger_rotation_unlocked()
+            ciphertext = encrypt_payload(self.rotator.session_key, plaintext)
+            self.rotator.message_counter += 1
+            return ciphertext
+
+    def receive_message(self, ciphertext: bytes) -> bytes:
+        with self._lock:
+            if self._should_rotation_unlocked():
+                self._trigger_rotation_unlocked()
+            plaintext = decrypt_payload(self.rotator.session_key, ciphertext)
+            self.rotator.message_counter += 1
+            return plaintext
 
 
 class TransportTelemetry:
@@ -62,7 +116,6 @@ class GossipTransport:
         self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = "default"
     ) -> Optional[Any]:
         """Receives, rate-limits, parses, and dispatches a payload from a peer."""
-        # Determine payload bytes and format
         if isinstance(payload, bytes):
             raw_bytes = payload
         elif isinstance(payload, str):
@@ -82,7 +135,6 @@ class GossipTransport:
 
         self.telemetry.record_received(size_bytes)
 
-        # Parse payload data
         parsed_data: Any
         if isinstance(payload, dict):
             parsed_data = payload
@@ -101,7 +153,6 @@ class GossipTransport:
         else:
             parsed_data = {"raw": str(payload)}
 
-        # Dispatch to handler if registered
         if topic in self.handlers:
             try:
                 res = self.handlers[topic](parsed_data)
@@ -144,15 +195,28 @@ class TransportSocketReader:
 
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
         """Reads a full gossip packet from the stream and returns header metadata and memoryview payload."""
-        header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
+        try:
+            header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
+        except asyncio.IncompleteReadError:
+            return None
+        
         if not header_data:
             return None
         
         header_view = memoryview(header_data)
-        magic, msg_type, msg_id, _ = ZeroCopyPacketParser.parse_header(header_view)
+        magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(header_view)
         
         if magic != self.expected_magic:
             logger.warning(f"Invalid packet magic received: {hex(magic)}")
             raise ValueError(f"Invalid packet magic: {hex(magic)}")
 
-        return msg_type, msg_id, header_view
+        try:
+            payload_data = await self.reader.readexactly(payload_len)
+        except asyncio.IncompleteReadError as e:
+            raise ValueError(f"Incomplete payload read: expected {payload_len} bytes, got {len(e.partial)}")
+
+        full_packet = header_data + payload_data
+        full_view = memoryview(full_packet)
+        _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
+
+        return msg_type, msg_id, payload_view
