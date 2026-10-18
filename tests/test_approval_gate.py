@@ -42,7 +42,7 @@ def override_get_current_user():
 
 @pytest.fixture(autouse=True)
 def setup_overrides():
-    # Ensure all models are registered in Base.metadata and tables created
+    # Ensure all models are imported and registered in Base.metadata and tables created
     Base.metadata.create_all(bind=engine)
     app.dependency_overrides[deps.get_db] = override_get_db
     app.dependency_overrides[deps.get_current_user] = override_get_current_user
