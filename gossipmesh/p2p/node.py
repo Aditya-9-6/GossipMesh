@@ -7,23 +7,35 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Any
 from gossipmesh.p2p.pow import mine_pow, verify_pow
+from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
+
 
 class GossipTopic(str, Enum):
-    AGENT_SPAWN = "agent:spawn"
-    CODE_REVIEW = "code:review"
-    BUILD_STATUS = "build:status"
-    SECURITY_ALERT = "security:alert"
+    AGENT_EVENT = "agent_event"
+    CODE_REVIEW = "code_review"
+    CONSENSUS = "consensus"
     HEARTBEAT = "heartbeat"
-    CUSTOM = "custom"
+    TASK_BID = "task_bid"
+
 
 class GossipMessage:
-    def __init__(self, topic: str, origin_node: str, payload: Dict[str, Any], repo: str='global', message_id: Optional[str]=None, vector_clock: Optional[Dict[str, int]]=None, timestamp: Optional[float]=None, ttl: int=10):
+    def __init__(
+        self,
+        topic: str,
+        origin_node: str,
+        payload: Dict[str, Any],
+        repo: str = "global",
+        message_id: Optional[str] = None,
+        vector_clock: Optional[Dict[str, int]] = None,
+        timestamp: Optional[float] = None,
+        ttl: int = 10,
+    ):
         self.topic = topic
         self.origin_node = origin_node
         self.payload = payload
         self.repo = repo
         self.message_id = message_id or str(uuid.uuid4())
-        self.vector_clock = vector_clock or {}
+        self.vector_clock = vector_clock or {origin_node: 1}
         self.timestamp = timestamp or time.time()
         self.ttl = ttl
 
@@ -36,45 +48,47 @@ class GossipMessage:
             "message_id": self.message_id,
             "vector_clock": self.vector_clock,
             "timestamp": self.timestamp,
-            "ttl": self.ttl
+            "ttl": self.ttl,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'GossipMessage':
         return cls(
-            topic=data.get("topic", GossipTopic.CUSTOM),
-            origin_node=data.get("origin_node", "unknown"),
-            payload=data.get("payload", {}),
+            topic=data["topic"],
+            origin_node=data["origin_node"],
+            payload=data["payload"],
             repo=data.get("repo", "global"),
             message_id=data.get("message_id"),
-            vector_clock=data.get("vector_clock", {}),
+            vector_clock=data.get("vector_clock"),
             timestamp=data.get("timestamp"),
-            ttl=data.get("ttl", 10)
+            ttl=data.get("ttl", 10),
         )
 
-class GossipNode:
-    """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence.
-Communicates via a shared ledger directory (file-backed mesh) or local bus."""
-    def __init__(self, node_id: str, mesh_dir: str | None = None, public_key: Optional[str] = None, pow_difficulty: int = 0, pow_nonce: Optional[int] = None):
-        self.node_id = node_id
-        self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh_ledger")
-        self.mesh_dir.mkdir(parents=True, exist_ok=True)
-        self.public_key = public_key or str(uuid.uuid4())
-        self.pow_difficulty = pow_difficulty
-        
-        if pow_nonce is not None:
-            self.pow_nonce = pow_nonce
-            if pow_difficulty > 0 and not verify_pow(self.public_key, self.pow_nonce, self.pow_difficulty):
-                raise ValueError("Provided PoW nonce is invalid for the given difficulty and public key")
-        elif pow_difficulty > 0:
-            self.pow_nonce, _ = mine_pow(self.public_key, pow_difficulty)
-        else:
-            self.pow_nonce = 0
 
+class GossipNode:
+    """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence
+    and Adaptive Scatter-Width CPU-Load Feedback Shaping.
+    Communicates via a shared ledger directory (file-backed mesh) or local bus."""
+    def __init__(
+        self,
+        node_id: str,
+        mesh_dir: str | None = None,
+        public_key: Optional[str] = None,
+        pow_difficulty: int = 0,
+        pow_nonce: Optional[int] = None,
+        base_scatter: int = 4,
+    ):
+        self.node_id = node_id
+        self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
+        self.mesh_dir.mkdir(parents=True, exist_ok=True)
+        self.public_key = public_key
+        self.pow_difficulty = pow_difficulty
+        self.pow_nonce = pow_nonce
         self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
         self.seen_messages = set()
-        self.recent_messages = deque(maxlen=1000)
+        self.recent_messages: deque = deque(maxlen=200)
         self._load_seen_history()
+        self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
 
     def _load_seen_history(self):
         """Loads message IDs previously witnessed to prevent duplicate processing."""
@@ -91,41 +105,53 @@ Communicates via a shared ledger directory (file-backed mesh) or local bus."""
 
     def subscribe(self, topic: GossipTopic, handler: Callable[[GossipMessage], None]):
         """Registers a reactive listener callback for a gossip topic."""
-        if topic not in self.subscribers:
-            self.subscribers[topic] = []
-        self.subscribers[topic].append(handler)
+        topic_str = topic.value if isinstance(topic, GossipTopic) else topic
+        if topic_str not in self.subscribers:
+            self.subscribers[topic_str] = []
+        self.subscribers[topic_str].append(handler)
 
-    def publish(self, topic: GossipTopic, payload: Dict[str, Any], repo: str='global', ttl: int=10) -> GossipMessage:
-        """Broadcasts an epidemic gossip event across the mesh."""
+    def publish(
+        self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
+    ) -> GossipMessage:
+        """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
+        current_scatter = self.scatter_governor.update()
+        
+        topic_str = topic.value if isinstance(topic, GossipTopic) else topic
         msg = GossipMessage(
-            topic=topic,
+            topic=topic_str,
             origin_node=self.node_id,
-            payload=payload,
+            payload={**payload, "_adaptive_scatter": current_scatter},
             repo=repo,
-            ttl=ttl
+            ttl=ttl,
         )
-        self.recent_messages.append(msg)
+        
+        if self.pow_difficulty > 0:
+            nonce, _ = mine_pow(msg.message_id, self.pow_difficulty, self.pow_nonce)
+            msg.payload["pow_nonce"] = nonce
+
         self.seen_messages.add(msg.message_id)
+        self.recent_messages.append(msg)
 
         file_path = self.mesh_dir / f"{msg.message_id}.json"
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(msg.to_dict(), f)
         except Exception as e:
-            print(f"Error writing message to ledger: {e}")
+            print(f"Error writing gossip message to ledger: {e}")
 
+        self._dispatch_to_subscribers(msg)
         return msg
 
     def sync(self) -> List[GossipMessage]:
         """Runs anti-entropy synchronization: scans the shared ledger for newly
-arrived gossip messages from other peer nodes."""
+        arrived gossip messages from other peer nodes."""
         new_messages = []
         if not self.mesh_dir.exists():
             return new_messages
 
+        self.scatter_governor.update()
+
         for file_path in self.mesh_dir.glob("*.json"):
-            if file_path.stem in self.seen_messages:
-                continue
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -145,31 +171,34 @@ arrived gossip messages from other peer nodes."""
             try:
                 handler(msg)
             except Exception as e:
-                print(f"Subscriber error on topic {msg.topic}: {e}")
+                print(f"Error in subscriber handler: {e}")
 
     def heartbeat(self):
-        """Updates this node's live liveness timestamp."""
-        self.publish(GossipTopic.HEARTBEAT, {"status": "alive", "timestamp": time.time(), "pow_nonce": self.pow_nonce})
+        """Updates this node's live liveness timestamp and resource governor."""
+        self.scatter_governor.update()
+        self.publish(GossipTopic.HEARTBEAT, {"status": "alive", "metrics": self.scatter_governor.get_metrics()})
 
-    def get_recent_messages(self, topic: Optional[GossipTopic]=None, limit: int=50) -> List[GossipMessage]:
+    def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
         """Fetches the latest gossip messages from the in-memory cache."""
-        msgs = list(self.recent_messages)
-        if topic:
-            msgs = [m for m in msgs if m.topic == topic]
-        return msgs[-limit:]
+        topic_str = topic.value if topic else None
+        filtered = [
+            m for m in self.recent_messages
+            if topic_str is None or m.topic == topic_str
+        ]
+        return list(filtered)[-limit:]
 
     def cleanup_ledger(self):
         """Removes expired messages from the ledger based on TTL."""
+        now = time.time()
         if not self.mesh_dir.exists():
             return
-        now = time.time()
         for file_path in self.mesh_dir.glob("*.json"):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     timestamp = data.get("timestamp", now)
                     ttl = data.get("ttl", 10)
-                    if (now - timestamp) > (ttl * 60):
+                    if now - timestamp > (ttl * 60):
                         file_path.unlink(missing_ok=True)
             except Exception:
                 continue
