@@ -36,7 +36,7 @@ class MerkleTree:
         left_node = self._build_tree(items[:mid])
         right_node = self._build_tree(items[mid:])
         
-        combined_key = f"{items[0][0]}-{items[-1][0]"
+        combined_key = f"{items[0][0]}-{items[-1][0]}"
         v_hash = hashlib.sha256(combined_key.encode('utf-8')).hexdigest()
         return MerkleNode(key=combined_key, value_hash=v_hash, left=left_node, right=right_node)
 
