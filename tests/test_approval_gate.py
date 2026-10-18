@@ -1,4 +1,4 @@
-import pytest
+pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -27,6 +27,7 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
+    Base.metadata.create_all(bind=engine)
     user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
     if not user:
         user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)

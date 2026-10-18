@@ -45,5 +45,5 @@ class TestMerkleDAG(unittest.TestCase):
         self.assertIn("k2", divergences)
 
 
-if __name__ == "__main പ്രധാന__":
+if __name__ == "__main__":
     unittest.main()
