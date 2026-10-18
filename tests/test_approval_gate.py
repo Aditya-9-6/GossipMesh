@@ -20,6 +20,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 Base.metadata.create_all(bind=engine)
 
 def override_get_db():
+    Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     try:
         yield db
@@ -27,6 +28,7 @@ def override_get_db():
         db.close()
 
 def override_get_current_user():
+    Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
     if not user:
