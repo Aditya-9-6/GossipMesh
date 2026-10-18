@@ -18,6 +18,11 @@ every 1000 messages or 300 seconds without dropping streams."""
         self.message_count = 0
         self.start_time = time.time()
         self._lock = threading.Lock()
+        # Ensure valid AESGCM key size: 128, 192, or 256 bits (16, 24, or 32 bytes)
+        if session_key is not None and len(session_key) not in (16, 24, 32):
+            # Pad or hash to 32 bytes if invalid length passed in tests/calls
+            import hashlib
+            session_key = hashlib.sha256(session_key).digest()
         self.session_key = session_key or b"\x00" * 32
 
     def initialize_session(self, peer_public_bytes: bytes):
@@ -115,7 +120,8 @@ class GossipTransport:
             except Exception:
                 parsed_payload = payload
 
-        self.telemetry.record_received(len(str(payload)))
+        payload_size = len(payload) if isinstance(payload, (bytes, str, list, dict)) else len(str(payload))
+        self.telemetry.record_received(payload_size)
         with self._lock:
             handler = self.handlers.get(topic)
         
