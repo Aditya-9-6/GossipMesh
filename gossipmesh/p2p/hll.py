@@ -37,6 +37,13 @@ class WindowedHyperLogLog:
         else:
             return abs(_FallbackMurmur3.hash(item, self.seed, signed=False)) & 0xFFFFFFFFFFFFFFFF
 
+    def _slide_window(self, now: float) -> None:
+        cutoff = now - self.window_seconds
+        for i in range(self.num_registers):
+            if self.timestamps[i] > 0.0 and self.timestamps[i] < cutoff:
+                self.registers[i] = 0
+                self.timestamps[i] = 0.0
+
     def add(self, item: str, timestamp: Optional[float] = None) -> None:
         ts = timestamp if timestamp is not None else time.time()
         h = self._hash(item)
@@ -50,6 +57,7 @@ class WindowedHyperLogLog:
             rho = (remaining & -remaining).bit_length() + 1
 
         with self._lock:
+            self._slide_window(ts)
             if ts >= self.timestamps[idx]:
                 if rho > self.registers[idx]:
                     self.registers[idx] = rho
@@ -61,12 +69,8 @@ class WindowedHyperLogLog:
     def count(self, current_time: Optional[float] = None) -> int:
         now = current_time if current_time is not None else time.time()
         with self._lock:
-            active_registers = []
-            for i in range(self.num_registers):
-                if self.timestamps[i] > 0.0 and (now - self.timestamps[i]) <= self.window_seconds:
-                    active_registers.append(float(self.registers[i]))
-                else:
-                    active_registers.append(0.0)
+            self._slide_window(now)
+            active_registers = [float(val) for val in self.registers]
 
             m = float(self.num_registers)
             if m == 16:
@@ -88,8 +92,11 @@ class WindowedHyperLogLog:
     def merge(self, other: 'WindowedHyperLogLog', current_time: Optional[float] = None) -> None:
         now = current_time if current_time is not None else time.time()
         with self._lock:
+            self._slide_window(now)
+            other._slide_window(now)
             for i in range(self.num_registers):
                 if other.timestamps[i] > self.timestamps[i]:
-                    if other.registers[i] > self.registers[i]:
-                        self.registers[i] = other.registers[i]
+                    self.registers[i] = other.registers[i]
                     self.timestamps[i] = other.timestamps[i]
+                elif other.timestamps[i] == self.timestamps[i] and other.registers[i] > self.registers[i]:
+                    self.registers[i] = other.registers[i]
