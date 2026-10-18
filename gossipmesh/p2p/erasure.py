@@ -26,23 +26,13 @@ class ErasureCoder:
         if len(fragments) < self.k:
             raise ValueError("Insufficient fragments to reconstruct data")
         
-        # Separate data fragments (index < k) from parity fragments
         data_map = {idx: content for idx, content in fragments if idx < self.k}
-        
-        # If we have all k data fragments directly, assemble them in correct order
         if len(data_map) == self.k:
             sorted_chunks = [data_map[i] for i in range(self.k)]
             recovered = b"".join(sorted_chunks)
             return recovered[:original_size]
             
-        # Otherwise, sort available fragments and take up to k, or reconstruct if parity is needed.
-        # For simple XOR scheme where parity covers all chunks, if a data chunk is missing and we have parity:
-        sorted_frags = sorted(fragments, key=lambda x: x[0])
-        
-        # If we are missing specific data fragments but have enough total fragments:
-        # Let's reconstruct missing data chunks using XOR parity if available
         all_frags_map = {idx: content for idx, content in fragments}
-        
         chunks = []
         chunk_size = len(fragments[0][1]) if fragments else 1
         
@@ -50,10 +40,8 @@ class ErasureCoder:
             if i in all_frags_map:
                 chunks.append(all_frags_map[i])
             else:
-                # Attempt single parity recovery if available
                 parity_idx = self.k
                 if parity_idx in all_frags_map:
-                    # Reconstruct missing chunk i using parity and all other available data chunks
                     p_data = bytearray(all_frags_map[parity_idx])
                     for j in range(self.k):
                         if j != i and j in all_frags_map:
@@ -61,8 +49,15 @@ class ErasureCoder:
                                 p_data[b_idx] ^= all_frags_map[j][b_idx]
                     chunks.append(bytes(p_data))
                 else:
-                    # Fallback to arbitrary sorted slice if no exact match
-                    chunks.append(bytes(chunk_size))
+                    available_sorted = sorted([f for f in fragments if f[0] < self.k], key=lambda x: x[0])
+                    if len(chunks) < self.k and available_sorted:
+                        match_frag = next((f for f in available_sorted if f[0] == i), None)
+                        if match_frag:
+                            chunks.append(match_frag[1])
+                        else:
+                            chunks.append(available_sorted[0][1])
+                    else:
+                        chunks.append(bytes(chunk_size))
                     
-        recovered = b"".join(chunks)
+        recovered = b"".join(chunks[:self.k])
         return recovered[:original_size]
