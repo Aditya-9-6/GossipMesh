@@ -1,5 +1,4 @@
 import hashlib
-import json
 from typing import Dict, List, Tuple, Any, Optional
 from gossipmesh.p2p.vector_clock import VectorClock
 
@@ -22,38 +21,39 @@ class MerkleNode:
         return hasher.hexdigest()
 
 class MerkleTree:
-    def __init__(self, data: Dict[str, str]):
-        self.root = self._build_tree(sorted(data.items()))
+    def __init__(self, entries: Optional[Dict[str, str]] = None):
+        self.root: Optional[MerkleNode] = None
+        if entries:
+            self.build_tree(entries)
 
-    def _build_tree(self, items: List[Tuple[str, str]]) -> Optional[MerkleNode]:
-        if not items:
-            return None
-        if len(items) == 1:
-            k, v = items[0]
-            val_hash = hashlib.sha256(v.encode('utf-8')).hexdigest()
-            return MerkleNode(k, val_hash)
+    def build_tree(self, entries: Dict[str, str]):
+        nodes = []
+        for key, val in sorted(entries.items()):
+            v_hash = hashlib.sha256(val.encode('utf-8')).hexdigest()
+            nodes.append(MerkleNode(key, v_hash))
         
-        mid = len(items) // 2
-        left_node = self._build_tree(items[:mid])
-        right_node = self._build_tree(items[mid:])
-        
-        combined_key = items[mid][0]
-        hasher = hashlib.sha256()
-        if left_node:
-            hasher.update(left_node.hash.encode('utf-8'))
-        if right_node:
-            hasher.update(right_node.hash.encode('utf-8'))
-        
-        return MerkleNode(combined_key, hasher.hexdigest(), left=left_node, right=right_node)
+        if not nodes:
+            self.root = None
+            return
+
+        while len(nodes) > 1:
+            next_level = []
+            for i in range(0, len(nodes), 2):
+                left = nodes[i]
+                right = nodes[i+1] if i + 1 < len(nodes) else None
+                parent = MerkleNode(left.key, left.value_hash, left, right)
+                next_level.append(parent)
+            nodes = next_level
+        self.root = nodes[0]
 
     def get_root_hash(self) -> str:
-        return self.root.hash if self.root else hashlib.sha256(b"empty").hexdigest()
+        return self.root.hash if self.root else hashlib.sha256(b"").hexdigest()
 
 class AntiEntropyReconciler:
     def __init__(self, node_id: str):
         self.node_id = node_id
-        self.vector_clock = VectorClock({node_id: 0})
         self.store: Dict[str, str] = {}
+        self.vector_clock = VectorClock({node_id: 0})
 
     def set_state(self, key: str, value: str):
         self.store[key] = value
@@ -63,19 +63,16 @@ class AntiEntropyReconciler:
         return MerkleTree(self.store)
 
     def reconcile(self, peer_id: str, peer_vc_dict: Dict[str, int], peer_root_hash: str) -> str:
-        peer_vc = VectorClock(peer_vc_dict)
+        peer_vc = VectorClock.from_dict(peer_vc_dict)
         comparison = self.vector_clock.compare(peer_vc)
-        if comparison == "EQUAL" or comparison == "AFTER":
-            return "NO_SYNC_NEEDED"
+        
+        if comparison == "EQUAL":
+            if self.get_merkle_tree().get_root_hash() == peer_root_hash:
+                return "NO_SYNC_NEEDED"
+            return "MERKLE_SYNC"
         elif comparison == "BEFORE":
             return "PULL_FROM_PEER"
+        elif comparison == "AFTER":
+            return "PUSH_TO_PEER"
         else:
-            return "EXCHANGE_MERKLE"
-
-    def find_differences(self, peer_store: Dict[str, str]) -> List[str]:
-        diffs = []
-        all_keys = set(self.store.keys()).union(set(peer_store.keys()))
-        for k in all_keys:
-            if self.store.get(k) != peer_store.get(k):
-                diffs.append(k)
-        return diffs
+            return "MERKLE_SYNC"
