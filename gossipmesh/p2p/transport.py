@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import struct
 import time
 import threading
 from typing import Any, Callable, Dict, Optional, Tuple, Union
@@ -85,6 +86,13 @@ class TransportTelemetry:
     def to_dict(self) -> Dict[str, Any]:
         with self._lock:
             return {
+                "transport": {
+                    "sent_messages": self.sent_count,
+                    "received_messages": self.received_count,
+                    "dropped_messages": self.dropped_count,
+                    "sent_bytes": self.sent_bytes,
+                    "received_bytes": self.received_bytes
+                },
                 "sent_count": self.sent_count,
                 "received_count": self.received_count,
                 "dropped_count": self.dropped_count,
@@ -125,9 +133,13 @@ class GossipTransport:
         self.telemetry.record_received(len(payload_bytes))
         handler = self.handlers.get(topic)
         if handler:
-            if asyncio.iscoroutinefunction(handler):
-                return await handler(payload)
-            return handler(payload)
+            try:
+                if asyncio.iscoroutinefunction(handler):
+                    return await handler(payload)
+                return handler(payload)
+            except Exception:
+                logging.exception("Error in message handler for topic %s", topic)
+                return None
         return payload
 
     async def receive_fountain_symbol(self, stream_id: str, seq: int, total_symbols: int, symbol: bytes, topic: str='default') -> Optional[Any]:
@@ -175,11 +187,18 @@ class TransportSocketReader:
 
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
         """Reads a full gossip packet from the stream and returns header metadata and memoryview payload."""
-        header_data = await self.reader.readexactly(12)
-        if len(header_data) < 12:
+        try:
+            header_data = await self.reader.readexactly(12)
+            if len(header_data) < 12:
+                return None
+            magic, length, flags = struct.unpack(">III", header_data)
+            if magic != self.expected_magic:
+                raise ValueError(f"Invalid packet magic: {hex(magic)}, expected {hex(self.expected_magic)}")
+            
+            msg_id_bytes = await self.reader.readexactly(32)
+            msg_id = msg_id_bytes.rstrip(b'\x00').decode('utf-8', errors='ignore')
+            
+            payload_bytes = await self.reader.readexactly(length)
+            return (flags, msg_id, memoryview(payload_bytes))
+        except asyncio.IncompleteReadError:
             return None
-        magic, length, flags = struct.unpack(">III", header_data)
-        if magic != self.expected_magic:
-            return None
-        payload_bytes = await self.reader.readexactly(length)
-        return (flags, "default", memoryview(payload_bytes))
