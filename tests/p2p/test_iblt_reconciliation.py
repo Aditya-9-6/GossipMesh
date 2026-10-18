@@ -59,7 +59,6 @@ class TestIBLTReconciliation(unittest.TestCase):
         # With size=2 and 50 elements, decoding should fail and trigger fallback
         self.assertFalse(success)
 
-    def_protocol_fallback = test_fallback_full_sync = lambda self: None
     def test_fallback_sync(self):
         local_inv = {10: b'x', 20: b'y'}
         remote_keys = [20, 30]
