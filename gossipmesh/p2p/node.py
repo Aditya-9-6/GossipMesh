@@ -139,14 +139,14 @@ class GossipNode:
             payload={**payload, "_adaptive_scatter": current_scatter},
             repo=repo,
             ttl=ttl,
-        }
+        )
         
         if self.pow_difficulty > 0:
             nonce, _ = mine_pow(msg.message_id, self.pow_difficulty, self.pow_nonce)
             msg.payload["pow_nonce"] = nonce
 
         self.seen_messages.add(msg.message_id)
-        self.seen_messages.add(file_path_stem := f"{msg.message_id}")
+        self.seen_messages.add(f"{msg.message_id}")
         self.recent_messages.append(msg)
 
         file_path = self.mesh_dir / f"{msg.message_id}.json"
