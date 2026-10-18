@@ -10,9 +10,16 @@ from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, d
 
 logger = logging.getLogger(__name__)
 
+class TransportTelemetry:
+    """Telemetry collector for transport operations."""
+    def __init__(self) -> None:
+        self.metrics: Dict[str, Any] = {}
+
+    def record(self, key: str, value: Any) -> None:
+        self.metrics[key] = value
+
 class EphemeralSessionKeyRotatorExtended(EphemeralSessionKeyRotator):
     def initialize_peer(self, peer_public_bytes: bytes) -> None:
-        # Extension supporting peer public key initialization
         self.peer_public_bytes = peer_public_bytes
 
 class P2PSessionTransport:
@@ -39,7 +46,8 @@ class GossipTransport:
         self.sent_messages = 0
         self.received_messages = 0
         self.dropped_messages = 0
-        self._lock = asyncio.Lock()  # Async-native lock for coroutines
+        self._lock = asyncio.Lock()
+        self.telemetry = TransportTelemetry()
 
     def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
         self.handlers[topic] = handler
@@ -51,7 +59,6 @@ class GossipTransport:
                 return None
             self.received_messages += 1
 
-        # Handle bytes payload parsing if needed
         parsed_payload = payload
         if isinstance(payload, bytes):
             try:
@@ -94,7 +101,7 @@ class TransportSocketReader:
         self.expected_magic = expected_magic
 
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        header_size = 4 + 4 + 36 + 4  # magic (4), msg_type (4), msg_id (36), payload_len (4)
+        header_size = 4 + 4 + 36 + 4
         try:
             header_data = await self.reader.readexactly(header_size)
         except Exception:
