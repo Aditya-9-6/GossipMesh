@@ -1,6 +1,6 @@
 import asyncio
 import heapq
-from typing import Dict, Set, Tuple, Any
+from typing import Dict, Set, Tuple, Any, List
 from gossipmesh.p2p.rate_limiter import TokenBucketRateLimiter
 
 class ConnectionManager:

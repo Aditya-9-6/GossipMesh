@@ -54,7 +54,8 @@ class AntiEntropyReconciler:
         self.store[key] = value
         self.vector_clock.increment(self.node_id)
 
-    get_merkle_tree = lambda self: MerkleTree(self.store)
+    def get_merkle_tree(self) -> MerkleTree:
+        return MerkleTree(self.store)
 
     def reconcile(self, peer_id: str, peer_vc_dict: Dict[str, int], peer_root_hash: Optional[str]) -> str:
         peer_vc = VectorClock.from_dict(peer_vc_dict)
