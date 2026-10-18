@@ -76,3 +76,13 @@ class AntiEntropyReconciler:
             return "PUSH_TO_PEER"
         else:
             return "EXCHANGE_MERKLE"
+
+    def find_differences(self, peer_store: Dict[str, str]) -> Dict[str, Tuple[Optional[str], Optional[str]]]:
+        diffs: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
+        all_keys = set(self.store.keys()).union(set(peer_store.keys()))
+        for key in all_keys:
+            val_local = self.store.get(key)
+            val_peer = peer_store.get(key)
+            if val_local != val_peer:
+                diffs[key] = (val_local, val_peer)
+        return diffs
