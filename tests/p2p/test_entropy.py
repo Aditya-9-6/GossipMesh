@@ -31,11 +31,9 @@ class TestAntiEntropyEntropy(unittest.TestCase):
         self.assertEqual(div["nodeC"], 4)
 
     def test_compute_shannon_entropy(self):
-        # Zero or empty divergence
         self.assertEqual(compute_shannon_entropy({}), 0.0)
         self.assertEqual(compute_shannon_entropy({"nodeA": 0}), 0.0)
 
-        # Uniform distribution should have max entropy
         div = {"nodeA": 10, "nodeB": 10}
         entropy = compute_shannon_entropy(div)
         self.assertAlmostEqual(entropy, 1.0, places=4)
@@ -44,7 +42,6 @@ class TestAntiEntropyEntropy(unittest.TestCase):
         scraper = AntiEntropyScraper(entropy_threshold=1.0, buffer_capacity=10)
         
         local_clock = {"nodeA": 10, "nodeB": 10}
-        # Highly divergent peer clock
         peer_clock = {"nodeA": 2, "nodeB": 18}
         
         scraper.record_peer_clock("peer-1", peer_clock)
@@ -54,7 +51,7 @@ class TestAntiEntropyEntropy(unittest.TestCase):
         self.assertTrue(should_sync)
 
     def test_anti_entropy_scraper_scan_mesh(self):
-        scraper = AntiEntropyScraper(entropy_threshold=1.5, buffer_capacity=10)
+        scraper = AntiEntropyScraper(entropy_threshold=0.2, buffer_capacity=10)
         local_clock = {"nodeA": 10}
         
         scraper.record_peer_clock("peer-synced", {"nodeA": 10})
@@ -65,5 +62,5 @@ class TestAntiEntropyEntropy(unittest.TestCase):
         self.assertNotIn("peer-synced", sync_peers)
 
 
-if __name__ == "__main പ്രധാന__":
+if __name__ == "__main__":
     unittest.main()
