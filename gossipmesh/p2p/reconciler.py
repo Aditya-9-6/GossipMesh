@@ -65,7 +65,9 @@ class AntiEntropyReconciler:
     def reconcile(self, peer_id: str, peer_vc_dict: Dict[str, int], peer_root_hash: str) -> str:
         peer_vc = VectorClock(peer_vc_dict)
         comparison = self.vector_clock.compare(peer_vc)
-        if comparison == "EQUAL" or comparison == "AFTER":
+        if comparison == "EQUAL":
+            return "NO_SYNC_NEEDED"
+        elif comparison == "AFTER":
             return "NO_SYNC_NEEDED"
         elif comparison == "BEFORE":
             return "PULL_FROM_PEER"
