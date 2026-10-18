@@ -23,7 +23,7 @@ class TestErasureCoder(unittest.TestCase):
         # Only provide 3 shards when k=4 is required
         sparse_shards = shards[:3]
         with self.assertRaises(ValueError):
-            coder.decode(sparse_shards)
+            coder.decode(sparse_shards, original_length=len(payload))
 
     def test_empty_payload(self):
         coder = ErasureCoder(k=2, m=1)
