@@ -5,9 +5,9 @@ from sqlalchemy.orm import sessionmaker
 
 from gossipmesh.api import app
 from gossipmesh.api.deps import get_db
-from gossipmesh.db.base import Base
+from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
-from gossipmesh.api.deps import get_current_user
+from gossipmesh.models.approval import ApprovalGate
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -16,26 +16,33 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+Base.metadata.create_all(bind=engine)
+
 def override_get_db():
-    db = TestingSessionLocal()
     try:
+        db = TestingSessionLocal()
         yield db
     finally:
         db.close()
 
-def override_get_current_user():
-    return User(id=1, email="test@example.com", is_active=True)
-
 app.dependency_overrides[get_db] = override_get_db
+
+# Mock current user dependency if needed
+from gossipmesh.api.deps import get_current_user
+def override_get_current_user():
+    db = TestingSessionLocal()
+    user = db.query(User).filter(User.username == "testuser").first()
+    if not user:
+        user = User(username="testuser", email="test@example.com", hashed_password="fakepass")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    db.close()
+    return user
+
 app.dependency_overrides[get_current_user] = override_get_current_user
 
 client = TestClient(app)
-
-@pytest.fixture(autouse=True)
-def setup_database():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
 
 def test_approval_gate_lifecycle():
     response = client.post(
@@ -55,15 +62,15 @@ def test_approval_gate_lifecycle():
     approval_id = data["id"]
 
     # Get approval gate
-    get_resp = client.get(f"/api/v1/approvals/{approval_id}", headers={"Authorization": "Bearer test-token"})
-    assert get_resp.status_code == 200
-    assert get_resp.json()["id"] == approval_id
+    res_get = client.get(f"/api/v1/approvals/{approval_id}", headers={"Authorization": "Bearer test-token"})
+    assert res_get.status_code == 200
+    assert res_get.json()["status"] == "pending"
 
-    # Decide approval gate
-    decide_resp = client.post(
+    # Decide approval
+    res_decide = client.post(
         f"/api/v1/approvals/{approval_id}/decision",
         json={"decision": "approved"},
         headers={"Authorization": "Bearer test-token"}
     )
-    assert decide_resp.status_code == 200
-    assert decide_resp.json()["status"] == "approved"
+    assert res_decide.status_code == 200
+    assert res_decide.json()["status"] == "approved"
