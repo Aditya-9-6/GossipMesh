@@ -1,4 +1,5 @@
 import time
+import threading
 from typing import Dict, List, Optional
 
 class PeerScore:
@@ -52,17 +53,21 @@ class ScoringRegistry:
         self.window_size = window_size
         self.reputation_threshold = reputation_threshold
         self.scores: Dict[str, PeerScore] = {}
+        self._lock = threading.RLock()
 
     def get_or_create(self, node_id: str) -> PeerScore:
-        if node_id not in self.scores:
-            self.scores[node_id] = PeerScore(node_id, self.window_size, self.reputation_threshold)
-        return self.scores[node_id]
+        with self._lock:
+            if node_id not in self.scores:
+                self.scores[node_id] = PeerScore(node_id, self.window_size, self.reputation_threshold)
+            return self.scores[node_id]
 
     def record(self, node_id: str, latency: float, valid: bool, protocol_error: bool = False) -> PeerScore:
-        score = self.get_or_create(node_id)
-        score.record_interaction(latency, valid, protocol_error)
-        return score
+        with self._lock:
+            score = self.get_or_create(node_id)
+            score.record_interaction(latency, valid, protocol_error)
+            return score
 
     def is_blacklisted(self, node_id: str) -> bool:
-        score = self.scores.get(node_id)
-        return score.blacklisted if score else False
+        with self._lock:
+            score = self.scores.get(node_id)
+            return score.blacklisted if score else False
