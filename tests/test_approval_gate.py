@@ -7,6 +7,7 @@ from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
+from gossipmesh.core.config import settings
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -42,7 +43,7 @@ client = TestClient(app)
 
 def test_approval_gate_lifecycle():
     response = client.post(
-        "/api/v1/approvals/",
+        f"{settings.API_V1_STR}/approvals/",
         json={
             "action_type": "push_commit",
             "diff_content": "--- a/file.py\n+++ b/file.py\n+print('hello')",
@@ -56,12 +57,12 @@ def test_approval_gate_lifecycle():
     assert data["status"] == "pending"
     assert data["commit_sha"] == "abc1234"
 
-    res_get = client.get(f"/api/v1/approvals/{approval_id}")
+    res_get = client.get(f"{settings.API_V1_STR}/approvals/{approval_id}")
     assert res_get.status_code == 200
     assert res_get.json()["status"] == "pending"
 
     res_decide = client.post(
-        f"/api/v1/approvals/{approval_id}/decision",
+        f"{settings.API_V1_STR}/approvals/{approval_id}/decision",
         json={"decision": "approved"}
     )
     assert res_decide.status_code == 200
