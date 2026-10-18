@@ -1,6 +1,9 @@
 from typing import AsyncGenerator
 import time
-import google.generativeai as genai
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import google.generativeai as genai
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
@@ -8,11 +11,6 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
-        # Avoid global state by passing the api_key implicitly via client instances or config overrides
-        # Due to google-generativeai SDK limitations, managing multi-tenant keys perfectly without genai.configure
-        # requires passing the client explicitly or instantiating a raw HTTPX client.
-        # For this milestone, we use the supported client initialization method.
-        # Note: The legacy SDK uses global config, the new `google.genai` SDK allows proper client injection.
         genai.configure(api_key=self.api_key)
 
     @property

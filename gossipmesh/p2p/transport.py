@@ -11,6 +11,26 @@ from gossipmesh.p2p.erasure import ErasureCoder
 
 logger = logging.getLogger(__name__)
 
+class TransportSocketReader:
+    """Asynchronous socket reader supporting zero-copy parsing of P2P gossip packets."""
+    
+    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
+        self.reader = reader
+        self.expected_magic = expected_magic
+
+    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
+        # Read header size: magic(4) + type(1) + uuid(36) + length(4) = 45 bytes
+        header_bytes = await self.reader.readexactly(45)
+        buf = memoryview(header_bytes)
+        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(buf)
+        
+        if magic != self.expected_magic:
+            raise ValueError(f"Invalid packet magic: 0x{magic:08X}, expected 0x{self.expected_magic:08X}")
+
+        actual_payload_bytes = await self.reader.readexactly(payload_len)
+        return msg_type, msg_id, memoryview(actual_payload_bytes)
+
+
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
 every 1000 messages or 300 seconds without dropping streams."""
@@ -97,7 +117,7 @@ class TransportTelemetry:
 
 
 class GossipTransport:
-    """Robust P2P Gossip Transport supporting erasure coding, rate-limiting, and topic multiplexing."""
+    """Robust P2P Gossip Transport supporting erasure coding, rate-limiting, thread-safe fragment assembly, and topic multiplexing."""
     
     def __init__(
         self,
@@ -115,7 +135,7 @@ class GossipTransport:
         self.rate_limiter = PeerRateLimiter(config=config)
         self.telemetry = TransportTelemetry()
         self.handlers: Dict[str, Callable[[Any], None]] = {}
-        # Fragment assembler with thread-safe lock and TTL tracking
+        # Fragment assembler with thread-safe lock and TTL tracking (msg_id -> (timestamp, list of fragments, original_size))
         self.fragment_assembler: Dict[str, Tuple[float, List[Tuple[int, bytes]], int]] = {}
         self._assembler_lock = threading.Lock()
 
@@ -127,6 +147,25 @@ class GossipTransport:
         expired = [msg_id for msg_id, (timestamp, _, _) in self.fragment_assembler.items() if now - timestamp > ttl]
         for msg_id in expired:
             del self.fragment_assembler[msg_id]
+
+    def add_fragment(self, msg_id: str, frag_idx: int, frag_data: bytes, original_size: Optional[int] = None, ttl: float = 60.0) -> Optional[bytes]:
+        with self._assembler_lock:
+            self._clean_expired_fragments_unlocked(ttl=ttl)
+            if msg_id not in self.fragment_assembler:
+                self.fragment_assembler[msg_id] = (time.time(), [], original_size or (self.k * self.block_size))
+            
+            timestamp, frags, orig_sz = self.fragment_assembler[msg_id]
+            if not any(f[0] == frag_idx for f in frags):
+                frags.append((frag_idx, frag_data))
+
+            if len(frags) >= self.k:
+                try:
+                    reconstructed = self.erasure_coder.decode(frags, original_size=orig_sz)
+                    del self.fragment_assembler[msg_id]
+                    return reconstructed
+                except Exception as e:
+                    logger.warning("Failed to decode fragments for msg %s: %s", msg_id, e)
+            return None
 
     async def send_payload(
         self, peer_id: str, payload: Union[bytes, str, dict], use_erasure: bool = False
