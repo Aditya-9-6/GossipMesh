@@ -1,7 +1,6 @@
 import time
 import os
 import logging
-threading = __import__('threading')
 try:
     import psutil
 except ImportError:
@@ -20,12 +19,11 @@ class AdaptiveScatterGovernor:
         self.min_scatter = min_scatter
         self.cpu_threshold = cpu_threshold
         self.mem_threshold = mem_threshold
-        self.alpha = alpha  # Smoothing factor for low-pass filter
+        self.alpha = alpha  # Smoothing factor for low-pass filter (increased to 0.5 for faster convergence)
         self._smoothed_cpu = 0.0
         self._smoothed_mem = 0.0
         self._last_update = 0.0
         self._current_scatter = float(base_scatter)
-        self._lock = threading.Lock()
         
         if psutil is not None:
             try:
@@ -51,44 +49,41 @@ class AdaptiveScatterGovernor:
 
     def update(self) -> int:
         """Updates smoothed metrics and computes the adaptive scatter-width."""
-        with self._lock:
-            raw_cpu, raw_mem = self.sample_metrics()
+        raw_cpu, raw_mem = self.sample_metrics()
+        
+        # Low-pass filter smoothing: smoothed = alpha * raw + (1 - alpha) * smoothed
+        self._smoothed_cpu = self.alpha * raw_cpu + (1.0 - self.alpha) * self._smoothed_cpu
+        self._smoothed_mem = self.alpha * raw_mem + (1.0 - self.alpha) * self._smoothed_mem
+        
+        # Determine penalty scaling factor based on thresholds
+        cpu_load_ratio = self._smoothed_cpu / max(self.cpu_threshold, 1.0)
+        mem_load_ratio = self._smoothed_mem / max(self.mem_threshold, 1.0)
+        max_load_ratio = max(cpu_load_ratio, mem_load_ratio)
+        
+        if max_load_ratio > 1.0:
+            # Scale down proportionally as load exceeds safety bounds
+            reduction_factor = 1.0 / max_load_ratio
+            target_scatter = float(self.base_scatter) * reduction_factor
+        else:
+            target_scatter = float(self.base_scatter)
             
-            # Low-pass filter smoothing: smoothed = alpha * raw + (1 - alpha) * smoothed
-            self._smoothed_cpu = self.alpha * raw_cpu + (1.0 - self.alpha) * self._smoothed_cpu
-            self._smoothed_mem = self.alpha * raw_mem + (1.0 - self.alpha) * self._smoothed_mem
-            
-            # Determine penalty scaling factor based on thresholds
-            cpu_load_ratio = self._smoothed_cpu / max(self.cpu_threshold, 1.0)
-            mem_load_ratio = self._smoothed_mem / max(self.mem_threshold, 1.0)
-            max_load_ratio = max(cpu_load_ratio, mem_load_ratio)
-            
-            if max_load_ratio > 1.0:
-                # Scale down proportionally as load exceeds safety bounds
-                reduction_factor = 1.0 / max_load_ratio
-                target_scatter = float(self.base_scatter) * reduction_factor
-            else:
-                target_scatter = float(self.base_scatter)
-                
-            # Clamp scatter width between min_scatter and base_scatter
-            clamped = max(float(self.min_scatter), min(float(self.base_scatter), target_scatter))
-            
-            # Smooth scatter transitions as well
-            self._current_scatter = self.alpha * clamped + (1.0 - self.alpha) * self._current_scatter
-            
-            return max(self.min_scatter, round(self._current_scatter))
+        # Clamp scatter width between min_scatter and base_scatter
+        clamped = max(float(self.min_scatter), min(float(self.base_scatter), target_scatter))
+        
+        # Smooth scatter transitions as well
+        self._current_scatter = self.alpha * clamped + (1.0 - self.alpha) * self._current_scatter
+        
+        return max(self.min_scatter, round(self._current_scatter))
 
     def get_scatter(self) -> int:
         """Returns the current adapted scatter-width."""
-        with self._lock:
-            return max(self.min_scatter, round(self._current_scatter))
+        return max(self.min_scatter, round(self._current_scatter))
 
     def get_metrics(self) -> dict:
         """Returns telemetry information for monitoring."""
-        with self._lock:
-            return {
-                "smoothed_cpu": self._smoothed_cpu,
-                "smoothed_mem": self._smoothed_mem,
-                "current_scatter": self.get_scatter(),
-                "base_scatter": self.base_scatter,
-            }
+        return {
+            "smoothed_cpu": self._smoothed_cpu,
+            "smoothed_mem": self._smoothed_mem,
+            "current_scatter": self.get_scatter(),
+            "base_scatter": self.base_scatter,
+        }
