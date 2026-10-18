@@ -1,6 +1,5 @@
 import math
 import json
-base64
 from typing import List, Dict, Any, Optional
 
 class HyperLogLogDigest:
@@ -42,7 +41,7 @@ class HyperLogLogDigest:
         # Small range correction (LinearCounting)
         if estimate <= 2.5 * m:
             zeros = self.registers.count(0)
-            if zeros >:
+            if zeros > 0:
                 estimate = m * math.log(m / zeros)
         return float(estimate)
 
