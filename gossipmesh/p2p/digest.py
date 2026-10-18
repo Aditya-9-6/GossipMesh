@@ -12,8 +12,13 @@ class LRUDigestCache:
         self.default_ttl = default_ttl
         self._cache: OrderedDict[str, float] = OrderedDict()
         self._lock = threading.Lock()
+        self._last_evict_time = 0.0
 
     def _evict_expired(self, now: float):
+        # Amortize full scans or only scan if enough time has elapsed or cache is large
+        if now - self._last_evict_time < 0.5 and len(self._cache) < self.max_size:
+            return
+        self._last_evict_time = now
         keys_to_delete = []
         for k, expiry in self._cache.items():
             if expiry <= now:
@@ -37,7 +42,6 @@ class LRUDigestCache:
     def contains(self, message_id: str) -> bool:
         now = time.time()
         with self._lock:
-            self._evict_expired(now)
             expiry = self._cache.get(message_id)
             if expiry is None:
                 return False
