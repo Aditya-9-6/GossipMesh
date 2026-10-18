@@ -12,16 +12,13 @@ class EntropyChurnDefense:
         self.window_size = window_size
         self.entropy_threshold = entropy_threshold
         self.max_ticks_to_drop = max_ticks_to_drop
-        # node_id -> deque of metadata feature values or timestamps/tokens
         self.peer_windows: Dict[str, deque] = {}
-        # node_id -> tick count of anomalous variance
         self.violation_counts: Dict[str, int] = {}
-        # quarantined/dropped nodes
         self.quarantined_peers: set = set()
         self._lock = threading.Lock()
 
     def record_message(self, node_id: str, metadata_feature: float) -> None:
-        """Records a feature value from a peer's message metadata into a bounded deque with thread safety."""
+        """Records a feature value from a peer's message metadata into a bounded deque."""
         with self._lock:
             if node_id in self.quarantined_peers:
                 return
@@ -34,7 +31,6 @@ class EntropyChurnDefense:
         if not values:
             return 0.0
         
-        # Discretize continuous values into bins or frequency counts
         counts: Dict[Any, int] = {}
         total = len(values)
         for val in values:
@@ -49,7 +45,7 @@ class EntropyChurnDefense:
         return entropy
 
     def evaluate_peer(self, node_id: str) -> bool:
-        """Evaluates a peer's recent message entropy against the threshold under lock.
+        """Evaluates a peer's recent message entropy against the threshold.
         Returns True if the peer is flagged as a Sybil/abnormal node and should be dropped.
         """
         with self._lock:
