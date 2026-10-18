@@ -11,26 +11,6 @@ from gossipmesh.p2p.erasure import ErasureCoder
 
 logger = logging.getLogger(__name__)
 
-class TransportSocketReader:
-    """Asynchronous socket reader supporting zero-copy parsing of P2P gossip packets."""
-    
-    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
-        self.reader = reader
-        self.expected_magic = expected_magic
-
-    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        # Read header size: magic(4) + type(1) + uuid(36) + length(4) = 45 bytes
-        header_bytes = await self.reader.readexactly(45)
-        buf = memoryview(header_bytes)
-        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(buf)
-        
-        if magic != self.expected_magic:
-            raise ValueError(f"Invalid packet magic: 0x{magic:08X}, expected 0x{self.expected_magic:08X}")
-
-        actual_payload_bytes = await self.reader.readexactly(payload_len)
-        return msg_type, msg_id, memoryview(actual_payload_bytes)
-
-
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
 every 1000 messages or 300 seconds without dropping streams."""
@@ -71,7 +51,7 @@ every 1000 messages or 300 seconds without dropping streams."""
             self.message_count += 1
             if self._should_rotation_unlocked():
                 self._trigger_rotation_unlocked()
-            return encrypt_payload(plaintext, self.rotator.get_current_key())
+            return encrypt_payload(self.rotator.get_current_key(), plaintext)
 
     def receive_message(self, ciphertext: bytes) -> bytes:
         with self._lock:
@@ -112,108 +92,85 @@ class TransportTelemetry:
                 "received_count": self.received_count,
                 "dropped_count": self.dropped_count,
                 "bytes_sent": self.bytes_sent,
-                "bytes_received": self.bytes_received
+                "bytes_received": self.bytes_received,
             }
 
 
+class TransportSocketReader:
+    """Reads zero-copy packet structures from an asyncio stream reader."""
+    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
+        self.reader = reader
+        self.expected_magic = expected_magic
+
+    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
+        header_bytes = await self.reader.readexactly(45)
+        buf = memoryview(header_bytes)
+        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(buf, expected_magic=self.expected_magic)
+        payload_bytes = await self.reader.readexactly(payload_len)
+        return magic, msg_id, memoryview(payload_bytes)
+
+
 class GossipTransport:
-    """Robust P2P Gossip Transport supporting erasure coding, rate-limiting, thread-safe fragment assembly, and topic multiplexing."""
-    
-    def __init__(
-        self,
-        node_id: str,
-        k: int = 4,
-        m: int = 2,
-        block_size: int = 1024,
-        config: Optional[RateLimitConfig] = None
-    ) -> None:
+    """Main GossipMesh transport layer integrating erasure coding, rate limiting, and handlers."""
+    def __init__(self, node_id: str, k: int = 4, m: int = 2, config: Optional[RateLimitConfig] = None) -> None:
         self.node_id = node_id
         self.k = k
         self.m = m
-        self.block_size = block_size
-        self.erasure_coder = ErasureCoder(k=k, m=m, block_size=block_size)
-        self.rate_limiter = PeerRateLimiter(config=config)
         self.telemetry = TransportTelemetry()
+        self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
+        self.erasure_coder = ErasureCoder(k=k, m=m)
         self.handlers: Dict[str, Callable[[Any], None]] = {}
-        # Fragment assembler with thread-safe lock and TTL tracking (msg_id -> (timestamp, list of fragments, original_size))
-        self.fragment_assembler: Dict[str, Tuple[float, List[Tuple[int, bytes]], int]] = {}
-        self._assembler_lock = threading.Lock()
+        self._lock = threading.Lock()
 
     def register_handler(self, topic: str, handler: Callable[[Any], None]) -> None:
-        self.handlers[topic] = handler
+        with self._lock:
+            self.handlers[topic] = handler
 
-    def _clean_expired_fragments_unlocked(self, ttl: float = 60.0) -> None:
-        now = time.time()
-        expired = [msg_id for msg_id, (timestamp, _, _) in self.fragment_assembler.items() if now - timestamp > ttl]
-        for msg_id in expired:
-            del self.fragment_assembler[msg_id]
-
-    def add_fragment(self, msg_id: str, frag_idx: int, frag_data: bytes, original_size: Optional[int] = None, ttl: float = 60.0) -> Optional[bytes]:
-        with self._assembler_lock:
-            self._clean_expired_fragments_unlocked(ttl=ttl)
-            if msg_id not in self.fragment_assembler:
-                self.fragment_assembler[msg_id] = (time.time(), [], original_size or (self.k * self.block_size))
-            
-            timestamp, frags, orig_sz = self.fragment_assembler[msg_id]
-            if not any(f[0] == frag_idx for f in frags):
-                frags.append((frag_idx, frag_data))
-
-            if len(frags) >= self.k:
-                try:
-                    reconstructed = self.erasure_coder.decode(frags, original_size=orig_sz)
-                    del self.fragment_assembler[msg_id]
-                    return reconstructed
-                except Exception as e:
-                    logger.warning("Failed to decode fragments for msg %s: %s", msg_id, e)
-            return None
-
-    async def send_payload(
-        self, peer_id: str, payload: Union[bytes, str, dict], use_erasure: bool = False
-    ) -> bool:
+    async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], use_erasure: bool = False) -> bool:
         if isinstance(payload, dict):
-            payload_bytes = json.dumps(payload).encode('utf-8')
+            data = json.dumps(payload).encode('utf-8')
         elif isinstance(payload, str):
-            payload_bytes = payload.encode('utf-8')
+            data = payload.encode('utf-8')
+        elif isinstance(payload, int):
+            data = str(payload).encode('utf-8')
+        elif isinstance(payload, bytes):
+            data = payload
         else:
-            payload_bytes = payload
+            data = bytes(payload)
 
-        total_size = 0
         if use_erasure:
-            fragments = self.erasure_coder.encode(payload_bytes)
-            for frag_idx, frag_data in fragments:
-                packet_size = len(frag_data) + 64
-                total_size += packet_size
+            fragments = self.erasure_coder.encode(data)
+            total_size = sum(len(f[1]) for f in fragments)
+            self.telemetry.record_sent(total_size)
         else:
-            total_size = len(payload_bytes) + 32
-
-        self.telemetry.record_sent(total_size)
+            self.telemetry.record_sent(len(data))
         return True
 
-    async def receive_payload(
-        self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = 'default'
-    ) -> Optional[Any]:
+    async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = 'default') -> Optional[Any]:
         if not self.rate_limiter.allow(peer_id):
             self.telemetry.record_dropped()
             return None
 
         if isinstance(payload, bytes):
             try:
-                parsed = json.loads(payload.decode('utf-8'))
+                payload = json.loads(payload.decode('utf-8'))
             except Exception:
-                parsed = payload
-        else:
-            parsed = payload
+                pass
 
-        self.telemetry.record_received(len(str(parsed)))
+        if isinstance(payload, (bytes, str, dict, int)):
+            size = len(json.dumps(payload)) if isinstance(payload, dict) else len(str(payload))
+            self.telemetry.record_received(size)
 
-        if topic in self.handlers:
+        handler = self.handlers.get(topic)
+        if handler:
             try:
-                res = self.handlers[topic](parsed)
-                if asyncio.iscoroutine(res):
-                    await res
+                if asyncio.iscoroutinefunction(handler):
+                    await handler(payload)
+                else:
+                    handler(payload)
             except Exception as e:
-                logger.exception("Error in message handler for topic %s: %s", topic, e)
-        return parsed
+                logger.error(f"Error in handler for topic {topic}: {e}")
+        return payload
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
         metrics = self.telemetry.to_dict()

@@ -1,36 +1,27 @@
 import struct
-import asyncio
-from typing import Tuple, Optional
+from typing import Tuple
 
 class ZeroCopyPacketParser:
-    """Parses packets efficiently without unnecessary memory allocations."""
-    
-    HEADER_FORMAT = "!I I 32s I"
-    HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
+    """Zero-copy packet serialization and parsing utility."""
 
     @staticmethod
     def serialize_header(magic: int, msg_type: int, msg_id: str, payload: bytes) -> bytes:
-        encoded_id = msg_id.encode('utf-8')[:32].ljust(32, b'\x00')
-        header = struct.pack(ZeroCopyPacketParser.HEADER_FORMAT, magic, msg_type, encoded_id, len(payload))
+        # magic(4) + type(1) + uuid(36) + length(4) = 45 bytes
+        uuid_bytes = msg_id.encode('utf-8').ljust(36, b'\x00')[:36]
+        length = len(payload)
+        header = struct.pack('!BI36sI', msg_type, magic, uuid_bytes, length)
         return header + payload
 
-
-class TransportSocketReader:
-    """Reads network packets from an asyncio stream reader with validation."""
-    
-    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
-        self.reader = reader
-        self.expected_magic = expected_magic
-
-    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
-        if not header_data or len(header_data) < ZeroCopyPacketParser.HEADER_SIZE:
-            return None
+    @staticmethod
+    def parse_header(buf: memoryview, expected_magic: int = 0x474D4553) -> Tuple[int, int, str, int, memoryview]:
+        if len(buf) < 45:
+            raise ValueError("Buffer too small for header: required 45 bytes")
         
-        magic, msg_type, raw_id, payload_len = struct.unpack(ZeroCopyPacketParser.HEADER_FORMAT, header_data)
-        if magic != self.expected_magic:
-            raise ValueError(f"Invalid packet magic: 0x{magic:08X} expected 0x{self.expected_magic:08X}")
+        # Unpack according to serialize_header format '!BI36sI'
+        msg_type, magic, uuid_bytes, payload_len = struct.unpack_from('!BI36sI', buf, 0)
+        if magic != expected_magic:
+            raise ValueError(f"Invalid packet magic: expected {expected_magic:#x}, got {magic:#x}")
         
-        msg_id = raw_id.rstrip(b'\x00').decode('utf-8', errors='ignore')
-        payload_bytes = await self.reader.readexactly(payload_len)
-        return msg_type, msg_id, memoryview(payload_bytes)
+        msg_id = uuid_bytes.rstrip(b'\x00').decode('utf-8', errors='ignore')
+        payload_view = buf[45:45 + payload_len]
+        return magic, msg_type, msg_id, payload_len, payload_view
