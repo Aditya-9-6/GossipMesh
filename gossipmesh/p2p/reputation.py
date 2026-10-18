@@ -6,7 +6,7 @@ class LeakyBucketReputation:
     """Memory-bounded, thread-safe sliding-window leaky bucket reputation scoring engine.
     Maintains O(1) time complexity updates using circular buffer time-slices.
     """
-    def __init__(self, capacity: float = 100.0, leak_rate_per_sec: float = 10.0, quarantine_threshold: float = 50.0, window_seconds: float = 60.0):
+    def __init__(self, capacity: float = 100.0, leak_rate_per_sec: float = 5.0, quarantine_threshold: float = 80.0, window_seconds: float = 60.0):
         self.capacity = capacity
         self.leak_rate_per_sec = leak_rate_per_sec
         self.quarantine_threshold = quarantine_threshold
@@ -45,10 +45,8 @@ class LeakyBucketReputation:
         """Checks if a peer is currently quarantined due to low reputation / high penalty."""
         now = time.time()
         with self._lock:
-            score = self._leak(peer_id, now)
-            is_q = score >= self.quarantine_threshold
-            self._quarantined[peer_id] = is_q
-            return is_q
+            self._leak(peer_id, now)
+            return self._quarantined.get(peer_id, False)
 
     def get_score(self, peer_id: str) -> float:
         """Returns the current effective penalty score for the peer."""

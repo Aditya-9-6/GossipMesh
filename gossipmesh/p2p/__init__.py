@@ -6,7 +6,7 @@ from gossipmesh.p2p.merkle_trie import MerklePatriciaTree
 from gossipmesh.p2p.pow import calculate_pow_hash, verify_pow, mine_pow
 from gossipmesh.p2p.ratelimit import TokenBucket, RateLimitConfig, PeerRateLimiter
 from gossipmesh.p2p.rto import RTOEstimator
-from gossipmesh.p2p.transport import GossipTransport, TransportTelemetry
+from gossipmesh.p2p.transport import GossipTransport, TransportTelemetry, TransportSocketReader, P2PSessionTransport
 from gossipmesh.p2p.checkpointer import StateCheckpointer
 from gossipmesh.p2p.entropy import AntiEntropyEngine
 from gossipmesh.p2p.snapshot import SnapshotTransferProtocol
@@ -24,6 +24,8 @@ from gossipmesh.p2p.priority_queue import (
     WeightedPriorityQueue,
 )
 from gossipmesh.p2p.router import GossipMessageRouter
+from gossipmesh.p2p.reputation import LeakyBucketReputation
+from gossipmesh.p2p.parser import ZeroCopyPacketParser
 
 __all__ = [
     "GossipMessageCache",
@@ -41,6 +43,8 @@ __all__ = [
     "RTOEstimator",
     "GossipTransport",
     "TransportTelemetry",
+    "TransportSocketReader",
+    "P2PSessionTransport",
     "StateCheckpointer",
     "AntiEntropyEngine",
     "SnapshotTransferProtocol",
@@ -54,6 +58,6 @@ __all__ = [
     "PriorityQueueConfig",
     "WeightedPriorityQueue",
     "GossipMessageRouter",
+    "LeakyBucketReputation",
+    "ZeroCopyPacketParser",
 ]
-
-
