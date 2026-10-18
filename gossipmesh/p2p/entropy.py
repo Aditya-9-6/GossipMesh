@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 from collections import deque
 
 class VectorClockEntropy:

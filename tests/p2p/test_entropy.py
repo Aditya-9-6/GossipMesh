@@ -47,5 +47,5 @@ class TestVectorClockEntropy(unittest.TestCase):
         self.assertEqual(len(best), 1)
         self.assertEqual(best[0][0], "p2")
 
-if __name__ == "__main":
+if __name__ == "__main__":
     unittest.main()
