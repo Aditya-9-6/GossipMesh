@@ -38,8 +38,8 @@ class ApprovalResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-@router.post("/", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
-@router.post("", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+@router.post("", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_approval_gate(
     req: ApprovalCreateRequest,
     db: Session = Depends(deps.get_db),
@@ -61,6 +61,7 @@ def create_approval_gate(
     return gate
 
 @router.get("/{approval_id}", response_model=ApprovalResponse)
+@router.get("/{approval_id}/", response_model=ApprovalResponse, include_in_schema=False)
 def get_approval_gate(
     approval_id: int,
     db: Session = Depends(deps.get_db),
@@ -78,6 +79,7 @@ def get_approval_gate(
     return gate
 
 @router.post("/{approval_id}/decision", response_model=ApprovalResponse)
+@router.post("/{approval_id}/decision/", response_model=ApprovalResponse, include_in_schema=False)
 def decide_approval(
     approval_id: int,
     req: ApprovalDecisionRequest,

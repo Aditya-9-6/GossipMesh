@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Dict, List
+from typing import Dict, List, Set, Any
 from gossipmesh.models.pr_review import SecurityFinding, TestResult
 from gossipmesh.integrations.github_pr import GitHubPRService
 
@@ -15,8 +15,8 @@ class GitHubIntegration:
         self.pr_number = pr_number
         self.github_pr_service = github_pr_service
 
-    def _parse_unified_diff(self, diff: str) -> Dict[str, Dict[str, set[int]]]:
-        valid_lines = {"RIGHT": {}, "LEFT": {}}
+    def _parse_unified_diff(self, diff: str) -> Dict[str, Dict[str, Set[int]]]:
+        valid_lines: Dict[str, Dict[str, Set[int]]] = {"RIGHT": {}, "LEFT": {}}
         current_file = None
         current_right_line = 0
         current_left_line = 0
@@ -55,11 +55,13 @@ class GitHubIntegration:
 
         # Fetch existing comments to support cross-run retry safety
         try:
-            existing_comments = await self.github_pr_service.get_pr_review_comments(self.owner, self.repo, self.pr_number)
-            for comment in existing_comments:
-                body = comment.get("body", "")
-                for fp in re.findall(r"<!-- fingerprint: (.*?) -->", body):
-                    seen_fingerprints.add(fp)
+            get_comments_func = getattr(self.github_pr_service, "get_pr_review_comments", None)
+            if get_comments_func:
+                existing_comments = await get_comments_func(self.owner, self.repo, self.pr_number)
+                for comment in existing_comments:
+                    body = comment.get("body", "")
+                    for fp in re.findall(r"<!-- fingerprint: (.*?) -->", body):
+                        seen_fingerprints.add(fp)
 
             existing_reviews = await self.github_pr_service.get_pr_reviews(self.owner, self.repo, self.pr_number)
             for review in existing_reviews:
@@ -70,7 +72,7 @@ class GitHubIntegration:
         except Exception as e:
             logger.warning(f"Failed to fetch existing PR comments for deduplication: {e}")
 
-        grouped_findings = {}
+        grouped_findings: Dict[tuple, List[SecurityFinding]] = {}
         fallback_findings = []
 
         for finding in findings:
