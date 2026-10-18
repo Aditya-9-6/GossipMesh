@@ -36,10 +36,20 @@ class VectorClock:
             for node, ver in sorted_items:
                 if node == self.node_id or len(retained) < self.max_epochs:
                     retained[node] = ver
+            # If node_id wasn't captured and we hit max_epochs, ensure node_id is kept if present
+            if self.node_id in self.clock and self.node_id not in retained and len(retained) > 0:
+                # Replace last item with node_id
+                last_key = list(retained.keys())[-1]
+                del retained[last_key]
+                retained[self.node_id] = self.clock[self.node_id]
             self.clock = retained
-        elif self.max_epochs > 0 and len(self.clock) > self.max_epochs:
-            # Ensure strict enforcement of max_epochs if pruning is triggered
-            pass
+        
+        # Secondary safeguard for strict max_epochs count limit
+        if self.max_epochs > 0 and len(self.clock) > self.max_epochs:
+            keys_to_remove = list(self.clock.keys())[self.max_epochs:]
+            for k in keys_to_remove:
+                if k != self.node_id:
+                    self.clock.pop(k, None)
 
     def compare(self, remote_clock: Dict[str, int]) -> str:
         """Compares local clock with a remote clock.

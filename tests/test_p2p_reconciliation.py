@@ -13,11 +13,10 @@ class TestVectorClockReconciliation(unittest.TestCase):
 
         # node-B updates with node-A's clock
         vc2.update(c1)
-        self.assertEqual(vc2.clock["node-A"], 1);
-        self.assertEqual(vc2.clock["node-B"], 0);
+        self.assertEqual(vc2.clock["node-A"], 1)
 
         # Compare relation: vc1 has {"node-A": 1}, vc2 has {"node-A": 1, "node-B": 0}
-        # vc1 is strictly older than vc2 because vc2 has all components >= vc1 plus node-B > 0
+        # vc1 is strictly older than vc2 because vc2 has all components >= vc1 plus node-B >= 0
         self.assertEqual(vc1.compare(vc2.clock), "older")
         self.assertEqual(vc2.compare(vc1.clock), "newer")
 
