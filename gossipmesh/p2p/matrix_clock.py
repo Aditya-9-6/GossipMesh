@@ -74,7 +74,6 @@ class BoundedMatrixClockEngine:
         sender = msg.sender_id
         msg_clock = msg.matrix_clock
 
-        # If we haven't seen any events from ourselves yet, or empty clock, allow initial messages
         if not msg_clock:
             return True
 
