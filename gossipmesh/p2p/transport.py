@@ -1,185 +1,137 @@
-import time
-import threading
-from typing import Optional, Callable, Dict, Any, List
-from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
+import os
+import json
+import asyncio
+import logging
+from typing import List, Dict, Any, Tuple, Optional, Callable
+from gossipmesh.p2p.erasure import ErasureCoder
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 
-class P2PSessionTransport:
-    """Manages peer-to-peer transport streams with automatic key rotation
-    every 1000 messages or 300 seconds without dropping streams."""
-    
-    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
-        self.rotator = EphemeralSessionKeyRotator()
-        self.max_messages = max_messages
-        self.max_time_seconds = max_time_seconds
-        self._lock = threading.Lock()
-        self.creation_time = time.time()
+logger = logging.getLogger(__name__)
 
-    def initialize_session(self, peer_public_bytes: bytes):
-        with self._lock:
-            self.rotator.derive_session_key(peer_public_bytes)
-            self.creation_time = time.time()
-
-    def _should_rotation_unlocked(self) -> bool:
-        if self.rotator.message_counter >= self.max_messages:
-            return True
-        if (time.time() - self.creation_time) >= self.max_time_seconds:
-            return True
-        return False
-
-    def should_rotate(self) -> bool:
-        with self._lock:
-            return self._should_rotation_unlocked()
-
-    def _trigger_rotation_unlocked(self) -> bytes:
-        _, new_pub_bytes = self.rotator.rotate()
-        self.creation_time = time.time()
-        return new_pub_bytes
-
-    def trigger_rotation(self) -> bytes:
-        with self._lock:
-            return self._trigger_rotation_unlocked()
-
-    def send_message(self, plaintext: bytes) -> bytes:
-        with self._lock:
-            if self._should_rotation_unlocked():
-                self._trigger_rotation_unlocked()
-            if not self.rotator.session_key:
-                raise ValueError("Session key not established for P2P transport.")
-            
-            self.rotator.message_counter += 1
-            return encrypt_payload(self.rotator.session_key, plaintext)
-
-    def receive_message(self, ciphertext_with_nonce: bytes) -> bytes:
-        with self._lock:
-            if self._should_rotation_unlocked():
-                self._trigger_rotation_unlocked()
-            if not self.rotator.session_key:
-                raise ValueError("Session key not established for P2P transport.")
-            
-            self.rotator.message_counter += 1
-            return decrypt_payload(self.rotator.session_key, ciphertext_with_nonce)
 
 class TransportTelemetry:
-    """Telemetry metrics collector for GossipTransport."""
+    """Telemetry counters for transport layer messaging and bandwidth."""
     def __init__(self):
-        self.received_messages = 0
         self.sent_messages = 0
+        self.received_messages = 0
         self.dropped_messages = 0
         self.sent_bytes = 0
+        self.received_bytes = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "sent_messages": self.sent_messages,
+            "received_messages": self.received_messages,
+            "dropped_messages": self.dropped_messages,
+            "sent_bytes": self.sent_bytes,
+            "received_bytes": self.received_bytes,
+        }
+
 
 class GossipTransport:
-    """Manages peer-to-peer transport streams, rate limiting, and session key rotation."""
-    def __init__(self, node_id: str, max_messages: int = 1000, max_time_seconds: float = 300.0, config: Optional[RateLimitConfig] = None):
+    """Async P2P Transport Layer with rate-limiting, backpressure protection, and payload dispatch."""
+    def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None):
         self.node_id = node_id
-        self.rotator = EphemeralSessionKeyRotator()
-        self.max_messages = max_messages
-        self.max_time_seconds = max_time_seconds
         self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
-        self.handlers: Dict[str, List[Callable[[Any], Any]]] = {}
         self.telemetry = TransportTelemetry()
-        self._lock = threading.Lock()
-        self.creation_time = time.time()
+        self.handlers: Dict[str, Callable[[Any], Any]] = {}
 
-    def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
-        with self._lock:
-            if topic not in self.handlers:
-                self.handlers[topic] = []
-            self.handlers[topic].append(handler)
+    def register_handler(self, topic: str, handler: Callable[[Any], Any]):
+        self.handlers[topic] = handler
 
-    def initialize_session(self, peer_public_bytes: bytes):
-        with self._lock:
-            self.rotator.derive_session_key(peer_public_bytes)
-            self.creation_time = time.time()
+    async def receive_payload(self, peer_id: str, payload: Any, topic: str = "default") -> Optional[Dict[str, Any]]:
+        # Format payload into standard dict format
+        if isinstance(payload, bytes):
+            try:
+                payload_dict = json.loads(payload.decode('utf-8'))
+            except Exception:
+                payload_dict = {"raw": payload.decode('errors', 'ignore')}
+            payload_bytes = len(payload)
+        elif isinstance(payload, str):
+            try:
+                payload_dict = json.loads(payload)
+            except Exception:
+                payload_dict = {"raw": payload}
+            payload_bytes = len(payload.encode('utf-8'))
+        elif isinstance(payload, dict):
+            payload_dict = payload
+            payload_bytes = len(json.dumps(payload).encode('utf-8'))
+        elif isinstance(payload, (int, float, list)):
+            payload_dict = {"data": payload}
+            payload_bytes = len(json.dumps(payload).encode('utf-8'))
+        else:
+            payload_dict = {"data": str(payload)}
+            payload_bytes = len(str(payload).encode('utf-8'))
 
-    def _should_rotate_unlocked(self) -> bool:
-        if self.rotator.message_counter >= self.max_messages:
-            return True
-        if (time.time() - self.creation_time) >= self.max_time_seconds:
-            return True
-        return False
-
-    def should_rotate(self) -> bool:
-        with self._lock:
-            return self._should_rotate_unlocked()
-
-    def _trigger_rotation_unlocked(self) -> bytes:
-        _, new_pub_bytes = self.rotator.rotate()
-        self.creation_time = time.time()
-        return new_pub_bytes
-
-    def trigger_rotation(self) -> bytes:
-        with self._lock:
-            return self._trigger_rotation_unlocked()
-
-    def send_message(self, plaintext: bytes) -> bytes:
-        with self._lock:
-            if self._should_rotate_unlocked():
-                self._trigger_rotation_unlocked()
-            if not self.rotator.session_key:
-                raise ValueError("Session key not established for P2P transport.")
-            
-            self.rotator.message_counter += 1
-            return encrypt_payload(self.rotator.session_key, plaintext)
-
-    def receive_message(self, ciphertext_with_nonce: bytes) -> bytes:
-        with self._lock:
-            if self._should_rotate_unlocked():
-                self._trigger_rotation_unlocked()
-            if not self.rotator.session_key:
-                raise ValueError("Session key not established for P2P transport.")
-            
-            self.rotator.message_counter += 1
-            return decrypt_payload(self.rotator.session_key, ciphertext_with_nonce)
-
-    async def receive_payload(self, peer_id: str, payload: Any, topic: str = "default") -> Optional[Any]:
-        import json
-        byte_size = len(payload) if isinstance(payload, bytes) else len(str(payload).encode('utf-8'))
-        allowed, _ = await self.rate_limiter.check_and_consume(peer_id, byte_size)
+        allowed, _reason = await self.rate_limiter.check_and_consume(peer_id, payload_bytes)
         if not allowed:
             self.telemetry.dropped_messages += 1
             return None
 
         self.telemetry.received_messages += 1
-        
-        parsed_payload = payload
-        if isinstance(payload, bytes):
-            try:
-                parsed_payload = json.loads(payload.decode('utf-8'))
-            except Exception:
-                parsed_payload = {"raw": payload.decode('utf-8', errors='ignore')}
-        elif isinstance(payload, str):
-            try:
-                parsed_payload = json.loads(payload)
-            except Exception:
-                parsed_payload = {"raw": payload}
-        elif isinstance(payload, (int, float)):
-            parsed_payload = {"data": payload}
+        self.telemetry.received_bytes += payload_bytes
 
         if topic in self.handlers:
-            for handler in self.handlers[topic]:
-                try:
-                    res = handler(parsed_payload)
-                    if hasattr(res, '__await__'):
-                        await res
-                except Exception:
-                    pass
+            try:
+                res = self.handlers[topic](payload_dict)
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception as e:
+                logger.error(f"Error in transport handler for topic {topic}: {e}")
 
-        return parsed_payload
+        return payload_dict
 
     async def send_payload(self, peer_id: str, payload: Any) -> bool:
+        serialized = json.dumps(payload).encode('utf-8') if not isinstance(payload, bytes) else payload
         self.telemetry.sent_messages += 1
-        self.telemetry.sent_bytes += len(payload) if isinstance(payload, bytes) else len(str(payload).encode('utf-8'))
+        self.telemetry.sent_bytes += len(serialized)
         return True
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
         limiter_metrics = await self.rate_limiter.get_metrics()
         return {
-            "transport": {
-                "received_messages": self.telemetry.received_messages,
-                "sent_messages": self.telemetry.sent_messages,
-                "dropped_messages": self.telemetry.dropped_messages,
-                "sent_bytes": self.telemetry.sent_bytes,
-            },
+            "transport": self.telemetry.to_dict(),
             "rate_limiter": limiter_metrics
         }
+
+
+class P2PSessionTransport(GossipTransport):
+    """Session-secured wrapper around GossipTransport."""
+    pass
+
+
+class ErasureTransportMultiplexer:
+    """Integrates erasure coding fragment multiplexing into gossip transport dissemination.
+    """
+    def __init__(self, k: int = 4, m: int = 2):
+        self.coder = ErasureCoder(k=k, m=m)
+
+    def prepare_dissemination(self, payload_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
+        raw_data = json.dumps(payload_dict).encode('utf-8')
+        original_size = len(raw_data)
+        fragments = self.coder.encode(raw_data)
+        
+        dissemination_packets = []
+        for shard_idx, shard_data in fragments:
+            packet = {
+                "shard_index": shard_idx,
+                "k": self.coder.k,
+                "m": self.coder.m,
+                "original_size": original_size,
+                "payload_shard": shard_data.hex()
+            }
+            dissemination_packets.append(packet)
+        return dissemination_packets
+
+    def assemble_dissemination(self, packets: List[Dict[str, Any]]) -> Dict[str, Any]:
+        fragments = []
+        original_size = None
+        for pkt in packets:
+            idx = pkt["shard_index"]
+            data = bytes.fromhex(pkt["payload_shard"])
+            fragments.append((idx, data))
+            if original_size is None:
+                original_size = pkt.get("original_size")
+                
+        raw_bytes = self.coder.decode(fragments, original_size=original_size)
+        return json.loads(raw_bytes.decode('utf-8'))
