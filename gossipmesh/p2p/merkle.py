@@ -67,13 +67,21 @@ class MerkleTree:
         if self_node and other_root and self_node.hash == other_root.hash:
             return sorted(list(diffs))
             
-        if not self_node or not other_root:
-            if self_node:
-                self._collect_keys(self_node, diffs)
+        if not self_node:
             return sorted(list(diffs))
 
-        if self_node.key and (other_root is None or self_node.value_hash != other_root.value_hash):
-            diffs.add(self_node.key)
+        if not other_root:
+            self._collect_keys(self_node, diffs)
+            return sorted(list(diffs))
+
+        if self_node.key:
+            other_val_hash = other_root.value_hash if other_root else None
+            if other_root is None or self_node.value_hash != other_val_hash:
+                # Check if this node has subtrees or if it's a leaf mismatch
+                if not self_node.left and not self_node.right and (not other_root or (not other_root.left and not other_root.right)):
+                    diffs.add(self_node.key)
+                elif not other_root:
+                    self._collect_keys(self_node, diffs)
 
         self.find_divergent_keys(other_root.left if other_root else None, self_node.left, diffs)
         self.find_divergent_keys(other_root.right if other_root else None, self_node.right, diffs)
