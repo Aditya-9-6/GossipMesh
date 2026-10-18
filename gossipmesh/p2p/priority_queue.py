@@ -44,7 +44,6 @@ class WeightedPriorityQueue:
         current_time = time.time()
         if not self._queue:
             return
-        new_queue = []
         for msg in self._queue:
             elapsed = current_time - msg.timestamp
             if elapsed > 0:
@@ -52,8 +51,6 @@ class WeightedPriorityQueue:
                 if boost > 0:
                     msg.priority = max(0, msg.priority - boost)
                     msg.timestamp = current_time
-            new_queue.append(msg)
-        self._queue = new_queue
         heapq.heapify(self._queue)
 
     def qsize(self) -> int:

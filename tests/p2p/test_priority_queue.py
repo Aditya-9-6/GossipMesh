@@ -45,5 +45,5 @@ class TestPriorityQueue(unittest.TestCase):
         self.assertEqual(router.dequeue_message(), "high")
         self.assertEqual(router.dequeue_message(), "low")
 
-if __name__ == "__main":
+if __name__ == "__main__":
     unittest.main()
