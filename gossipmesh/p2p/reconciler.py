@@ -70,4 +70,4 @@ class AntiEntropyReconciler:
         elif comparison == "AFTER":
             return "PUSH_TO_PEER"
         else:
-            return "PULL_FROM_PEER"
+            return "EXCHANGE_MERKLE"
