@@ -57,6 +57,14 @@ class AntiEntropyReconciler:
     def get_merkle_tree(self) -> MerkleTree:
         return MerkleTree(self.store)
 
+    def find_differences(self, peer_store: Dict[str, str]) -> List[str]:
+        diffs = []
+        all_keys = set(self.store.keys()).union(set(peer_store.keys()))
+        for k in all_keys:
+            if self.store.get(k) != peer_store.get(k):
+                diffs.append(k)
+        return diffs
+
     def reconcile(self, peer_id: str, peer_vc_dict: Dict[str, int], peer_root_hash: Optional[str]) -> str:
         peer_vc = VectorClock.from_dict(peer_vc_dict)
         comparison = self.vector_clock.compare(peer_vc)
