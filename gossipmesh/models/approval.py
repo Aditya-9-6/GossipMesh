@@ -1,27 +1,16 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, Text, DateTime, Enum, ForeignKey
+from sqlalchemy.sql import func
 from gossipmesh.models.base import Base
+import uuid
 
-class ApprovalGate(Base):
-    __tablename__ = "approval_gates"
+class Approval(Base):
+    __tablename__ = "approvals"
 
-    id = Column(Integer, primary_key=True, index=True)
-    workflow_id = Column(Integer, ForeignKey("workflows.id"), nullable=True)
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     action_type = Column(String(50), nullable=False)
-    diff_content = Column(Text, nullable=True)
-    commit_sha = Column(String(64), nullable=True)
+    diff_content = Column(Text, nullable=False)
+    commit_sha = Column(String(64), nullable=False)
     status = Column(String(20), default="pending", nullable=False)
-    expires_in_hours = Column(Integer, default=24, nullable=False)
-    expires_at = Column(DateTime, nullable=True)
-    approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    approved_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    approver = relationship("User", foreign_keys=[approver_id])
-    workflow = relationship("Workflow", foreign_keys=[workflow_id])
-    repository = relationship("Repository", foreign_keys=[repository_id])
-
-Approval = ApprovalGate
+    approver_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    approved_at = Column(DateTime(timezone=True), nullable=True)

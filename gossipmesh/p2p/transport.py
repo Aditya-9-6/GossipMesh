@@ -1,31 +1,28 @@
+"""P2P Transport and PlumTree Multicast layer for GossipMesh."""
 import asyncio
-import logging
-from typing import Dict, Any, Optional
+import json
+from typing import Any, Dict, Set
 
-logger = logging.getLogger(__name__)
+class PlumTreeMulticast:
+    """PlumTree epidemic broadcast multicast implementation with eager and lazy peers."""
+    def __init__(self, node_id: str):
+        self.node_id = node_id
+        self.eager_peers: Set[str] = set()
+        self.lazy_peers: Set[str] = set()
+        self.lock = asyncio.Lock()
 
-class P2PTransport:
-    """P2P Transport layer for node communication."""
-    def __init__(self, host: str = "127.0.0.1", port: int = 8000):
-        self.host = host
-        self.port = port
-        self.connected_peers: Dict[str, Any] = {}
+    async def add_eager_peer(self, peer_id: str):
+        async with self.lock:
+            self.eager_peers.add(peer_id)
+            self.lazy_peers.discard(peer_id)
 
-    async def start(self) -> None:
-        """Starts the transport layer server."""
-        logger.info(f"Starting P2PTransport on {self.host}:{self.port}")
+    async def add_lazy_peer(self, peer_id: str):
+        async with self.lock:
+            if peer_id not in self.eager_peers:
+                self.lazy_peers.add(peer_id)
 
-    async def stop(self) -> None:
-        """Stops the transport layer server."""
-        logger.info("Stopping P2PTransport")
-
-    async def send_message(self, peer_id: str, payload: Dict[str, Any]) -> bool:
-        """Sends a message to a connected peer."""
-        if peer_id in self.connected_peers:
-            logger.debug(f"Sending message to {peer_id}")
-            return True
-        return False
-
-    async def receive_message(self, msg_id: str, sender_id: str, payload: Optional[Dict[str, Any]] = None) -> None:
-        """Handles receiving a message from a peer."""
-        logger.debug(f"Received message {msg_id} from {sender_id}")
+    async def handle_message(self, sender_id: str, message: Dict[str, Any]) -> bool:
+        async with self.lock:
+            if sender_id in self.eager_peers:
+                return True
+            return False

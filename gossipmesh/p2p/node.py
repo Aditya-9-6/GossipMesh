@@ -61,6 +61,18 @@ class GossipMessage:
             ttl=data.get("ttl", 10),
         )
 
+class KademliaDHT:
+    """Simulated Kademlia Distributed Hash Table for Peer Discovery."""
+    def __init__(self, node_id: str):
+        self.node_id = node_id
+        self.routing_table: Dict[str, str] = {}
+
+    def add_peer(self, node_id: str, address: str):
+        self.routing_table[node_id] = address
+
+    def find_node(self, target_id: str) -> List[str]:
+        return sorted(self.routing_table.keys(), key=lambda n: abs(hash(n) - hash(target_id)))[:5]
+
 class GossipNode:
     """Decentralized Gossip Peer Node with Entropy-Based Churn Defense."""
     def __init__(self, node_id: str, mesh_dir: str | None = None):
@@ -71,6 +83,7 @@ class GossipNode:
         self.seen_messages: set = set()
         self.message_cache: deque = deque(maxlen=1000)
         self.churn_defense = EntropyChurnDefense()
+        self.dht = KademliaDHT(node_id)
         self._load_seen_history()
 
     def _load_seen_history(self):
@@ -158,7 +171,13 @@ class GossipNode:
         now = time.time()
         for file_path in self.mesh_dir.glob("*.json"):
             try:
-                if now - file_path.stat().st_mtime > 86400:
-                    file_path.unlink()
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if now - data.get("timestamp", now) > 86400:
+                    file_path.unlink(missing_ok=True)
             except Exception:
                 continue
+
+class P2PGossipMeshNode(GossipNode):
+    """Combined P2P Mesh Node with DHT and Churn Defense integration."""
+    pass
