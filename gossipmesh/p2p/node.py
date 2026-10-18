@@ -12,10 +12,14 @@ from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
 
 class GossipTopic(str, Enum):
     AGENT_EVENT = "agent_event"
+    AGENT_SPAWN = "agent_spawn"
     CODE_REVIEW = "code_review"
     CONSENSUS = "consensus"
     HEARTBEAT = "heartbeat"
     TASK_BID = "task_bid"
+    BUILD_STATUS = "build_status"
+    SECURITY_ALERT = "security_alert"
+    CUSTOM = "custom"
 
 
 class GossipMessage:
@@ -83,7 +87,18 @@ class GossipNode:
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
         self.public_key = public_key
         self.pow_difficulty = pow_difficulty
-        self.pow_nonce = pow_nonce
+        
+        if self.pow_difficulty > 0:
+            if pow_nonce is None:
+                nonce, _ = mine_pow(self.public_key or self.node_id, self.pow_difficulty)
+                self.pow_nonce = nonce
+            else:
+                if not verify_pow(self.public_key or self.node_id, pow_nonce, self.pow_difficulty):
+                    raise ValueError("Invalid Proof-of-Work nonce for specified difficulty")
+                self.pow_nonce = pow_nonce
+        else:
+            self.pow_nonce = pow_nonce
+
         self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
         self.seen_messages = set()
         self.recent_messages: deque = deque(maxlen=200)
@@ -96,6 +111,7 @@ class GossipNode:
             return
         for file_path in self.mesh_dir.glob("*.json"):
             try:
+                self.seen_messages.add(file_path.stem)
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     if "message_id" in data:
@@ -123,13 +139,14 @@ class GossipNode:
             payload={**payload, "_adaptive_scatter": current_scatter},
             repo=repo,
             ttl=ttl,
-        )
+        }
         
         if self.pow_difficulty > 0:
             nonce, _ = mine_pow(msg.message_id, self.pow_difficulty, self.pow_nonce)
             msg.payload["pow_nonce"] = nonce
 
         self.seen_messages.add(msg.message_id)
+        self.seen_messages.add(file_path_stem := f"{msg.message_id}")
         self.recent_messages.append(msg)
 
         file_path = self.mesh_dir / f"{msg.message_id}.json"
@@ -152,12 +169,15 @@ class GossipNode:
         self.scatter_governor.update()
 
         for file_path in self.mesh_dir.glob("*.json"):
+            if file_path.stem in self.seen_messages:
+                continue
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     msg = GossipMessage.from_dict(data)
                     if msg.message_id not in self.seen_messages:
                         self.seen_messages.add(msg.message_id)
+                        self.seen_messages.add(file_path.stem)
                         self.recent_messages.append(msg)
                         new_messages.append(msg)
                         self._dispatch_to_subscribers(msg)
