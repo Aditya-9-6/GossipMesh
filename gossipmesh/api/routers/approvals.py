@@ -9,7 +9,7 @@ from gossipmesh.models.user import User
 from gossipmesh.models.approval import ApprovalGate
 from gossipmesh.runtime.workflow import WorkflowManager
 
-router = APIRouter(prefix="/approvals", tags=["approvals"])
+router = APIRouter(prefix="/api/v1/approvals", tags=["approvals"])
 
 class ApprovalCreateRequest(BaseModel):
     workflow_id: Optional[int] = None

@@ -42,7 +42,7 @@ client = TestClient(app)
 
 def test_approval_gate_lifecycle():
     response = client.post(
-        "/approvals/",
+        "/api/v1/approvals/",
         json={
             "action_type": "push_commit",
             "diff_content": "--- a/file.py\n+++ b/file.py\n+print('hello')",
@@ -56,12 +56,12 @@ def test_approval_gate_lifecycle():
     assert data["status"] == "pending"
     assert data["commit_sha"] == "abc1234"
 
-    res_get = client.get(f"/approvals/{approval_id}")
+    res_get = client.get(f"/api/v1/approvals/{approval_id}")
     assert res_get.status_code == 200
     assert res_get.json()["status"] == "pending"
 
     res_decide = client.post(
-        f"/approvals/{approval_id}/decision",
+        f"/api/v1/approvals/{approval_id}/decision",
         json={"decision": "approved"}
     )
     assert res_decide.status_code == 200
