@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Optional
+from pydantic import BaseModel, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.approval import ApprovalGate
 from gossipmesh.runtime.workflow import WorkflowManager
-from gossipmesh.models.audit import AuditEvent
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -21,9 +20,11 @@ class ApprovalCreateRequest(BaseModel):
     expires_in_hours: int = 24
 
 class ApprovalDecisionRequest(BaseModel):
-    decision: str  # approved, rejected
+    decision: str
 
 class ApprovalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     workflow_id: Optional[int]
     repository_id: Optional[int]
@@ -36,14 +37,11 @@ class ApprovalResponse(BaseModel):
     expires_at: datetime
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 @router.post("/", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
 def create_approval_gate(
     req: ApprovalCreateRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user),
 ):
     expires_at = datetime.now(timezone.utc) + timedelta(hours=req.expires_in_hours)
     gate = ApprovalGate(
@@ -64,13 +62,12 @@ def create_approval_gate(
 def get_approval_gate(
     approval_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user),
 ):
     gate = db.query(ApprovalGate).filter(ApprovalGate.id == approval_id).first()
     if not gate:
         raise HTTPException(status_code=404, detail="Approval gate not found")
     
-    # Check expiration
     if gate.status == "pending" and gate.expires_at < datetime.now(timezone.utc):
         gate.status = "expired"
         db.commit()
@@ -83,7 +80,7 @@ def decide_approval(
     approval_id: int,
     req: ApprovalDecisionRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user),
 ):
     gate = db.query(ApprovalGate).filter(ApprovalGate.id == approval_id).first()
     if not gate:

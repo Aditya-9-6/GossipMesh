@@ -2,13 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime, timedelta, timezone
 
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
-from gossipmesh.models.approval import ApprovalGate
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -38,12 +36,11 @@ def override_get_current_user():
     return user
 
 app.dependency_overrides[deps.get_db] = override_get_db
-app.dependency_overrides[deps.get_current_active_user] = override_get_current_user
+app.dependency_overrides[deps.get_current_user] = override_get_current_user
 
 client = TestClient(app)
 
 def test_approval_gate_lifecycle():
-    # Create approval request
     response = client.post(
         "/approvals/",
         json={
@@ -59,12 +56,10 @@ def test_approval_gate_lifecycle():
     assert data["status"] == "pending"
     assert data["commit_sha"] == "abc1234"
 
-    # Get approval status
     res_get = client.get(f"/approvals/{approval_id}")
     assert res_get.status_code == 200
     assert res_get.json()["status"] == "pending"
 
-    # Approve
     res_decide = client.post(
         f"/approvals/{approval_id}/decision",
         json={"decision": "approved"}
