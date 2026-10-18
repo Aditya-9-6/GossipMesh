@@ -28,9 +28,9 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
-    user = db.query(User).filter(User.username == "test_approver").first()
+    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
     if not user:
-        user = User(username="test_approver", email="approver@gossipmesh.test", hashed_password="fakepass", is_active=True)
+        user = User(email="approver@gossipmesh.test", hashed_password="fakepass", is_active=True, full_name="test_approver")
         db.add(user)
         db.commit()
         db.refresh(user)
