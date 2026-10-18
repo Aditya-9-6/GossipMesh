@@ -68,7 +68,7 @@ class AntiEntropyReconciler:
         if comparison == "EQUAL":
             return "NO_SYNC_NEEDED"
         elif comparison == "AFTER":
-            return "NO_SYNC_NEEDED"
+            return "PUSH_TO_PEER"
         elif comparison == "BEFORE":
             return "PULL_FROM_PEER"
         else:
