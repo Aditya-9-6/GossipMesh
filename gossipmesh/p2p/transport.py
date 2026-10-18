@@ -11,6 +11,35 @@ from gossipmesh.p2p.erasure import ErasureCoder
 
 logger = logging.getLogger(__name__)
 
+
+class TransportSocketReader:
+    """Reads serialized fixed-header gossip packets from an asyncio StreamReader zero-copy."""
+
+    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
+        self.reader = reader
+        self.expected_magic = expected_magic
+
+    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
+        try:
+            header_bytes = await self.reader.readexactly(44)
+        except (asyncio.IncompleteReadError, ConnectionError, asyncio.CancelledError):
+            return None
+
+        magic, msg_type = ZeroCopyPacketParser.deserialize_header(header_bytes)
+        if magic != self.expected_magic:
+            return None
+        
+        # Extract msg_id and payload length from header_bytes (struct format: !I I 32s Q)
+        # Let's decode properly using parser
+        import struct
+        unpacked = struct.unpack('!II32sQ', header_bytes)
+        msg_id = unpacked[2].rstrip(b'\x00').decode('utf-8', errors='ignore')
+        payload_len = unpacked[3]
+
+        payload_bytes = await self.reader.readexactly(payload_len)
+        return (msg_type, msg_id, memoryview(payload_bytes))
+
+
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
 every 1000 messages or 300 seconds without dropping streams."""
@@ -51,36 +80,14 @@ every 1000 messages or 300 seconds without dropping streams."""
             self.message_count += 1
             if self._should_rotation_unlocked():
                 self._trigger_rotation_unlocked()
-            return encrypt_payload(plaintext, self.rotator.current_key)
+            return encrypt_payload(plaintext, self.rotator.get_current_key())
 
     def receive_message(self, ciphertext: bytes) -> bytes:
         with self._lock:
             self.message_count += 1
             if self._should_rotation_unlocked():
                 self._trigger_rotation_unlocked()
-            return decrypt_payload(ciphertext, self.rotator.current_key)
-
-
-class TransportSocketReader:
-    """Reads structured zero-copy packets from an asyncio StreamReader."""
-    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
-        self.reader = reader
-        self.expected_magic = expected_magic
-
-    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        # Header is 4 (magic) + 2 (type) + 36 (msg_id) + 4 (length) = 46 bytes
-        header_data = await self.reader.readexactly(46)
-        if not header_data or len(header_data) < 46:
-            raise ValueError("Incomplete packet header received")
-        
-        view = memoryview(header_data)
-        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(view)
-        
-        if magic != self.expected_magic:
-            raise ValueError(f"Invalid packet magic: expected {self.expected_magic:#x}, got {magic:#x}")
-
-        payload_bytes = await self.reader.readexactly(payload_len)
-        return msg_type, msg_id, memoryview(payload_bytes)
+            return decrypt_payload(ciphertext, self.rotator.get_current_key())
 
 
 class TransportTelemetry:
@@ -114,28 +121,22 @@ class TransportTelemetry:
                 "received_count": self.received_count,
                 "dropped_count": self.dropped_count,
                 "bytes_sent": self.bytes_sent,
-                "bytes_received": self.bytes_received
+                "bytes_received": self.bytes_received,
             }
 
 
 class GossipTransport:
-    """High-performance Gossip Transport Layer combining rate limiting, encryption, erasure coding and telemetry."""
-    def __init__(self, node_id: str, k: int = 4, m: int = 2, config: Optional[RateLimitConfig] = None):
+    """High-performance P2P gossip transport supporting rate limiting, encryption, and erasure coding."""
+
+    def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None, k: int = 4, m: int = 2) -> None:
         self.node_id = node_id
-        self.k = k
-        self.m = m
-        self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
+        self.rate_limiter = PeerRateLimiter(config or RateLimitConfig())
         self.telemetry = TransportTelemetry()
+        self.handlers: Dict[str, Callable[[Any], None]] = {}
         self.erasure_coder = ErasureCoder(k=k, m=m)
-        self.session = P2PSessionTransport()
-        self.handlers: Dict[str, List[Callable[[Any], None]]] = {}
-        self._lock = threading.Lock()
 
     def register_handler(self, topic: str, handler: Callable[[Any], None]) -> None:
-        with self._lock:
-            if topic not in self.handlers:
-                self.handlers[topic] = []
-            self.handlers[topic].append(handler)
+        self.handlers[topic] = handler
 
     async def send_payload(self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm", use_erasure: bool = False) -> bool:
         if not self.rate_limiter.acquire(peer_id):
@@ -143,20 +144,17 @@ class GossipTransport:
             return False
 
         if isinstance(payload, dict):
-            data = json.dumps(payload).encode("utf-8")
-        elif isinstance(payload, bytes):
-            data = payload
+            raw_data = json.dumps(payload).encode('utf-8')
         else:
-            data = str(payload).encode("utf-8")
+            raw_data = payload
 
         if use_erasure:
-            fragments = self.erasure_coder.encode(data)
+            fragments = self.erasure_coder.encode(raw_data)
             total_size = sum(len(f_bytes) for _, f_bytes in fragments)
             self.telemetry.record_sent(total_size)
-            return True
+        else:
+            self.telemetry.record_sent(len(raw_data))
 
-        ciphertext = self.session.send_message(data)
-        self.telemetry.record_sent(len(ciphertext))
         return True
 
     async def receive_payload(self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm") -> Optional[Union[bytes, Dict[str, Any]]]:
@@ -165,26 +163,26 @@ class GossipTransport:
             return None
 
         if isinstance(payload, bytes):
+            self.telemetry.record_received(len(payload))
             try:
-                parsed_payload = json.loads(payload.decode("utf-8"))
+                parsed = json.loads(payload.decode('utf-8'))
             except Exception:
-                parsed_payload = payload
-            size = len(payload)
+                parsed = payload
         else:
-            parsed_payload = payload
-            size = len(json.dumps(payload))
+            parsed = payload
+            self.telemetry.record_received(len(json.dumps(payload)))
 
-        self.telemetry.record_received(size)
+        handler = self.handlers.get(topic)
+        if handler:
+            try:
+                if asyncio.iscoroutinefunction(handler):
+                    await handler(parsed)
+                else:
+                    handler(parsed)
+            except Exception as e:
+                logger.error(f"Error in handler for topic {topic}: {e}")
 
-        with self._lock:
-            topic_handlers = self.handlers.get(topic, [])
-            for h in topic_handlers:
-                try:
-                    h(parsed_payload)
-                except Exception as exc:
-                    logger.error(f"Error in handler for topic {topic}: {exc}")
-
-        return parsed_payload
+        return parsed
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
         return self.telemetry.to_dict()
