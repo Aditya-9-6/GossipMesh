@@ -1,5 +1,6 @@
 import time
 import threading
+from collections import OrderedDict
 from typing import Optional, Dict, Any
 
 
@@ -42,7 +43,7 @@ class BoundedLRUGossipRingBuffer:
 
     def __init__(self, capacity: int = 1000) -> None:
         self.capacity = capacity
-        self.cache: dict[str, Any] = {}
+        self.cache: OrderedDict[str, Any] = OrderedDict()
         self.bloom = CountingBloomFilter(capacity=capacity)
         self._lock = threading.Lock()
 
