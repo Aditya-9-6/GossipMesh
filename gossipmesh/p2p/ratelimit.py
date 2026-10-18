@@ -55,6 +55,8 @@ class RateLimitMetrics:
             "dropped_count": self.dropped_count,
             "allowed_bytes": self.allowed_bytes,
             "dropped_bytes": self.dropped_bytes,
+            "allowed_messages": self.allowed_count,
+            "dropped_messages": self.dropped_count,
         }
 
 class TokenBucket:
@@ -100,6 +102,10 @@ Enforces frequency and bandwidth thresholds in O(1) time."""
         self._lock = asyncio.Lock()
         self.metrics = RateLimitMetrics()
 
+    @property
+    def peers(self) -> OrderedDict[str, PeerEntry]:
+        return self._peers
+
     def _evict_lru_if_full(self) -> None:
         while len(self._peers) >= self.config.max_peers:
             self._peers.popitem(last=False)
@@ -125,16 +131,16 @@ Returns (is_allowed, reason)."""
             
             if not peer.rate_bucket.can_consume(1.0, now):
                 self.metrics.record_dropped(payload_size_bytes)
-                return False, "rate_limit_exceeded"
+                return False, "RATE_LIMIT_EXCEEDED"
             
             if not peer.bandwidth_bucket.can_consume(float(payload_size_bytes), now):
                 self.metrics.record_dropped(payload_size_bytes)
-                return False, "bandwidth_limit_exceeded"
+                return False, "BANDWIDTH_LIMIT_EXCEEDED"
             
             peer.rate_bucket.consume(1.0, now)
             peer.bandwidth_bucket.consume(float(payload_size_bytes), now)
             self.metrics.record_allowed(payload_size_bytes)
-            return True, "allowed"
+            return True, "ALLOWED"
 
     async def get_metrics(self) -> Dict[str, Any]:
         """Returns local telemetry metrics and active peer count."""
