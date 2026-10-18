@@ -21,8 +21,8 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-2.5-flash"
-FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-lite-latest", "gemini-2.5-pro"]
+DEFAULT_MODEL = "gemini-flash-lite-latest"
+FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-3.8-flash"]
 
 # Curated catalog of high-impact open-source architecture advancements for GossipMesh (Python)
 CATALOG = [
