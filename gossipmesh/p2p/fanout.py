@@ -1,4 +1,5 @@
 import time
+import threading
 from collections import deque
 from typing import Dict, Any, Optional
 
@@ -13,29 +14,33 @@ class AdaptiveFanoutController:
         self.timestamps = deque(maxlen=window_size)
         self.duplicate_count = 0
         self.total_received = 0
+        self._lock = threading.Lock()
 
     def record_message(self, is_duplicate: bool = False) -> int:
-        now = time.time()
-        self.timestamps.append(now)
-        self.total_received += 1
-        if is_duplicate:
-            self.duplicate_count += 1
-        return self.adapt()
+        with self._lock:
+            now = time.time()
+            self.timestamps.append(now)
+            self.total_received += 1
+            if is_duplicate:
+                self.duplicate_count += 1
+            return self.adapt()
 
     def adapt(self) -> int:
-        if len(self.timestamps) < 5:
-            return self.fanout
-        
-        duration = self.timestamps[-1] - self.timestamps[0]
-        rate = len(self.timestamps) / duration if duration > 0 else float('inf')
-        dup_ratio = self.duplicate_count / max(1, self.total_received)
-
-        if rate > self.target_rate * 1.5 or dup_ratio > 0.3:
-            self.fanout = max(self.min_fanout, self.fanout - 1)
-        elif rate < self.target_rate * 0.8 and dup_ratio < 0.1:
-            self.fanout = min(self.max_fanout, self.fanout + 1)
+        with self._lock:
+            if len(self.timestamps) < 5:
+                return self.fanout
             
-        return self.fanout
+            duration = self.timestamps[-1] - self.timestamps[0]
+            rate = len(self.timestamps) / duration if duration > 0 else float('inf')
+            dup_ratio = self.duplicate_count / max(1, self.total_received)
+
+            if rate > self.target_rate * 1.5 or dup_ratio > 0.3:
+                self.fanout = max(self.min_fanout, self.fanout - 1)
+            elif rate < self.target_rate * 0.8 and dup_ratio < 0.1:
+                self.fanout = min(self.max_fanout, self.fanout + 1)
+                
+            return self.fanout
 
     def get_fanout(self) -> int:
-        return self.fanout
+        with self._lock:
+            return self.fanout

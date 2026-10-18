@@ -35,9 +35,9 @@ class VectorClock:
             v_self = self.clock.get(k, 0)
             v_other = other.clock.get(k, 0)
             if v_self > v_other:
-                other_less_or_equal = False
-            if v_self < v_other:
                 self_less_or_equal = False
+            if v_self < v_other:
+                other_less_or_equal = False
 
         if self_less_or_equal and other_less_or_equal:
             return 'EQUAL'
@@ -54,6 +54,19 @@ class VectorClock:
     @classmethod
     def from_dict(cls, data: Dict[str, int]) -> 'VectorClock':
         return cls(data)
+
+    """Vector clock comparison bugfix: Ensure strict causal ordering semantics"""
+    def __le__(self, other: 'VectorClock') -> bool:
+        return self.compare(other) in ('LESS_THAN', 'EQUAL')
+
+    def __ge__(self, other: 'VectorClock') -> bool:
+        return self.compare(other) in ('GREATER_THAN', 'EQUAL')
+
+    def __lt__(self, other: 'VectorClock') -> bool:
+        return self.compare(other) == 'LESS_THAN'
+
+    def __gt__(self, other: 'VectorClock') -> bool:
+        return self.compare(other) == 'GREATER_THAN'
 
     def __repr__(self) -> str:
         return f"VectorClock({self.clock})"

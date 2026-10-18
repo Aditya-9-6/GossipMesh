@@ -1,5 +1,6 @@
 import hashlib
 import json
+import threading
 from typing import Dict, List, Optional, Any, Set
 from gossipmesh.core.vector_clock import VectorClock
 
@@ -37,32 +38,36 @@ class MerkleDAG:
     def __init__(self):
         self.nodes: Dict[str, MerkleDAGNode] = {}
         self.heads: Set[str] = set()
+        self._lock = threading.Lock()
 
     def add_mutation(self, node_id: str, payload: Dict[str, Any], vector_clock: VectorClock, parents: Optional[List[str]] = None) -> MerkleDAGNode:
-        resolved_parents = parents if parents is not None else list(self.heads)
-        dag_node = MerkleDAGNode(
-            node_id=node_id,
-            payload=payload,
-            parents=resolved_parents,
-            vector_clock=vector_clock
-        )
-        if dag_node.hash not in self.nodes:
-            self.nodes[dag_node.hash] = dag_node
-            
-            # Update heads: remove parents, add new node
-            for p in resolved_parents:
-                if p in self.heads:
-                    self.heads.remove(p)
-            self.heads.add(dag_node.hash)
-            
-        return dag_node
+        with self._lock:
+            resolved_parents = parents if parents is not None else list(self.heads)
+            dag_node = MerkleDAGNode(
+                node_id=node_id,
+                payload=payload,
+                parents=resolved_parents,
+                vector_clock=vector_clock
+            )
+            if dag_node.hash not in self.nodes:
+                self.nodes[dag_node.hash] = dag_node
+                
+                # Update heads: remove parents, add new node
+                for p in resolved_parents:
+                    if p in self.heads:
+                        self.heads.remove(p)
+                self.heads.add(dag_node.hash)
+                
+            return dag_node
 
     def get_node(self, hash_str: str) -> Optional[MerkleDAGNode]:
-        return self.nodes.get(hash_str)
+        with self._lock:
+            return self.nodes.get(hash_str)
 
     def gc(self, finalized_hashes: Set[str]):
         """Garbage collects finalized roots to ensure bounded memory growth."""
-        for h in finalized_hashes:
-            if h in self.nodes and h not in self.heads:
-                # Only remove non-head finalized historical nodes safely
-                del self.nodes[h]
+        with self._lock:
+            for h in finalized_hashes:
+                if h in self.nodes:
+                    self.nodes.pop(h, None)
+                    self.heads.discard(h)
