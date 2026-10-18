@@ -69,10 +69,10 @@ class AntiEntropyReconciler:
         if comparison == "EQUAL":
             if self.get_merkle_tree().get_root_hash() == peer_root_hash:
                 return "NO_SYNC_NEEDED"
-            return "MERKLE_SYNC"
+            return "EXCHANGE_MERKLE"
         elif comparison == "BEFORE":
             return "PULL_FROM_PEER"
         elif comparison == "AFTER":
             return "PUSH_TO_PEER"
         else:
-            return "MERKLE_SYNC"
+            return "EXCHANGE_MERKLE"
