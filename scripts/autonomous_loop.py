@@ -21,8 +21,8 @@ import argparse
 from pathlib import Path
 
 try:
-    sys.stdout.reconfigure(line_buffering=True)
-    sys.stderr.reconfigure(line_buffering=True)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 except Exception:
     pass
 
@@ -166,7 +166,10 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         "--workspace", str(workspace)
     ]
     res = subprocess.run(solver_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    print(res.stdout, flush=True)
+    try:
+        print(res.stdout, flush=True)
+    except Exception:
+        print(res.stdout.encode("ascii", errors="replace").decode("ascii"), flush=True)
     if res.returncode != 0:
         print(f"[!] Solver failed: {res.stderr}", file=sys.stderr, flush=True)
         return False
@@ -182,10 +185,16 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     run_cmd(["black", "."], cwd=workspace, check=False, timeout=30)
 
     print("[*] Verifying Python linting & static analysis (flake8)...", flush=True)
-    vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    vet_failed = False
+    try:
+        vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        if vet_res.returncode != 0:
+            vet_failed = True
+    except FileNotFoundError:
+        pass
     check_res = subprocess.run([py_bin, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
 
-    if vet_res.returncode != 0 or check_res.returncode != 0:
+    if vet_failed or check_res.returncode != 0:
         print(f"[!] CI failed. Calling AI CI Fixer...", flush=True)
         ci_fixer_cmd = [
             sys.executable, "scripts/ai_ci_fixer.py",

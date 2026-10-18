@@ -46,6 +46,8 @@ if ($keys.Count -gt 0) {
 }
 
 $env:PYTHONUNBUFFERED = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 
 # Continuous Loop with automatic recovery
 while ($true) {
