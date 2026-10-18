@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Dict, List, Set, Any
+from typing import Dict, List, Optional, Set, Tuple, Any
 from gossipmesh.models.pr_review import SecurityFinding, TestResult
 from gossipmesh.integrations.github_pr import GitHubPRService
 
@@ -55,9 +55,9 @@ class GitHubIntegration:
 
         # Fetch existing comments to support cross-run retry safety
         try:
-            get_comments_func = getattr(self.github_pr_service, "get_pr_review_comments", None)
-            if get_comments_func:
-                existing_comments = await get_comments_func(self.owner, self.repo, self.pr_number)
+            get_comments_fn = getattr(self.github_pr_service, "get_pr_review_comments", None)
+            if get_comments_fn:
+                existing_comments = await get_comments_fn(self.owner, self.repo, self.pr_number)
                 for comment in existing_comments:
                     body = comment.get("body", "")
                     for fp in re.findall(r"<!-- fingerprint: (.*?) -->", body):
@@ -72,7 +72,7 @@ class GitHubIntegration:
         except Exception as e:
             logger.warning(f"Failed to fetch existing PR comments for deduplication: {e}")
 
-        grouped_findings: Dict[tuple, List[SecurityFinding]] = {}
+        grouped_findings: Dict[Tuple[str, int, Optional[int], str], List[SecurityFinding]] = {}
         fallback_findings = []
 
         for finding in findings:

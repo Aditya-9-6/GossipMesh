@@ -1,16 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.approval import ApprovalGate
 from gossipmesh.runtime.workflow import WorkflowManager
-from gossipmesh.models.audit import AuditEvent
 
-router = APIRouter(prefix="/approvals", tags=["approvals"])
+router = APIRouter(prefix="/api/v1/approvals", tags=["approvals"])
 
 class ApprovalCreateRequest(BaseModel):
     workflow_id: Optional[int] = None
@@ -21,9 +20,11 @@ class ApprovalCreateRequest(BaseModel):
     expires_in_hours: int = 24
 
 class ApprovalDecisionRequest(BaseModel):
-    decision: str  # approved, rejected
+    decision: str
 
 class ApprovalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     workflow_id: Optional[int]
     repository_id: Optional[int]
@@ -36,10 +37,7 @@ class ApprovalResponse(BaseModel):
     expires_at: datetime
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
-
-@router.post("", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
-@router.post("/", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+@router.post("/", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
 def create_approval_gate(
     req: ApprovalCreateRequest,
     db: Session = Depends(deps.get_db),
@@ -61,7 +59,6 @@ def create_approval_gate(
     return gate
 
 @router.get("/{approval_id}", response_model=ApprovalResponse)
-@router.get("/{approval_id}/", response_model=ApprovalResponse, include_in_schema=False)
 def get_approval_gate(
     approval_id: int,
     db: Session = Depends(deps.get_db),
@@ -79,7 +76,6 @@ def get_approval_gate(
     return gate
 
 @router.post("/{approval_id}/decision", response_model=ApprovalResponse)
-@router.post("/{approval_id}/decision/", response_model=ApprovalResponse, include_in_schema=False)
 def decide_approval(
     approval_id: int,
     req: ApprovalDecisionRequest,
