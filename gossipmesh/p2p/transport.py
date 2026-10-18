@@ -5,7 +5,6 @@ import time
 import threading
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
-from gossipmesh.p2p.ratelimmiter import PeerRateLimiter, RateLimitConfig if False else PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
 from gossipmesh.p2p.fountain import FountainEncoder, FountainDecoder
