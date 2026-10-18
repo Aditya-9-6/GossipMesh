@@ -2,22 +2,25 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from gossipmesh.api import app
-from gossipmesh.api import deps
+from gossipmesh.api.deps import get_db
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
-from gossipmesh.models.approval import ApprovalGate
+from gossipmesh.api.deps import get_current_user
 
-SQLALCHEMY_DATABASE_URL = "sqlite://"
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+@pytest.fixture(autouse=True)
+def setup_db():
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
 
 def override_get_db():
     try:
@@ -28,23 +31,17 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
-    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
+    user = db.query(User).filter(User.username == "test_approver").first()
     if not user:
-        user = User(email="approver@gossipmesh.test", hashed_password="fakepass", is_active=True)
+        user = User(username="test_approver", email="approver@example.com", hashed_password="fakepwd", is_active=True)
         db.add(user)
         db.commit()
         db.refresh(user)
     db.close()
     return user
 
-app.dependency_overrides[deps.get_db] = override_get_db
-app.dependency_overrides[deps.get_current_user] = override_get_current_user
-
-@pytest.fixture(autouse=True)
-def setup_db():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
 
 client = TestClient(app)
 
@@ -60,9 +57,9 @@ def test_approval_gate_lifecycle():
     )
     assert response.status_code == 201, response.text
     data = response.json()
-    approval_id = data["id"]
     assert data["status"] == "pending"
     assert data["action_type"] == "push_commit"
+    approval_id = data["id"]
 
     # Get approval gate
     get_resp = client.get(f"/api/v1/approvals/{approval_id}")
@@ -70,9 +67,9 @@ def test_approval_gate_lifecycle():
     assert get_resp.json()["status"] == "pending"
 
     # Decide approval
-    decide_resp = client.post(
+    decision_resp = client.post(
         f"/api/v1/approvals/{approval_id}/decision",
         json={"decision": "approved"}
     )
-    assert decide_resp.status_code == 200
-    assert decide_resp.json()["status"] == "approved"
+    assert decision_resp.status_code == 200
+    assert decision_resp.json()["status"] == "approved"
