@@ -24,10 +24,9 @@ class FountainEncoder:
         return chunks
 
     def generate_packet(self) -> Tuple[List[int], bytes]:
-        # Ensure field_size <= 256 for standard byte storage or clip/modulo safely into 0-255
         actual_field_size = min(self.field_size, 256)
         coeffs = [random.randint(1, max(1, actual_field_size - 1)) for _ in range(self.k)]
-        coded_chunk = bytearray(self.chunk_size)
+        coded_chunk = [0] * self.chunk_size
         for i, coeff in enumerate(coeffs):
             chunk = self.chunks[i]
             for b_idx in range(self.chunk_size):
