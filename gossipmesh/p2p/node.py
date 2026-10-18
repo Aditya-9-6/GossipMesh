@@ -1,20 +1,15 @@
-import hashlib
-from typing import List
+from typing import Dict, List, Any, Optional
+from gossipmesh.p2p.transport import AdaptiveTransport
 
-from gossipmesh.node import GossipNode, GossipTopic, GossipMessage
-from gossipmesh.p2p.dht import KademliaDHT, KademliaNode
+class P2PNodeExtension:
+    """Node extension integrating AdaptiveTransport for dynamic gossip dissemination."""
+    def __init__(self, node_id: str, base_fanout: int = 4):
+        self.node_id = node_id
+        self.transport = AdaptiveTransport(base_fanout=base_fanout)
 
-class P2PGossipMeshNode(GossipNode):
-    def __init__(self, node_id: str, mesh_dir: str | None = None, dht_port: int = 8468):
-        super().__init__(node_id=node_id, mesh_dir=mesh_dir)
-        self.dht_port = dht_port
-        self.dht = KademliaDHT(local_node_id=hashlib.sha256(node_id.encode()).hexdigest())
+    def record_peer_feedback(self, peer_id: str, rtt: float, velocity: float) -> None:
+        self.transport.record_metric(peer_id, rtt, velocity)
 
-    def register_peer(self, peer_id: str, address: str, port: int):
-        peer_hex = hashlib.sha256(peer_id.encode()).hexdigest()
-        node = KademliaNode(node_id=peer_hex, address=address, port=port)
-        self.dht.add_node(node)
-
-    def lookup_peer(self, peer_id: str) -> List[KademliaNode]:
-        peer_hex = hashlib.sha256(peer_id.encode()).hexdigest()
-        return self.dht.find_close_nodes(peer_hex)
+    def select_targets(self, all_peers: List[str]) -> List[str]:
+        fanout = self.transport.compute_adaptive_fanout(len(all_peers))
+        return self.transport.select_optimal_peers(all_peers, fanout)
