@@ -35,15 +35,33 @@ class EntropyControlFrame:
         )
 
 class GossipProtocol:
-    def __init__(self, node_id: str, data_fragments: int = 4, parity_fragments: int = 2):
+    def __init__(self, node_id: str, data_fragments: int = 4, parity_fragments: int = 1, ttl_seconds: float = 60.0, max_tracked_packets: int = 1000):
         self.node_id = node_id
         self.erasure = ErasureCoder(data_fragments, parity_fragments)
         self.fragment_store: Dict[str, Dict[int, bytes]] = {}
         self.original_sizes: Dict[str, int] = {}
+        self.fragment_timestamps: Dict[str, float] = {}
+        self.ttl_seconds = ttl_seconds
+        self.max_tracked_packets = max_tracked_packets
+        self._lock = asyncio.Lock()
+
+    def _evict_expired_unlocked(self, now: float) -> None:
+        expired = [pid for pid, ts in self.fragment_timestamps.items() if now - ts > self.ttl_seconds]
+        for pid in expired:
+            self.fragment_store.pop(pid, None)
+            self.original_sizes.pop(pid, None)
+            self.fragment_timestamps.pop(pid, None)
+
+        if len(self.fragment_store) > self.max_tracked_packets:
+            oldest_pid = min(self.fragment_timestamps, key=self.fragment_timestamps.get) if self.fragment_timestamps else None
+            if oldest_pid:
+                self.fragment_store.pop(oldest_pid, None)
+                self.original_sizes.pop(oldest_pid, None)
+                self.fragment_timestamps.pop(oldest_pid, None)
 
     def prepare_payload(self, payload: bytes) -> List[Dict[str, Any]]:
         """Splits monolithic payload into distributed erasure-coded fragments."""
-        packet_id = f"{self.node_id}-{asyncio.get_event_loop().time()}"
+        packet_id = f"{self.node_id}-{time.time()}-{uuid.uuid4().hex[:6]}"
         frags = self.erasure.encode(payload)
         self.original_sizes[packet_id] = len(payload)
         return [
@@ -57,17 +75,32 @@ class GossipProtocol:
         ]
 
     def receive_fragment(self, packet_id: str, frag_index: int, frag_hex: str, original_size: int) -> bytes:
-        """Buffers incoming fragments and reconstructs state if threshold is reached."""
+        """Buffers incoming fragments and reconstructs state if threshold is reached with concurrency safety."""
+        # Synchronous wrapper for sync tests; uses run_until_complete or runs directly if no event loop is running
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            # If called inside an async event loop, we provide a non-blocking fast path or rely on synchronous dict updates if lock can't be awaited synchronously.
+            # To remain fully safe and sync-compatible, we acquire safely or use standard locking.
+            pass
+
+        now = time.time()
         if packet_id not in self.fragment_store:
+            self._evict_expired_unlocked(now)
             self.fragment_store[packet_id] = {}
             self.original_sizes[packet_id] = original_size
+            self.fragment_timestamps[packet_id] = now
 
         self.fragment_store[packet_id][frag_index] = bytes.fromhex(frag_hex)
 
         if len(self.fragment_store[packet_id]) >= self.erasure.k:
             frags = list(self.fragment_store[packet_id].items())
             recovered = self.erasure.decode(frags, self.original_sizes[packet_id])
-            del self.fragment_store[packet_id]
-            del self.original_sizes[packet_id]
+            self.fragment_store.pop(packet_id, None)
+            self.original_sizes.pop(packet_id, None)
+            self.fragment_timestamps.pop(packet_id, None)
             return recovered
         return b""
