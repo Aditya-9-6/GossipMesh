@@ -25,6 +25,7 @@ def override_get_db():
         db.close()
 
 def override_get_current_user():
+    Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
     if not user:
