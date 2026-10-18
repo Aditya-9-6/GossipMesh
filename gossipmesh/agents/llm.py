@@ -19,7 +19,7 @@ class LocalLLMFallbackProvider:
         self.model_path = model_path or os.getenv("GOSSIPMESH_LOCAL_LLM_PATH", "models/llama-model.gguf")
         self.n_ctx = n_ctx
         self.n_threads = n_threads
-        self._model = None
+        self._model: Optional[Any] = None
         self._initialized = False
 
     def _initialize_model(self) -> None:
@@ -40,6 +40,8 @@ class LocalLLMFallbackProvider:
         """
         try:
             self._initialize_model()
+            if self._model is None:
+                raise RuntimeError("Model failed to initialize.")
             response = self._model(
                 prompt,
                 max_tokens=max_tokens,
