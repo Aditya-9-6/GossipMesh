@@ -22,7 +22,6 @@ class TestAdaptiveFanout(unittest.TestCase):
         peers = ["slow_peer", "fast_peer", "medium_peer"]
         selected = self.transport.select_peers(peers, congestion_signal=0.0)
         
-        # Fast peer should definitely be selected first
         self.assertEqual(selected[0], "fast_peer")
 
     def test_congestion_scaling(self):
@@ -32,10 +31,9 @@ class TestAdaptiveFanout(unittest.TestCase):
 
     def test_stale_metrics_expiration(self):
         self.registry.record_rtt("stale_peer", 0.05)
-        # Force expiration by adjusting ttl or waiting
         self.registry.ttl_seconds = -1.0
         smoothed, failures = self.registry.get_metrics("stale_peer")
         self.assertEqual(smoothed, 0.1)
 
-if __name__ == "__main一个新的测试__":
+if __name__ == "__main__":
     unittest.main()
