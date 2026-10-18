@@ -1,6 +1,7 @@
 import time
 import threading
-from typing import Dict
+from collections import OrderedDict
+from typing import Dict, Any
 
 class TokenBucketRateLimiter:
     """Decentralized O(1) token-bucket rate limiter for P2P peers with memory bounding."""
@@ -9,14 +10,12 @@ class TokenBucketRateLimiter:
         self.capacity = float(capacity)
         self.refill_rate = float(refill_rate)  # tokens per second
         self.max_buckets = max_buckets
-        self.buckets: Dict[str, Dict[str, float]] = {}
+        self.buckets: OrderedDict[str, Dict[str, float]] = OrderedDict()
         self._lock = threading.Lock()
 
     def _evict_lru_unlocked(self) -> None:
         if len(self.buckets) >= self.max_buckets:
-            # Evict oldest by last_refill
-            oldest_peer = min(self.buckets.keys(), key=lambda p: self.buckets[p]["last_refill"])
-            del self.buckets[oldest_peer]
+            self.buckets.popitem(last=False)
 
     def allow(self, peer_id: str, cost: float = 1.0) -> bool:
         """Check if peer has enough tokens to consume cost. Returns True if allowed."""
@@ -28,6 +27,7 @@ class TokenBucketRateLimiter:
                 self.buckets[peer_id] = {"tokens": self.capacity - cost, "last_refill": now}
                 return self.capacity >= cost
 
+            self.buckets.move_to_end(peer_id)
             elapsed = now - bucket["last_refill"]
             bucket["last_refill"] = now
             bucket["tokens"] = min(self.capacity, bucket["tokens"] + elapsed * self.refill_rate)
