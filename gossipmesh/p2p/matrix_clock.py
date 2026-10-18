@@ -74,10 +74,14 @@ class BoundedMatrixClockEngine:
         sender = msg.sender_id
         msg_clock = msg.matrix_clock
 
+        # If we haven't seen any events from ourselves yet, or empty clock, allow initial messages
+        if not msg_clock:
+            return True
+
         for k, req_val in msg_clock.items():
             if k == sender:
                 known_val = self._matrix.get(sender, {}).get(sender, 0)
-                if req_val != known_val + 1:
+                if req_val > known_val + 1:
                     return False
             else:
                 known_val = self._matrix.get(sender, {}).get(k, 0)
@@ -100,7 +104,8 @@ class BoundedMatrixClockEngine:
         if self.node_id not in self._matrix[sender]:
             self._matrix[sender][self.node_id] = 0
 
-        self._matrix[sender][sender] = msg_clock.get(sender, self._matrix[sender].get(sender, 0))
+        if sender in msg_clock:
+            self._matrix[sender][sender] = msg_clock[sender]
 
     def ingest(self, msg: MatrixClockMessage) -> List[MatrixClockMessage]:
         with self._lock:
@@ -108,14 +113,9 @@ class BoundedMatrixClockEngine:
             while self._buffer and (now - self._buffer[0].timestamp > self.staleness_window_seconds):
                 self._buffer.popleft()
 
-            # If causally ready immediately, update matrix and release
-            if self._is_causally_ready(msg):
-                self._update_matrix(msg)
-                released = [msg]
-            else:
-                self._buffer.append(msg)
-                released = []
+            self._buffer.append(msg)
             
+            released: List[MatrixClockMessage] = []
             progress = True
 
             while progress:
