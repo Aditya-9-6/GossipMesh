@@ -1,12 +1,14 @@
-import time
 import math
-from typing import Dict, Any, Optional
 
 class AdaptiveTTLEngine:
     """Calculates adaptive epidemic Time-To-Live (TTL) decay based on local queue depths
     and downstream neighbor latency, incorporating a congestion-aware poison-reverse heuristic."""
 
     def __init__(self, base_ttl: int = 10, max_queue_depth: int = 100, max_latency_ms: float = 500.0):
+        if max_queue_depth <= 0:
+            raise ValueError("max_queue_depth must be greater than zero")
+        if max_latency_ms <= 0.0:
+            raise ValueError("max_latency_ms must be greater than zero")
         self.base_ttl = base_ttl
         self.max_queue_depth = max_queue_depth
         self.max_latency_ms = max_latency_ms
@@ -25,7 +27,7 @@ class AdaptiveTTLEngine:
         # Combined penalty score
         congestion_penalty = (q_factor + l_factor) / 2.0
 
-        # Decay formula: reduce TTL faster under higher congestion, ensuring high congestion yields strictly fewer than current_ttl - 3 or appropriate decay
+        # Decay formula: reduce TTL faster under higher congestion
         decay_amount = max(1, math.ceil(congestion_penalty * 4.0))
         new_ttl = current_ttl - decay_amount
 

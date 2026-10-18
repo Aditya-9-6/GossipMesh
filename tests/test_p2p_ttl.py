@@ -6,7 +6,6 @@ class TestAdaptiveTTLEngine(unittest.TestCase):
         self.engine = AdaptiveTTLEngine(base_ttl=10, max_queue_depth=100, max_latency_ms=500.0)
 
     def test_high_congestion_decay(self):
-        # High queue depth and latency should result in aggressive decay
         new_ttl = self.engine.calculate_decay(current_ttl=10, queue_depth=90, latency_ms=450.0)
         self.assertLess(new_ttl, 7)
 
@@ -17,6 +16,12 @@ class TestAdaptiveTTLEngine(unittest.TestCase):
     def test_poison_reverse(self):
         new_ttl = self.engine.calculate_decay(current_ttl=10, queue_depth=50, latency_ms=200.0, is_poison_reverse=True)
         self.assertEqual(new_ttl, 0)
+
+    def test_invalid_initialization(self):
+        with self.assertRaises(ValueError):
+            AdaptiveTTLEngine(max_queue_depth=0)
+        with self.assertRaises(ValueError):
+            AdaptiveTTLEngine(max_latency_ms=0.0)
 
 if __name__ == "__main__":
     unittest.main()
