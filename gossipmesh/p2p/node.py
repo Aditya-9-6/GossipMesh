@@ -85,15 +85,15 @@ class GossipNode:
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
-        self.public_key = public_key
+        self.public_key = public_key or node_id
         self.pow_difficulty = pow_difficulty
         
         if self.pow_difficulty > 0:
             if pow_nonce is None:
-                nonce, _ = mine_pow(self.public_key or self.node_id, self.pow_difficulty)
+                nonce, _ = mine_pow(self.public_key, self.pow_difficulty)
                 self.pow_nonce = nonce
             else:
-                if not verify_pow(self.public_key or self.node_id, pow_nonce, self.pow_difficulty):
+                if not verify_pow(self.public_key, pow_nonce, self.pow_difficulty):
                     raise ValueError("Invalid Proof-of-Work nonce for specified difficulty")
                 self.pow_nonce = pow_nonce
         else:

@@ -1,7 +1,7 @@
 import time
 import os
 import logging
-import threading
+threading = __import__('threading')
 try:
     import psutil
 except ImportError:
@@ -15,7 +15,7 @@ class AdaptiveScatterGovernor:
     gossip fanout (scatter-width) based on real-time OS process CPU and memory utilization.
     Uses a low-pass smoothing filter to prevent oscillation.
     """
-    def __init__(self, base_scatter: int = 4, min_scatter: int = 1, cpu_threshold: float = 80.0, mem_threshold: float = 85.0, alpha: float = 0.3):
+    def __init__(self, base_scatter: int = 4, min_scatter: int = 1, cpu_threshold: float = 80.0, mem_threshold: float = 85.0, alpha: float = 0.5):
         self.base_scatter = base_scatter
         self.min_scatter = min_scatter
         self.cpu_threshold = cpu_threshold
