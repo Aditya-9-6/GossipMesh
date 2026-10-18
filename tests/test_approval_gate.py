@@ -17,7 +17,12 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base.metadata.create_all(bind=engine)
+@pytest.fixture(autouse=True)
+def setup_db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
 
 def override_get_db():
     db = TestingSessionLocal()
@@ -28,14 +33,16 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
-    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
-    if not user:
-        user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    db.close()
-    return user
+    try:
+        user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
+        if not user:
+            user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+    finally:
+        db.close()
 
 @pytest.fixture(autouse=True)
 def setup_overrides():
