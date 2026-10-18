@@ -53,7 +53,6 @@ class TestCheckpointConsensus(unittest.TestCase):
         validator = EpochCheckpointValidator(total_nodes=2, secret_keys=keys)
 
         unknown_cp = StateCheckpoint(epoch=1, node_id="unregistered", state_root="root_x")
-        # Even if it signs with some key, node_id is not in secret_keys
         unknown_cp.sign("any_key")
 
         self.assertFalse(validator.submit_checkpoint(unknown_cp))
@@ -81,13 +80,11 @@ class TestCheckpointConsensus(unittest.TestCase):
         keys = {"n1": "k1", "n2": "k2", "n3": "k3", "n4": "k4"}
         validator = EpochCheckpointValidator(total_nodes=4, secret_keys=keys)
 
-        # 2 nodes vote for fork A
         cp1 = StateCheckpoint(epoch=30, node_id="n1", state_root="fork_a")
         cp1.sign("k1")
         cp2 = StateCheckpoint(epoch=30, node_id="n2", state_root="fork_a")
         cp2.sign("k2")
 
-        # 2 nodes vote for fork B
         cp3 = StateCheckpoint(epoch=30, node_id="n3", state_root="fork_b")
         cp3.sign("k3")
         cp4 = StateCheckpoint(epoch=30, node_id="n4", state_root="fork_b")
@@ -98,7 +95,6 @@ class TestCheckpointConsensus(unittest.TestCase):
         validator.submit_checkpoint(cp3)
         validator.submit_checkpoint(cp4)
 
-        # Quorum required for 4 nodes is 3. Neither fork reached 3.
         self.assertFalse(validator.check_quorum(30))
         self.assertFalse(validator.is_finalized(30))
         self.assertIsNone(validator.get_finalized_state_root(30))

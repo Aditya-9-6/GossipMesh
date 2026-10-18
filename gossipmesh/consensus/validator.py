@@ -15,17 +15,16 @@ class EpochCheckpointValidator:
         return (2 * self.total_nodes // 3) + 1
 
     def submit_checkpoint(self, checkpoint: StateCheckpoint) -> bool:
-        # Strict authentication: node_id must be registered and signature must be valid
-        if checkpoint.node_id not in self.secret_keys:
-            return False
-        key = self.secret_keys[checkpoint.node_id]
-        if not checkpoint.verify_signature(key):
-            return False
-
         with self._lock:
             if checkpoint.epoch in self._finalized_epochs:
                 return False
             
+            if checkpoint.node_id not in self.secret_keys:
+                return False
+            key = self.secret_keys[checkpoint.node_id]
+            if not checkpoint.verify_signature(key):
+                return False
+
             epoch_map = self._checkpoints.setdefault(checkpoint.epoch, {})
             epoch_map[checkpoint.node_id] = checkpoint
             return True
