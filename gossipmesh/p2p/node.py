@@ -155,11 +155,10 @@ class GossipNode:
     def cleanup_ledger(self):
         if not self.mesh_dir.exists():
             return
+        now = time.time()
         for file_path in self.mesh_dir.glob("*.json"):
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if data.get("timestamp", 0) < time.time() - 86400:
-                        file_path.unlink(missing_ok=True)
+                if now - file_path.stat().st_mtime > 86400:
+                    file_path.unlink()
             except Exception:
                 continue

@@ -23,3 +23,5 @@ class ApprovalGate(Base):
     approver = relationship("User", foreign_keys=[approver_id])
     workflow = relationship("Workflow", foreign_keys=[workflow_id])
     repository = relationship("Repository", foreign_keys=[repository_id])
+
+Approval = ApprovalGate
