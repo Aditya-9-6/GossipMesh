@@ -24,15 +24,15 @@ class DoubleRatchetSession:
     def _ratchet_step(self, remote_pub: x25519.X25519PublicKey) -> None:
         self.dh_remote_pub = remote_pub
         shared = self.dh_local.shared_key(remote_pub)
-        self.root_key, derived_recv = derive_hkdf(self.root_key, shared, b"root-ratchet", 64).chunk(32) if hasattr(derive_hkdf(self.root_key, shared, b"root-ratchet", 64), 'chunk') else (
-            derive_hkdf(self.root_key, shared, b"root-ratchet", 64)[:32],
-            derive_hkdf(self.root_key, shared, b"root-ratchet", 64)[32:]
-        )
-        self.recv_chain_key = derived_recv
+        derived_recv_full = derive_hkdf(self.root_key, shared, b"root-ratchet", 64)
+        self.root_key = derived_recv_full[:32]
+        self.recv_chain_key = derived_recv_full[32:]
+
         self.dh_local = KeyPair()
         new_shared = self.dh_local.shared_key(remote_pub)
-        self.root_key, derived_send = derive_hkdf(self.root_key, new_shared, b"root-ratchet-send", 64)[:32], derive_hkdf(self.root_key, new_shared, b"root-ratchet-send", 64)[32:]
-        self.send_chain_key = derived_send
+        derived_send_full = derive_hkdf(self.root_key, new_shared, b"root-ratchet-send", 64)
+        self.root_key = derived_send_full[:32]
+        self.send_chain_key = derived_send_full[32:]
         self.message_number_send = 0
         self.message_number_recv = 0
 
