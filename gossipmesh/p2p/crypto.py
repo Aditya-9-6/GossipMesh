@@ -52,6 +52,8 @@ def encrypt_payload(session_key: bytes, plaintext: bytes) -> bytes:
     return nonce + ciphertext
 
 def decrypt_payload(session_key: bytes, ciphertext_with_nonce: bytes) -> bytes:
+    if len(ciphertext_with_nonce) < 12:
+        raise ValueError("Ciphertext too short to contain nonce.")
     aesgcm = AESGCM(session_key)
     nonce = ciphertext_with_nonce[:12]
     ciphertext = ciphertext_with_nonce[12:]

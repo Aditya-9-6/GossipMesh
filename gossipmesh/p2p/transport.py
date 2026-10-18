@@ -1,6 +1,6 @@
 import time
 import threading
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, Any, List
 from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 
@@ -20,25 +20,30 @@ class P2PSessionTransport:
             self.rotator.derive_session_key(peer_public_bytes)
             self.creation_time = time.time()
 
+    def _should_rotation_unlocked(self) -> bool:
+        if self.rotator.message_counter >= self.max_messages:
+            return True
+        if (time.time() - self.creation_time) >= self.max_time_seconds:
+            return True
+        return False
+
     def should_rotate(self) -> bool:
         with self._lock:
-            if self.rotator.message_counter >= self.max_messages:
-                return True
-            if (time.time() - self.creation_time) >= self.max_time_seconds:
-                return True
-            return False
+            return self._should_rotation_unlocked()
+
+    def _trigger_rotation_unlocked(self) -> bytes:
+        _, new_pub_bytes = self.rotator.rotate()
+        self.creation_time = time.time()
+        return new_pub_bytes
 
     def trigger_rotation(self) -> bytes:
         with self._lock:
-            _, new_pub_bytes = self.rotator.rotate()
-            self.creation_time = time.time()
-            return new_pub_bytes
+            return self._trigger_rotation_unlocked()
 
     def send_message(self, plaintext: bytes) -> bytes:
-        if self.should_rotate():
-            with self._lock:
-                self.trigger_rotation()
         with self._lock:
+            if self._should_rotation_unlocked():
+                self._trigger_rotation_unlocked()
             if not self.rotator.session_key:
                 raise ValueError("Session key not established for P2P transport.")
             
@@ -46,10 +51,9 @@ class P2PSessionTransport:
             return encrypt_payload(self.rotator.session_key, plaintext)
 
     def receive_message(self, ciphertext_with_nonce: bytes) -> bytes:
-        if self.should_rotate():
-            with self._lock:
-                self.trigger_rotation()
         with self._lock:
+            if self._should_rotation_unlocked():
+                self._trigger_rotation_unlocked()
             if not self.rotator.session_key:
                 raise ValueError("Session key not established for P2P transport.")
             
@@ -88,25 +92,30 @@ class GossipTransport:
             self.rotator.derive_session_key(peer_public_bytes)
             self.creation_time = time.time()
 
+    def _should_rotate_unlocked(self) -> bool:
+        if self.rotator.message_counter >= self.max_messages:
+            return True
+        if (time.time() - self.creation_time) >= self.max_time_seconds:
+            return True
+        return False
+
     def should_rotate(self) -> bool:
         with self._lock:
-            if self.rotator.message_counter >= self.max_messages:
-                return True
-            if (time.time() - self.creation_time) >= self.max_time_seconds:
-                return True
-            return False
+            return self._should_rotate_unlocked()
+
+    def _trigger_rotation_unlocked(self) -> bytes:
+        _, new_pub_bytes = self.rotator.rotate()
+        self.creation_time = time.time()
+        return new_pub_bytes
 
     def trigger_rotation(self) -> bytes:
         with self._lock:
-            _, new_pub_bytes = self.rotator.rotate()
-            self.creation_time = time.time()
-            return new_pub_bytes
+            return self._trigger_rotation_unlocked()
 
     def send_message(self, plaintext: bytes) -> bytes:
-        if self.should_rotate():
-            with self._lock:
-                self.trigger_rotation()
         with self._lock:
+            if self._should_rotate_unlocked():
+                self._trigger_rotation_unlocked()
             if not self.rotator.session_key:
                 raise ValueError("Session key not established for P2P transport.")
             
@@ -114,10 +123,9 @@ class GossipTransport:
             return encrypt_payload(self.rotator.session_key, plaintext)
 
     def receive_message(self, ciphertext_with_nonce: bytes) -> bytes:
-        if self.should_rotate():
-            with self._lock:
-                self.trigger_rotation()
         with self._lock:
+            if self._should_rotate_unlocked():
+                self._trigger_rotation_unlocked()
             if not self.rotator.session_key:
                 raise ValueError("Session key not established for P2P transport.")
             
@@ -126,7 +134,7 @@ class GossipTransport:
 
     async def receive_payload(self, peer_id: str, payload: Any, topic: str = "default") -> Optional[Any]:
         import json
-        byte_size = len(str(payload).encode('utf-8'))
+        byte_size = len(payload) if isinstance(payload, bytes) else len(str(payload).encode('utf-8'))
         allowed, _ = await self.rate_limiter.check_and_consume(peer_id, byte_size)
         if not allowed:
             self.telemetry.dropped_messages += 1
@@ -161,7 +169,7 @@ class GossipTransport:
 
     async def send_payload(self, peer_id: str, payload: Any) -> bool:
         self.telemetry.sent_messages += 1
-        self.telemetry.sent_bytes += len(str(payload).encode('utf-8'))
+        self.telemetry.sent_bytes += len(payload) if isinstance(payload, bytes) else len(str(payload).encode('utf-8'))
         return True
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
