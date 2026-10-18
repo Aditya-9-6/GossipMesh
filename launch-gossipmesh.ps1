@@ -49,11 +49,16 @@ $env:PYTHONUNBUFFERED = "1"
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONUTF8 = "1"
 
+$py = "G:\My Drive\GossipMesh\.venv\Scripts\python.exe"
+if (-not (Test-Path $py)) {
+    $py = "python"
+}
+
 # Continuous Loop with automatic recovery
 while ($true) {
     try {
         Write-Host "`n[*] Starting GossipMesh autonomous loop cycle..." -ForegroundColor Magenta
-        python scripts/autonomous_loop.py --workspace . --interval 15
+        & $py scripts/autonomous_loop.py --workspace . --interval 15
     } catch {
         Write-Host "[!] Loop exited with error: $_" -ForegroundColor Red
     }
