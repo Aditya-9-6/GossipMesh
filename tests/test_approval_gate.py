@@ -28,19 +28,21 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
-    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
-    if not user:
-        user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    db.close()
-    return user
+    try:
+        user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
+        if not user:
+            user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+    finally:
+        db.close()
 
 
 @pytest.fixture(autouse=True)
 def setup_overrides():
-    # Ensure all models are registered in Base.metadata
+    # Ensure all models are registered in Base.metadata and tables created
     Base.metadata.create_all(bind=engine)
     app.dependency_overrides[deps.get_db] = override_get_db
     app.dependency_overrides[deps.get_current_user] = override_get_current_user
