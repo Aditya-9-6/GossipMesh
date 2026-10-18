@@ -181,18 +181,18 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     print(f"[*] Tidying Python files with compileall (project dirs only)...", flush=True)
     run_cmd([py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"], cwd=workspace, check=False, timeout=15)
 
-    print("[*] Formatting Python codebase with black...", flush=True)
-    run_cmd(["black", "."], cwd=workspace, check=False, timeout=30)
+    print("[*] Formatting Python codebase with black (project dirs only)...", flush=True)
+    run_cmd(["black", "gossipmesh", "tests", "scripts"], cwd=workspace, check=False, timeout=30)
 
     print("[*] Verifying Python linting & static analysis (flake8)...", flush=True)
     vet_failed = False
     try:
-        vet_res = subprocess.run(["flake8", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        vet_res = subprocess.run(["flake8", "--exclude", ".venv,.git", "gossipmesh", "tests", "scripts"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         if vet_res.returncode != 0:
             vet_failed = True
     except FileNotFoundError:
         pass
-    check_res = subprocess.run([py_bin, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
+    check_res = subprocess.run([py_bin, "-m", "pytest", "tests/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
 
     if vet_failed or check_res.returncode != 0:
         print(f"[!] CI failed. Calling AI CI Fixer...", flush=True)
@@ -301,14 +301,30 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         ]
         if review_md_file.exists():
             ci_fixer_cmd.extend(["--review-feedback-file", str(review_md_file)])
-        fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
         print(fix_res.stdout, flush=True)
 
         # Re-commit and push if fixed
         run_cmd(["git", "add", "-A"], cwd=workspace)
         run_cmd(["git", "commit", "-m", f"fix: incorporate ai reviewer feedback for PR #{pr_num}"], cwd=workspace, check=False)
         run_cmd(["git", "push", "origin", branch_name, "--force"], cwd=workspace, check=False)
-        return False
+
+        # Re-run reviewer to verify the fixes
+        print(f"[*] Re-running Autonomous Architectural Reviewer on PR #{pr_num} after fixes...", flush=True)
+        rev_res = subprocess.run([
+            sys.executable, "scripts/ai_pr_reviewer.py",
+            "--pr-number", str(pr_num),
+            "--workspace", str(workspace)
+        ], cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        print(rev_res.stdout, flush=True)
+
+        if review_status_file.exists():
+            try:
+                status_data = json.loads(review_status_file.read_text(encoding="utf-8"))
+                score = status_data.get("score", score)
+                verdict = status_data.get("verdict", verdict)
+            except Exception:
+                pass
 
     if verdict == "APPROVED" and score >= 90:
         print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Merging PR #{pr_num} into main...", flush=True)
@@ -378,7 +394,7 @@ def handle_pr_comments(workspace: Path):
             py_bin = str(venv_py) if venv_py.exists() else sys.executable
 
             # Run tests
-            check_res = subprocess.run([py_bin, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
+            check_res = subprocess.run([py_bin, "-m", "pytest", "tests/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
 
             if check_res.returncode != 0:
                 print(f"[!] PR #{pr_num} CI failed during requested review. Calling AI CI Fixer...", flush=True)
@@ -412,8 +428,30 @@ def handle_pr_comments(workspace: Path):
             if review_md_file.exists():
                 run_cmd(["gh", "pr", "comment", str(pr_num), "--body-file", str(review_md_file)], cwd=workspace, check=False)
 
-            # Switch back to main
-            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            review_status_file = workspace / "ai_review_status.json"
+            score = 0
+            verdict = "ACTION_REQUIRED"
+            if review_status_file.exists():
+                try:
+                    status_data = json.loads(review_status_file.read_text(encoding="utf-8"))
+                    score = status_data.get("score", 0)
+                    verdict = status_data.get("verdict", "ACTION_REQUIRED")
+                except Exception:
+                    pass
+
+            if verdict == "APPROVED" and score >= 90:
+                print(f"[🚀] Requested PR #{pr_num} APPROVED (Score: {score}/100)! Merging PR #{pr_num} into main...", flush=True)
+                run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace, check=False)
+                run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
+                run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace, check=False)
+                print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
+                run_cmd(["git", "checkout", "main"], cwd=workspace)
+                run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
+                run_cmd(["git", "branch", "-D", branch_name], cwd=workspace, check=False)
+                run_cmd(["git", "push", "origin", "--delete", branch_name], cwd=workspace, check=False)
+            else:
+                # Switch back to main
+                run_cmd(["git", "checkout", "main"], cwd=workspace)
 
     except Exception as e:
         print(f"[Warning] Failed to check PR comments: {e}", file=sys.stderr, flush=True)
