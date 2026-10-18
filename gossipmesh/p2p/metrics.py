@@ -1,6 +1,7 @@
 import time
+import threading
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 class EMALatencyTracker:
     """Tracks round-trip latency using a windowed Exponential Moving Average (EMA) with bounded memory."""
@@ -38,15 +39,19 @@ class PeerMetricsRegistry:
         self.window_size = window_size
         self.alpha = alpha
         self._trackers: Dict[str, EMALatencyTracker] = {}
+        self._lock = threading.Lock()
 
     def record_latency(self, peer_id: str, latency_ms: float) -> float:
-        if peer_id not in self._trackers:
-            self._trackers[peer_id] = EMALatencyTracker(window_size=self.window_size, alpha=self.alpha)
-        return self._trackers[peer_id].record(latency_ms)
+        with self._lock:
+            if peer_id not in self._trackers:
+                self._trackers[peer_id] = EMALatencyTracker(window_size=self.window_size, alpha=self.alpha)
+            return self._trackers[peer_id].record(latency_ms)
 
     def get_ema(self, peer_id: str) -> Optional[float]:
-        tracker = self._trackers.get(peer_id)
-        return tracker.ema if tracker else None
+        with self._lock:
+            tracker = self._trackers.get(peer_id)
+            return tracker.ema if tracker else None
 
     def get_all_emas(self) -> Dict[str, float]:
-        return {pid: t.ema for pid, t in self._trackers.items() if t.ema is not None}
+        with self._lock:
+            return {pid: t.ema for pid, t in self._trackers.items() if t.ema is not None}

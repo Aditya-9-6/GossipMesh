@@ -29,7 +29,9 @@ class PeerSelector:
 
         scored_peers.sort(key=lambda x: x[1])
 
-        num_exploration = max(1, int(count * exploration_ratio)) if strategy == "hybrid" else 0
+        num_exploration = int(count * exploration_ratio) if strategy == "hybrid" else 0
+        if strategy == "hybrid" and exploration_ratio > 0.0 and num_exploration == 0:
+            num_exploration = 1
         num_exploitation = count - num_exploration
 
         # Exploitation set: lowest latency peers
