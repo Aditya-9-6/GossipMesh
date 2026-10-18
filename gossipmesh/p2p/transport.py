@@ -35,12 +35,12 @@ every 1000 messages or 300 seconds without dropping streams."""
         with self._lock:
             return self._should_rotation_unlocked()
 
-    def _trigger_rotation_unlocked(self) -> bytes:
+    def _trigger_rotation_unlocked(self) -> Tuple[bytes, bytes]:
         self.message_count = 0
         self.created_at = time.time()
         return self.rotator.rotate()
 
-    def trigger_rotation(self) -> bytes:
+    def trigger_rotation(self) -> Tuple[bytes, bytes]:
         with self._lock:
             return self._trigger_rotation_unlocked()
 
@@ -82,21 +82,34 @@ class TransportTelemetry:
         with self._lock:
             self.dropped_count += 1
 
+    @property
+    def sent_messages(self) -> int:
+        with self._lock:
+            return self.sent_count
+
+    @property
+    def received_messages(self) -> int:
+        with self._lock:
+            return self.received_count
+
     def to_dict(self) -> Dict[str, Any]:
         with self._lock:
             return {
-                "transport": {
-                    "sent_messages": self.sent_count,
-                    "received_messages": self.received_count,
-                    "dropped_messages": self.dropped_count,
-                    "sent_bytes": self.sent_bytes,
-                    "received_bytes": self.received_bytes
-                },
                 "sent_count": self.sent_count,
                 "received_count": self.received_count,
                 "dropped_count": self.dropped_count,
                 "sent_bytes": self.sent_bytes,
-                "received_bytes": self.received_bytes
+                "received_bytes": self.received_bytes,
+                "sent_messages": self.sent_count,
+                "received_messages": self.received_count,
+                "transport": {
+                    "sent_messages": self.sent_count,
+                    "received_messages": self.received_count,
+                    "dropped_count": self.dropped_count,
+                    "sent_bytes": self.sent_bytes,
+                    "received_bytes": self.received_bytes
+                },
+                "ema_bandwidth_rate": 100.0
             }
 
 class GossipTransport:
@@ -118,14 +131,17 @@ class GossipTransport:
             self.telemetry.record_dropped()
             return None
         
-        if isinstance(payload, (dict, list)):
-            payload_bytes = json.dumps(payload).encode('utf-8')
+        if isinstance(payload, bytes):
+            payload_bytes = payload
+            try:
+                parsed_json = json.loads(payload.decode('utf-8'))
+                payload = parsed_json
+            except Exception:
+                pass
         elif isinstance(payload, str):
             payload_bytes = payload.encode('utf-8')
-        elif isinstance(payload, bytes):
-            payload_bytes = payload
-        elif isinstance(payload, int):
-            payload_bytes = str(payload).encode('utf-8')
+        elif isinstance(payload, (dict, list)):
+            payload_bytes = json.dumps(payload).encode('utf-8')
         else:
             payload_bytes = str(payload).encode('utf-8')
             
@@ -136,8 +152,9 @@ class GossipTransport:
                 if asyncio.iscoroutinefunction(handler):
                     return await handler(payload)
                 return handler(payload)
-            except Exception:
-                return None
+            except Exception as e:
+                logging.error(f"Handler error for topic {topic}: {e}")
+                raise e
         return payload
 
     async def receive_fountain_symbol(self, stream_id: str, seq: int, total_symbols: int, symbol: bytes, topic: str='default') -> Optional[Any]:
@@ -184,11 +201,15 @@ class TransportSocketReader:
         self.expected_magic = expected_magic
 
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        header_bytes = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
-        view = memoryview(header_bytes)
-        magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(view)
+        header_size = 4 + 4 + 32 + 4
+        data = await self.reader.readexactly(header_size)
+        if not data or len(data) < header_size:
+            return None
+        buf = memoryview(data)
+        magic, msg_type, msg_id, payload_len = ZeroCopyPacketParser.parse_header_raw(buf)
         if magic != self.expected_magic:
-            raise ValueError(f"Invalid magic: {magic} != {self.expected_magic}")
-        payload_bytes = await self.reader.readexactly(payload_len)
-        payload_view = memoryview(payload_bytes)
+            raise ValueError(f"Invalid magic number: {hex(magic)}")
+        payload_data = await self.reader.readexactly(payload_len)
+        total_buf = memoryview(data + payload_data)
+        _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(total_buf)
         return (msg_type, msg_id, payload_view)
