@@ -1,12 +1,46 @@
 import pytest
 from fastapi.testclient import TestClient
-from gossipmesh.api import app
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from gossipmesh.api.main import app
+from gossipmesh.api import deps
+from gossipmesh.models.base import Base
+from gossipmesh.models.user import User
+
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base.metadata.create_all(bind=engine)
+
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def override_get_current_user():
+    db = TestingSessionLocal()
+    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
+    if not user:
+        user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    db.close()
+    return user
+
+app.dependency_overrides[deps.get_db] = override_get_db
+app.dependency_overrides[deps.get_current_user] = override_get_current_user
 
 client = TestClient(app)
 
 def test_approval_gate_lifecycle():
-    # The approval gate endpoint requires authentication credentials.
-    # We supply a mock authorization token header or basic auth token as expected by the API auth middleware/dependency.
     headers = {"Authorization": "Bearer test-token"}
     response = client.post(
         "/api/v1/approvals/",
@@ -17,6 +51,5 @@ def test_approval_gate_lifecycle():
             "expires_in_hours": 1
         },
         headers=headers
-    );
-    # If authentication succeeds or returns 201 as configured in mock environment
+    )
     assert response.status_code in (201, 200)
