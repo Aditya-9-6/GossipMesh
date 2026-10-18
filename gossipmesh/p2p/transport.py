@@ -9,6 +9,30 @@ from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 logger = logging.getLogger(__name__)
 
 
+class P2PSessionTransport:
+    """Manages P2P transport sessions, session keys, and message counters for rotation."""
+
+    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 3600.0) -> None:
+        self.max_messages = max_messages
+        self.max_time_seconds = max_time_seconds
+        self.message_count = 0
+        self.start_time = time.time()
+        self.peer_public_key: Optional[bytes] = None
+
+    def initialize_session(self, peer_public_bytes: bytes) -> None:
+        self.peer_public_key = peer_public_bytes
+        self.start_time = time.time()
+        self.message_count = 0
+
+    def send_message(self, plaintext: bytes) -> bytes:
+        self.message_count += 1
+        return plaintext
+
+    def should_rotate(self) -> bool:
+        elapsed = time.time() - self.start_time
+        return (self.message_count >= self.max_messages) or (elapsed >= self.max_time_seconds)
+
+
 class TransportTelemetry:
     def __init__(self) -> None:
         self.sent_messages = 0

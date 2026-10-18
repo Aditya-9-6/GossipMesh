@@ -7,6 +7,7 @@ class ZeroCopyPacketParser:
     HEADER_FORMAT = "!BI"  # Magic byte (1), Payload length (4)
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
     MAGIC_BYTE = 0x47  # 'G'
+    MAX_PAYLOAD_LENGTH = 16 * 1024 * 1024  # 16 MB max safety limit
 
     @staticmethod
     def parse_header(buffer: memoryview) -> Tuple[int, int]:
@@ -17,6 +18,9 @@ class ZeroCopyPacketParser:
         magic, length = struct.unpack_from(ZeroCopyPacketParser.HEADER_FORMAT, buffer, 0)
         if magic != ZeroCopyPacketParser.MAGIC_BYTE:
             raise ValueError(f"Invalid packet magic byte: {hex(magic)}")
+        
+        if length > ZeroCopyPacketParser.MAX_PAYLOAD_LENGTH:
+            raise ValueError(f"Payload length {length} exceeds maximum allowed size ({ZeroCopyPacketParser.MAX_PAYLOAD_LENGTH})")
         
         return magic, length
 
@@ -33,5 +37,7 @@ class ZeroCopyPacketParser:
     def serialize_packet(msg_type: bytes, payload_bytes: bytes) -> bytes:
         """Helper to construct valid wire format packets for testing/transport."""
         length = len(payload_bytes)
+        if length > ZeroCopyPacketParser.MAX_PAYLOAD_LENGTH:
+            raise ValueError("Payload length exceeds maximum allowed size")
         header = struct.pack(ZeroCopyPacketParser.HEADER_FORMAT, ZeroCopyPacketParser.MAGIC_BYTE, length)
         return header + payload_bytes

@@ -24,6 +24,13 @@ class TestTransportAndParser(unittest.TestCase):
         with self.assertRaises(ValueError):
             ZeroCopyPacketParser.parse_header(mv)
 
+    def test_parser_header_oversized_payload(self):
+        # Test security check for oversized payload limit
+        oversized_packet = b'\x47' + (100 * 1024 * 1024).to_bytes(4, byteorder='big')
+        mv = memoryview(oversized_packet)
+        with self.assertRaises(ValueError):
+            ZeroCopyPacketParser.parse_header(mv)
+
     def test_extract_payload(self):
         payload_data = b'test-payload'
         packet = ZeroCopyPacketParser.serialize_packet(b'T', payload_data)
