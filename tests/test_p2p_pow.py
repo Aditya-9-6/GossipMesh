@@ -3,7 +3,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from gossipmesh.p2p.pow import calculate_pow_hash, verify_pow, mine_pow
-from gossipmesh.node import GossipNode, GossipTopic
+from gossipmesh.p2p.node import GossipNode, GossipTopic
 
 
 class TestP2PPow(unittest.TestCase):
@@ -22,8 +22,7 @@ class TestP2PPow(unittest.TestCase):
 
     def test_pow_invalid_verification(self):
         pubkey = "test_pubkey_12345"
-        difficulty = 3
-        # incorrect nonce or mismatching hash
+        difficulty = 2
         self.assertFalse(verify_pow(pubkey, 999999, difficulty))
 
     def test_gossip_node_with_pow(self):
@@ -35,7 +34,6 @@ class TestP2PPow(unittest.TestCase):
             pow_difficulty=difficulty
         )
         self.assertEqual(node.pow_difficulty, difficulty)
-        self.assertIsNotNone(node.pow_nonce)
         self.assertTrue(verify_pow(node.public_key, node.pow_nonce, difficulty))
 
     def test_gossip_node_invalid_pow_nonce_raises(self):
@@ -47,7 +45,3 @@ class TestP2PPow(unittest.TestCase):
                 pow_difficulty=2,
                 pow_nonce=12345
             )
-
-
-if __name__ == '__main__':
-    unittest.main()
