@@ -7,9 +7,15 @@ class LeakyBucketReputation:
     """Memory-bounded, thread-safe sliding-window leaky bucket reputation scoring engine.
     Maintains O(1) time complexity updates using circular buffer time-slices.
     """
-    def __init__(self, capacity: float = 100.0, leak_rate: float = 1.0, quarantine_threshold: float = 20.0) -> None:
+    def __init__(
+        self,
+        capacity: float = 100.0,
+        leak_rate_per_sec: Optional[float] = None,
+        leak_rate: Optional[float] = None,
+        quarantine_threshold: float = 50.0
+    ) -> None:
         self.capacity = capacity
-        self.leak_rate = leak_rate
+        self.leak_rate = leak_rate_per_sec if leak_rate_per_sec is not None else (leak_rate if leak_rate is not None else 10.0)
         self.quarantine_threshold = quarantine_threshold
         self._scores: Dict[str, float] = {}
         self._last_update: Dict[str, float] = {}
@@ -19,32 +25,21 @@ class LeakyBucketReputation:
     def _leak(self, peer_id: str, now: float) -> float:
         last = self._last_update.get(peer_id, now)
         elapsed = now - last
-        score = self._scores.get(peer_id, self.capacity)
-        leaked = elapsed * self.leak_rate
-        new_score = min(self.capacity, score + leaked)
-        self._scores[peer_id] = new_score
+        score = self._scores.get(peer_id, 0.0)
+        score = max(0.0, score - elapsed * self.leak_rate)
         self._last_update[peer_id] = now
-        return new_score
+        self._scores[peer_id] = score
+        return score
 
-    def penalize(self, peer_id: str, amount: float) -> float:
+    def add_penalty(self, peer_id: str, amount: float = 10.0) -> float:
         with self._lock:
             now = time.monotonic()
             score = self._leak(peer_id, now)
-            new_score = max(0.0, score - amount)
-            self._scores[peer_id] = new_score
-            if new_score <= self.quarantine_threshold:
+            score = min(self.capacity, score + amount)
+            self._scores[peer_id] = score
+            if score >= self.quarantine_threshold:
                 self._quarantined[peer_id] = True
-            return new_score
-
-    def reward(self, peer_id: str, amount: float) -> float:
-        with self._lock:
-            now = time.monotonic()
-            score = self._leak(peer_id, now)
-            new_score = min(self.capacity, score + amount)
-            self._scores[peer_id] = new_score
-            if new_score > self.quarantine_threshold:
-                self._quarantined[peer_id] = False
-            return new_score
+            return score
 
     def is_quarantined(self, peer_id: str) -> bool:
         with self._lock:
@@ -56,3 +51,19 @@ class LeakyBucketReputation:
         with self._lock:
             now = time.monotonic()
             return self._leak(peer_id, now)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._scores.clear()
+            self._last_update.clear()
+            self._quarantined.clear()
+
+    def get_metrics(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "capacity": self.capacity,
+                "leak_rate": self.leak_rate,
+                "quarantine_threshold": self.quarantine_threshold,
+                "tracked_peers": len(self._scores),
+                "quarantined_peers": sum(1 for q in self._quarantined.values() if q)
+            }
