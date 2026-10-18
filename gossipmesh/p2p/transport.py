@@ -97,111 +97,86 @@ class TransportTelemetry:
 
 
 class GossipTransport:
-    """High-level P2P gossip transport integrating rate limiting, framing, topic dispatch, and erasure coding multiplexing."""
-    def __init__(self, node_id: str, config: Optional[RateLimitConfig]=None, k: int = 4, m: int = 2) -> None:
+    """Robust P2P Gossip Transport supporting erasure coding, rate-limiting, and topic multiplexing."""
+    
+    def __init__(
+        self,
+        node_id: str,
+        k: int = 4,
+        m: int = 2,
+        block_size: int = 1024,
+        config: Optional[RateLimitConfig] = None
+    ) -> None:
         self.node_id = node_id
-        self.rate_limiter = PeerRateLimiter(config or RateLimitConfig())
-        self.handlers: Dict[str, Callable[[Any], Any]] = {}
+        self.k = k
+        self.m = m
+        self.block_size = block_size
+        self.erasure_coder = ErasureCoder(k=k, m=m, block_size=block_size)
+        self.rate_limiter = PeerRateLimiter(config=config)
         self.telemetry = TransportTelemetry()
-        self.erasure_coder = ErasureCoder(k=k, m=m)
-        self.fragment_assembler: Dict[str, List[Tuple[int, bytes]]] = {}
+        self.handlers: Dict[str, Callable[[Any], None]] = {}
+        # Fragment assembler with thread-safe lock and TTL tracking
+        self.fragment_assembler: Dict[str, Tuple[float, List[Tuple[int, bytes]], int]] = {}
+        self._assembler_lock = threading.Lock()
 
-    def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
-        """Registers a callback handler for a gossip topic."""
+    def register_handler(self, topic: str, handler: Callable[[Any], None]) -> None:
         self.handlers[topic] = handler
 
-    async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str='default') -> Optional[Any]:
-        """Receives, rate-limits, parses, and dispatches a payload from a peer, supporting erasure fragments."""
+    def _clean_expired_fragments_unlocked(self, ttl: float = 60.0) -> None:
+        now = time.time()
+        expired = [msg_id for msg_id, (timestamp, _, _) in self.fragment_assembler.items() if now - timestamp > ttl]
+        for msg_id in expired:
+            del self.fragment_assembler[msg_id]
+
+    async def send_payload(
+        self, peer_id: str, payload: Union[bytes, str, dict], use_erasure: bool = False
+    ) -> bool:
+        if isinstance(payload, dict):
+            payload_bytes = json.dumps(payload).encode('utf-8')
+        elif isinstance(payload, str):
+            payload_bytes = payload.encode('utf-8')
+        else:
+            payload_bytes = payload
+
+        total_size = 0
+        if use_erasure:
+            fragments = self.erasure_coder.encode(payload_bytes)
+            for frag_idx, frag_data in fragments:
+                packet_size = len(frag_data) + 64
+                total_size += packet_size
+        else:
+            total_size = len(payload_bytes) + 32
+
+        self.telemetry.record_sent(total_size)
+        return True
+
+    async def receive_payload(
+        self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = 'default'
+    ) -> Optional[Any]:
         if not self.rate_limiter.allow(peer_id):
             self.telemetry.record_dropped()
-            logger.warning(f"Rate limit exceeded for peer {peer_id}")
             return None
 
-        if isinstance(payload, dict) and "fragment_idx" in payload:
-            # Handle erasure-coded fragment multiplexing
-            msg_id = payload.get("msg_id", "default_msg")
-            frag_idx = payload["fragment_idx"]
-            frag_data = bytes.fromhex(payload["data"])
-            
-            if msg_id not in self.fragment_assembler:
-                self.fragment_assembler[msg_id] = []
-            
-            self.fragment_assembler[msg_id].append((frag_idx, frag_data))
-            self.telemetry.record_received(len(frag_data))
-            
-            if len(self.fragment_assembler[msg_id]) >= self.erasure_coder.k:
-                fragments = self.fragment_assembler.pop(msg_id)
-                reconstructed_bytes = self.erasure_coder.decode(fragments)
-                try:
-                    decoded_payload = json.loads(reconstructed_bytes.decode('utf-8'))
-                except Exception:
-                    decoded_payload = reconstructed_bytes
-                
-                handler = self.handlers.get(topic)
-                if handler:
-                    if asyncio.iscoroutinefunction(handler):
-                        return await handler(decoded_payload)
-                    return handler(decoded_payload)
-                return decoded_payload
-            return None
-
-        data_bytes = json.dumps(payload).encode('utf-8') if not isinstance(payload, bytes) else payload
-        self.telemetry.record_received(len(data_bytes))
-        
-        handler = self.handlers.get(topic)
-        if handler:
-            if asyncio.iscoroutinefunction(handler):
-                return await handler(payload)
-            return handler(payload)
-        return payload
-
-    async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict], use_erasure: bool = True) -> bool:
-        """Simulates sending a payload to a peer with erasure coding multiplexing and telemetry recording."""
-        data_bytes = json.dumps(payload).encode('utf-8') if not isinstance(payload, bytes) else payload
-        
-        if use_erasure:
-            msg_id = f"{self.node_id}-{time.time_ns()}"
-            fragments = self.erasure_coder.encode(data_bytes)
-            total_sent = 0
-            for frag_idx, frag_bytes in fragments:
-                frag_payload = {
-                    "msg_id": msg_id,
-                    "fragment_idx": frag_idx,
-                    "data": frag_bytes.hex()
-                }
-                serialized = json.dumps(frag_payload).encode('utf-8')
-                total_sent += len(serialized)
-            self.telemetry.record_sent(total_sent)
-            return True
+        if isinstance(payload, bytes):
+            try:
+                parsed = json.loads(payload.decode('utf-8'))
+            except Exception:
+                parsed = payload
         else:
-            self.telemetry.record_sent(len(data_bytes))
-            return True
+            parsed = payload
+
+        self.telemetry.record_received(len(str(parsed)))
+
+        if topic in self.handlers:
+            try:
+                res = self.handlers[topic](parsed)
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception as e:
+                logger.exception("Error in message handler for topic %s: %s", topic, e)
+        return parsed
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
-        """Returns comprehensive telemetry metrics for transport and rate limiter."""
         metrics = self.telemetry.to_dict()
         metrics["rate_limiter_stats"] = self.rate_limiter.get_stats()
         return metrics
-
-
-class TransportSocketReader:
-    """Low-level transport socket reader with zero-allocation memoryview parsing pipelines."""
-    def __init__(self, reader: asyncio.StreamReader, expected_magic: int=1196246355) -> None:
-        self.reader = reader
-        self.expected_magic = expected_magic
-
-    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        """Reads a full gossip packet from the stream and returns header metadata and memoryview payload."""
-        try:
-            header = await self.reader.readexactly(12)
-            if len(header) < 12:
-                return None
-            magic, length, msg_type = struct.unpack("!IHI", header[:10])
-            if magic != self.expected_magic:
-                return None
-            body = await self.reader.readexactly(length)
-            return (msg_type, "peer_stream", memoryview(body))
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            return None
