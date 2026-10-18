@@ -1,67 +1,68 @@
 import math
 import hashlib
-import threading
-from typing import List, Iterable, Union
+import base64
+from typing import Set, List, Dict, Any, Optional
 
 class BloomFilterDigest:
-    """Memory-efficient, thread-safe Bloom filter for P2P anti-entropy digest exchange."""
-
-    def __init__(self, capacity: int = 100000, error_rate: float = 0.01):
+    """Space-efficient dynamic Bloom filter digest for P2P anti-entropy state reconciliation."""
+    
+    def __init__(self, capacity: int = 1000, error_rate: float = 0.01) -> None:
         self.capacity = max(1, capacity)
-        self.error_rate = min(max(error_rate, 0.0001), 0.5)
-        
-        # Compute optimal bit array size (m) and hash count (k)
-        self.size = int(- (self.capacity * math.log(self.error_rate)) / (math.log(2) ** 2))
-        self.hash_count = max(1, int((self.size / self.capacity) * math.log(2)))
-        
-        self.bit_array = 0
-        self._lock = threading.Lock()
+        self.error_rate = min(max(0.0001, error_rate), 0.5)
+        self._size = 0
+        self._bit_array_size = int(-self.capacity * math.log(self.error_rate) / (math.log(2) ** 2))
+        self._bit_array_size = max(64, self._bit_array_size)
+        self._num_hashes = int(max(1, round((self._bit_array_size / self.capacity) * math.log(2))))
+        self._bits = [0] * ((self._bit_array_size + 63) // 64)
 
-    def _hashes(self, item: Union[str, bytes]) -> Iterable[int]:
-        if isinstance(item, str):
-            item_bytes = item.encode('utf-8')
-        else:
-            item_bytes = item
-            
-        h1 = int.from_bytes(hashlib.md5(item_bytes).digest()[:8], 'big')
-        h2 = int.from_bytes(hashlib.sha256(item_bytes).digest()[:8], 'big')
-        
-        for i in range(self.hash_count):
-            yield (h1 + i * h2) % self.size
+    @property
+    def size(self) -> int:
+        return self._size
 
-    def add(self, item: Union[str, bytes]) -> None:
-        """Add an item to the bloom filter."""
-        with self._lock:
-            mask = 0
-            for bit_index in self._hashes(item):
-                mask |= (1 << bit_index)
-            self.bit_array |= mask
+    def _get_hashes(self, item: str) -> List[int]:
+        digest1 = int(hashlib.sha256(item.encode('utf-8')).hexdigest(), 16)
+        digest2 = int(hashlib.md5(item.encode('utf-8')).hexdigest(), 16)
+        return [(digest1 + i * digest2) % self._bit_array_size for i in range(self._num_hashes)]
 
-    def __contains__(self, item: Union[str, bytes]) -> bool:
-        """Check if an item might be in the set."""
-        with self._lock:
-            for bit_index in self._hashes(item):
-                if not (self.bit_array & (1 << bit_index)):
-                    return False
-            return True
+    def add(self, item: str) -> None:
+        for h in self._get_hashes(item):
+            idx = h // 64
+            bit = h % 64
+            if not (self._bits[idx] & (1 << bit)):
+                self._bits[idx] |= (1 << bit)
+                self._size += 1
 
-    def serialize(self) -> dict:
-        """Serialize the bloom filter state for digest wire transmission."""
-        with self._lock:
-            hex_val = format(self.bit_array, 'x')
-            return {
-                "capacity": self.capacity,
-                "error_rate": self.error_rate,
-                "size": self.size,
-                "hash_count": self.hash_count,
-                "bit_array_hex": hex_val
-            }
+    def __contains__(self, item: str) -> bool:
+        return self.contains(item)
+
+    def contains(self, item: str) -> bool:
+        for h in self._get_hashes(item):
+            idx = h // 64
+            bit = h % 64
+            if not (self._bits[idx] & (1 << bit)):
+                return False
+        return True
+
+    def serialize(self) -> Dict[str, Any]:
+        bit_bytes = bytearray()
+        for word in self._bits:
+            bit_bytes.extend(word.to_bytes(8, byteorder='big', signed=False))
+        encoded = base64.b64encode(bytes(bit_bytes)).decode('utf-8')
+        return {
+            "capacity": self.capacity,
+            "error_rate": self.error_rate,
+            "size": self._size,
+            "bit_array_size": self._bit_array_size,
+            "num_hashes": self._num_hashes,
+            "bits": encoded,
+        }
 
     @classmethod
-    def deserialize(cls, data: dict) -> "BloomFilterDigest":
-        """Restore a BloomFilterDigest from its serialized dict form."""
+    def deserialize(cls, data: Dict[str, Any]) -> "BloomFilterDigest":
         instance = cls(capacity=data["capacity"], error_rate=data["error_rate"])
-        instance.size = data["size"]
-        instance.hash_count = data["hash_count"]
-        instance.bit_array = int(data["bit_array_hex"], 16)
+        instance._size = data.get("size", 0)
+        instance._bit_array_size = data.get("bit_array_size", instance._bit_array_size)
+        instance._num_hashes = data.get("num_hashes", instance._num_hashes)
+        decoded = base64.b64decode(data["bits"].encode('utf-8'))
+        instance._bits = [int.from_bytes(decoded[i:i+8], byteorder='big', signed=False) for i in range(0, len(decoded), 8)]
         return instance
