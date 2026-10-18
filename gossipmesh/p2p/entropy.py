@@ -1,6 +1,6 @@
 import math
 from collections import deque
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Tuple, Any
 
 
 class VectorClockRingBuffer:
@@ -82,7 +82,6 @@ class AntiEntropyScraper:
         if not clocks:
             return 0.0, False
 
-        # Use the latest recorded peer clock
         latest_peer_clock = clocks[-1]
         divergence = compute_divergence_vector(local_clock, latest_peer_clock)
         entropy = compute_shannon_entropy(divergence)
@@ -101,12 +100,11 @@ class AntiEntropyScraper:
 
 
 class AntiEntropyEngine:
-    """Compatibility engine wrapper for anti-entropy reconciliation tests."""
-
-    def __init__(self, node_id: str):
+    """Engine supporting both scraper-based divergence and state reconciliation tests."""
+    def __init__(self, node_id: str = 'node-1', entropy_threshold: float = 1.5, buffer_capacity: int = 100):
         self.node_id = node_id
         self.state_store: Dict[str, Any] = {}
-        self.scraper = AntiEntropyScraper()
+        self.scraper = AntiEntropyScraper(entropy_threshold=entropy_threshold, buffer_capacity=buffer_capacity)
 
     def set_state(self, key: str, value: Any) -> None:
         self.state_store[key] = value
@@ -118,3 +116,12 @@ class AntiEntropyEngine:
             if self.state_store.get(k) != peer_state.get(k):
                 diffs.append(k)
         return diffs
+
+    def evaluate_peer(self, local_clock: Dict[str, int], peer_id: str) -> Tuple[float, bool]:
+        return self.scraper.evaluate_peer(local_clock, peer_id)
+
+    def record_peer_clock(self, peer_id: str, vector_clock: Dict[str, int]) -> None:
+        self.scraper.record_peer_clock(peer_id, vector_clock)
+
+    def scan_mesh(self, local_clock: Dict[str, int]) -> List[str]:
+        return self.scraper.scan_mesh(local_clock)
