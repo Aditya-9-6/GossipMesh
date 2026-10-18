@@ -7,7 +7,7 @@ from gossipmesh.models.user import User
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
-):
+def setup_auth_override():
     app.dependency_overrides[get_current_user] = lambda: User(id="test-user-id", email="test@example.com", is_active=True)
     yield
     app.dependency_overrides.clear()
