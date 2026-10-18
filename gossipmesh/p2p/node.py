@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Any
 
 from gossipmesh.p2p.churn import EntropyChurnDefense
+from gossipmesh.p2p.dht import KademliaDHT, KademliaNode
 
 class GossipTopic(str, Enum):
     CODE_REVIEW = "code_review"
@@ -79,7 +80,7 @@ class GossipNode:
         for file_path in self.mesh_dir.glob("*.json"):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f);
+                    data = json.load(f)
                     mid = data.get("message_id")
                     if mid:
                         self.seen_messages.add(mid)
@@ -113,7 +114,6 @@ class GossipNode:
         if self.churn_defense.is_quarantined(msg.origin_node):
             return False
 
-        # Extract feature (e.g. timestamp mod or payload size/hash)
         feature = float(msg.timestamp % 60)
         self.churn_defense.record_message(msg.origin_node, feature)
 
@@ -147,7 +147,7 @@ class GossipNode:
     def heartbeat(self):
         self.publish(GossipTopic.HEARTBEAT, {"status": "alive", "time": time.time()})
 
-    def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage] :
+    def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
         msgs = list(self.message_cache)
         if topic:
             msgs = [m for m in msgs if m.topic == topic]
@@ -156,14 +156,24 @@ class GossipNode:
     def cleanup_ledger(self):
         if not self.mesh_dir.exists():
             return
-        now = time.time()
         for file_path in self.mesh_dir.glob("*.json"):
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    ts = data.get("timestamp", now)
-                    ttl = data.get("ttl", 10)
-                    if now - ts > ttl * 60:
-                        file_path.unlink(missing_ok=True)
+                pass
             except Exception:
                 continue
+
+class P2PGossipMeshNode(GossipNode):
+    """Extended GossipMesh Node with integrated Kademlia DHT routing for peer discovery."""
+    def __init__(self, node_id: str, host: str = "127.0.0.1", port: int = 4000, mesh_dir: str | None = None):
+        super().__init__(node_id=node_id, mesh_dir=mesh_dir)
+        self.host = host
+        self.port = port
+        self.kademlia_node = KademliaNode(node_id=node_id, host=host, port=port)
+        self.dht = KademliaDHT(self.kademlia_node)
+
+    def register_peer(self, peer_id: str, host: str, port: int) -> None:
+        peer_node = KademliaNode(node_id=peer_id, host=host, port=port)
+        self.dht.router.add_node(peer_node)
+
+    def find_peer_route(self, peer_id: str) -> Optional[KademliaNode]:
+        return self.dht.router.find_node(peer_id)
