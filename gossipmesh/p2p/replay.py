@@ -38,25 +38,13 @@ class ReplayProtectionRingBuffer:
             bit_mask = 1 << bit_offset
             
             if (byte_val & bit_mask) != 0:
-                return False  # Already seen (replay)
+                return False
             
             self._buffer[byte_idx] = byte_val | bit_mask
             return True
 
-    def is_seen(self, seq: int) -> bool:
-        """
-        Checks if a sequence number has been seen without modifying state.
-        """
-        with self._lock:
-            idx = seq & self.mask
-            byte_idx = idx >> 3
-            bit_offset = idx & 7
-            return (self._buffer[byte_idx] & (1 << bit_offset)) != 0
-
     def clear(self) -> None:
-        """
-        Resets the ring buffer state.
-        """
+        """Resets the buffer."""
         with self._lock:
             for i in range(len(self._buffer)):
                 self._buffer[i] = 0
