@@ -51,7 +51,7 @@ every 1000 messages or 300 seconds without dropping streams."""
             self.message_count += 1
             if self._should_rotation_unlocked():
                 self._trigger_rotation_unlocked()
-            return encrypt_payload(self.rotator.current_key, plaintext)
+            return encrypt_payload(plaintext, self.rotator.current_key)
 
     def receive_message(self, ciphertext: bytes) -> bytes:
         with self._lock:
@@ -59,6 +59,28 @@ every 1000 messages or 300 seconds without dropping streams."""
             if self._should_rotation_unlocked():
                 self._trigger_rotation_unlocked()
             return decrypt_payload(ciphertext, self.rotator.current_key)
+
+
+class TransportSocketReader:
+    """Reads structured zero-copy packets from an asyncio StreamReader."""
+    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
+        self.reader = reader
+        self.expected_magic = expected_magic
+
+    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
+        # Header is 4 (magic) + 2 (type) + 36 (msg_id) + 4 (length) = 46 bytes
+        header_data = await self.reader.readexactly(46)
+        if not header_data or len(header_data) < 46:
+            raise ValueError("Incomplete packet header received")
+        
+        view = memoryview(header_data)
+        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(view)
+        
+        if magic != self.expected_magic:
+            raise ValueError(f"Invalid packet magic: expected {self.expected_magic:#x}, got {magic:#x}")
+
+        payload_bytes = await self.reader.readexactly(payload_len)
+        return msg_type, msg_id, memoryview(payload_bytes)
 
 
 class TransportTelemetry:
