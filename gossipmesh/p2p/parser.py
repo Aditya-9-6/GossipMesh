@@ -1,29 +1,29 @@
 import struct
-from typing import Tuple, Dict, Any, Optional
+import uuid
+from typing import Tuple
 
 class ZeroCopyPacketParser:
-    """Zero-allocation packet parser utilizing memoryviews and struct unpacking."""
-    
-    HEADER_FORMAT = "!IB36sI"  # Magic (4B), Type (1B), UUID/ID (36B), Payload Length (4B)
-    HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
-
-    @staticmethod
-    def parse_header(buffer: memoryview) -> Tuple[int, int, str, int, memoryview]:
-        """Parses packet header from memoryview without byte string allocation."""
-        if len(buffer) < ZeroCopyPacketParser.HEADER_SIZE:
-            raise ValueError(f"Buffer too small for header: {len(buffer)} < {ZeroCopyPacketParser.HEADER_SIZE}")
-        
-        header_view = buffer[:ZeroCopyPacketParser.HEADER_SIZE]
-        magic, msg_type, raw_id, payload_len = struct.unpack(ZeroCopyPacketParser.HEADER_FORMAT, header_view)
-        
-        msg_id = raw_id.rstrip(b'\x00').decode('utf-8', errors='ignore')
-        payload_view = buffer[ZeroCopyPacketParser.HEADER_SIZE : ZeroCopyPacketParser.HEADER_SIZE + payload_len]
-        return magic, msg_type, msg_id, payload_len, payload_view
-
+    """Zero-copy packet serialization and deserialization for wire protocols."""
     @staticmethod
     def serialize_header(magic: int, msg_type: int, msg_id: str, payload: bytes) -> bytes:
-        """Serializes message header and payload into wire format."""
-        padded_id = msg_id.encode('utf-8').ljust(36, b'\x00')[:36]
+        try:
+            uid_bytes = uuid.UUID(msg_id).bytes
+        except Exception:
+            uid_bytes = msg_id.encode('utf-8')[:16].ljust(16, b'\x00')
+        if len(uid_bytes) < 36:
+            uid_bytes = uid_bytes.ljust(36, b'\x00')
         payload_len = len(payload)
-        header = struct.pack(ZeroCopyPacketParser.HEADER_FORMAT, magic, msg_type, padded_id, payload_len)
+        # magic (4 bytes), msg_type (4 bytes), msg_id (36 bytes), payload_len (4 bytes)
+        header = struct.pack(">II 36s I", magic, msg_type, uid_bytes, payload_len)
         return header + payload
+
+    @staticmethod
+    def deserialize_header(header_data: bytes) -> Tuple[int, int, bytes, int]:
+        if len(header_data) < 48:
+            raise ValueError("Header data too short")
+        magic, msg_type, msg_id_bytes, payload_len = struct.unpack(">II 36s I", header_data[:48])
+        return magic, msg_type, msg_id_bytes, payload_len
+
+    @staticmethod
+    def parse_header(header_data: bytes) -> Tuple[int, int, bytes, int]:
+        return ZeroCopyPacketParser.deserialize_header(header_data)
