@@ -88,3 +88,5 @@ class GossipTransport:
         selected = random.sample(all_peers, min(len(all_peers), current_fanout))
         logger.debug(f"Node {self.node_id} selected {len(selected)} peers with fanout {current_fanout}")
         return selected
+
+P2PSessionTransport = GossipTransport
