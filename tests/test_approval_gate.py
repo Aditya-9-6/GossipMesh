@@ -26,6 +26,7 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
+    Base.metadata.create_all(bind=engine)
     user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
     if not user:
         user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
@@ -41,6 +42,7 @@ app.dependency_overrides[deps.get_current_user] = override_get_current_user
 client = TestClient(app)
 
 def test_approval_gate_lifecycle():
+    Base.metadata.create_all(bind=engine)
     response = client.post(
         "/api/v1/approvals/",
         json={
