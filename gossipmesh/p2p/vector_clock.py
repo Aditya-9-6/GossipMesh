@@ -37,8 +37,8 @@ class VectorClock:
         if self_less_equal and other_less_equal:
             return "EQUAL"
         elif self_less_equal:
-            return "BEFORE"
-        elif other_less_equal:
             return "AFTER"
+        elif other_less_equal:
+            return "BEFORE"
         else:
             return "CONCURRENT"
