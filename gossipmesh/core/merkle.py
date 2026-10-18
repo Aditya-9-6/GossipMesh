@@ -101,7 +101,6 @@ class MerkleDAG:
         if self.root_hash == remote_root:
             return []
         
-        # Support both List[str] (keys) and Dict[str, str] (key -> value_hash) for reconciliation
         if isinstance(remote_keys, dict):
             remote_dict = remote_keys
         else:
@@ -113,6 +112,8 @@ class MerkleDAG:
         divergent = set(local_keys.symmetric_difference(remote_set))
         for k in local_keys.intersection(remote_set):
             if k in remote_dict and remote_dict[k] and self._data[k] != remote_dict[k]:
+                divergent.add(k)
+            elif k not in remote_dict or not remote_dict[k]:
                 divergent.add(k)
                 
         return sorted(list(divergent))
