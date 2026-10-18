@@ -71,6 +71,7 @@ class ErasureCoder:
         
         recovered_chunks = []
         for i in range(self.k):
+            reconstructed_chunk = bytearray(shard_size)
             if i in data_map:
                 chunk = data_map[i]
                 if len(chunk) < shard_size:
@@ -78,7 +79,6 @@ class ErasureCoder:
                 recovered_chunks.append(chunk)
             else:
                 # Reconstruct missing data shard using parity info if available
-                reconstructed_chunk = bytearray(shard_size)
                 if parity_map:
                     p_idx, p_data = next(iter(parity_map.items()))
                     j = p_idx - self.k
@@ -91,7 +91,7 @@ class ErasureCoder:
                                 coeff = ((other_i + 1) * (j + 1)) & 0xFF
                                 val ^= (b ^ coeff)
                         coeff_self = ((i + 1) * (j + 1)) & 0xFF
-                        recovered_chunk[idx] = (val ^ coeff_self) & 0xFF
+                        reconstructed_chunk[idx] = (val ^ coeff_self) & 0xFF
                 recovered_chunks.append(bytes(reconstructed_chunk))
                 
         reconstructed = b"".join(recovered_chunks)
