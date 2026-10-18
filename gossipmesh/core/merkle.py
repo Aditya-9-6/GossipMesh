@@ -1,6 +1,6 @@
 import hashlib
 import json
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 
 
 def compute_hash(data: bytes) -> str:
