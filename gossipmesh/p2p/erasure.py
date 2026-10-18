@@ -161,7 +161,7 @@ class ErasureCoder:
             return combined[:original_size]
         return combined.rstrip(b'\x00')
 
-    def _invert_matrix(self, matrix: List[List[int]])
+    def _invert_matrix(self, matrix: List[List[int]]) -> List[List[int]]:
         n = len(matrix)
         # Augment with identity matrix
         aug = [row[:] + [1 if i == j else 0 for j in range(n)] for i, row in enumerate(matrix)]
