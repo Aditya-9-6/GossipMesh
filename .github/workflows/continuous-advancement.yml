@@ -3,6 +3,8 @@ name: Continuous Autonomous Advancement Engine
 on:
   schedule:
     - cron: '*/5 * * * *' # Executes 24/7 every 5 minutes in GitHub Actions Cloud
+  push:
+    branches: [main]     # Instantly trigger next cycle whenever a PR is merged into main
   issues:
     types: [opened]       # Instant event-driven trigger whenever an issue is created
   workflow_dispatch:
@@ -10,7 +12,7 @@ on:
       iterations:
         description: 'Number of autonomous development cycles to run'
         required: false
-        default: '5'
+        default: '2'
 
 permissions:
   contents: write
@@ -24,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        worker: [1, 2, 3]
+        worker: [1, 2, 3, 4, 5]
       fail-fast: false
     concurrency:
       group: continuous-advancement-worker-${{ matrix.worker }}
@@ -39,9 +41,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Install Dependencies
         run: |
+          pip install --upgrade pip
           pip install -e .[api,dev]
 
       - name: Configure Git User Identity
@@ -62,4 +66,5 @@ jobs:
           HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
         run: |
-          python3 scripts/autonomous_loop.py --workspace . --interval 5 --once
+          ITER="${{ github.event.inputs.iterations || '2' }}"
+          python3 scripts/autonomous_loop.py --workspace . --interval 5 --iterations "$ITER"

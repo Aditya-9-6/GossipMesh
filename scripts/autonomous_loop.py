@@ -228,6 +228,8 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     print("[*] Creating / updating Pull Request...", flush=True)
     summary_file = workspace / "ai_pr_summary.md"
     body_content = summary_file.read_text(encoding="utf-8") if summary_file.exists() else f"Automated resolution for Issue #{issue_num}."
+    if f"Closes #{issue_num}" not in body_content and f"Fixes #{issue_num}" not in body_content:
+        body_content += f"\n\nCloses #{issue_num}"
 
     pr_url = ""
     pr_num = None
@@ -332,6 +334,7 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
         merge_res = run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace, check=False)
         print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
+        run_cmd(["gh", "issue", "close", str(issue_num), "-c", f"Resolved and merged in PR #{pr_num}."], cwd=workspace, check=False)
         run_cmd(["git", "checkout", "main"], cwd=workspace)
         run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
         # Clean up feature branch
@@ -494,6 +497,7 @@ def main():
     parser = argparse.ArgumentParser(description="GossipMesh Autonomous Multi-Agent Daemon")
     parser.add_argument("--workspace", default=".", help="Path to GossipMesh repository root")
     parser.add_argument("--once", action="store_true", help="Run once and exit instead of continuous daemon")
+    parser.add_argument("--iterations", type=int, default=0, help="Number of advancement cycles to run (0 for continuous daemon)")
     parser.add_argument("--interval", type=int, default=10, help="Interval in seconds between cycles (default: 10s)")
     parser.add_argument("--add-keys", nargs="*", default=[], help="Additional Gemini API keys to add to the round-robin pool")
     args = parser.parse_args()
@@ -507,6 +511,18 @@ def main():
 
     if args.once:
         run_loop_iteration(workspace)
+    elif args.iterations > 0:
+        print(f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, interval: {args.interval}s)...", flush=True)
+        for i in range(args.iterations):
+            print(f"\n=======================================================", flush=True)
+            print(f"[*] Advancement Batch Cycle {i+1}/{args.iterations}", flush=True)
+            print(f"=======================================================", flush=True)
+            try:
+                run_loop_iteration(workspace)
+            except Exception as e:
+                print(f"[Error in cycle {i+1}]: {e}", file=sys.stderr, flush=True)
+            if i + 1 < args.iterations:
+                time.sleep(args.interval)
     else:
         print(f"[*] Starting GossipMesh Continuous Autonomous Daemon (interval: {args.interval}s)...", flush=True)
         while True:
