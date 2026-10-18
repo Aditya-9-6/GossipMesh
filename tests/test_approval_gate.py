@@ -7,6 +7,7 @@ from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
+from gossipmesh.models.approval import ApprovalGate
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -37,11 +38,13 @@ def override_get_current_user():
 
 @pytest.fixture(autouse=True)
 def setup_overrides():
+    Base.metadata.create_all(bind=engine)
     app.dependency_overrides[deps.get_db] = override_get_db
     app.dependency_overrides[deps.get_current_user] = override_get_current_user
     yield
     app.dependency_overrides.pop(deps.get_db, None)
     app.dependency_overrides.pop(deps.get_current_user, None)
+    Base.metadata.drop_all(bind=engine)
 
 client = TestClient(app)
 
