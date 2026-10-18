@@ -77,8 +77,9 @@ class BoundedMatrixClockEngine:
         for k, req_val in msg_clock.items():
             if k == sender:
                 known_val = self._matrix.get(sender, {}).get(sender, 0)
-                if req_val != known_val + 1:
-                    return False
+                if req_val != known_val + 1 and req_val != 1 and known_val != 0:
+                    if req_val > known_val + 1:
+                        return False
             else:
                 known_val = self._matrix.get(sender, {}).get(k, 0)
                 if req_val > known_val:
