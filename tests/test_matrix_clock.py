@@ -80,5 +80,5 @@ class TestBoundedMatrixClockEngine(unittest.TestCase):
         self.assertEqual(restored.matrix_clock, msg.matrix_clock)
         self.assertEqual(restored.payload, msg.payload)
 
-if __name__ == "__main പ്രധാന__":
+if __name__ == "__main__":
     unittest.main()
