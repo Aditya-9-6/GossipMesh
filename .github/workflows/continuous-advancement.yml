@@ -46,7 +46,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv venv
+          uv venv --allow-existing
           echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
           uv pip install -e ".[api,dev]"
 
