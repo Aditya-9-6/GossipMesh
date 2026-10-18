@@ -1,8 +1,9 @@
 import hashlib
+import hmac
 import json
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass, field
+from typing import Optional
 
 @dataclass
 class StateCheckpoint:
@@ -23,25 +24,18 @@ class StateCheckpoint:
         return hashlib.sha256(encoded).hexdigest()
 
     def sign(self, secret_key: str) -> str:
-        hasher = hashlib.sha256()
-        hasher.update(self.compute_hash().encode("utf-8"))
-        hasher.update(secret_key.encode("utf-8"))
-        self.signature = hasher.hexdigest()
+        msg = self.compute_hash().encode("utf-8")
+        key = secret_key.encode("utf-8")
+        self.signature = hmac.new(key, msg, hashlib.sha256).hexdigest()
         return self.signature
 
     def verify_signature(self, public_key_or_secret: str) -> bool:
         if not self.signature:
             return False
-        hasher = hashlib.sha256()
-        hasher.update(self.compute_hash().encode("utf-8"))
-        hasher.update(public_key_or_secret.encode("utf-8"))
-        expected = hasher.hexdigest()
-        return hmac_compare(self.signature, expected)
+        msg = self.compute_hash().encode("utf-8")
+        key = public_key_or_secret.encode("utf-8")
+        expected = hmac.new(key, msg, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(self.signature, expected)
 
 def hmac_compare(a: str, b: str) -> bool:
-    if len(a) != len(b):
-        return False
-    result = 0
-    for x, y in zip(a, b):
-        result |= ord(x) ^ ord(y)
-    return result == 0
+    return hmac.compare_digest(a, b)
