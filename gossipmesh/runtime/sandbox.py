@@ -30,6 +30,10 @@ class SandboxEnvironment:
         if isinstance(cmd, str):
             cmd = shlex.split(cmd)
 
+        if os.name == "nt" and cmd and cmd[0].lower() == "echo":
+            import sys
+            cmd = [sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))"] + cmd[1:]
+
         process = subprocess.Popen(
             cmd,
             cwd=self.workspace_dir,
