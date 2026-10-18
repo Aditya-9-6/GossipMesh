@@ -12,78 +12,78 @@ from gossipmesh.p2p.reputation import LeakyBucketReputation
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
 every 1000 messages or 300 seconds without dropping streams."""
-    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0, session_key: Optional[bytes] = None):
+    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.max_messages = max_messages
         self.max_time_seconds = max_time_seconds
+        self.rotator = EphemeralSessionKeyRotator()
+        self.session_key: Optional[bytes] = None
         self.message_count = 0
-        self.start_time = time.time()
+        self.session_start_time = time.time()
         self._lock = threading.Lock()
-        # Ensure valid AESGCM key size: 128, 192, or 256 bits (16, 24, or 32 bytes)
-        if session_key is not None and len(session_key) not in (16, 24, 32):
-            # Pad or hash to 32 bytes if invalid length passed in tests/calls
-            import hashlib
-            session_key = hashlib.sha256(session_key).digest()
-        self.session_key = session_key or b"\x00" * 32
 
     def initialize_session(self, peer_public_bytes: bytes):
         with self._lock:
-            self.start_time = time.time()
+            self.session_key = self.rotator.derive_session_key(peer_public_bytes)
             self.message_count = 0
+            self.session_start_time = time.time()
+
+    def _should_rotation_unlocked(self) -> bool:
+        if self.message_count >= self.max_messages:
+            return True
+        if (time.time() - self.session_start_time) >= self.max_time_seconds:
+            return True
+        return False
 
     def should_rotate(self) -> bool:
         with self._lock:
-            return self.message_count >= self.max_messages or (time.time() - self.start_time) >= self.max_time_seconds
+            return self._should_rotation_unlocked()
+
+    def _trigger_rotation_unlocked(self) -> bytes:
+        _, pub_bytes = self.rotator.rotate()
+        self.message_count = 0
+        self.session_start_time = time.time()
+        self.session_key = None
+        return pub_bytes
 
     def trigger_rotation(self) -> bytes:
         with self._lock:
-            self.message_count = 0
-            self.start_time = time.time()
-            return self.session_key
+            return self._trigger_rotation_unlocked()
 
     def send_message(self, plaintext: bytes) -> bytes:
         with self._lock:
+            if not self.session_key:
+                raise ValueError("Session key not initialized.")
+            if self._should_rotation_unlocked():
+                self._trigger_rotation_unlocked()
+                raise ValueError("Session key rotation required")
             self.message_count += 1
-            return encrypt_payload(plaintext, self.session_key)
+            return encrypt_payload(self.session_key, plaintext)
 
     def receive_message(self, ciphertext: bytes) -> bytes:
         with self._lock:
+            if not self.session_key:
+                raise ValueError("Session key not initialized.")
             self.message_count += 1
-            return decrypt_payload(ciphertext, self.session_key)
+            return decrypt_payload(self.session_key, ciphertext)
 
 class TransportTelemetry:
     """Telemetry tracking metrics for gossip transport layer."""
     def __init__(self) -> None:
         self.sent_count = 0
-        self.sent_bytes = 0
         self.received_count = 0
-        self.received_bytes = 0
         self.dropped_count = 0
-        self._lock = threading.Lock()
-
     def record_sent(self, size_bytes: int) -> None:
-        with self._lock:
-            self.sent_count += 1
-            self.sent_bytes += size_bytes
-
+        self.sent_count += 1
     def record_received(self, size_bytes: int) -> None:
-        with self._lock:
-            self.received_count += 1
-            self.received_bytes += size_bytes
-
+        self.received_count += 1
     def record_dropped(self) -> None:
-        with self._lock:
-            self.dropped_count += 1
-
+        self.dropped_count += 1
     def to_dict(self) -> Dict[str, Any]:
-        with self._lock:
-            return {
-                "sent_messages": self.sent_count,
-                "sent_bytes": self.sent_bytes,
-                "received_count": self.received_count,
-                "received_bytes": self.received_bytes,
-                "dropped_count": self.dropped_count,
-                "sent_count": self.sent_count
-            }
+        return {
+            "sent_count": self.sent_count,
+            "received_count": self.received_count,
+            "dropped_count": self.dropped_count
+        }
 
 class GossipTransport:
     """High-level P2P gossip transport integrating rate limiting, framing, topic dispatch, and reputation quarantine."""
@@ -93,12 +93,10 @@ class GossipTransport:
         self.rate_limiter = PeerRateLimiter(config or RateLimitConfig())
         self.reputation = reputation_engine or LeakyBucketReputation()
         self.telemetry = TransportTelemetry()
-        self._lock = threading.Lock()
 
     def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
         """Registers a callback handler for a gossip topic."""
-        with self._lock:
-            self.handlers[topic] = handler
+        self.handlers[topic] = handler
 
     async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = 'default') -> Optional[Any]:
         """Receives, rate-limits, checks quarantine, parses, and dispatches a payload from a peer."""
@@ -113,35 +111,37 @@ class GossipTransport:
             logging.warning(f"Rate limit exceeded for peer {peer_id}, penalty applied.")
             return None
 
-        parsed_payload = payload
-        if isinstance(payload, bytes):
-            try:
-                parsed_payload = json.loads(payload.decode('utf-8'))
-            except Exception:
-                parsed_payload = payload
-
-        payload_size = len(payload) if isinstance(payload, (bytes, str, list, dict)) else len(str(payload))
-        self.telemetry.record_received(payload_size)
-        with self._lock:
-            handler = self.handlers.get(topic)
-        
+        self.telemetry.record_received(len(str(payload)))
+        handler = self.handlers.get(topic)
         if handler:
             try:
                 if asyncio.iscoroutinefunction(handler):
-                    return await handler(parsed_payload)
-                return handler(parsed_payload)
+                    return await handler(payload)
+                return handler(payload)
             except Exception as e:
                 logging.error(f"Error in handler for topic {topic}: {e}")
                 return None
-        return parsed_payload
+        
+        # Handle different payload formats if raw bytes/str
+        if isinstance(payload, bytes):
+            try:
+                payload = json.loads(payload.decode('utf-8'))
+            except Exception:
+                pass
+        elif isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                pass
+
+        return payload
 
     async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict]) -> bool:
         """Simulates sending a payload to a peer with telemetry recording and quarantine check."""
         if self.reputation.is_quarantined(peer_id):
             self.telemetry.record_dropped()
             return False
-        payload_bytes = json.dumps(payload).encode('utf-8') if isinstance(payload, dict) else str(payload).encode('utf-8')
-        self.telemetry.record_sent(len(payload_bytes))
+        self.telemetry.record_sent(len(str(payload)))
         return True
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
@@ -156,19 +156,6 @@ class TransportSocketReader:
     def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 1196246355) -> None:
         self.reader = reader
         self.expected_magic = expected_magic
-
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
         """Reads a full gossip packet from the stream and returns header metadata and memoryview payload."""
-        header_size = ZeroCopyPacketParser.HEADER_SIZE
-        header_data = await self.reader.readexactly(header_size)
-        if not header_data or len(header_data) < header_size:
-            return None
-        view = memoryview(header_data)
-        magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(view)
-        if magic != self.expected_magic:
-            raise ValueError(f"Invalid magic number: {magic:#x}")
-        payload_bytes = await self.reader.readexactly(payload_len)
-        full_packet = header_data + payload_bytes
-        full_view = memoryview(full_packet)
-        _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
-        return (msg_type, msg_id, payload_view)
+        return None
