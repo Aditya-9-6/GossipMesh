@@ -18,8 +18,8 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 Base.metadata.create_all(bind=engine)
 
 def override_get_db():
+    db = TestingSessionLocal()
     try:
-        db = TestingSessionLocal()
         yield db
     finally:
         db.close()
@@ -28,7 +28,7 @@ async def override_get_current_user():
     return User(
         id="test-user-id",
         email="test@gossipmesh.internal",
-        username="testuser",
+        name="testuser",
         hashed_password="hashed",
         is_active=True,
         is_superuser=False
