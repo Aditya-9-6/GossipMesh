@@ -1,7 +1,7 @@
 import math
 import time
 import threading
-from typing import Optional, List
+from typing import Optional
 
 try:
     import mmh3
@@ -11,10 +11,8 @@ except ImportError:
 class _FallbackMurmur3:
     @staticmethod
     def hash(key: str, seed: int = 0, signed: bool = True) -> int:
-        # Simple fallback hash using Python's hash and seed
         h = hash((key, seed))
         if signed:
-            # Fit into 32-bit signed integer range
             return ((h + 0x80000000) % 0x100000000) - 0x80000000
         else:
             return h % 0x100000000
@@ -34,41 +32,38 @@ class WindowedHyperLogLog:
 
     def _hash(self, item: str) -> int:
         if mmh3 is not None:
-            return mmh3.hash(item, self.seed, signed=True)
+            val = mmh3.hash64(item, seed=self.seed, signed=False)[0]
+            return val & 0xFFFFFFFFFFFFFFFF
         else:
-            return _FallbackMurmur3.hash(item, self.seed, signed=True)
+            return abs(_FallbackMurmur3.hash(item, self.seed, signed=False)) & 0xFFFFFFFFFFFFFFFF
 
     def add(self, item: str, timestamp: Optional[float] = None) -> None:
         ts = timestamp if timestamp is not None else time.time()
         h = self._hash(item)
-        # Use lower bits for register index
         bits_idx = int(math.log2(self.num_registers))
         idx = h & (self.num_registers - 1)
         
-        # Remaining bits for leading zeros calculation
         remaining = h >> bits_idx
-        # Count leading zeros in the remaining bits
         if remaining == 0:
-            rho = 32 - bits_idx
+            rho = 64 - bits_idx + 1
         else:
-            rho = 1
-            while (remaining & 1) == 0 and rho < 32:
-                rho += 1
-                remaining >>= 1
+            rho = (remaining & -remaining).bit_length() + 1
 
         with self._lock:
             if ts >= self.timestamps[idx]:
                 if rho > self.registers[idx]:
                     self.registers[idx] = rho
                 self.timestamps[idx] = ts
+            elif self.timestamps[idx] == 0.0:
+                self.registers[idx] = rho
+                self.timestamps[idx] = ts
 
     def count(self, current_time: Optional[float] = None) -> int:
         now = current_time if current_time is not None else time.time()
         with self._lock:
-            # Apply window decay
             active_registers = []
             for i in range(self.num_registers):
-                if now - self.timestamps[i] <= self.window_seconds:
+                if self.timestamps[i] > 0.0 and (now - self.timestamps[i]) <= self.window_seconds:
                     active_registers.append(float(self.registers[i]))
                 else:
                     active_registers.append(0.0)

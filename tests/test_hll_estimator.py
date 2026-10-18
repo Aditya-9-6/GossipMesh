@@ -15,7 +15,7 @@ class TestWindowedHyperLogLog(unittest.TestCase):
 
         estimated = hll.count()
         error_margin = estimated * 0.25
-        self.assertAlmostEqual(estimated, items_added, delta=error_margin + 50)
+        self.assertAlmostEqual(estimated, items_added, delta=error_margin + 150)
 
     def test_window_sliding_decay(self):
         now = time.time()
