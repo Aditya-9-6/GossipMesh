@@ -1,5 +1,5 @@
 import hashlib
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 class MerkleNode:
     def __init__(self, key: str, value_hash: str, left: Optional['MerkleNode'] = None, right: Optional['MerkleNode'] = None):
@@ -97,9 +97,22 @@ class MerkleDAG:
                 break
         return proof
 
-    def reconcile(self, remote_root: Optional[str], remote_keys: List[str]) -> List[str]:
+    def reconcile(self, remote_root: Optional[str], remote_keys: Any) -> List[str]:
         if self.root_hash == remote_root:
             return []
+        
+        # Support both List[str] (keys) and Dict[str, str] (key -> value_hash) for reconciliation
+        if isinstance(remote_keys, dict):
+            remote_dict = remote_keys
+        else:
+            remote_dict = {k: "" for k in remote_keys}
+            
         local_keys = set(self._data.keys())
-        remote_set = set(remote_keys)
-        return sorted(list(local_keys.symmetric_difference(remote_set)))
+        remote_set = set(remote_dict.keys())
+        
+        divergent = set(local_keys.symmetric_difference(remote_set))
+        for k in local_keys.intersection(remote_set):
+            if k in remote_dict and remote_dict[k] and self._data[k] != remote_dict[k]:
+                divergent.add(k)
+                
+        return sorted(list(divergent))

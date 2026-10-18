@@ -18,7 +18,7 @@ class TestMerkleDAG(unittest.TestCase):
         dag1 = MerkleDAG({"a": "1", "b": "2"})
         dag2 = MerkleDAG({"a": "1", "b": "3"})
         self.assertNotEqual(dag1.root_hash, dag2.root_hash)
-        divergent = dag1.reconcile(dag2.root_hash, list(dag2._data.keys()))
+        divergent = dag1.reconcile(dag2.root_hash, dag2._data)
         self.assertIn("b", divergent)
 
     def test_proof_generation(self):
@@ -29,7 +29,7 @@ class TestMerkleDAG(unittest.TestCase):
     def test_symmetric_reconciliation(self):
         dag1 = MerkleDAG({"k1": "v1", "k2": "v2"})
         dag2 = MerkleDAG({"k1": "v1", "k3": "v3"})
-        diff = dag1.reconcile(dag2.root_hash, list(dag2._data.keys()))
+        diff = dag1.reconcile(dag2.root_hash, dag2._data)
         self.assertEqual(set(diff), {"k2", "k3"})
 
 if __name__ == "__main__":
