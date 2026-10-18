@@ -1,70 +1,73 @@
 import os
-import hashlib
-import hmac
-import logging
+import threading
 from typing import Tuple, Optional
-
-logger = logging.getLogger(__name__)
-
+from cryptography.hazmat.primitives.asymmetric import x25519
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 class EphemeralSessionKeyRotator:
-    """Manages ephemeral session key generation, derivation, and rotation.
-    Provides secure key exchange primitives for P2P transport encryption."""
+    """Manages ephemeral X25519 key pairs and derives session keys using HKDF-SHA256."""
 
-    def __init__(self, seed: Optional[bytes] = None) -> None:
-        self._private_key = seed or os.urandom(32)
-        self._public_key = hashlib.sha256(self._private_key).digest()
-        self._current_session_key = os.urandom(32)
+    def __init__(self) -> None:
+        self._private_key = x25519.X25519PrivateKey.generate()
+        self._public_key = self._private_key.public_key()
+        self._session_key: Optional[bytes] = None
+        self._lock = threading.Lock()
+
+    @property
+    def session_key(self) -> Optional[bytes]:
+        with self._lock:
+            return self._session_key
 
     def get_public_bytes(self) -> bytes:
-        """Returns the public key bytes for key exchange."""
-        return self._public_key
-
-    def rotate(self) -> Tuple[bytes, bytes]:
-        """Rotates the private and public key pair, returning (new_private, new_public)."""
-        self._private_key = os.urandom(32)
-        self._public_key = hashlib.sha256(self._private_key).digest()
-        self._current_session_key = os.urandom(32)
-        return self._private_key, self._public_key
+        return self._public_key.public_bytes(
+            encoding=hashes.serialization.Encoding.Raw,
+            format=hashes.serialization.PublicFormat.Raw
+        )
 
     def derive_session_key(self, peer_public_bytes: bytes) -> bytes:
-        """Derives a shared session key using peer public bytes and local private key."""
-        h = hmac.new(self._private_key, peer_public_bytes, hashlib.sha256)
-        self._current_session_key = h.digest()
-        return self._current_session_key
+        peer_pub = x25519.X25519PublicKey.from_public_bytes(peer_public_bytes)
+        shared_key = self._private_key.exchange(peer_pub)
+        derived = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=b"gossipmesh-p2p-salt",
+            info=b"gossipmesh-session-key"
+        ).derive(shared_key)
+        with self._lock:
+            self._session_key = derived
+        return derived
 
-    def get_current_key(self) -> bytes:
-        """Returns the current active session key."""
-        return self._current_session_key
+    def rotate(self) -> Tuple[bytes, bytes]:
+        with self._lock:
+            self._private_key = x25519.X25519PrivateKey.generate()
+            self._public_key = self._private_key.public_key()
+            self._session_key = None
+            return self.get_public_bytes(), self.get_public_bytes()
 
     def rotate_key(self) -> bytes:
-        """Explicitly rotates the session key and returns it."""
-        self._current_session_key = os.urandom(32)
-        return self._current_session_key
+        self.rotate()
+        return self.get_public_bytes()
+
+    def get_current_key(self) -> bytes:
+        with self._lock:
+            if self._session_key is None:
+                raise ValueError("Session key has not been derived yet.")
+            return self._session_key
 
 
-def encrypt_payload(plaintext: bytes, key: bytes) -> bytes:
-    """Encrypts plaintext payload using AES-256 equivalent symmetric XOR/HMAC cipher or similar stream primitive."""
-    if not key:
-        key = b'\x00' * 32
-    iv = os.urandom(16)
-    ciphertext = bytearray()
-    for i, b in enumerate(plaintext):
-        mask = key[i % len(key)] ^ iv[i % len(iv)]
-        ciphertext.append(b ^ mask)
-    return bytes(iv + bytes(ciphertext))
+def encrypt_payload(plaintext: bytes, session_key: bytes) -> bytes:
+    aesgcm = AESGCM(session_key)
+    nonce = os.urandom(12)
+    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+    return nonce + ciphertext
 
 
-def decrypt_payload(ciphertext: bytes, key: bytes) -> bytes:
-    """Decrypts ciphertext payload."""
-    if not key:
-        key = b'\x00' * 32
-    if len(ciphertext) < 16:
-        return ciphertext
-    iv = ciphertext[:16]
-    data = ciphertext[16:]
-    plaintext = bytearray()
-    for i, b in enumerate(data):
-        mask = key[i % len(key)] ^ iv[i % len(iv)]
-        plaintext.append(b ^ mask)
-    return bytes(plaintext)
+def decrypt_payload(ciphertext: bytes, session_key: bytes) -> bytes:
+    if len(ciphertext) < 12:
+        raise ValueError("Ciphertext too short.")
+    aesgcm = AESGCM(session_key)
+    nonce = ciphertext[:12]
+    actual_ct = ciphertext[12:]
+    return aesgcm.decrypt(nonce, actual_ct, None)

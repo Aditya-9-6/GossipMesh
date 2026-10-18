@@ -27,10 +27,8 @@ class TransportSocketReader:
 
         magic, msg_type = ZeroCopyPacketParser.deserialize_header(header_bytes)
         if magic != self.expected_magic:
-            return None
+            raise ValueError(f"Invalid magic number: 0x{magic:X}, expected 0x{self.expected_magic:X}")
         
-        # Extract msg_id and payload length from header_bytes (struct format: !I I 32s Q)
-        # Let's decode properly using parser
         import struct
         unpacked = struct.unpack('!II32sQ', header_bytes)
         msg_id = unpacked[2].rstrip(b'\x00').decode('utf-8', errors='ignore')
