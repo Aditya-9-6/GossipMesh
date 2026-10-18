@@ -1,5 +1,5 @@
 import hashlib
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 
 class MerkleNode:
     def __init__(self, key: str, value_hash: str, left: Optional['MerkleNode'] = None, right: Optional['MerkleNode'] = None):
@@ -53,6 +53,8 @@ class MerkleDAG:
         self.root = self._build_sub_tree(nodes)
 
     def _build_sub_tree(self, nodes: List[MerkleNode]) -> MerkleNode:
+        if not nodes:
+            raise ValueError("Cannot build subtree from empty nodes list")
         if len(nodes) == 1:
             return nodes[0]
         mid = len(nodes) // 2
@@ -75,18 +77,21 @@ class MerkleDAG:
         return sorted(list(self._data.keys()))
 
     def generate_proof(self, key: str) -> List[Dict[str, Any]]:
-        if key not in self._data:
+        if not self.root or key not in self._data:
             return []
         proof = []
         curr = self.root
         while curr and (curr.left or curr.right):
-            if curr.left and key <= curr.left.key:
-                if curr.right:
+            if curr.left and curr.right:
+                if key <= curr.left.key:
                     proof.append({"direction": "right", "hash": curr.right.hash})
+                    curr = curr.left
+                else:
+                    proof.append({"direction": "left", "hash": curr.left.hash})
+                    curr = curr.right
+            elif curr.left:
                 curr = curr.left
             elif curr.right:
-                if curr.left:
-                    proof.append({"direction": "left", "hash": curr.left.hash})
                 curr = curr.right
             else:
                 break
