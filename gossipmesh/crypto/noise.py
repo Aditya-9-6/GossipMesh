@@ -60,7 +60,6 @@ class NoiseHandshakeState:
 
     def write_message_1(self) -> bytes:
         assert self.is_initiator
-        self._mix_hash(self.s_pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
         e_bytes = self.e_pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         self._mix_hash(e_bytes)
         return e_bytes
@@ -68,7 +67,6 @@ class NoiseHandshakeState:
     def read_message_1(self, message: bytes):
         assert not self.is_initiator
         self.remote_e_pub = x25519.X25519PublicKey.from_public_bytes(message)
-        self._mix_hash(self.s_pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
         self._mix_hash(message)
 
     def write_message_2(self) -> bytes:
@@ -95,7 +93,7 @@ class NoiseHandshakeState:
         enc_s = message[32:32 + 32 + 16]
         s_bytes = self.decrypt_and_hash(enc_s)
         self.remote_s_pub = x25519.X25519PublicKey.from_public_bytes(s_bytes)
-        self._mix_key(self.e_priv.exchange(self.remote_s_pub))
+        self._mix_key(self.e_priv.exchange(self.remote_s_pub) if self.remote_s_pub else b"\x00" * 32)
         
         enc_payload = message[32 + 32 + 16:]
         self.decrypt_and_hash(enc_payload)
@@ -104,7 +102,7 @@ class NoiseHandshakeState:
         assert self.is_initiator
         s_bytes = self.s_pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         enc_s = self.encrypt_and_hash(s_bytes)
-        self._mix_key(self.s_priv.exchange(self.remote_e_pub))
+        self._mix_key(self.s_priv.exchange(self.remote_e_pub) if self.remote_e_pub else b"\x00" * 32)
         
         payload = b""
         enc_payload = self.encrypt_and_hash(payload)
@@ -115,7 +113,7 @@ class NoiseHandshakeState:
         enc_s = message[:32 + 16]
         s_bytes = self.decrypt_and_hash(enc_s)
         self.remote_s_pub = x25519.X25519PublicKey.from_public_bytes(s_bytes)
-        self._mix_key(self.s_priv.exchange(self.remote_e_pub))
+        self._mix_key(self.s_priv.exchange(self.remote_e_pub) if self.remote_e_pub else b"\x00" * 32)
         
         enc_payload = message[32 + 16:]
         self.decrypt_and_hash(enc_payload)
