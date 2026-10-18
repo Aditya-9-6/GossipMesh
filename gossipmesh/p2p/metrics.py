@@ -1,7 +1,6 @@
-import time
 import threading
 from collections import deque
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 class EMALatencyTracker:
     """Tracks round-trip latency using a windowed Exponential Moving Average (EMA) with bounded memory."""

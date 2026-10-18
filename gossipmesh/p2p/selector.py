@@ -29,14 +29,12 @@ class PeerSelector:
 
         scored_peers.sort(key=lambda x: x[1])
 
-        num_exploration = int(count * exploration_ratio) if strategy == "hybrid" else 0
-        if strategy == "hybrid" and exploration_ratio > 0.0 and num_exploration == 0:
-            num_exploration = 1
+        num_exploration = int(count * exploration_ratio) if strategy == "hybrid" and exploration_ratio > 0.0 else 0
         num_exploitation = count - num_exploration
 
         # Exploitation set: lowest latency peers
         exploitation_pool = [p[0] for p in scored_peers[:max(0, len(scored_peers) - num_exploration)]]
-        selected = random.sample(exploitation_pool, min(num_exploitation, len(exploitation_pool)))
+        selected = random.sample(exploitation_pool, min(num_exploitation, len(exploitation_pool))) if num_exploitation > 0 else []
 
         # Exploration set: random remaining peers
         remaining_pool = [p for p in available_peers if p not in selected]
@@ -47,6 +45,7 @@ class PeerSelector:
         # Ensure we return exact count if possible
         if len(selected) < count:
             leftovers = [p for p in available_peers if p not in selected]
-            selected.extend(random.sample(leftovers, count - len(selected)))
+            if leftovers:
+                selected.extend(random.sample(leftovers, min(count - len(selected), len(leftovers))))
 
         return selected[:count]
