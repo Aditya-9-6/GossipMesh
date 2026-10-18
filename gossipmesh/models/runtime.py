@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Float, JSON
+from sqlalchemy import String, Date, Integer, ForeignKey, DateTime, Float, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -69,3 +69,48 @@ class Artifact(SoftDeleteMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     job = relationship("Job")
+
+
+class UsageLimit(SoftDeleteMixin, Base):
+    __tablename__ = "usage_limits"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    repository_id: Mapped[int | None] = mapped_column(
+        ForeignKey("repositories.id"), nullable=True, index=True
+    )
+
+    daily_ai_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_prs_created: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_tokens_used: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_estimated_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    daily_changed_lines: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_sandbox_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    organization = relationship("Organization")
+    repository = relationship("Repository")
+
+
+class DailyUsage(Base):
+    __tablename__ = "daily_usages"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    repository_id: Mapped[int | None] = mapped_column(
+        ForeignKey("repositories.id"), nullable=True, index=True
+    )
+    date: Mapped[datetime] = mapped_column(Date, nullable=False, index=True)
+
+    ai_runs: Mapped[int] = mapped_column(Integer, default=0)
+    prs_created: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_used: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    changed_lines: Mapped[int] = mapped_column(Integer, default=0)
+    sandbox_minutes: Mapped[int] = mapped_column(Integer, default=0)
+
+    organization = relationship("Organization")
+    repository = relationship("Repository")

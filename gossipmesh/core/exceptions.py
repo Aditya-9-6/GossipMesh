@@ -50,3 +50,7 @@ class SandboxError(GossipMeshException):
 class RateLimitError(GossipMeshException):
     def __init__(self, message: str = "Rate limit exceeded", details: Optional[Dict[str, Any]] = None):
         super().__init__(message, status_code=429, error_code="RATE_LIMIT_ERROR", details=details)
+
+class UsageLimitError(GossipMeshException):
+    def __init__(self, message: str = "Usage limit exceeded", details: Optional[Dict[str, Any]] = None):
+        super().__init__(message, status_code=429, error_code="USAGE_LIMIT_ERROR", details=details)

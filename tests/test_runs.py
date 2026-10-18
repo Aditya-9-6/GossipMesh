@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 import datetime
 
 from gossipmesh.api.main import app
-from gossipmesh.database import Base
+from gossipmesh.models.base import Base
 
 # Initialize the database engine and session
 engine = create_engine("sqlite:///:memory:", echo=False)
@@ -14,6 +14,12 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base.metadata.create_all(bind=engine)
 
 # Create a test client for the FastAPI app
+
+from fastapi import APIRouter
+from gossipmesh.api.routers.runs import router as runs_router
+
+app.include_router(runs_router)
+
 client = TestClient(app)
 
 # Test case for tracking a run
@@ -26,8 +32,8 @@ def test_track_run():
         "workflow_type": "CI",
         "run_id": "123456",
         "status": "success",
-        "start_time": datetime.datetime(2024, 1, 1, 12, 0),
-        "end_time": datetime.datetime(2024, 1, 1, 12, 30),
+        "start_time": str(datetime.datetime(2024, 1, 1, 12, 0)),
+        "end_time": str(datetime.datetime(2024, 1, 1, 12, 30)),
         "failure_reason": "None",
         "branch": "main",
         "commit_sha": "abc123",
