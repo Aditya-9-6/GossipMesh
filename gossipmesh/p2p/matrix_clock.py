@@ -108,9 +108,14 @@ class BoundedMatrixClockEngine:
             while self._buffer and (now - self._buffer[0].timestamp > self.staleness_window_seconds):
                 self._buffer.popleft()
 
-            self._buffer.append(msg)
+            # If causally ready immediately, update matrix and release
+            if self._is_causally_ready(msg):
+                self._update_matrix(msg)
+                released = [msg]
+            else:
+                self._buffer.append(msg)
+                released = []
             
-            released: List[MatrixClockMessage] = []
             progress = True
 
             while progress:
