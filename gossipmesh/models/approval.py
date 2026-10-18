@@ -14,3 +14,12 @@ class Approval(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     approver_id = Column(Integer, nullable=True)
     approved_at = Column(DateTime, nullable=True)
+
+class ApprovalGate(Base):
+    __tablename__ = "approval_gates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True, nullable=False)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
