@@ -36,5 +36,5 @@ class TestVectorClock(unittest.TestCase):
         vc2 = VectorClock("node-B", {"node-A": 1, "node-B": 2})
         self.assertEqual(vc1.compare(vc2.snapshot()), "EQUAL")
 
-if __name__ == "__main":
+if __name__ == "__main__":
     unittest.main()
