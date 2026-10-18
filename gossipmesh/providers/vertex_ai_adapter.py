@@ -2,12 +2,16 @@ from typing import AsyncGenerator
 import time
 import json
 import vertexai
+from google.api_core.exceptions import GoogleAPIError
+from gossipmesh.core.exceptions import ProviderError
+from gossipmesh.core.retry import with_retry_and_circuit_breaker, CircuitBreaker
 from vertexai.generative_models import GenerativeModel, Part, Content
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
 class VertexAIProvider(BaseProvider):
+    _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
     def __init__(self, project_id: str, location: str):
         # BaseProvider expects an api_key, we will pass a placeholder since Vertex uses application default credentials or explicit project info
         super().__init__("vertex_placeholder")
@@ -19,6 +23,7 @@ class VertexAIProvider(BaseProvider):
     def provider_name(self) -> str:
         return "vertex_ai"
 
+    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         # In Vertex AI (Gemini), system instructions are passed to the model initialization
         system_instruction = next((msg.content for msg in request.messages if msg.role == "system"), None)
@@ -40,10 +45,13 @@ class VertexAIProvider(BaseProvider):
             "stop_sequences": request.stop_sequences
         }
 
-        response = await model.generate_content_async(
-            contents=contents,
-            generation_config=generation_config
-        )
+        try:
+            response = await model.generate_content_async(
+                contents=contents,
+                generation_config=generation_config
+            )
+        except GoogleAPIError as e:
+            raise ProviderError("Provider API error") from None
 
         usage = Usage(
             prompt_tokens=response.usage_metadata.prompt_token_count if response.usage_metadata else 0,
@@ -59,6 +67,7 @@ class VertexAIProvider(BaseProvider):
             raw_response=response.to_dict()
         )
 
+    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         system_instruction = next((msg.content for msg in request.messages if msg.role == "system"), None)
 
@@ -79,15 +88,18 @@ class VertexAIProvider(BaseProvider):
             "stop_sequences": request.stop_sequences
         }
 
-        response = await model.generate_content_async(
-            contents=contents,
-            generation_config=generation_config,
-            stream=True
-        )
+        try:
+            response = await model.generate_content_async(
+                contents=contents,
+                generation_config=generation_config,
+                stream=True
+            )
 
-        async for chunk in response:
-            if chunk.text:
-                yield chunk.text
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        except GoogleAPIError as e:
+            raise ProviderError("Provider API error") from None
 
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()
@@ -97,7 +109,7 @@ class VertexAIProvider(BaseProvider):
             latency = (time.time() - start_time) * 1000
             return ProviderHealth(is_healthy=True, latency_ms=latency)
         except Exception as e:
-            return ProviderHealth(is_healthy=False, error=str(e))
+            return ProviderHealth(is_healthy=False, error="Provider connection failed")
 
     def count_tokens(self, text: str) -> int:
         return int(len(text.split()) * 1.3)

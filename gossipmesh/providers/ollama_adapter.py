@@ -2,11 +2,15 @@ from typing import AsyncGenerator
 import time
 import httpx
 import json
+from httpx import RequestError, HTTPStatusError
+from gossipmesh.core.exceptions import ProviderError
+from gossipmesh.core.retry import with_retry_and_circuit_breaker, CircuitBreaker
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
 class OllamaProvider(BaseProvider):
+    _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
     def __init__(self, base_url: str = "http://localhost:11434"):
         super().__init__(api_key="") # Ollama usually doesn't need an API key
         self.base_url = base_url
@@ -15,28 +19,32 @@ class OllamaProvider(BaseProvider):
     def provider_name(self) -> str:
         return "ollama"
 
+    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         time.time()
 
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/chat",
-                json={
-                    "model": request.model,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": request.temperature,
-                        "num_predict": request.max_tokens,
-                        "stop": request.stop_sequences
-                    }
-                },
-                timeout=300.0
-            )
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/api/chat",
+                    json={
+                        "model": request.model,
+                        "messages": messages,
+                        "stream": False,
+                        "options": {
+                            "temperature": request.temperature,
+                            "num_predict": request.max_tokens,
+                            "stop": request.stop_sequences
+                        }
+                    },
+                    timeout=300.0
+                )
+                response.raise_for_status()
+                data = response.json()
+        except (RequestError, HTTPStatusError) as e:
+            raise ProviderError("Provider API error") from None
 
         time.time()
 
@@ -54,31 +62,35 @@ class OllamaProvider(BaseProvider):
             raw_response=data
         )
 
+    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
-        async with httpx.AsyncClient() as client:
-            async with client.stream(
-                "POST",
-                f"{self.base_url}/api/chat",
-                json={
-                    "model": request.model,
-                    "messages": messages,
-                    "stream": True,
-                    "options": {
-                        "temperature": request.temperature,
-                        "num_predict": request.max_tokens,
-                        "stop": request.stop_sequences
-                    }
-                },
-                timeout=300.0
-            ) as response:
-                response.raise_for_status()
-                async for chunk in response.aiter_lines():
-                    if chunk:
-                        data = json.loads(chunk)
-                        if "message" in data and "content" in data["message"]:
-                            yield data["message"]["content"]
+        try:
+            async with httpx.AsyncClient() as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/api/chat",
+                    json={
+                        "model": request.model,
+                        "messages": messages,
+                        "stream": True,
+                        "options": {
+                            "temperature": request.temperature,
+                            "num_predict": request.max_tokens,
+                            "stop": request.stop_sequences
+                        }
+                    },
+                    timeout=300.0
+                ) as response:
+                    response.raise_for_status()
+                    async for chunk in response.aiter_lines():
+                        if chunk:
+                            data = json.loads(chunk)
+                            if "message" in data and "content" in data["message"]:
+                                yield data["message"]["content"]
+        except (RequestError, HTTPStatusError) as e:
+            raise ProviderError("Provider API error") from None
 
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()
@@ -89,7 +101,7 @@ class OllamaProvider(BaseProvider):
             latency = (time.time() - start_time) * 1000
             return ProviderHealth(is_healthy=True, latency_ms=latency)
         except Exception as e:
-            return ProviderHealth(is_healthy=False, error=str(e))
+            return ProviderHealth(is_healthy=False, error="Provider connection failed")
 
     def count_tokens(self, text: str) -> int:
         return int(len(text.split()) * 1.3)
