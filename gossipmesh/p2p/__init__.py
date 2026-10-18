@@ -10,6 +10,13 @@ from gossipmesh.p2p.transport import GossipTransport, TransportTelemetry
 from gossipmesh.p2p.checkpointer import StateCheckpointer
 from gossipmesh.p2p.entropy import AntiEntropyEngine
 from gossipmesh.p2p.snapshot import SnapshotTransferProtocol
+from gossipmesh.p2p.congestion import (
+    CongestionState,
+    CongestionConfig,
+    NetworkJitterEstimator,
+    SlidingWindowCongestionController,
+    StreamCongestionManager,
+)
 
 __all__ = [
     "GossipMessageCache",
@@ -30,4 +37,10 @@ __all__ = [
     "StateCheckpointer",
     "AntiEntropyEngine",
     "SnapshotTransferProtocol",
+    "CongestionState",
+    "CongestionConfig",
+    "NetworkJitterEstimator",
+    "SlidingWindowCongestionController",
+    "StreamCongestionManager",
 ]
+
