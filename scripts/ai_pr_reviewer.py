@@ -107,16 +107,18 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
 
    - Enterprise Privacy & Secrets Policy Check: Ensure no PII, API keys, or sensitive credentials are leaked in the code or tests.
-5. Python Idiomatic Standards & Test Coverage:
-   - Error wrapping and proper exception handling using `try...except`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and proper asyncio usage.
+6. Master Implementation Plan Alignment & Enterprise SaaS Invariants:
+   - Real Behavior vs. Placeholders: Reject PRs that add fake stubs, placeholder mocks, or unfinished skeletons instead of real production implementations.
+   - Roadmap Necessity: The PR must advance concrete goals in `docs/MASTER_IMPLEMENTATION_PLAN.md` or `docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md` (stabilization, multi-tenant boundaries, secure sandboxes, provider abstraction, durable persistence, audit ledgers).
+   - Minimal Blast Radius: PRs must touch only files relevant to the specific task; reject PRs modifying unrelated subsystems.
+   - Idempotency & Observability: Systems operations must be idempotent, retriable, and observable.
 
 EVALUATION & VERDICT:
-- If code is redundant, trivial duplicate of existing features, introduces anti-patterns, breaks repository invariants, or is genuinely NOT NEEDED:
+- If code is redundant, trivial duplicate of existing features, violates Master Implementation Plan priorities, introduces placeholders instead of real code, or is NOT strictly necessary:
   verdict must be "REJECT", score < 55, and should_close must be true.
 - If code has compilation errors, missing dependencies, data race risks, spaghetti code, or missing unit tests, but is a valuable feature:
   verdict must be "ACTION_REQUIRED" and score 55-89.
-- If code is clean, modular, race-free, properly tested, high-value, and meets all anti-spaghetti architectural invariants:
+- If code is clean, modular, race-free, properly tested, high-value, strictly aligns with the Master Implementation Plan, and meets all invariants:
   verdict must be "APPROVED" and score >= 90 (typically 95-100).
 - You must prioritize high precision (minimal noise, fewer false positives) before recall. Do not flag trivial styling issues as ACTION_REQUIRED.
 
