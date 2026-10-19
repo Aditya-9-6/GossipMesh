@@ -49,9 +49,17 @@ def load_private_key(key_input: Optional[str] = None):
 
     if key_input:
         p = Path(key_input)
-        if p.is_file():
+        if not p.is_absolute():
+            # Try relative to CWD first, then relative to project root
+            if p.is_file():
+                pem_bytes = p.read_bytes()
+            else:
+                proj_root_p = Path(__file__).resolve().parent.parent / key_input
+                if proj_root_p.is_file():
+                    pem_bytes = proj_root_p.read_bytes()
+        elif p.is_file():
             pem_bytes = p.read_bytes()
-        elif "BEGIN" in key_input:
+        elif key_input and "BEGIN" in key_input:
             pem_bytes = key_input.encode("utf-8")
 
     if not pem_bytes:
@@ -68,6 +76,12 @@ def load_private_key(key_input: Optional[str] = None):
         fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
         if fallback.is_file():
             pem_bytes = fallback.read_bytes()
+
+    if not pem_bytes:
+        # Also check relative to CWD if project root lookup fails
+        cwd_fallback = Path("enterprise/test_private_key.pem")
+        if cwd_fallback.is_file():
+            pem_bytes = cwd_fallback.read_bytes()
 
     if not pem_bytes:
         raise ValueError(
@@ -152,9 +166,7 @@ def issue_license(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Issue offline RSA-4096 signed JWT enterprise license tokens."
-    )
+    parser = argparse.ArgumentParser(description="Issue offline RSA-4096 signed JWT enterprise license tokens.")
     parser.add_argument("--customer-id", required=True, help="Customer ID (e.g., acme-fintech-corp)")
     parser.add_argument(
         "--bundle",

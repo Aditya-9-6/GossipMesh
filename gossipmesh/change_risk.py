@@ -43,12 +43,7 @@ class ChangeRiskAssessment(BaseModel):
 class ChangeRiskClassifier:
     def __init__(self, max_allowed_risk: RiskLevel = RiskLevel.HIGH):
         self.max_allowed_risk = max_allowed_risk
-        self.risk_hierarchy = {
-            RiskLevel.LOW: 1,
-            RiskLevel.MEDIUM: 2,
-            RiskLevel.HIGH: 3,
-            RiskLevel.CRITICAL: 4
-        }
+        self.risk_hierarchy = {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3, RiskLevel.CRITICAL: 4}
 
     def classify(self, details: ChangeDetails) -> ChangeRiskAssessment:
         reasons = []
@@ -85,7 +80,7 @@ class ChangeRiskClassifier:
                 is_blocked=True,
                 blocked=True,
                 reasons=reasons,
-                score=100
+                score=100,
             )
 
         # High triggers
@@ -114,7 +109,7 @@ class ChangeRiskClassifier:
                 is_blocked=blocked_val,
                 blocked=blocked_val,
                 reasons=reasons,
-                score=75
+                score=75,
             )
 
         # Medium triggers
@@ -137,7 +132,7 @@ class ChangeRiskClassifier:
                 is_blocked=blocked_val,
                 blocked=blocked_val,
                 reasons=reasons,
-                score=40
+                score=40,
             )
 
         # Low default
@@ -148,5 +143,5 @@ class ChangeRiskClassifier:
             is_blocked=False,
             blocked=False,
             reasons=reasons,
-            score=10
+            score=10,
         )

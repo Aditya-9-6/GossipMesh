@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 class PeerTier(str, enum.Enum):
     """Peer performance tiers based on sustained bandwidth throughput."""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -16,6 +17,7 @@ class PeerTier(str, enum.Enum):
 @dataclass(frozen=True)
 class BandwidthConfig:
     """Configuration parameters for windowed EWMA bandwidth profiler."""
+
     alpha: float = 0.2
     window_seconds: float = 60.0
     high_tier_threshold_bps: float = 1_048_576.0  # 1 MB/s
