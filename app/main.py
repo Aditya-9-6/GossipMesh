@@ -70,3 +70,14 @@ async def webhook(request: Request):
     loop.run_in_executor(thread_pool, process_pr_event, payload)
     return {"status": "queued_async"}
 
+# Diagnostics endpoint to expose worker count
+@app.get("/debug/worker_status")
+def worker_status():
+    """Return the configured number of worker threads handling PR events."""
+    return {"active_workers": thread_pool._max_workers}
+
+# Ready endpoint for Kubernetes liveness/readiness probes
+@app.get("/ready")
+async def ready():
+    # Simple readiness check – could be expanded to DB connections, etc.
+    return {"status": "ready", "service": "GossipMesh Autonomous Reviewer"}
