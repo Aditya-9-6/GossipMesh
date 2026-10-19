@@ -31,6 +31,8 @@ def main():
     comment = f"🧠 **Reviewer Bot**\nScore: **{score}** / 100\n\n_This is an automated evaluation based on change size._"
     run_cmd(f"gh pr comment {pr_number} --body \"{comment}\"")
     # Add labels
+    run_cmd(f"gh label create reviewed --force 2>/dev/null || true")
+    run_cmd(f"gh label create score-{score} --force 2>/dev/null || true")
     run_cmd(f"gh pr edit {pr_number} --add-label reviewed --add-label score-{score}")
     print(f"Reviewed PR #{pr_number} with score {score}")
 
