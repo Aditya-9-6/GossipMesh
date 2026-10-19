@@ -1,4 +1,4 @@
-# ---- Production Dockerfile for GossipMesh ----
+# forced rebuild comment
 # Multi‑stage build using official Python image
 # Stage 1: Builder – install dependencies
 FROM python:3.11-slim AS builder
