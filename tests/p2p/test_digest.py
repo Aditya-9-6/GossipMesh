@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.digest import BloomFilterDigest
 from gossipmesh.p2p.sync import AntiEntropySync
 
+
 class TestBloomFilterDigest(unittest.TestCase):
     def test_bloom_filter_basic_operations(self):
         bf = BloomFilterDigest(capacity=100, error_rate=0.01)
@@ -39,6 +40,7 @@ class TestBloomFilterDigest(unittest.TestCase):
         self.assertIn("item_4", missing)
         self.assertNotIn("item_1", missing)
         self.assertNotIn("item_2", missing)
+
 
 if __name__ == "__main__":
     unittest.main()

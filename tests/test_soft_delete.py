@@ -5,6 +5,7 @@ from gossipmesh.models.base import Base
 from gossipmesh.models.organization import Organization
 from gossipmesh.models.audit import AuditEvent
 
+
 class TestSoftDelete(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
@@ -58,6 +59,7 @@ class TestSoftDelete(unittest.TestCase):
         self.assertEqual(audit.details["model"], "Organization")
         self.assertEqual(audit.details["id"], org.id)
         self.assertEqual(audit.details["retention_days"], 30)
+
 
 if __name__ == "__main__":
     unittest.main()

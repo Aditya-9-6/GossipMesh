@@ -2,9 +2,13 @@ import time
 import math
 from typing import Dict, Any, List
 
+
 class AdaptiveBackoffController:
     """Calculates exponential backoff and dynamic heartbeat intervals based on rolling latency."""
-    def __init__(self, base_interval: float = 1.0, max_interval: float = 60.0, multiplier: float = 2.0, jitter: float = 0.1):
+
+    def __init__(
+        self, base_interval: float = 1.0, max_interval: float = 60.0, multiplier: float = 2.0, jitter: float = 0.1
+    ):
         self.base_interval = base_interval
         self.max_interval = max_interval
         self.multiplier = multiplier

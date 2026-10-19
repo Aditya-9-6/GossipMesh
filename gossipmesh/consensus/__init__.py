@@ -100,38 +100,27 @@ class ByzantineConsensusEngine:
                 for v in votes
                 if v.verdict == "APPROVE" and v.score >= self.min_score_threshold
             )
-            approval_ratio = (
-                approvals_weight / total_weight if total_weight > 0 else 0.0
-            )
+            approval_ratio = approvals_weight / total_weight if total_weight > 0 else 0.0
             avg_score = (
-                sum(v.score * self.model_weights.get(v.model_name, 1.0) for v in votes)
-                / total_weight
+                sum(v.score * self.model_weights.get(v.model_name, 1.0) for v in votes) / total_weight
                 if total_weight > 0
                 else 0.0
             )
         else:
-            approvals = sum(
-                1
-                for v in votes
-                if v.verdict == "APPROVE" and v.score >= self.min_score_threshold
-            )
+            approvals = sum(1 for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
             approval_ratio = approvals / len(votes)
             avg_score = sum(v.score for v in votes) / len(votes)
 
         all_concerns = list(dict.fromkeys(c for v in votes for c in v.concerns))
         all_suggestions = list(dict.fromkeys(s for v in votes for s in v.suggestions))
 
-        is_approved = (approval_ratio >= self.quorum_threshold) and (
-            avg_score >= self.min_score_threshold
-        )
+        is_approved = (approval_ratio >= self.quorum_threshold) and (avg_score >= self.min_score_threshold)
 
         all_confidences = []
         for v in votes:
             all_confidences.extend(v.confidence_scores)
 
-        avg_confidence = (
-            sum(all_confidences) / len(all_confidences) if all_confidences else 100.0
-        )
+        avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 100.0
 
         return ConsensusResult(
             is_approved=is_approved,

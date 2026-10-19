@@ -3,9 +3,16 @@ import asyncio
 from typing import Dict, Callable, Optional, Any
 from gossipmesh.consensus.backoff import AdaptiveBackoffController
 
+
 class HeartbeatManager:
     """Manages node heartbeats with decentralized adaptive backoff."""
-    def __init__(self, node_id: str, ping_callback: Callable[[str], float], controller: Optional[AdaptiveBackoffController] = None):
+
+    def __init__(
+        self,
+        node_id: str,
+        ping_callback: Callable[[str], float],
+        controller: Optional[AdaptiveBackoffController] = None,
+    ):
         self.node_id = node_id
         self.ping_callback = ping_callback
         self.controller = controller or AdaptiveBackoffController()

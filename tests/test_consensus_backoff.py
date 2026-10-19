@@ -3,6 +3,7 @@ import asyncio
 from gossipmesh.consensus.backoff import AdaptiveBackoffController
 from gossipmesh.consensus.heartbeat import HeartbeatManager
 
+
 class TestAdaptiveBackoffController(unittest.TestCase):
     def setUp(self):
         self.controller = AdaptiveBackoffController(base_interval=1.0, max_interval=16.0)
@@ -34,6 +35,7 @@ class TestAdaptiveBackoffController(unittest.TestCase):
             self.controller.record_failure(node)
         self.assertTrue(self.controller.is_partitioned(node))
 
+
 class TestHeartbeatManager(unittest.TestCase):
     def test_heartbeat_pulse_success(self):
         def mock_ping(peer_id):
@@ -41,7 +43,7 @@ class TestHeartbeatManager(unittest.TestCase):
 
         manager = HeartbeatManager(node_id="local", ping_callback=mock_ping)
         manager.register_peer("peer-1")
-        
+
         loop = asyncio.get_event_loop()
         res = loop.run_until_complete(manager.pulse("peer-1"))
         self.assertTrue(res)
@@ -53,7 +55,7 @@ class TestHeartbeatManager(unittest.TestCase):
 
         manager = HeartbeatManager(node_id="local", ping_callback=mock_ping)
         manager.register_peer("peer-1")
-        
+
         loop = asyncio.get_event_loop()
         res = loop.run_until_complete(manager.pulse("peer-1"))
         self.assertFalse(res)
@@ -61,6 +63,7 @@ class TestHeartbeatManager(unittest.TestCase):
         self.assertEqual(manager.get_next_interval("peer-1"), 1.0)
         loop.run_until_complete(manager.pulse("peer-1"))
         self.assertEqual(manager.get_next_interval("peer-1"), 2.0)
+
 
 if __name__ == "__main__":
     unittest.main()
