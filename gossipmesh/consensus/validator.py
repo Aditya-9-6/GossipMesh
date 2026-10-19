@@ -2,6 +2,7 @@ import threading
 from typing import Dict, Optional, Set
 from gossipmesh.consensus.checkpoint import StateCheckpoint
 
+
 class EpochCheckpointValidator:
     def __init__(self, total_nodes: int, secret_keys: Optional[Dict[str, str]] = None) -> None:
         self.total_nodes = total_nodes
@@ -18,7 +19,7 @@ class EpochCheckpointValidator:
         with self._lock:
             if checkpoint.epoch in self._finalized_epochs:
                 return False
-            
+
             if checkpoint.node_id not in self.secret_keys:
                 return False
             key = self.secret_keys[checkpoint.node_id]
@@ -34,7 +35,7 @@ class EpochCheckpointValidator:
             if epoch in self._finalized_epochs:
                 return True
             epoch_map = self._checkpoints.get(epoch, {})
-            
+
             root_counts: Dict[str, int] = {}
             for cp in epoch_map.values():
                 root_counts[cp.state_root] = root_counts.get(cp.state_root, 0) + 1

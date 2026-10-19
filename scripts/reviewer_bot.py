@@ -17,11 +17,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 MASTER_PLAN_PATH = REPO_ROOT / "docs" / "MASTER_IMPLEMENTATION_PLAN.md"
 ENTERPRISE_PLAN_PATH = REPO_ROOT / "docs" / "ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md"
 
+
 def run_cmd(cmd):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"Command failed: {cmd}\n{result.stderr}", file=sys.stderr)
     return result.stdout.strip()
+
 
 def load_master_plan_keywords():
     keywords = set()
@@ -35,8 +37,11 @@ def load_master_plan_keywords():
                     keywords.add(t.lower())
     return keywords
 
+
 def evaluate_pr_against_master_plan(pr_number):
-    pr_json = run_cmd(f"gh pr view {pr_number} --json number,title,body,headRefName,baseRefName,changedFiles,additions,deletions,mergeable,files")
+    pr_json = run_cmd(
+        f"gh pr view {pr_number} --json number,title,body,headRefName,baseRefName,changedFiles,additions,deletions,mergeable,files"
+    )
     if not pr_json:
         raise ValueError(f"Could not retrieve metadata for PR #{pr_number}")
     pr = json.loads(pr_json)
@@ -58,14 +63,16 @@ def evaluate_pr_against_master_plan(pr_number):
     matched_aspects = []
 
     # Check for direct task or phase references (e.g., Task 12, Phase 1, #180)
-    task_match = re.search(r"(?:task\s*#?\d+|phase\s*#?\d+|resolve\s*#\d+|feat\([a-z0-9_-]+\))", combined_text)
+    task_match = re.search(r"(?:task\s*#?\d+|phase\s*#?\d+|resolve\s*#?\d+|feat\([a-z0-9_-]+\))", combined_text)
     if task_match:
         plan_score += 25
         matched_aspects.append(f"Explicit roadmap link: `{task_match.group(0)}`")
         master_plan_aligned = True
 
     # Check for core architectural paths outlined in Master Implementation Plan
-    core_paths = [f for f in files if f.startswith("gossipmesh/") or f.startswith("worker/") or f.startswith("scripts/")]
+    core_paths = [
+        f for f in files if f.startswith("gossipmesh/") or f.startswith("worker/") or f.startswith("scripts/")
+    ]
     if core_paths:
         plan_score += 15
         matched_aspects.append(f"Touches {len(core_paths)} core Master Plan subsystem files")
@@ -99,7 +106,9 @@ def evaluate_pr_against_master_plan(pr_number):
 
     # Construct review report
     status_icon = "🟢" if total_score > 90 else ("🟡" if total_score >= 70 else "🔴")
-    verdict = "APPROVED (Ready for Gate)" if total_score > 90 else ("ACTION_REQUIRED" if total_score >= 70 else "REJECTED")
+    verdict = (
+        "APPROVED (Ready for Gate)" if total_score > 90 else ("ACTION_REQUIRED" if total_score >= 70 else "REJECTED")
+    )
 
     comment = f"""### {status_icon} GossipMesh AI Reviewer Gate: Master Implementation Plan Audit
 **PR #{pr_number}**: `{title}`
@@ -125,6 +134,7 @@ def evaluate_pr_against_master_plan(pr_number):
 
     return total_score, comment
 
+
 def main():
     pr_number = os.getenv("PR_NUMBER")
     if not pr_number:
@@ -132,7 +142,9 @@ def main():
         sys.exit(1)
 
     # Check if comprehensive ai_pr_reviewer can be run with multi-provider keys
-    has_keys = any(os.environ.get(k) for k in ("GEMINI_API_KEY", "OPENROUTER_API_KEY", "NVIDIA_API_KEY", "GROQ_API_KEY"))
+    has_keys = any(
+        os.environ.get(k) for k in ("GEMINI_API_KEY", "OPENROUTER_API_KEY", "NVIDIA_API_KEY", "GROQ_API_KEY")
+    )
     score = 0
     comment = ""
 
@@ -149,13 +161,14 @@ def main():
     score, comment = evaluate_pr_against_master_plan(pr_number)
 
     # Post comment
-    run_cmd(f"gh pr comment {pr_number} --body \"{comment}\"")
+    run_cmd(f'gh pr comment {pr_number} --body "{comment}"')
 
     # Add labels
     run_cmd(f"gh label create reviewed --force 2>/dev/null || true")
     run_cmd(f"gh label create score-{score} --force 2>/dev/null || true")
     run_cmd(f"gh pr edit {pr_number} --add-label reviewed --add-label score-{score}")
     print(f"Reviewed PR #{pr_number} against Master Implementation Plan. Score: {score}")
+
 
 if __name__ == "__main__":
     main()

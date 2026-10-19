@@ -12,7 +12,6 @@ from gossipmesh.p2p.backpressure import BackpressureConfig, BackpressureState
 class TestLeakyBucketConnectionPool(unittest.TestCase):
     """Unit tests for Leaky-Bucket Connection Pool Manager and Backpressure Eviction."""
 
-
     def test_basic_acquire_and_release(self):
         config = ConnectionPoolConfig(max_capacity=5)
         pool = LeakyBucketConnectionPool(config)

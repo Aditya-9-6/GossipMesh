@@ -600,19 +600,16 @@ class ModelProvider(Protocol):
         request: CompletionRequest,
         *,
         cancellation_token: CancellationToken,
-    ) -> CompletionResponse:
-        ...
+    ) -> CompletionResponse: ...
 
     async def embed(
         self,
         request: EmbeddingRequest,
         *,
         cancellation_token: CancellationToken,
-    ) -> EmbeddingResponse:
-        ...
+    ) -> EmbeddingResponse: ...
 
-    async def health(self) -> ProviderHealth:
-        ...
+    async def health(self) -> ProviderHealth: ...
 ```
 
 ## Providers to support

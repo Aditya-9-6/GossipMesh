@@ -3,6 +3,7 @@ import heapq
 from typing import Dict, Set, Tuple, Any, List
 from gossipmesh.p2p.rate_limiter import TokenBucketRateLimiter
 
+
 class ConnectionManager:
     def __init__(self, max_connections: int = 100, capacity: float = 50.0, refill_rate: float = 10.0):
         self.max_connections = max_connections
@@ -28,7 +29,7 @@ class ConnectionManager:
                 self.active_connections.remove(evicted_peer)
                 if evicted_peer in self.connection_priorities:
                     del self.connection_priorities[evicted_peer]
-            
+
             self.active_connections.add(peer_id)
             self.connection_priorities[peer_id] = priority
             heapq.heappush(self._pq, (priority, asyncio.get_event_loop().time(), peer_id))
