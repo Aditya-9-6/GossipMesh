@@ -40,8 +40,7 @@ class P2PSessionTransport:
     def _trigger_rotation_unlocked(self) -> bytes:
         self.message_count = 0
         self.created_at = time.time()
-        priv_b, pub_b = self.rotator.rotate()
-        return pub_b
+        return self.rotator.rotate()
 
     def trigger_rotation(self) -> bytes:
         with self._lock:
@@ -184,16 +183,3 @@ class TransportSocketReader:
 
     def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 1196246355) -> None:
         self.reader = reader
-        self.expected_magic = expected_magic
-
-    async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
-        if not header_data:
-            return None
-        buf = memoryview(header_data)
-        magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(buf)
-        if magic != self.expected_magic:
-            raise ValueError(f"Invalid packet magic: {magic:#x} != {self.expected_magic:#x}")
-        payload_data = await self.reader.readexactly(payload_len)
-        payload_view = memoryview(payload_data)
-        return (msg_type, msg_id, payload_view)

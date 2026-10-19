@@ -46,6 +46,18 @@ class BundleNotAuthorizedError(LicenseError):
     pass
 
 
+class LicenseBundleError(LicenseError):
+    """Raised when a license bundle is invalid or unauthorized."""
+
+    pass
+
+
+class LicenseTaskModelError(LicenseError):
+    """Raised when a task model mapping is invalid."""
+
+    pass
+
+
 def _find_public_key_path() -> Path:
     """Find the public key file path in standard package locations."""
     # 1. Environment variable override
