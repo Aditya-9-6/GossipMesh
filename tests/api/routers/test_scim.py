@@ -29,7 +29,9 @@ def test_list_users_empty():
     app.dependency_overrides[deps.get_db] = lambda: mock_db
     app.dependency_overrides[deps.get_scim_token] = mock_get_scim_token
 
-    mock_db.query.return_value.filter.return_value.first.side_effect = [ServiceAccount(id=1, organization_id=1)]
+    mock_db.query.return_value.filter.return_value.first.side_effect = [
+        ServiceAccount(id=1, organization_id=1)
+    ]
     mock_db.query.return_value.join.return_value.filter.return_value.count.return_value = 0
     mock_db.query.return_value.join.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = []
 
@@ -125,6 +127,8 @@ def test_list_groups():
         deps.get_db: lambda: mock_db,
         deps.get_scim_token: mock_get_scim_token,
     }
-    mock_db.query.return_value.filter.return_value.first.side_effect = [ServiceAccount(id=1, organization_id=1)]
+    mock_db.query.return_value.filter.return_value.first.side_effect = [
+        ServiceAccount(id=1, organization_id=1)
+    ]
     response = client.get("/api/v1/scim/v2/1/Groups")
     assert response.status_code == 200

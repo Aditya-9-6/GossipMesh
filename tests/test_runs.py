@@ -16,7 +16,6 @@ Base.metadata.create_all(bind=engine)
 # Create a test client for the FastAPI app
 client = TestClient(app)
 
-
 # Test case for tracking a run
 def test_track_run():
     # Create a sample run data
@@ -35,16 +34,16 @@ def test_track_run():
         "files_changed": ["file1.py", "file2.py"],
         "model": "gemini-2.5-flash",
         "token_usage": 1000,
-        "estimated_cost": 0.01,
+        "estimated_cost": 0.01
     }
 
     # Send a POST request to track the run
-    from gossipmesh.core.config import settings
-
-    response = client.post(f"{settings.API_V1_STR}/runs/", json=run_data)
+    response = client.post("/api/v1/runs/", json=run_data)
 
     # Assert that the response status code is 200 OK
     assert response.status_code == 200
 
     # Assert that the response message is correct
-    assert response.json() == {"message": "Run tracked successfully"}
+    assert response.json() == {
+        "message": "Run tracked successfully"
+    }

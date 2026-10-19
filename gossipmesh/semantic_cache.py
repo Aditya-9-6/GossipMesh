@@ -5,7 +5,6 @@ from pathlib import Path
 from collections import Counter
 import hashlib
 
-
 class SemanticCache:
     def __init__(self, cache_dir: str = ".gossip_mesh/cache", threshold: float = 0.98):
         self.cache_dir = Path(cache_dir)
@@ -29,10 +28,8 @@ class SemanticCache:
             pass
 
     def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        if not vec1 or not vec2:
-            return 0.0
-        if len(vec1) != len(vec2):
-            return 0.0
+        if not vec1 or not vec2: return 0.0
+        if len(vec1) != len(vec2): return 0.0
 
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
         norm_a = math.sqrt(sum(a * a for a in vec1))
@@ -46,22 +43,17 @@ class SemanticCache:
         best_match = None
         best_score = 0.0
 
-        query_embedding = None
-        try:
-            from gossipmesh.rag import VectorDB
-
-            db = VectorDB()
-            query_embedding = db.get_embedding(key_text)
-        except Exception:
-            pass
+        from gossipmesh.rag import VectorDB
+        db = VectorDB()
+        query_embedding = db.get_embedding(key_text)
 
         if not query_embedding:
             # Fallback to exact match if embedding generation fails
             cache_key = hashlib.sha256(key_text.encode("utf-8")).hexdigest()
             if cache_key in self.metadata:
-                cache_file = self.cache_dir / f"{cache_key}.json"
-                if cache_file.exists():
-                    return json.loads(cache_file.read_text(encoding="utf-8"))
+                 cache_file = self.cache_dir / f"{cache_key}.json"
+                 if cache_file.exists():
+                     return json.loads(cache_file.read_text(encoding="utf-8"))
             return None
 
         for cache_key, data in self.metadata.items():
@@ -100,18 +92,16 @@ class SemanticCache:
         cache_key = hashlib.sha256(key_text.encode("utf-8")).hexdigest()
         cache_file = self.cache_dir / f"{cache_key}.json"
 
-        embedding = None
-        try:
-            from gossipmesh.rag import VectorDB
-
-            db = VectorDB()
-            embedding = db.get_embedding(key_text)
-        except Exception:
-            pass
+        from gossipmesh.rag import VectorDB
+        db = VectorDB()
+        embedding = db.get_embedding(key_text)
 
         try:
             cache_file.write_text(json.dumps(value), encoding="utf-8")
-            self.metadata[cache_key] = {"key_text": key_text, "embedding": embedding}
+            self.metadata[cache_key] = {
+                "key_text": key_text,
+                "embedding": embedding
+            }
             self._save_metadata()
         except Exception as e:
             print(f"[Warning] Failed to write cache: {e}")

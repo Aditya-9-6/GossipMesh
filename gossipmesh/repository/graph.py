@@ -2,7 +2,6 @@ import networkx as nx
 import ast
 from typing import Dict, Any
 
-
 class ArchitectureGraph:
     def __init__(self):
         self.graph = nx.DiGraph()

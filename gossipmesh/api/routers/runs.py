@@ -8,7 +8,6 @@ from gossipmesh.api.deps import get_db
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
-
 # Model for run tracking
 class Run(BaseModel):
     repository: str
@@ -27,10 +26,12 @@ class Run(BaseModel):
     token_usage: int
     estimated_cost: float
 
-
+# Dependency to get the database session
 @router.post("/")
 def track_run(run: Run, db: Session = Depends(get_db)):
     # Implement logic to track the run details in the database
     # This is a placeholder, replace with actual database interaction code
     print(f"Tracking run: {{run}}")
-    return {"message": "Run tracked successfully"}
+    return {
+        "message": "Run tracked successfully"
+    }

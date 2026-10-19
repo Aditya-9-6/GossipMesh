@@ -1,7 +1,6 @@
 import unittest
 from gossipmesh.enterprise.canary import CanaryManager
 
-
 class TestCanaryManager(unittest.TestCase):
     def test_is_automation_allowed_valid(self):
         manager = CanaryManager(allowed_repositories=["repo1", "repo2"], allowed_labels=["canary"])
@@ -73,6 +72,5 @@ class TestCanaryManager(unittest.TestCase):
         self.assertEqual(metrics["runs_rejected_repo"], 1)
         self.assertEqual(metrics["runs_rejected_label"], 1)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

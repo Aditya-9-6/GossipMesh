@@ -12,7 +12,6 @@ from typing import List, Dict, Any, Tuple
 import math
 import operator
 
-
 class VectorDB:
     def __init__(self, db_path: str = ".gossip_mesh/vectordb.json"):
         self.db_path = Path(db_path)
@@ -42,10 +41,18 @@ class VectorDB:
             raise RuntimeError("GEMINI_API_KEY environment variable is missing.")
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
-        payload = {"model": "models/text-embedding-004", "content": {"parts": [{"text": text}]}}
+        payload = {
+            "model": "models/text-embedding-004",
+            "content": {
+                "parts": [{"text": text}]
+            }
+        }
 
         req = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST"
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
         )
 
         try:
@@ -57,10 +64,8 @@ class VectorDB:
             return []
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
-        if not vec1 or not vec2:
-            return 0.0
-        if len(vec1) != len(vec2):
-            return 0.0
+        if not vec1 or not vec2: return 0.0
+        if len(vec1) != len(vec2): return 0.0
 
         dot_product = sum(map(operator.mul, vec1, vec2))
         norm_a = math.hypot(*vec1)
@@ -71,29 +76,10 @@ class VectorDB:
         return dot_product / (norm_a * norm_b)
 
     def index_workspace(self, workspace_path: Path):
-        """Indexes all .py files in gossipmesh directory, strictly skipping .venv and tests."""
-        print("[*] Indexing gossipmesh into VectorDB...")
-        target_dir = workspace_path / "gossipmesh"
-        if not target_dir.exists():
-            target_dir = workspace_path
-
-        for root, dirs, files in os.walk(target_dir):
-            dirs[:] = [
-                d
-                for d in dirs
-                if d
-                not in [
-                    ".git",
-                    "vendor",
-                    ".gossip_mesh",
-                    "__pycache__",
-                    "node_modules",
-                    ".venv",
-                    ".pytest_cache",
-                    ".ruff_cache",
-                    "tests",
-                ]
-            ]
+        """Indexes all .py files in the workspace, skipping tests if necessary."""
+        print("[*] Indexing workspace into VectorDB...")
+        for root, dirs, files in os.walk(workspace_path):
+            dirs[:] = [d for d in dirs if d not in [".git", "vendor", ".gossip_mesh", "__pycache__", "node_modules"]]
             for file in files:
                 if file.endswith(".py") and not file.startswith("test_"):
                     full_path = Path(root) / file
@@ -101,11 +87,15 @@ class VectorDB:
 
                     try:
                         content = full_path.read_text(encoding="utf-8")
+                        # Simple chunking if file is too large (Gemini has high limits, but good to be safe)
                         chunk = content[:15000]
                         embedding = self.get_embedding(chunk)
 
                         if embedding:
-                            self.embeddings[rel_path] = {"content": chunk, "embedding": embedding}
+                            self.embeddings[rel_path] = {
+                                "content": chunk,
+                                "embedding": embedding
+                            }
                             print(f"  [+] Indexed: {rel_path}")
                     except Exception as e:
                         print(f"  [!] Failed to index {rel_path}: {e}")

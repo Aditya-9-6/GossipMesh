@@ -40,7 +40,7 @@ class CanaryManager:
             "runs_rejected_repo": 0,
             "runs_rejected_label": 0,
             "runs_rejected_limit": 0,
-            "runs_rejected_shutdown": 0,
+            "runs_rejected_shutdown": 0
         }
         self._runs_today: int = 0
 

@@ -12,11 +12,6 @@ dist/
 *.key
 *.pem
 *.test
-*private_key*
-*.token
-*.jwt
-*.lic
-!enterprise/public_key.pem
 
 # OS & IDE
 .DS_Store
@@ -47,9 +42,4 @@ build/
 *.db
 *.sqlite3
 venv/
-.venv/
-.mypy_cache/
-.pytest_cache/
-.gossip_mesh/
 .coverage
-*.db-*

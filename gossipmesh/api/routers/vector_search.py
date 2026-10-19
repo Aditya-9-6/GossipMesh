@@ -13,16 +13,16 @@ from gossipmesh.repository.vector_store import PGVectorStore
 
 router = APIRouter()
 
-
 class SearchQuery(BaseModel):
     query: str
     repo_id: int
     top_k: int = 5
 
-
 @router.post("/search")
 def search_vectors(
-    search_query: SearchQuery, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
+    search_query: SearchQuery,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     # Look up the repository to find its organization
     repo = db.query(Repository).filter(Repository.id == search_query.repo_id).first()
@@ -30,21 +30,18 @@ def search_vectors(
         raise AuthorizationError(message="Repository not found")
 
     # Check if the user belongs to the repository's organization
-    is_member = (
-        db.query(UserOrganization)
-        .filter(UserOrganization.user_id == current_user.id, UserOrganization.organization_id == repo.organization_id)
-        .first()
-    )
+    is_member = db.query(UserOrganization).filter(
+        UserOrganization.user_id == current_user.id,
+        UserOrganization.organization_id == repo.organization_id
+    ).first()
     if not is_member:
         raise AuthorizationError(message="Not authorized for this organization")
 
     # Proceed with search safely
     store = PGVectorStore(db)
-
     # Dummy graph for the prototype
     class DummyGraph:
-        def get_dependencies(self, filepath):
-            return []
+        def get_dependencies(self, filepath): return []
 
     retriever = HybridRetriever(store, DummyGraph())
     results = retriever.search(search_query.query, search_query.repo_id, search_query.top_k)
