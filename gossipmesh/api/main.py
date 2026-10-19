@@ -1,29 +1,36 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime
+from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs, approvals
 from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
 from gossipmesh.core.logging import setup_logging
+from gossipmesh.api import deps
+from sqlalchemy.orm import Session
 
 setup_logging()
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
-from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs, approvals
-from alembic.config import Config
-from alembic.script import ScriptDirectory
-from alembic.runtime.migration import MigrationContext
-from sqlalchemy import create_engine
 
 logger = logging.getLogger(__name__)
+
+# Export get_db and get_current_user for compatibility with tests and external modules
+def get_db():
+    yield from deps.get_db()
+
+def get_current_user(db: Session = Depends(get_db)):
+    return deps.get_current_user(db=db)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup Migration Policy: Prevent accidental destructive migrations by validating state
     logger.info("Validating database migration state...")
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import create_engine
+
     alembic_cfg = Config("alembic.ini")
     script = ScriptDirectory.from_config(alembic_cfg)
 
@@ -44,11 +51,9 @@ async def lifespan(app: FastAPI):
                 logger.info("Database migration state is up-to-date.")
     except Exception as e:
         logger.error(f"Failed to validate migration state: {e}")
-        # Not exiting here to allow app to start even if db is temporarily down,
-        # but the warning/error is logged per policy.
 
     yield
-    # Cleanup on shutdown can go here if needed
+
 from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
 from gossipmesh.core.exceptions import GossipMeshException
 
@@ -91,7 +96,6 @@ app.include_router(repositories.router, prefix=f"{settings.API_V1_STR}/repositor
 app.include_router(runtime.router, prefix=f"{settings.API_V1_STR}/runtime", tags=["runtime"])
 app.include_router(artifacts.router, prefix=f"{settings.API_V1_STR}/artifacts", tags=["artifacts"])
 app.include_router(enterprise.router, prefix=f"{settings.API_V1_STR}/enterprise", tags=["enterprise"])
-app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector_search", tags=["vector_search"])
 app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
 
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
