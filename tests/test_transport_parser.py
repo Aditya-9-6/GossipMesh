@@ -4,8 +4,8 @@ import struct
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
 from gossipmesh.p2p.transport import TransportSocketReader
 
-class TestZeroCopyParserAndTransport(unittest.TestCase):
 
+class TestZeroCopyParserAndTransport(unittest.TestCase):
     def test_parser_serialization_and_deserialization(self):
         magic = 0x474D4553
         msg_type = 1
@@ -67,5 +67,6 @@ class TestZeroCopyParserAndTransport(unittest.TestCase):
 
         asyncio.run(run_test())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

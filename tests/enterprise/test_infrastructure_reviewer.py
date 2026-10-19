@@ -20,12 +20,7 @@ def test_clean_repo_high_score(tmp_path):
     """A clean repository with no infrastructure violations should score 100 (Grade A)."""
     # Create clean dockerfile
     dockerfile = tmp_path / "Dockerfile"
-    dockerfile.write_text(
-        "FROM python:3.12-slim\n"
-        "RUN useradd -u 1000 reviewer\n"
-        "USER reviewer\n"
-        "WORKDIR /app\n"
-    )
+    dockerfile.write_text("FROM python:3.12-slim\nRUN useradd -u 1000 reviewer\nUSER reviewer\nWORKDIR /app\n")
 
     result = review(repo_root=tmp_path)
     assert result["score"] == 100
@@ -36,12 +31,7 @@ def test_clean_repo_high_score(tmp_path):
 def test_detect_hardcoded_secrets(tmp_path):
     """Verify detection of hardcoded API keys and secrets."""
     tf_file = tmp_path / "main.tf"
-    tf_file.write_text(
-        'provider "aws" {\n'
-        '  region = "us-east-1"\n'
-        '  access_key = "AKIA12345678EXAMPLEKEY"\n'
-        '}\n'
-    )
+    tf_file.write_text('provider "aws" {\n  region = "us-east-1"\n  access_key = "AKIA12345678EXAMPLEKEY"\n}\n')
 
     result = review(repo_root=tmp_path)
     assert result["total_findings"] >= 1
@@ -53,11 +43,7 @@ def test_detect_hardcoded_secrets(tmp_path):
 def test_detect_docker_root_and_latest(tmp_path):
     """Verify detection of Docker root user and unpinned latest base image."""
     dockerfile = tmp_path / "Dockerfile"
-    dockerfile.write_text(
-        "FROM ubuntu:latest\n"
-        "RUN apt-get update\n"
-        "CMD [\"bash\"]\n"
-    )
+    dockerfile.write_text('FROM ubuntu:latest\nRUN apt-get update\nCMD ["bash"]\n')
 
     result = review(repo_root=tmp_path)
     rule_ids = [f["rule_id"] for f in result["findings"]]

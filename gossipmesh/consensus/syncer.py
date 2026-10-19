@@ -4,6 +4,7 @@ from gossipmesh.consensus.merkle import MerkleTree
 
 class MerkleSyncer:
     """Anti-entropy synchronization engine using Merkle trees."""
+
     def __init__(self, local_tree: MerkleTree):
         self.local_tree = local_tree
 
