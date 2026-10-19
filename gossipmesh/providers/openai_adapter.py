@@ -26,8 +26,7 @@ class OpenAIProvider(BaseProvider):
             messages=formatted_messages,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
-            stop=request.stop_sequences,
-            timeout=request.timeout
+            stop=request.stop_sequences
         )
 
         time.time()
@@ -54,8 +53,7 @@ class OpenAIProvider(BaseProvider):
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stop=request.stop_sequences,
-            stream=True,
-            timeout=request.timeout
+            stream=True
         )
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:

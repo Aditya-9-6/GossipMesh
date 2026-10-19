@@ -9,13 +9,6 @@ Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tes
 
 import os
 import sys
-
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
 import json
 import re
 import argparse
@@ -25,11 +18,15 @@ import subprocess
 import time
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-flash-lite-latest"
+DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-3.8-flash",
-    "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+    "gemini-2.5-pro",
 ]
 
 DEFAULT_KEYS = []
@@ -563,53 +560,31 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
     return "\n\n".join(ci_reports).strip()
 
 def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
-    print("[*] Running local diagnostic checks (pytest, ruff, mypy)...", flush=True)
+    print("[*] Running local diagnostic checks (ruff check, mypy, unittest)...", flush=True)
     out_lines = []
 
-    # Locate virtualenv python and tools
-    venv_py = workspace / ".venv" / "Scripts" / "python.exe"
-    py_bin = str(venv_py) if venv_py.is_file() else sys.executable
+    # Check ruff
+    ruff_res = subprocess.run(["ruff", "check", "."], cwd=workspace, capture_output=True, text=True)
+    if ruff_res.returncode != 0:
+        out_lines.append("=== RUFF LINT ERRORS ===")
+        out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
+        out_lines.append("")
 
-    # Check tests FIRST via pytest
-    test_failed = False
-    try:
-        test_res = subprocess.run(
-            [py_bin, "-m", "pytest", "tests/"],
-            cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300
-        )
-        if test_res.returncode != 0:
-            test_failed = True
-            out_lines.append("=== PYTHON TEST FAILURES ===")
-            combined = (test_res.stdout + "\n" + test_res.stderr).strip()
-            out_lines.append(combined)
-            out_lines.append("")
-    except Exception as e:
-        test_failed = True
-        out_lines.append(f"=== TEST RUN ERROR ===\n{e}\n")
+    # Check mypy
+    mypy_res = subprocess.run(["mypy", "gossipmesh/"], cwd=workspace, capture_output=True, text=True)
+    if mypy_res.returncode != 0:
+        out_lines.append("=== MYPY TYPE ERRORS ===")
+        out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
+        out_lines.append("")
 
-    # Check ruff if available (non-blocking)
-    try:
-        venv_ruff = workspace / ".venv" / "Scripts" / "ruff.exe"
-        ruff_cmd = [str(venv_ruff)] if venv_ruff.is_file() else [py_bin, "-m", "ruff"]
-        ruff_res = subprocess.run(ruff_cmd + ["check", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
-        if ruff_res.returncode != 0 and ruff_res.stdout.strip():
-            out_lines.append("=== RUFF LINT ERRORS ===")
-            out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
-            out_lines.append("")
-    except Exception:
-        pass
+    # Check unittest
+    test_res = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True)
+    if test_res.returncode != 0:
+        out_lines.append("=== PYTHON TEST FAILURES ===")
+        combined = (test_res.stdout + "\n" + test_res.stderr).strip()
+        out_lines.append(combined)
 
-    # Check mypy if available (non-blocking)
-    try:
-        venv_mypy = workspace / ".venv" / "Scripts" / "mypy.exe"
-        mypy_cmd = [str(venv_mypy)] if venv_mypy.is_file() else [py_bin, "-m", "mypy"]
-        mypy_res = subprocess.run(mypy_cmd + ["gossipmesh/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
-        if mypy_res.returncode != 0 and mypy_res.stdout.strip():
-            out_lines.append("=== MYPY TYPE ERRORS ===")
-            out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
-            out_lines.append("")
-    except Exception:
-        pass
+    local_errors = bool(out_lines)
 
     # Always fetch remote GitHub CI failures and security alerts if pr_number is provided
     remote_ci = ""
@@ -619,31 +594,27 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
             out_lines.append(remote_ci)
 
     combined_output = "\n".join(out_lines).strip()
-    total_exit = 1 if (test_failed or bool(remote_ci)) else 0
+    total_exit = 1 if (local_errors or bool(remote_ci)) else 0
     return total_exit, combined_output
 
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
     found = set()
     pattern = re.compile(r'([\w/\\.-]+\.py)(?::\d+)?')
-    search_dirs = [workspace / d for d in ("gossipmesh", "tests", "scripts") if (workspace / d).is_dir()]
     for match in pattern.finditer(error_log):
         rel_str = match.group(1).replace("\\", "/")
         p = workspace / rel_str
-        if p.is_file() and not any(part in p.parts for part in (".venv", ".git", "__pycache__")):
+        if p.is_file():
             found.add(rel_str)
         else:
-            for sdir in search_dirs:
-                for sub in sdir.rglob("*.py"):
-                    if any(part in sub.parts for part in (".venv", ".git", "__pycache__")):
-                        continue
-                    if sub.name == Path(rel_str).name:
-                        try:
-                            found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
-                        except ValueError:
-                            pass
+            for sub in workspace.rglob("*.py"):
+                if sub.name == Path(rel_str).name:
+                    try:
+                        found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
+                    except ValueError:
+                        pass
 
     try:
-        diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
         for line in diff_names.stdout.splitlines():
             line = line.strip().replace("\\", "/")
             if line.endswith(".py") and (workspace / line).is_file():

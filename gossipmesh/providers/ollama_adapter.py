@@ -33,7 +33,7 @@ class OllamaProvider(BaseProvider):
                         "stop": request.stop_sequences
                     }
                 },
-                timeout=request.timeout or 300.0
+                timeout=300.0
             )
             response.raise_for_status()
             data = response.json()
@@ -71,7 +71,7 @@ class OllamaProvider(BaseProvider):
                         "stop": request.stop_sequences
                     }
                 },
-                timeout=request.timeout or 300.0
+                timeout=300.0
             ) as response:
                 response.raise_for_status()
                 async for chunk in response.aiter_lines():

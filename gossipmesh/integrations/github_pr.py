@@ -110,11 +110,6 @@ class GitHubPRService:
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/commits"
         return await self._get_paginated(url)
 
-    async def get_pr_reviews(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
-        """Fetch all reviews for a pull request."""
-        url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
-        return await self._get_paginated(url)
-
     async def get_pr_details(self, owner: str, repo: str, pull_number: int) -> Dict[str, Any]:
         """
         Get comprehensive details about a pull request including metadata,

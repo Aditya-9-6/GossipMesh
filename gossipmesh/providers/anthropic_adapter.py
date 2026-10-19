@@ -27,8 +27,7 @@ class AnthropicProvider(BaseProvider):
             messages=messages, # type: ignore
             max_tokens=request.max_tokens,
             temperature=request.temperature,
-            stop_sequences=request.stop_sequences or [],
-            timeout=request.timeout
+            stop_sequences=request.stop_sequences or []
         )
 
         time.time()
@@ -61,8 +60,7 @@ class AnthropicProvider(BaseProvider):
             messages=messages, # type: ignore
             max_tokens=request.max_tokens,
             temperature=request.temperature,
-            stop_sequences=request.stop_sequences or [],
-            timeout=request.timeout
+            stop_sequences=request.stop_sequences or []
         ) as stream:
             async for text in stream.text_stream:
                 yield text

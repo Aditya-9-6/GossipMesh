@@ -40,7 +40,7 @@ def test_sso_config_and_login(test_client: TestClient):
     db.add(org)
     db.commit()
 
-    user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="organization_admin")
+    user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="admin")
     db.add(user_org)
     db.commit()
 
@@ -105,7 +105,7 @@ def test_sso_config_unauthorized(test_client: TestClient):
     db.add(org)
     db.commit()
 
-    user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="developer")
+    user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="member")
     db.add(user_org)
     db.commit()
 
