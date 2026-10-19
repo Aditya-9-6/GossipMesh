@@ -2,20 +2,22 @@ import unittest
 from gossipmesh.p2p.vector_clock import VectorClock
 from gossipmesh.p2p.reconciler import MerkleTree, AntiEntropyReconciler
 
+
 class TestVectorClock(unittest.TestCase):
     def test_vector_clock_operations(self):
         vc1 = VectorClock({"nodeA": 1})
         vc2 = VectorClock({"nodeA": 2})
         self.assertEqual(vc1.compare(vc2), "BEFORE")
         self.assertEqual(vc2.compare(vc1), "AFTER")
-        
+
         vc3 = VectorClock({"nodeA": 1, "nodeB": 1})
         vc4 = VectorClock({"nodeA": 1, "nodeB": 2})
         self.assertEqual(vc3.compare(vc4), "BEFORE")
-        
+
         vc5 = VectorClock({"nodeA": 2, "nodeB": 1})
         vc6 = VectorClock({"nodeA": 1, "nodeB": 2})
         self.assertEqual(vc5.compare(vc6), "CONCURRENT")
+
 
 class TestMerkleTreeAndReconciler(unittest.TestCase):
     def test_merkle_tree_hashing(self):
@@ -49,6 +51,7 @@ class TestMerkleTreeAndReconciler(unittest.TestCase):
 
         diffs = rec1.find_differences(rec2.store)
         self.assertIn("key2", diffs)
+
 
 if __name__ == "__main__":
     unittest.main()

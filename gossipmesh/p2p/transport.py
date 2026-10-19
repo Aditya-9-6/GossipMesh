@@ -20,6 +20,7 @@ class PeerRateLimiter:
         self._tokens: Dict[str, float] = {}
         self._last_check: Dict[str, float] = {}
         import time
+
         self._time_func = time.time
         self._lock = asyncio.Lock()
 
@@ -31,10 +32,10 @@ class PeerRateLimiter:
         tokens = self._tokens.get(peer_id, self.config.burst_capacity)
         last = self._last_check.get(peer_id, now)
         elapsed = max(0.0, now - last)
-        
+
         tokens = min(self.config.burst_capacity, tokens + elapsed * self.config.max_rate_per_sec)
         self._last_check[peer_id] = now
-        
+
         if tokens >= 1.0:
             self._tokens[peer_id] = tokens - 1.0
             return True
@@ -65,12 +66,14 @@ class GossipTransport:
     def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
         self._handlers[topic] = handler
 
-    async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = 'default') -> Optional[Any]:
+    async def receive_payload(
+        self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = "default"
+    ) -> Optional[Any]:
         if self.reputation.is_quarantined(peer_id):
             self.telemetry.record_dropped()
             logging.warning(f"Dropped payload from quarantined peer {peer_id}")
             return None
-    
+
         allowed = self.rate_limiter.check_rate_limit(peer_id)
         if not allowed:
             self.telemetry.record_dropped()
@@ -79,7 +82,7 @@ class GossipTransport:
 
         if isinstance(payload, bytes):
             try:
-                payload_str = payload.decode('utf-8')
+                payload_str = payload.decode("utf-8")
                 try:
                     payload = json.loads(payload_str)
                 except Exception:
@@ -120,7 +123,7 @@ class P2PSessionTransport:
 class ZeroCopyPacketParser:
     @staticmethod
     def serialize_header(magic: int, msg_type: int, msg_id: str, payload: bytes) -> bytes:
-        id_bytes = msg_id.encode('utf-8').ljust(36, b'\x00')[:36]
+        id_bytes = msg_id.encode("utf-8").ljust(36, b"\x00")[:36]
         length = len(payload)
         header = struct.pack(">I B 36s I", magic, msg_type, id_bytes, length)
         return header + payload
@@ -130,8 +133,8 @@ class ZeroCopyPacketParser:
         if len(buf) < 45:
             raise ValueError("Buffer too small for packet header")
         magic, msg_type, raw_id, length = struct.unpack_from(">I B 36s I", buf, 0)
-        msg_id = raw_id.rstrip(b'\x00').decode('utf-8')
-        payload = buf[45:45 + length].tobytes()
+        msg_id = raw_id.rstrip(b"\x00").decode("utf-8")
+        payload = buf[45 : 45 + length].tobytes()
         return magic, msg_type, msg_id, length, payload
 
 

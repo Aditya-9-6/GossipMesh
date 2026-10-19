@@ -65,7 +65,10 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = Path(env_path).read_bytes()
 
     if not pem_bytes:
-        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
+        # Check both relative to cwd and relative to workspace root
+        fallback = Path("enterprise/test_private_key.pem")
+        if not fallback.is_file():
+            fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
         if fallback.is_file():
             pem_bytes = fallback.read_bytes()
 
@@ -152,9 +155,7 @@ def issue_license(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Issue offline RSA-4096 signed JWT enterprise license tokens."
-    )
+    parser = argparse.ArgumentParser(description="Issue offline RSA-4096 signed JWT enterprise license tokens.")
     parser.add_argument("--customer-id", required=True, help="Customer ID (e.g., acme-fintech-corp)")
     parser.add_argument(
         "--bundle",

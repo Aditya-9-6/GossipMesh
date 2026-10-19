@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 class GossipDedupFilter:
     """High-performance bounded ring-buffer deduplication filter using cryptographic hash truncation.
-    
+
     Prevents amplification storms in dense multi-agent meshes with O(1) time complexity lookups,
     zero memory allocations on steady-state lookups, and thread-safe operations via fine-grained locking.
     """
@@ -20,21 +20,21 @@ class GossipDedupFilter:
         self._tail = 0
         self._size = 0
         self._lock = threading.Lock()
-        
+
         # Telemetry metrics
         self._duplicates_filtered = 0
         self._total_evaluated = 0
 
     def _compute_digest(self, frame: bytes) -> bytes:
         """Computes a truncated cryptographic hash of the incoming gossip frame.
-        
+
         Using SHA-256 truncated to 16 bytes for compact storage and minimal collision risk.
         """
         return hashlib.sha256(frame).digest()[:16]
 
     def is_duplicate(self, frame: bytes) -> bool:
         """Checks if a gossip frame is a duplicate without inserting it.
-        
+
         Performs cryptographic digest computation outside the critical section or safely within.
         """
         digest = self._compute_digest(frame)
@@ -44,11 +44,11 @@ class GossipDedupFilter:
     def check_and_add(self, frame: bytes) -> bool:
         """Evaluates a gossip frame, returning True if it is a duplicate (already seen),
         or recording it and returning False if it is novel.
-        
+
         Maintains a fixed-size ring buffer with O(1) amortized time complexity.
         """
         digest = self._compute_digest(frame)
-        
+
         with self._lock:
             self._total_evaluated += 1
             if digest in self._set:
@@ -90,9 +90,5 @@ class GossipDedupFilter:
                 "current_size": self._size,
                 "total_evaluated": self._total_evaluated,
                 "duplicates_filtered": self._duplicates_filtered,
-                "hit_ratio": (
-                    self._duplicates_filtered / self._total_evaluated
-                    if self._total_evaluated > 0
-                    else 0.0
-                ),
+                "hit_ratio": (self._duplicates_filtered / self._total_evaluated if self._total_evaluated > 0 else 0.0),
             }

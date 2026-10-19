@@ -91,20 +91,20 @@ def format_report_text(
     else:
         lines.append("\nDIAGNOSTIC FINDINGS & REMEDIATION:")
         for idx, f in enumerate(findings, start=1):
-            lines.extend([
-                f"\n[{idx}] {f['severity'].upper()} - {f['rule_id']} at {f['file']}:{f['line']}",
-                f"    Issue      : {f['message']}",
-                f"    Remediation: {f['remediation']}",
-            ])
+            lines.extend(
+                [
+                    f"\n[{idx}] {f['severity'].upper()} - {f['rule_id']} at {f['file']}:{f['line']}",
+                    f"    Issue      : {f['message']}",
+                    f"    Remediation: {f['remediation']}",
+                ]
+            )
 
     lines.append("\n" + "=" * 72)
     return "\n".join(lines)
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="GossipMesh Enterprise Air-Gapped Code & Infrastructure Reviewer."
-    )
+    parser = argparse.ArgumentParser(description="GossipMesh Enterprise Air-Gapped Code & Infrastructure Reviewer.")
     parser.add_argument(
         "--repo-path",
         default=".",
@@ -186,6 +186,7 @@ def main():
     # 3. Execute Infrastructure Reviewer
     try:
         from scripts.infrastructure_reviewer import review as run_infra_review
+
         repo_root = Path(args.repo_path).resolve()
         review_result = run_infra_review(
             repo_root=repo_root,
@@ -216,17 +217,20 @@ def main():
 
     # 5. Output Report
     if args.output_format == "json":
-        output_str = json.dumps({
-            "license": {
-                "customer": customer_id,
-                "tier": license_data.get("tier"),
-                "plan": license_data.get("plan"),
-                "offline_air_gapped": license_data.get("offline_air_gapped", True),
+        output_str = json.dumps(
+            {
+                "license": {
+                    "customer": customer_id,
+                    "tier": license_data.get("tier"),
+                    "plan": license_data.get("plan"),
+                    "offline_air_gapped": license_data.get("offline_air_gapped", True),
+                },
+                "bundle": active_bundle,
+                "task": args.task,
+                "review": review_result,
             },
-            "bundle": active_bundle,
-            "task": args.task,
-            "review": review_result,
-        }, indent=2)
+            indent=2,
+        )
     else:
         output_str = format_report_text(
             license_data=license_data,

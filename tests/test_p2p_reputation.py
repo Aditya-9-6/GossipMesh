@@ -4,6 +4,7 @@ import asyncio
 from gossipmesh.p2p.reputation import LeakyBucketReputation
 from gossipmesh.p2p.transport import GossipTransport
 
+
 class TestLeakyBucketReputation(unittest.TestCase):
     def setUp(self):
         self.rep = LeakyBucketReputation(capacity=100.0, leak_rate_per_sec=10.0, quarantine_threshold=50.0)
@@ -30,5 +31,6 @@ class TestLeakyBucketReputation(unittest.TestCase):
         score = self.rep.get_score("peer_1")
         self.assertLess(score, 40.0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

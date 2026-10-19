@@ -52,10 +52,10 @@ class TestGossipDedupFilter(unittest.TestCase):
 
         # Add f4, which should evict f1
         self.assertFalse(dedup.check_and_add(f4))
-        
+
         # f1 should now be evicted and treated as new
         self.assertFalse(dedup.check_and_add(f1))
-        
+
         # f2 should now be evicted (since capacity is 3 and we added f1, f3, f4, f1)
         self.assertTrue(dedup.is_duplicate(f3))
         self.assertTrue(dedup.is_duplicate(f4))
