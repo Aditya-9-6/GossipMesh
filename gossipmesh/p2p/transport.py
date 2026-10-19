@@ -1,47 +1,12 @@
-<<<<<<< HEAD
-import logging
-import time
-from typing import List, Any, Dict, Optional, Callable
-from gossipmesh.p2p.fanout import AdaptiveFanoutController
-from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
-
-logger = logging.getLogger(__name__)
-
-class TransportTelemetry:
-    def __init__(self):
-        self.sent_messages = 0
-        self.received_messages = 0
-        self.dropped_messages = 0
-
-class GossipTransport:
-    """Manages peer-to-peer transport layer with adaptive fanout controls and rate limiting."""
-    def __init__(self, node_id: str, initial_fanout: int = 6, config: Optional[RateLimitConfig] = None):
-        self.node_id = node_id
-        self.fanout_controller = AdaptiveFanoutController(initial_fanout=initial_fanout)
-        self.rate_limiter = PeerRateLimiter(config=config)
-        self.telemetry = TransportTelemetry()
-        self.handlers: Dict[str, Callable[[Any], None]] = {}
-
-    def register_handler(self, topic: str, handler: Callable[[Any], None]) -> None:
-        self.handlers[topic] = handler
-
-    def select_peers(self, all_peers: List[str], is_duplicate: bool = False) -> List[str]:
-        current_fanout = self.fanout_controller.record_message(is_duplicate=is_duplicate)
-        import random
-        selected = random.sample(all_peers, min(len(all_peers), current_fanout))
-        logger.debug(f"Node {self.node_id} selected {len(selected)} peers with fanout {current_fanout}")
-        return selected
-
-    async def send_payload(self, peer_id: str, payload: Any, topic: Optional[str] = None) -> bool:
-        self.telemetry.sent_messages += 1
-=======
 import asyncio
 import json
 import logging
 import time
 import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+import random
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from gossipmesh.p2p.fanout import AdaptiveFanoutController
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
@@ -133,14 +98,16 @@ class TransportTelemetry:
 
 
 class GossipTransport:
-    """High-level P2P gossip transport integrating rate limiting, framing, and topic dispatch."""
+    """Manages peer-to-peer transport layer with adaptive fanout controls, rate limiting, and topic dispatch."""
 
     def __init__(
         self,
         node_id: str,
+        initial_fanout: int = 6,
         config: Optional[RateLimitConfig] = None,
     ) -> None:
         self.node_id = node_id
+        self.fanout_controller = AdaptiveFanoutController(initial_fanout=initial_fanout)
         self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
         self.telemetry = TransportTelemetry()
         self.handlers: Dict[str, Callable[[Any], Any]] = {}
@@ -149,8 +116,14 @@ class GossipTransport:
         """Registers a callback handler for a gossip topic."""
         self.handlers[topic] = handler
 
+    def select_peers(self, all_peers: List[str], is_duplicate: bool = False) -> List[str]:
+        current_fanout = self.fanout_controller.record_message(is_duplicate=is_duplicate)
+        selected = random.sample(all_peers, min(len(all_peers), current_fanout))
+        logger.debug(f"Node {self.node_id} selected {len(selected)} peers with fanout {current_fanout}")
+        return selected
+
     async def receive_payload(
-        self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = "default"
+        self, peer_id: str, payload: Union[bytes, str, dict, int, float], topic: Optional[str] = "default"
     ) -> Optional[Any]:
         """Receives, rate-limits, parses, and dispatches a payload from a peer."""
         if isinstance(payload, bytes):
@@ -165,7 +138,14 @@ class GossipTransport:
             raw_bytes = str(payload).encode("utf-8")
 
         size_bytes = len(raw_bytes)
-        allowed, _reason = await self.rate_limiter.check_and_consume(peer_id, size_bytes)
+        
+        # Await or handle rate limiter check
+        rate_check = self.rate_limiter.check_and_consume(peer_id, size_bytes)
+        if asyncio.iscoroutine(rate_check):
+            allowed, _reason = await rate_check
+        else:
+            allowed, _reason = rate_check, None
+
         if not allowed:
             self.telemetry.record_dropped()
             return None
@@ -185,22 +165,23 @@ class GossipTransport:
                 parsed_data = json.loads(payload)
             except Exception:
                 parsed_data = {"raw": payload}
-        elif isinstance(payload, int):
+        elif isinstance(payload, (int, float)):
             parsed_data = {"data": payload}
         else:
             parsed_data = {"raw": str(payload)}
 
-        if topic in self.handlers:
+        active_topic = topic or "default"
+        if active_topic in self.handlers:
             try:
-                res = self.handlers[topic](parsed_data)
+                res = self.handlers[active_topic](parsed_data)
                 if asyncio.iscoroutine(res):
                     await res
             except Exception as e:
-                logger.error(f"Error in transport handler for topic {topic}: {e}")
+                logger.error(f"Error in transport handler for topic {active_topic}: {e}")
 
         return parsed_data
 
-    async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict]) -> bool:
+    async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict], topic: Optional[str] = None) -> bool:
         """Simulates sending a payload to a peer with telemetry recording."""
         if isinstance(payload, bytes):
             raw_bytes = payload
@@ -212,45 +193,15 @@ class GossipTransport:
             raw_bytes = str(payload).encode("utf-8")
 
         self.telemetry.record_sent(len(raw_bytes))
->>>>>>> origin/main
         return True
 
-    async def receive_payload(
-        self, peer_id: str, raw_payload: Any, topic: Optional[str] = None
-    ) -> Optional[Any]:
-        # Estimate size or default to 1
-        size_bytes = len(str(raw_payload))
-        if not self.rate_limiter.check_and_consume(peer_id, size_bytes=size_bytes):
-            self.telemetry.dropped_messages += 1
-            return None
-
-        self.telemetry.received_messages += 1
-        payload = raw_payload
-        if topic and topic in self.handlers:
-            try:
-                handler = self.handlers[topic]
-                if callable(handler):
-                    handler(payload)
-            except Exception as e:
-                logger.error(f"Error in handler for topic {topic}: {e}")
-        return payload
-
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
-<<<<<<< HEAD
-        return {
-            "transport": {
-                "sent_messages": self.telemetry.sent_messages,
-                "received_messages": self.telemetry.received_messages,
-                "dropped_messages": self.telemetry.dropped_messages,
-            },
-            "node_id": self.node_id,
-=======
         """Returns comprehensive telemetry metrics for transport and rate limiter."""
-        limiter_metrics = await self.rate_limiter.get_metrics()
+        limiter_metrics = await self.rate_limiter.get_metrics() if hasattr(self.rate_limiter, "get_metrics") else {}
         return {
             "transport": self.telemetry.to_dict(),
             "rate_limiter": limiter_metrics,
->>>>>>> origin/main
+            "node_id": self.node_id,
         }
 
 
