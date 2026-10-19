@@ -75,3 +75,17 @@ class ProviderManager:
         for name, provider in self._instances.items():
             health_status[name] = await provider.check_health()
         return health_status
+
+    def fallback_chain(self, primary: str = "gemini") -> List[BaseProvider]:
+        """Return a list of provider instances in order of fallback.
+
+        The primary provider (default 'gemini') is placed first if available,
+        followed by all other registered providers.
+        """
+        chain: List[BaseProvider] = []
+        if primary in self._instances:
+            chain.append(self._instances[primary])
+        for name, provider in self._instances.items():
+            if name != primary:
+                chain.append(provider)
+        return chain
