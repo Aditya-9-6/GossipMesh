@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.p2p.merkle_trie import MerklePatriciaTree
 
+
 class TestMerklePatriciaTree(unittest.TestCase):
     def test_empty_trie(self):
         trie = MerklePatriciaTree()
@@ -30,5 +31,6 @@ class TestMerklePatriciaTree(unittest.TestCase):
         proof = trie.get_proof("key1")
         self.assertIsInstance(proof, list)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ import threading
 from typing import Dict, Any, Optional
 from gossipmesh.p2p.health import SlidingWindowPeerHealthScorecard, PeerHealthConfig
 
+
 class PeerNode:
     def __init__(self, peer_id: str, address: str, health_config: Optional[PeerHealthConfig] = None) -> None:
         self.peer_id = peer_id
@@ -26,6 +27,7 @@ class PeerNode:
             "connected_at": self.connected_at,
             **metrics,
         }
+
 
 class PeerManager:
     def __init__(self, health_config: Optional[PeerHealthConfig] = None) -> None:

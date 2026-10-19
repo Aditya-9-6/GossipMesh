@@ -3,6 +3,7 @@ import asyncio
 import time
 from gossipmesh.p2p.ratelimit import TokenBucket, RateLimitConfig, PeerRateLimiter
 
+
 class TestTokenBucket(unittest.TestCase):
     def test_token_bucket_basic(self):
         bucket = TokenBucket(capacity=10.0, refill_rate=5.0, initial_tokens=10.0)
@@ -18,14 +19,10 @@ class TestTokenBucket(unittest.TestCase):
         self.assertTrue(bucket.can_consume(1.0))
         self.assertTrue(bucket.consume(1.0))
 
+
 class TestPeerRateLimiter(unittest.TestCase):
     def setUp(self):
-        self.config = RateLimitConfig(
-            max_tokens=5.0,
-            refill_rate=10.0,
-            max_bytes_per_sec=100.0,
-            max_peers=2
-        )
+        self.config = RateLimitConfig(max_tokens=5.0, refill_rate=10.0, max_bytes_per_sec=100.0, max_peers=2)
         self.limiter = PeerRateLimiter(self.config)
 
     def test_rate_limiting_flow(self):
@@ -70,6 +67,7 @@ class TestPeerRateLimiter(unittest.TestCase):
             self.assertEqual(metrics_after["active_peers"], 1)
 
         asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

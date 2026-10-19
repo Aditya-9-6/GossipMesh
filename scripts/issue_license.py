@@ -53,6 +53,16 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = p.read_bytes()
         elif "BEGIN" in key_input:
             pem_bytes = key_input.encode("utf-8")
+        else:
+            # Try relative to repo root if not absolute or direct file
+            candidate = Path(__file__).resolve().parent.parent / key_input
+            if candidate.is_file():
+                pem_bytes = candidate.read_bytes()
+            else:
+                # Also check direct CWD or relative to CWD
+                cwd_candidate = Path.cwd() / key_input
+                if cwd_candidate.is_file():
+                    pem_bytes = cwd_candidate.read_bytes()
 
     if not pem_bytes:
         env_raw = os.getenv("LICENSE_PRIVATE_KEY")
@@ -65,9 +75,14 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = Path(env_path).read_bytes()
 
     if not pem_bytes:
-        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
-        if fallback.is_file():
-            pem_bytes = fallback.read_bytes()
+        for fallback in [
+            Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem",
+            Path.cwd() / "enterprise" / "test_private_key.pem",
+            Path.cwd() / "test_private_key.pem",
+        ]:
+            if fallback.is_file():
+                pem_bytes = fallback.read_bytes()
+                break
 
     if not pem_bytes:
         raise ValueError(
@@ -152,9 +167,7 @@ def issue_license(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Issue offline RSA-4096 signed JWT enterprise license tokens."
-    )
+    parser = argparse.ArgumentParser(description="Issue offline RSA-4096 signed JWT enterprise license tokens.")
     parser.add_argument("--customer-id", required=True, help="Customer ID (e.g., acme-fintech-corp)")
     parser.add_argument(
         "--bundle",
