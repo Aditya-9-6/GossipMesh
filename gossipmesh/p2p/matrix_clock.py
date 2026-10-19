@@ -1,7 +1,7 @@
 import time
 import threading
 from collections import deque
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 
 class MatrixClockMessage:
@@ -76,13 +76,10 @@ class BoundedMatrixClockEngine:
         sender = msg.sender_id
         msg_clock = msg.matrix_clock
 
-        if not msg_clock:
-            return True
-
         for k, req_val in msg_clock.items():
             if k == sender:
                 known_val = self._matrix.get(sender, {}).get(sender, 0)
-                if req_val > known_val + 1:
+                if req_val != known_val + 1:
                     return False
             else:
                 known_val = self._matrix.get(sender, {}).get(k, 0)
@@ -105,8 +102,7 @@ class BoundedMatrixClockEngine:
         if self.node_id not in self._matrix[sender]:
             self._matrix[sender][self.node_id] = 0
 
-        if sender in msg_clock:
-            self._matrix[sender][sender] = msg_clock[sender]
+        self._matrix[sender][sender] = msg_clock.get(sender, self._matrix[sender].get(sender, 0))
 
     def ingest(self, msg: MatrixClockMessage) -> List[MatrixClockMessage]:
         with self._lock:
@@ -142,5 +138,6 @@ class BoundedMatrixClockEngine:
                 (m for m in self._buffer if now - m.timestamp <= self.staleness_window_seconds),
                 maxlen=self.max_buffer_size,
             )
+            removed = initial_len - len(active_buffer)
             self._buffer = active_buffer
-            return initial_len - len(self._buffer)
+            return removed
