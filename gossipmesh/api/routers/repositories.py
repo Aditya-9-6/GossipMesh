@@ -15,23 +15,28 @@ from gossipmesh.core.exceptions import AuthorizationError
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 class SyncRequest(BaseModel):
     full_name: str
     installation_id: int
     organization_id: int
+
 
 @router.post("/sync", status_code=202)
 def sync_repository(
     request: SyncRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """Queues a background task to sync repository metadata from GitHub."""
-    is_member = db.query(UserOrganization).filter(
-        UserOrganization.user_id == current_user.id,
-        UserOrganization.organization_id == request.organization_id
-    ).first()
+    is_member = (
+        db.query(UserOrganization)
+        .filter(
+            UserOrganization.user_id == current_user.id, UserOrganization.organization_id == request.organization_id
+        )
+        .first()
+    )
     if not is_member:
         raise AuthorizationError(message="Not authorized for this organization")
 

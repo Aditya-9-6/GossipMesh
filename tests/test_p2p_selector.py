@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.metrics import EMALatencyTracker, PeerMetricsRegistry
 from gossipmesh.p2p.selector import PeerSelector
 
+
 class TestP2PSelectorAndMetrics(unittest.TestCase):
     def test_ema_tracker_normal_operation(self):
         tracker = EMALatencyTracker(window_size=5, alpha=0.5)
@@ -34,7 +35,7 @@ class TestP2PSelectorAndMetrics(unittest.TestCase):
 
         selector = PeerSelector(registry)
         peers = ["peer_slow", "peer_fast", "peer_medium", "peer_unseen"]
-        
+
         # Force strict exploitation by setting exploration_ratio=0.0
         selected = selector.select_peers(peers, count=2, strategy="hybrid", exploration_ratio=0.0)
         self.assertIn("peer_fast", selected)
@@ -45,6 +46,7 @@ class TestP2PSelectorAndMetrics(unittest.TestCase):
         selector = PeerSelector(registry)
         self.assertEqual(selector.select_peers([], 3), [])
         self.assertEqual(selector.select_peers(["p1", "p2"], 5), ["p1", "p2"])
+
 
 if __name__ == "__main__":
     unittest.main()

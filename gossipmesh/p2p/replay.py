@@ -33,13 +33,13 @@ class ReplayProtectionRingBuffer:
             idx = seq & self.mask
             byte_idx = idx >> 3
             bit_offset = idx & 7
-            
+
             byte_val = self._buffer[byte_idx]
             bit_mask = 1 << bit_offset
-            
+
             if (byte_val & bit_mask) != 0:
                 return False
-            
+
             self._buffer[byte_idx] = byte_val | bit_mask
             return True
 

@@ -2,8 +2,10 @@ import threading
 from collections import deque
 from typing import Any, Dict, List, Optional
 
+
 class EMALatencyTracker:
     """Tracks round-trip latency using a windowed Exponential Moving Average (EMA) with bounded memory."""
+
     def __init__(self, window_size: int = 50, alpha: float = 0.2):
         self.window_size = window_size
         self.alpha = alpha
@@ -26,14 +28,12 @@ class EMALatencyTracker:
         return self.current_ema
 
     def get_stats(self) -> Dict[str, Any]:
-        return {
-            "ema": self.current_ema,
-            "samples": len(self.latencies),
-            "recent": list(self.latencies)
-        }
+        return {"ema": self.current_ema, "samples": len(self.latencies), "recent": list(self.latencies)}
+
 
 class PeerMetricsRegistry:
     """Thread-safe registry for managing peer EMA latency trackers."""
+
     def __init__(self, window_size: int = 50, alpha: float = 0.2):
         self.window_size = window_size
         self.alpha = alpha
