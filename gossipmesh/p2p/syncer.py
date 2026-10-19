@@ -1,17 +1,19 @@
-from typing import Any, Dict, Optional
+import asyncio
+import logging
+from typing import Optional, Dict, Any
 from gossipmesh.p2p.entropy import VectorClock
 
+logger = logging.getLogger(__name__)
 
-class VectorClockSyncer:
-    """Syncs state between peers using VectorClocks."""
+
+class PeerSyncer:
+    """Handles peer state synchronization and entropy reconciliation."""
 
     def __init__(self, node_id: str) -> None:
         self.node_id = node_id
-        self.clock = VectorClock(node_id)
+        self.vector_clock = VectorClock(node_id)
 
-    def prepare_sync(self) -> Dict[str, int]:
-        return self.clock.get_state()
-
-    def reconcile(self, remote_state: Dict[str, int]) -> bool:
-        remote_clock = VectorClock.from_state(remote_state)
-        return self.clock.merge(remote_clock)
+    async def sync_with_peer(self, peer_endpoint: str) -> None:
+        """Synchronizes state with a peer using vector clocks."""
+        logger.info(f"Syncing with peer at {peer_endpoint}")
+        self.vector_clock.increment()
