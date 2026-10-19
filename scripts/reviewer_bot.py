@@ -38,7 +38,9 @@ def load_master_plan_keywords():
 
 
 def evaluate_pr_against_master_plan(pr_number):
-    pr_json = run_cmd(f"gh pr view {pr_number} --json number,title,body,headRefName,baseRefName,changedFiles,additions,deletions,mergeable,files")
+    pr_json = run_cmd(
+        f"gh pr view {pr_number} --json number,title,body,headRefName,baseRefName,changedFiles,additions,deletions,mergeable,files"
+    )
     if not pr_json:
         raise ValueError(f"Could not retrieve metadata for PR #{pr_number}")
     pr = json.loads(pr_json)
@@ -61,7 +63,9 @@ def evaluate_pr_against_master_plan(pr_number):
         plan_score += 25
         matched_aspects.append(f"Explicit roadmap link: `{task_match.group(0)}`")
 
-    core_paths = [f for f in files if f.startswith("gossipmesh/") or f.startswith("worker/") or f.startswith("scripts/")]
+    core_paths = [
+        f for f in files if f.startswith("gossipmesh/") or f.startswith("worker/") or f.startswith("scripts/")
+    ]
     if core_paths:
         plan_score += 15
         matched_aspects.append(f"Touches {len(core_paths)} core Master Plan subsystem files")
@@ -91,7 +95,9 @@ def evaluate_pr_against_master_plan(pr_number):
     total_score = max(0, min(100, total_score))
 
     status_icon = "🟢" if total_score > 90 else ("🟡" if total_score >= 70 else "🔴")
-    verdict = "APPROVED (Ready for Gate)" if total_score > 90 else ("ACTION_REQUIRED" if total_score >= 70 else "REJECTED")
+    verdict = (
+        "APPROVED (Ready for Gate)" if total_score > 90 else ("ACTION_REQUIRED" if total_score >= 70 else "REJECTED")
+    )
 
     comment = f"""### {status_icon} GossipMesh AI Reviewer Gate: Master Implementation Plan Audit
 **PR #{pr_number}**: `{title}`
@@ -124,7 +130,9 @@ def main():
         print("PR_NUMBER env var not set", file=sys.stderr)
         sys.exit(1)
 
-    has_keys = any(os.environ.get(k) for k in ("GEMINI_API_KEY", "OPENROUTER_API_KEY", "NVIDIA_API_KEY", "GROQ_API_KEY"))
+    has_keys = any(
+        os.environ.get(k) for k in ("GEMINI_API_KEY", "OPENROUTER_API_KEY", "NVIDIA_API_KEY", "GROQ_API_KEY")
+    )
     score = 0
     comment = ""
 
