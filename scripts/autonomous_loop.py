@@ -373,18 +373,35 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
                 pass
 
     if verdict == "APPROVED" and score >= 90:
-        print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Merging PR #{pr_num} into main...", flush=True)
+        print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Attempting to merge PR #{pr_num} into main...", flush=True)
         run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace, check=False)
         run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
         merge_res = run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace, check=False)
-        print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
-        run_cmd(["gh", "issue", "close", str(issue_num), "-c", f"Resolved and merged in PR #{pr_num}."], cwd=workspace, check=False)
-        run_cmd(["git", "checkout", "main"], cwd=workspace)
-        run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
-        # Clean up feature branch
-        run_cmd(["git", "branch", "-D", branch_name], cwd=workspace, check=False)
-        run_cmd(["git", "push", "origin", "--delete", branch_name], cwd=workspace, check=False)
-        return True
+        
+        # Verify PR was actually merged on GitHub
+        pr_state_raw = run_cmd(["gh", "pr", "view", str(pr_num), "--json", "state,merged"], cwd=workspace, check=False)
+        is_merged = False
+        try:
+            pr_data = json.loads(pr_state_raw) if pr_state_raw else {}
+            is_merged = pr_data.get("merged", False) or pr_data.get("state") == "MERGED"
+        except Exception:
+            pass
+
+        if is_merged:
+            print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
+            run_cmd(["gh", "pr", "comment", str(pr_num), "--body", f"✅ **Pull Request #{pr_num} successfully merged into `main`**.\n\nAll automated architectural reviews (score: {score}/100) and tests passed."], cwd=workspace, check=False)
+            run_cmd(["gh", "issue", "close", str(issue_num), "-c", f"Resolved and merged in PR #{pr_num}."], cwd=workspace, check=False)
+            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
+            # Clean up feature branch
+            run_cmd(["git", "branch", "-D", branch_name], cwd=workspace, check=False)
+            run_cmd(["git", "push", "origin", "--delete", branch_name], cwd=workspace, check=False)
+            return True
+        else:
+            print(f"[!] PR #{pr_num} merge command did not complete merge: {merge_res}. Leaving open for sweeper.", flush=True)
+            run_cmd(["gh", "pr", "comment", str(pr_num), "--body", f"⚠️ **Merge Incomplete**: Auto-merge attempted but GitHub reported conflicts or blocked merge:\n```text\n{merge_res}\n```\nBranch preserved for automated self-healing."], cwd=workspace, check=False)
+            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            return False
     else:
         print(f"[!] PR #{pr_num} verdict: {verdict} (Score: {score}). Awaiting review fixes.", flush=True)
         return False
@@ -458,11 +475,25 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
 
         if linked_issue:
             try:
-                iss_out = run_cmd(["gh", "issue", "view", str(linked_issue), "--repo", REPO, "--json", "state"], cwd=workspace, check=False)
+                iss_out = run_cmd(["gh", "issue", "view", str(linked_issue), "--repo", REPO, "--json", "state,comments"], cwd=workspace, check=False)
                 if iss_out and '"state":"CLOSED"' in iss_out:
-                    print(f"[*] PR #{pr_num} resolves Issue #{linked_issue} which is ALREADY CLOSED. Closing obsolete PR...", flush=True)
-                    run_cmd(["gh", "pr", "close", str(pr_num), "--repo", REPO, "--comment", f"Closed obsolete PR: Issue #{linked_issue} is already resolved and closed.", "--delete-branch"], cwd=workspace, check=False)
-                    continue
+                    # Check if the issue was solved by ANOTHER merged PR, not this PR itself
+                    comments_data = json.loads(iss_out).get("comments", [])
+                    merged_other_pr = None
+                    for c in comments_data:
+                        body_c = c.get("body", "")
+                        match_pr = re.search(r"PR #(\d+)", body_c)
+                        if match_pr and int(match_pr.group(1)) != pr_num:
+                            merged_other_pr = int(match_pr.group(1))
+                            break
+
+                    if merged_other_pr:
+                        print(f"[*] PR #{pr_num} resolves Issue #{linked_issue} which was already resolved by PR #{merged_other_pr}. Closing duplicate PR...", flush=True)
+                        close_reason = f"👋 Closing PR #{pr_num}: Linked Issue #{linked_issue} was already resolved and merged in PR #{merged_other_pr}."
+                        run_cmd(["gh", "pr", "close", str(pr_num), "--repo", REPO, "--comment", close_reason, "--delete-branch"], cwd=workspace, check=False)
+                        continue
+                    else:
+                        print(f"[*] Note: Linked Issue #{linked_issue} was closed but PR #{pr_num} was NOT merged. Re-evaluating PR for merge...", flush=True)
             except Exception:
                 pass
 
@@ -542,18 +573,35 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                     run_cmd(["gh", "pr", "comment", str(pr_num), "--body-file", str(review_md_file)], cwd=workspace, check=False)
 
                 if verdict == "APPROVED" and score >= 90:
-                    print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Merging into main...", flush=True)
+                    print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Attempting to merge into main...", flush=True)
                     run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace, check=False)
                     run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
-                    run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace, check=False)
-                    print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
-                    if linked_issue:
-                        run_cmd(["gh", "issue", "close", str(linked_issue), "-c", f"Resolved and merged in PR #{pr_num}."], cwd=workspace, check=False)
-                    run_cmd(["git", "checkout", "main"], cwd=workspace)
-                    run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
-                    run_cmd(["git", "branch", "-D", head_ref], cwd=workspace, check=False)
-                    run_cmd(["git", "push", "origin", "--delete", head_ref], cwd=workspace, check=False)
-                    return True
+                    merge_res = run_cmd(["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace, check=False)
+
+                    # Verify PR was actually merged on GitHub
+                    pr_state_raw = run_cmd(["gh", "pr", "view", str(pr_num), "--json", "state,merged"], cwd=workspace, check=False)
+                    is_merged = False
+                    try:
+                        pr_data = json.loads(pr_state_raw) if pr_state_raw else {}
+                        is_merged = pr_data.get("merged", False) or pr_data.get("state") == "MERGED"
+                    except Exception:
+                        pass
+
+                    if is_merged:
+                        print(f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.", flush=True)
+                        run_cmd(["gh", "pr", "comment", str(pr_num), "--body", f"✅ **Pull Request #{pr_num} successfully merged into `main`**.\n\nAll automated architectural reviews (score: {score}/100) and tests passed."], cwd=workspace, check=False)
+                        if linked_issue:
+                            run_cmd(["gh", "issue", "close", str(linked_issue), "-c", f"Resolved and merged in PR #{pr_num}."], cwd=workspace, check=False)
+                        run_cmd(["git", "checkout", "main"], cwd=workspace)
+                        run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
+                        run_cmd(["git", "branch", "-D", head_ref], cwd=workspace, check=False)
+                        run_cmd(["git", "push", "origin", "--delete", head_ref], cwd=workspace, check=False)
+                        return True
+                    else:
+                        print(f"[!] PR #{pr_num} merge command did not complete merge: {merge_res}. Leaving open for next cycle.", flush=True)
+                        run_cmd(["gh", "pr", "comment", str(pr_num), "--body", f"⚠️ **Merge Incomplete**: Auto-merge attempted but GitHub reported conflicts or blocked merge:\n```text\n{merge_res}\n```\nBranch preserved for automated self-healing."], cwd=workspace, check=False)
+                        run_cmd(["git", "checkout", "main"], cwd=workspace)
+                        return False
                 else:
                     print(f"[*] PR #{pr_num} verdict: {verdict} (Score: {score}). Left open for next review cycle.", flush=True)
         except Exception as e:
