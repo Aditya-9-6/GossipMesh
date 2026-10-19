@@ -4,7 +4,9 @@ from typing import Tuple, Optional
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 
 class EphemeralSessionKeyRotator:
     """Manages ephemeral X25519 key pairs and derives session keys using HKDF-SHA256."""
@@ -21,19 +23,13 @@ class EphemeralSessionKeyRotator:
             return self._session_key
 
     def get_public_bytes(self) -> bytes:
-        return self._public_key.public_bytes(
-            encoding=hashes.serialization.Encoding.Raw,
-            format=hashes.serialization.PublicFormat.Raw
-        )
+        return self._public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
 
     def derive_session_key(self, peer_public_bytes: bytes) -> bytes:
         peer_pub = x25519.X25519PublicKey.from_public_bytes(peer_public_bytes)
         shared_key = self._private_key.exchange(peer_pub)
         derived = HKDF(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=b"gossipmesh-p2p-salt",
-            info=b"gossipmesh-session-key"
+            algorithm=hashes.SHA256(), length=32, salt=b"gossipmesh-p2p-salt", info=b"gossipmesh-session-key"
         ).derive(shared_key)
         with self._lock:
             self._session_key = derived

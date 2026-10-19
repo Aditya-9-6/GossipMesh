@@ -55,5 +55,3 @@ __all__ = [
     "WeightedPriorityQueue",
     "GossipMessageRouter",
 ]
-
-

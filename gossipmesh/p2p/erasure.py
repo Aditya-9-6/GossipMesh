@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Tuple, ByteString
 
 class BlockPool:
     """Thread-safe memory pool for byte buffers to prevent allocation overhead on hot paths."""
-    
+
     def __init__(self, block_size: int, max_pool_size: int = 256) -> None:
         self.block_size = block_size
         self.max_pool_size = max_pool_size
@@ -36,7 +36,7 @@ class BlockPool:
 
 class GF28Arithmetic:
     """Galois Field GF(2^8) arithmetic operations with primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11d)."""
-    
+
     _INIT = False
     _EXP = [0] * 512
     _LOG = [0] * 256
@@ -109,17 +109,17 @@ class ErasureCoder:
     def encode(self, payload: bytes) -> List[Tuple[int, bytes]]:
         total_data_len = len(payload)
         required_capacity = self.k * self.block_size
-        
+
         padded = bytearray(payload)
         if len(padded) < required_capacity:
-            padded.extend(b'\x00' * (required_capacity - len(padded)))
+            padded.extend(b"\x00" * (required_capacity - len(padded)))
 
         data_blocks: List[bytearray] = []
         for i in range(self.k):
             start = i * self.block_size
             end = start + self.block_size
             block = self.pool.acquire()
-            block[:len(padded[start:end])] = padded[start:end]
+            block[: len(padded[start:end])] = padded[start:end]
             data_blocks.append(block)
 
         parity_blocks: List[bytearray] = []
@@ -181,7 +181,7 @@ class ErasureCoder:
         if len(fragments) < self.k:
             raise ValueError(f"Insufficient fragments for reconstruction: got {len(fragments)}, required {self.k}")
 
-        active_frags = fragments[:self.k]
+        active_frags = fragments[: self.k]
         available_map = {idx: content for idx, content in active_frags}
 
         # Check if all systematic data blocks are present
@@ -192,7 +192,7 @@ class ErasureCoder:
                 reconstructed.extend(available_map[i])
             if original_size is not None:
                 return bytes(reconstructed[:original_size])
-            return bytes(reconstructed).rstrip(b'\x00')
+            return bytes(reconstructed).rstrip(b"\x00")
 
         # Construct encoding sub-matrix corresponding to available fragments
         sub_matrix: List[List[int]] = []
@@ -200,7 +200,7 @@ class ErasureCoder:
 
         for idx, content in active_frags:
             block = bytearray(self.block_size)
-            block[:len(content)] = content
+            block[: len(content)] = content
             rhs_blocks.append(block)
 
             if idx < self.k:
@@ -232,4 +232,4 @@ class ErasureCoder:
         if original_size is not None:
             return bytes(reconstructed[:original_size])
 
-        return bytes(reconstructed).rstrip(b'\x00')
+        return bytes(reconstructed).rstrip(b"\x00")

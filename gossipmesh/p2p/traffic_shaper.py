@@ -3,13 +3,16 @@ import threading
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 
+
 @dataclass(frozen=True)
 class TokenBucketConfig:
     capacity: float = 1024.0 * 1024.0  # 1 MB bucket capacity
-    refill_rate: float = 100.0 * 1024.0 # 100 KB/s refill rate
+    refill_rate: float = 100.0 * 1024.0  # 100 KB/s refill rate
+
 
 class LeakyBucketTrafficShaper:
     """Thread-safe leaky-bucket / token-bucket traffic shaper enforcing strict per-peer bandwidth caps."""
+
     def __init__(self, config: Optional[TokenBucketConfig] = None) -> None:
         self.config = config or TokenBucketConfig()
         self.tokens = self.config.capacity
@@ -50,8 +53,10 @@ class LeakyBucketTrafficShaper:
                 "total_dropped_bytes": self.total_dropped_bytes,
             }
 
+
 class PeerTrafficShaperManager:
     """Manages independent leaky bucket traffic shapers per peer."""
+
     def __init__(self, default_config: Optional[TokenBucketConfig] = None) -> None:
         self.default_config = default_config or TokenBucketConfig()
         self._shapers: Dict[str, LeakyBucketTrafficShaper] = {}

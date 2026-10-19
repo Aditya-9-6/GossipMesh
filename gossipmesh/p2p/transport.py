@@ -28,10 +28,11 @@ class TransportSocketReader:
         magic, msg_type = ZeroCopyPacketParser.deserialize_header(header_bytes)
         if magic != self.expected_magic:
             raise ValueError(f"Invalid magic number: 0x{magic:X}, expected 0x{self.expected_magic:X}")
-        
+
         import struct
-        unpacked = struct.unpack('!II32sQ', header_bytes)
-        msg_id = unpacked[2].rstrip(b'\x00').decode('utf-8', errors='ignore')
+
+        unpacked = struct.unpack("!II32sQ", header_bytes)
+        msg_id = unpacked[2].rstrip(b"\x00").decode("utf-8", errors="ignore")
         payload_len = unpacked[3]
 
         payload_bytes = await self.reader.readexactly(payload_len)
@@ -40,8 +41,9 @@ class TransportSocketReader:
 
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
-every 1000 messages or 300 seconds without dropping streams."""
-    def __init__(self, max_messages: int=1000, max_time_seconds: float=300.0):
+    every 1000 messages or 300 seconds without dropping streams."""
+
+    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.max_messages = max_messages
         self.max_time_seconds = max_time_seconds
         self.message_count = 0
@@ -90,6 +92,7 @@ every 1000 messages or 300 seconds without dropping streams."""
 
 class TransportTelemetry:
     """Telemetry tracking metrics for gossip transport layer."""
+
     def __init__(self) -> None:
         self.sent_count = 0
         self.received_count = 0
@@ -136,13 +139,15 @@ class GossipTransport:
     def register_handler(self, topic: str, handler: Callable[[Any], None]) -> None:
         self.handlers[topic] = handler
 
-    async def send_payload(self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm", use_erasure: bool = False) -> bool:
-        if not self.rate_limiter.acquire(peer_id):
+    async def send_payload(
+        self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm", use_erasure: bool = False
+    ) -> bool:
+        if not self.rate_limiter.allow_request(peer_id):
             self.telemetry.record_dropped()
             return False
 
         if isinstance(payload, dict):
-            raw_data = json.dumps(payload).encode('utf-8')
+            raw_data = json.dumps(payload).encode("utf-8")
         else:
             raw_data = payload
 
@@ -155,15 +160,17 @@ class GossipTransport:
 
         return True
 
-    async def receive_payload(self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm") -> Optional[Union[bytes, Dict[str, Any]]]:
-        if not self.rate_limiter.acquire(peer_id):
+    async def receive_payload(
+        self, peer_id: str, payload: Union[bytes, Dict[str, Any]], topic: str = "swarm"
+    ) -> Optional[Union[bytes, Dict[str, Any]]]:
+        if not self.rate_limiter.allow_request(peer_id):
             self.telemetry.record_dropped()
             return None
 
         if isinstance(payload, bytes):
             self.telemetry.record_received(len(payload))
             try:
-                parsed = json.loads(payload.decode('utf-8'))
+                parsed = json.loads(payload.decode("utf-8"))
             except Exception:
                 parsed = payload
         else:

@@ -3,6 +3,7 @@ import asyncio
 from gossipmesh.p2p.erasure import ErasureCoder, BlockPool
 from gossipmesh.p2p.transport import GossipTransport
 
+
 class TestErasureCoder(unittest.TestCase):
     def setUp(self):
         self.coder = ErasureCoder(k=4, m=2, block_size=64)
@@ -36,9 +37,9 @@ class TestErasureCoder(unittest.TestCase):
         self.assertEqual(reconstructed, payload)
 
     def test_insufficient_fragments(self):
-        payload = b"Test insufficient fragments exception." 
+        payload = b"Test insufficient fragments exception."
         fragments = self.coder.encode(payload)
-        
+
         # Provide only 3 fragments when k=4 is required
         insufficient = fragments[:3]
         with self.assertRaises(ValueError):
@@ -50,16 +51,17 @@ class TestGossipTransportErasure(unittest.TestCase):
         async def run():
             transport = GossipTransport(node_id="node-1", k=3, m=1)
             received_messages = []
-            
+
             transport.register_handler("swarm", lambda p: received_messages.append(p))
-            
+
             payload = {"task": "refactor_module", "priority": 1}
             success = await transport.send_payload("node-2", payload, use_erasure=True)
             self.assertTrue(success)
             metrics = await transport.get_telemetry_metrics()
             self.assertGreater(metrics["bytes_sent"], 0)
-            
+
         asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()
