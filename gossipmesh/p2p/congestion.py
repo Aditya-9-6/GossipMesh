@@ -102,9 +102,7 @@ class SlidingWindowCongestionController:
         with self._lock:
             return len(self._in_flight) < math.floor(self.cwnd)
 
-    def on_packet_sent(
-        self, packet_id: str, size_bytes: int = 1, sent_at: Optional[float] = None
-    ) -> bool:
+    def on_packet_sent(self, packet_id: str, size_bytes: int = 1, sent_at: Optional[float] = None) -> bool:
         """
         Registers an outgoing packet in the in-flight sliding window.
         Returns True if sent within window capacity, False otherwise.
@@ -118,14 +116,10 @@ class SlidingWindowCongestionController:
         with self._lock:
             if len(self._in_flight) >= math.floor(self.cwnd):
                 return False
-            self._in_flight[packet_id] = InFlightPacket(
-                packet_id=packet_id, sent_at=timestamp, size_bytes=size_bytes
-            )
+            self._in_flight[packet_id] = InFlightPacket(packet_id=packet_id, sent_at=timestamp, size_bytes=size_bytes)
             return True
 
-    def on_ack_received(
-        self, packet_id: str, ack_at: Optional[float] = None
-    ) -> Optional[float]:
+    def on_ack_received(self, packet_id: str, ack_at: Optional[float] = None) -> Optional[float]:
         """
         Processes an incoming packet ACK, updates RTT, jitter, and expands cwnd.
         Returns the measured sample RTT, or None if packet was not tracked.
@@ -151,9 +145,7 @@ class SlidingWindowCongestionController:
                 self._in_flight.pop(packet_id, None)
 
             # Halve window down to minimum bound
-            new_ssthresh = max(
-                self.config.min_cwnd, self.cwnd * self.config.loss_reduction_factor
-            )
+            new_ssthresh = max(self.config.min_cwnd, self.cwnd * self.config.loss_reduction_factor)
             self.ssthresh = new_ssthresh
             self.cwnd = max(self.config.min_cwnd, new_ssthresh)
             self.state = CongestionState.FAST_RECOVERY
@@ -166,9 +158,7 @@ class SlidingWindowCongestionController:
             effective_rtt = self.srtt if self.srtt is not None else 0.05
             jitter = self.jitter_estimator.get_jitter()
             delay = (effective_rtt + 2.0 * jitter) / max(1.0, self.cwnd)
-            return max(
-                self.config.min_pacing_delay, min(self.config.max_pacing_delay, delay)
-            )
+            return max(self.config.min_pacing_delay, min(self.config.max_pacing_delay, delay))
 
     def get_metrics(self) -> Dict[str, Any]:
         """Returns snapshot telemetry of the congestion control instance."""
@@ -231,9 +221,7 @@ class StreamCongestionManager:
             raise ValueError("peer_id cannot be empty")
         with self._lock:
             if peer_id not in self._controllers:
-                self._controllers[peer_id] = SlidingWindowCongestionController(
-                    config=self.default_config
-                )
+                self._controllers[peer_id] = SlidingWindowCongestionController(config=self.default_config)
             return self._controllers[peer_id]
 
     def remove_peer(self, peer_id: str) -> None:
@@ -244,7 +232,4 @@ class StreamCongestionManager:
     def get_all_metrics(self) -> Dict[str, Dict[str, Any]]:
         """Returns telemetry metrics across all active peer streams."""
         with self._lock:
-            return {
-                peer_id: ctrl.get_metrics()
-                for peer_id, ctrl in self._controllers.items()
-            }
+            return {peer_id: ctrl.get_metrics() for peer_id, ctrl in self._controllers.items()}

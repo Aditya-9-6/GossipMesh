@@ -1,5 +1,6 @@
 import math
 
+
 class AdaptiveTTLEngine:
     """Calculates adaptive epidemic Time-To-Live (TTL) decay based on local queue depths
     and downstream neighbor latency, incorporating a congestion-aware poison-reverse heuristic."""
@@ -13,7 +14,9 @@ class AdaptiveTTLEngine:
         self.max_queue_depth = max_queue_depth
         self.max_latency_ms = max_latency_ms
 
-    def calculate_decay(self, current_ttl: int, queue_depth: int, latency_ms: float, is_poison_reverse: bool = False) -> int:
+    def calculate_decay(
+        self, current_ttl: int, queue_depth: int, latency_ms: float, is_poison_reverse: bool = False
+    ) -> int:
         """Computes the adjusted TTL given local congestion metrics and poison-reverse flags.
         Functions strictly within single-responsibility constraints and < 50 LOC.
         """

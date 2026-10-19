@@ -49,6 +49,8 @@ def load_private_key(key_input: Optional[str] = None):
 
     if key_input:
         p = Path(key_input)
+        if not p.is_absolute():
+            p = Path(__file__).resolve().parent.parent / p
         if p.is_file():
             pem_bytes = p.read_bytes()
         elif "BEGIN" in key_input:
@@ -75,7 +77,16 @@ def load_private_key(key_input: Optional[str] = None):
             "or set LICENSE_PRIVATE_KEY_PATH."
         )
 
-    return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
+    last_ex = None
+    for loader in [
+        lambda b: serialization.load_pem_private_key(b, password=None, backend=default_backend()),
+        lambda b: serialization.load_der_private_key(b, password=None, backend=default_backend()),
+    ]:
+        try:
+            return loader(pem_bytes)
+        except Exception as e:
+            last_ex = e
+    raise last_ex
 
 
 def parse_task_map(map_str: Optional[str]) -> Optional[Dict[str, str]]:
@@ -152,9 +163,7 @@ def issue_license(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Issue offline RSA-4096 signed JWT enterprise license tokens."
-    )
+    parser = argparse.ArgumentParser(description="Issue offline RSA-4096 signed JWT enterprise license tokens.")
     parser.add_argument("--customer-id", required=True, help="Customer ID (e.g., acme-fintech-corp)")
     parser.add_argument(
         "--bundle",

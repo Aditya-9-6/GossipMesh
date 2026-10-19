@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.p2p.ttl import AdaptiveTTLEngine
 
+
 class TestAdaptiveTTLEngine(unittest.TestCase):
     def setUp(self):
         self.engine = AdaptiveTTLEngine(base_ttl=10, max_queue_depth=100, max_latency_ms=500.0)
@@ -22,6 +23,7 @@ class TestAdaptiveTTLEngine(unittest.TestCase):
             AdaptiveTTLEngine(max_queue_depth=0)
         with self.assertRaises(ValueError):
             AdaptiveTTLEngine(max_latency_ms=0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
