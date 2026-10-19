@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -24,55 +24,28 @@ async def lifespan(app: FastAPI):
     logger.info("Validating database migration state...")
     alembic_cfg = Config("alembic.ini")
     script = ScriptDirectory.from_config(alembic_cfg)
-
-    engine = create_engine(str(settings.DATABASE_URI))
-    try:
-        with engine.connect() as connection:
-            context = MigrationContext.configure(connection)
-            current_rev = context.get_current_revision()
-            head_rev = script.get_current_head()
-
-            if current_rev != head_rev:
-                logger.warning(
-                    f"Database migration state is not up-to-date. "
-                    f"Current: {current_rev}, Head: {head_rev}. "
-                    f"Please run migrations manually."
-                )
-            else:
-                logger.info("Database migration state is up-to-date.")
-    except Exception as e:
-        logger.error(f"Failed to validate migration state: {e}")
-
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URI)
+    with engine.connect() as connection:
+        context = MigrationContext.configure(connection)
+        current_rev = context.get_current_revision()
+        head_rev = script.get_current_head()
+        if current_rev != head_rev:
+            logger.warning(f"Database revision {current_rev} does not match head revision {head_rev}.")
+        else:
+            logger.info("Database migration state is up-to-date.")
     yield
 
 app = FastAPI(
-    title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
 app.add_middleware(CorrelationIdMiddleware)
 
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail, "correlation_id": get_correlation_id()},
-    )
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors(), "correlation_id": get_correlation_id()},
-    )
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled exception")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "correlation_id": get_correlation_id()},
-    )
+app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler)
+app.add_exception_handler(Exception, global_exception_handler)
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
@@ -82,16 +55,13 @@ app.include_router(repositories.router, prefix=f"{settings.API_V1_STR}/repositor
 app.include_router(runtime.router, prefix=f"{settings.API_V1_STR}/runtime", tags=["runtime"])
 app.include_router(artifacts.router, prefix=f"{settings.API_V1_STR}/artifacts", tags=["artifacts"])
 app.include_router(enterprise.router, prefix=f"{settings.API_V1_STR}/enterprise", tags=["enterprise"])
-app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector_search", tags=["vector_search"])
+app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector-search", tags=["vector-search"])
 app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
-app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
-app.include_router(approvals.router)
-
-app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
-app.add_exception_handler(Exception, global_exception_handler) # type: ignore
+app.include_router(runs.router, prefix=f"{settings.API_V1_STR}/runs", tags=["runs"])
+app.include_router(approvals.router, prefix=f"{settings.API_V1_STR}/approvals", tags=["approvals"])
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": settings.VERSION}
