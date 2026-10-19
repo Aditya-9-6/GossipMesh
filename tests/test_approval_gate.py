@@ -8,13 +8,10 @@ from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
-<<<<<<< HEAD
-from gossipmesh.models.approval import Approval
-=======
 from gossipmesh.core.config import settings
+from gossipmesh.models.approval import Approval
 from gossipmesh.models.approval import ApprovalGate
 import gossipmesh.models
->>>>>>> origin/main
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 

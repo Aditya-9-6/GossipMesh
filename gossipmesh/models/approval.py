@@ -14,3 +14,13 @@ class Approval(Base):
     approver_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     approved_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class ApprovalGate(Base):
+    __tablename__ = "approval_gates"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    is_active = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
