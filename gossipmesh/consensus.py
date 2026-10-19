@@ -5,6 +5,7 @@ Audits code proposals across multiple model personas and enforces quorum consens
 
 from typing import List, Dict, Any, Optional
 
+
 class ModelVote:
     def __init__(
         self,
@@ -31,6 +32,7 @@ class ModelVote:
             "suggestions": self.suggestions,
             "confidence_scores": self.confidence_scores,
         }
+
 
 class ConsensusResult:
     def __init__(
@@ -62,9 +64,16 @@ class ConsensusResult:
             "avg_confidence_score": round(self.avg_confidence_score, 1),
         }
 
+
 class ByzantineConsensusEngine:
     """Enforces Byzantine Fault Tolerant quorum across multi-model peer audits."""
-    def __init__(self, quorum_threshold: float = 0.66, min_score_threshold: int = 85, model_weights: Optional[Dict[str, float]] = None):
+
+    def __init__(
+        self,
+        quorum_threshold: float = 0.66,
+        min_score_threshold: int = 85,
+        model_weights: Optional[Dict[str, float]] = None,
+    ):
         self.quorum_threshold = quorum_threshold
         self.min_score_threshold = min_score_threshold
         self.model_weights = model_weights
@@ -78,14 +87,22 @@ class ByzantineConsensusEngine:
                 votes=[],
                 combined_concerns=["No model votes submitted"],
                 combined_suggestions=[],
-                avg_confidence_score=0.0
+                avg_confidence_score=0.0,
             )
 
         if self.model_weights:
             total_weight = sum(self.model_weights.get(v.model_name, 1.0) for v in votes)
-            approvals_weight = sum(self.model_weights.get(v.model_name, 1.0) for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
+            approvals_weight = sum(
+                self.model_weights.get(v.model_name, 1.0)
+                for v in votes
+                if v.verdict == "APPROVE" and v.score >= self.min_score_threshold
+            )
             approval_ratio = approvals_weight / total_weight if total_weight > 0 else 0.0
-            avg_score = sum(v.score * self.model_weights.get(v.model_name, 1.0) for v in votes) / total_weight if total_weight > 0 else 0.0
+            avg_score = (
+                sum(v.score * self.model_weights.get(v.model_name, 1.0) for v in votes) / total_weight
+                if total_weight > 0
+                else 0.0
+            )
         else:
             approvals = sum(1 for v in votes if v.verdict == "APPROVE" and v.score >= self.min_score_threshold)
             approval_ratio = approvals / len(votes)
