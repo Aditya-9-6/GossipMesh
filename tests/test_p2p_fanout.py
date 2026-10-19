@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
 from gossipmesh.p2p.fanout import DynamicFanoutController
 
+
 class TestEpidemicReachabilityAndFanout(unittest.TestCase):
     def test_reachability_matrix_basic(self):
         matrix = EpidemicReachabilityMatrix("node-1")
@@ -29,6 +30,7 @@ class TestEpidemicReachabilityAndFanout(unittest.TestCase):
         metrics = controller.get_metrics()
         self.assertIn("current_fanout", metrics)
         self.assertIn("matrix", metrics)
+
 
 if __name__ == "__main__":
     unittest.main()

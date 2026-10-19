@@ -2,8 +2,10 @@ import json
 import hashlib
 from typing import Dict, Any
 
+
 class RaftLogCompactionEngine:
     """Manages Raft log truncation and structural state snapshot generation."""
+
     def __init__(self, window_size: int = 100):
         self.window_size = window_size
         self.last_included_index = 0
@@ -19,13 +21,13 @@ class RaftLogCompactionEngine:
         return log_length > self.window_size
 
     def create_snapshot(self) -> Dict[str, Any]:
-        state_bytes = json.dumps(self.state_tree, sort_keys=True).encode('utf-8')
+        state_bytes = json.dumps(self.state_tree, sort_keys=True).encode("utf-8")
         checksum = hashlib.sha256(state_bytes).hexdigest()
         return {
             "last_included_index": self.last_included_index,
             "last_included_term": self.last_included_term,
             "state_tree": self.state_tree,
-            "checksum": checksum
+            "checksum": checksum,
         }
 
     def restore_snapshot(self, snapshot: Dict[str, Any]) -> None:

@@ -1,14 +1,15 @@
 from typing import Dict, Any, Optional
 
+
 class VectorClock:
     def __init__(self, clock: Optional[Dict[str, int]] = None):
         self.clock = clock.copy() if clock else {}
 
-    def increment(self, node_id: str) -> 'VectorClock':
+    def increment(self, node_id: str) -> "VectorClock":
         self.clock[node_id] = self.clock.get(node_id, 0) + 1
         return self
 
-    def update(self, other: 'VectorClock') -> 'VectorClock':
+    def update(self, other: "VectorClock") -> "VectorClock":
         for node_id, val in other.clock.items():
             self.clock[node_id] = max(self.clock.get(node_id, 0), val)
         return self
@@ -17,10 +18,10 @@ class VectorClock:
         return self.clock.copy()
 
     @classmethod
-    def from_dict(cls, d: Dict[str, int]) -> 'VectorClock':
+    def from_dict(cls, d: Dict[str, int]) -> "VectorClock":
         return cls(d)
 
-    def compare(self, other: 'VectorClock') -> str:
+    def compare(self, other: "VectorClock") -> str:
         """
         Compare self with other.
         Returns:
@@ -30,10 +31,10 @@ class VectorClock:
         - "EQUAL" if identical
         """
         keys = set(self.clock.keys()).union(set(other.clock.keys()))
-        
+
         less_or_equal = True
         greater_or_equal = True
-        
+
         for k in keys:
             v_self = self.clock.get(k, 0)
             v_other = other.clock.get(k, 0)
@@ -41,7 +42,7 @@ class VectorClock:
                 less_or_equal = False
             if v_self < v_other:
                 greater_or_equal = False
-                
+
         if self.clock == other.clock:
             return "EQUAL"
         if less_or_equal:
