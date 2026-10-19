@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
