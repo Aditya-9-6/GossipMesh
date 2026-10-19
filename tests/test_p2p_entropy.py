@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.entropy import VectorClockEntropyEngine, MerkleIntervalNode
 from gossipmesh.p2p.protocol import EntropyControlFrame
 
+
 class TestVectorClockEntropyEngine(unittest.TestCase):
     def test_compare_clocks(self):
         c1 = {"node_a": 2, "node_b": 1}
@@ -40,6 +41,7 @@ class TestVectorClockEntropyEngine(unittest.TestCase):
         frame2 = EntropyControlFrame.from_dict(d)
         self.assertEqual(frame.sender_id, frame2.sender_id)
         self.assertEqual(frame.merkle_digest, frame2.merkle_digest)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,15 +1,23 @@
-<<<<<<< HEAD
 import asyncio
 import logging
 import time
 import uuid
 from typing import Dict, List, Any, Optional
 from gossipmesh.p2p.erasure import ErasureCoder
+from gossipmesh.p2p.retransmit import RetransmissionCache
 
 logger = logging.getLogger("gossipmesh.p2p.protocol")
 
+
 class EntropyControlFrame:
-    def __init__(self, sender_id: str, vector_clock: Dict[str, int], merkle_digest: str, message_id: Optional[str] = None, timestamp: Optional[float] = None):
+    def __init__(
+        self,
+        sender_id: str,
+        vector_clock: Dict[str, int],
+        merkle_digest: str,
+        message_id: Optional[str] = None,
+        timestamp: Optional[float] = None,
+    ):
         self.sender_id = sender_id
         self.vector_clock = vector_clock
         self.merkle_digest = merkle_digest
@@ -26,7 +34,7 @@ class EntropyControlFrame:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'EntropyControlFrame':
+    def from_dict(cls, data: Dict[str, Any]) -> "EntropyControlFrame":
         return cls(
             sender_id=data["sender_id"],
             vector_clock=data["vector_clock"],
@@ -35,8 +43,16 @@ class EntropyControlFrame:
             timestamp=data.get("timestamp"),
         )
 
+
 class GossipProtocol:
-    def __init__(self, node_id: str, data_fragments: int = 4, parity_fragments: int = 1, ttl_seconds: float = 60.0, max_tracked_packets: int = 1000):
+    def __init__(
+        self,
+        node_id: str,
+        data_fragments: int = 4,
+        parity_fragments: int = 1,
+        ttl_seconds: float = 60.0,
+        max_tracked_packets: int = 1000,
+    ):
         self.node_id = node_id
         self.erasure = ErasureCoder(data_fragments, parity_fragments)
         self.fragment_store: Dict[str, Dict[int, bytes]] = {}
@@ -54,7 +70,9 @@ class GossipProtocol:
             self.fragment_timestamps.pop(pid, None)
 
         if len(self.fragment_store) > self.max_tracked_packets:
-            oldest_pid = min(self.fragment_timestamps, key=self.fragment_timestamps.get) if self.fragment_timestamps else None
+            oldest_pid = (
+                min(self.fragment_timestamps, key=self.fragment_timestamps.get) if self.fragment_timestamps else None
+            )
             if oldest_pid:
                 self.fragment_store.pop(oldest_pid, None)
                 self.original_sizes.pop(oldest_pid, None)
@@ -66,26 +84,18 @@ class GossipProtocol:
         frags = self.erasure.encode(payload)
         self.original_sizes[packet_id] = len(payload)
         return [
-            {
-                "packet_id": packet_id,
-                "frag_index": idx,
-                "data": frag.hex(),
-                "original_size": len(payload)
-            }
+            {"packet_id": packet_id, "frag_index": idx, "data": frag.hex(), "original_size": len(payload)}
             for idx, frag in frags
         ]
 
     def receive_fragment(self, packet_id: str, frag_index: int, frag_hex: str, original_size: int) -> bytes:
         """Buffers incoming fragments and reconstructs state if threshold is reached with concurrency safety."""
-        # Synchronous wrapper for sync tests; uses run_until_complete or runs directly if no event loop is running
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
 
         if loop and loop.is_running():
-            # If called inside an async event loop, we provide a non-blocking fast path or rely on synchronous dict updates if lock can't be awaited synchronously.
-            # To remain fully safe and sync-compatible, we acquire safely or use standard locking.
             pass
 
         now = time.time()
@@ -105,12 +115,11 @@ class GossipProtocol:
             self.fragment_timestamps.pop(packet_id, None)
             return recovered
         return b""
-=======
-from typing import Dict, Any, Optional
-from gossipmesh.p2p.retransmit import RetransmissionCache
+
 
 class GossipProtocolHandler:
     """Protocol handler integrating retransmission caching and backpressure telemetry."""
+
     def __init__(self, capacity: int = 1000, max_memory_bytes: int = 16 * 1024 * 1024):
         self.retransmit_cache = RetransmissionCache(capacity=capacity, max_memory_bytes=max_memory_bytes)
 
@@ -126,4 +135,3 @@ class GossipProtocolHandler:
     def is_congested(self) -> bool:
         """Checks downstream backpressure status."""
         return self.retransmit_cache.check_backpressure()
->>>>>>> origin/main

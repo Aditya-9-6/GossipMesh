@@ -4,17 +4,18 @@ from typing import Dict, List, Optional, Tuple
 
 def hash_data(data: str) -> str:
     """Computes SHA-256 hash for a given string."""
-    return hashlib.sha256(data.encode('utf-8')).hexdigest()
+    return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 
 def hash_pair(left: str, right: str) -> str:
     """Computes parent hash from left and right child hashes."""
     combined = left + right
-    return hashlib.sha256(combined.encode('utf-8')).hexdigest()
+    return hashlib.sha256(combined.encode("utf-8")).hexdigest()
 
 
 class MerkleNode:
     """Represents a node in the Merkle tree."""
+
     def __init__(self, key: Optional[str] = None, value_hash: Optional[str] = None):
         self.key = key
         self.value_hash = value_hash
@@ -25,6 +26,7 @@ class MerkleNode:
 
 class MerkleTree:
     """Hierarchical Merkle tree for state partitions and anti-entropy sync."""
+
     def __init__(self, items: Optional[Dict[str, str]] = None):
         self.root: Optional[MerkleNode] = None
         self.items: Dict[str, str] = {}

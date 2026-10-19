@@ -4,11 +4,13 @@ import math
 from collections import deque
 from typing import Dict, List, Tuple, Any
 
+
 class MerkleIntervalNode:
     def __init__(self, start_key: str, end_key: str, digest: str):
         self.start_key = start_key
         self.end_key = end_key
         self.digest = digest
+
 
 class VectorClockRingBuffer:
     """Fixed-size bounded memory ring buffer for tracking peer vector clocks."""
@@ -32,6 +34,7 @@ class VectorClockRingBuffer:
     def __len__(self) -> int:
         return len(self._buffer)
 
+
 def compute_divergence_vector(local_clock: Dict[str, int], peer_clock: Dict[str, int]) -> Dict[str, int]:
     """Computes absolute element-wise divergence between local and peer vector clocks."""
     all_keys = set(local_clock.keys()).union(set(peer_clock.keys()))
@@ -42,11 +45,12 @@ def compute_divergence_vector(local_clock: Dict[str, int], peer_clock: Dict[str,
         divergence[key] = abs(l_val - p_val)
     return divergence
 
+
 def compute_shannon_entropy(divergence_vector: Dict[str, int]) -> float:
     """Computes Shannon entropy over the divergence vector distribution."""
     if not divergence_vector:
         return 0.0
-    
+
     total = sum(divergence_vector.values())
     if total == 0:
         return 0.0
@@ -56,8 +60,9 @@ def compute_shannon_entropy(divergence_vector: Dict[str, int]) -> float:
         if val > 0:
             prob = val / total
             entropy -= prob * math.log2(prob)
-            
+
     return float(entropy)
+
 
 class AntiEntropyScraper:
     """Vector-Clock Entropy-Based Anti-Entropy Scraper for mesh peer divergence monitoring."""
@@ -102,6 +107,7 @@ class AntiEntropyScraper:
                 sync_peers.append(peer_id)
         return sync_peers
 
+
 class VectorClockEntropyEngine:
     @staticmethod
     def data_hasher(d: Any) -> str:
@@ -120,7 +126,7 @@ class VectorClockEntropyEngine:
             return [MerkleIntervalNode("", "", cls.compute_digest({}))]
         nodes = []
         for i in range(0, len(sorted_keys), bucket_size):
-            bucket_keys = sorted_keys[i:i + bucket_size]
+            bucket_keys = sorted_keys[i : i + bucket_size]
             bucket_data = {k: state_store[k] for k in bucket_keys}
             digest = cls.compute_digest(bucket_data)
             nodes.append(MerkleIntervalNode(bucket_keys[0], bucket_keys[-1], digest))
@@ -147,7 +153,13 @@ class VectorClockEntropyEngine:
         return "concurrent"
 
     @classmethod
-    def reconcile_state(cls, local_state: Dict[str, Any], local_clock: Dict[str, int], peer_state: Dict[str, Any], peer_clock: Dict[str, int]) -> Tuple[Dict[str, Any], Dict[str, int]]:
+    def reconcile_state(
+        cls,
+        local_state: Dict[str, Any],
+        local_clock: Dict[str, int],
+        peer_state: Dict[str, Any],
+        peer_clock: Dict[str, int],
+    ) -> Tuple[Dict[str, Any], Dict[str, int]]:
         relation = cls.compare_clocks(local_clock, peer_clock)
         if relation == "after":
             return local_state, local_clock
@@ -157,9 +169,11 @@ class VectorClockEntropyEngine:
         merged_clock = {k: max(local_clock.get(k, 0), peer_clock.get(k, 0)) for k in set(local_clock).union(peer_clock)}
         return merged_state, merged_clock
 
+
 class AntiEntropyEngine:
     """Engine supporting both scraper-based divergence and state reconciliation tests."""
-    def __init__(self, node_id: str = 'node-1', entropy_threshold: float = 1.5, buffer_capacity: int = 100):
+
+    def __init__(self, node_id: str = "node-1", entropy_threshold: float = 1.5, buffer_capacity: int = 100):
         self.node_id = node_id
         self.state_store: Dict[str, Any] = {}
         self.scraper = AntiEntropyScraper(entropy_threshold=entropy_threshold, buffer_capacity=buffer_capacity)
