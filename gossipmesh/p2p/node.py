@@ -5,8 +5,9 @@ import uuid
 from collections import deque
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Any
+from typing import Callable, Dict, List, Optional, Any, Set
 from gossipmesh.p2p.pow import mine_pow, verify_pow
+
 
 class GossipTopic(str, Enum):
     AGENT_SPAWN = "agent:spawn"
@@ -16,8 +17,19 @@ class GossipTopic(str, Enum):
     HEARTBEAT = "heartbeat"
     CUSTOM = "custom"
 
+
 class GossipMessage:
-    def __init__(self, topic: str, origin_node: str, payload: Dict[str, Any], repo: str='global', message_id: Optional[str]=None, vector_clock: Optional[Dict[str, int]]=None, timestamp: Optional[float]=None, ttl: int=10):
+    def __init__(
+        self,
+        topic: str,
+        origin_node: str,
+        payload: Dict[str, Any],
+        repo: str = "global",
+        message_id: Optional[str] = None,
+        vector_clock: Optional[Dict[str, int]] = None,
+        timestamp: Optional[float] = None,
+        ttl: int = 10,
+    ):
         self.topic = topic
         self.origin_node = origin_node
         self.payload = payload
@@ -36,11 +48,11 @@ class GossipMessage:
             "message_id": self.message_id,
             "vector_clock": self.vector_clock,
             "timestamp": self.timestamp,
-            "ttl": self.ttl
+            "ttl": self.ttl,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'GossipMessage':
+    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
         return cls(
             topic=data.get("topic", GossipTopic.CUSTOM),
             origin_node=data.get("origin_node", "unknown"),
@@ -49,19 +61,28 @@ class GossipMessage:
             message_id=data.get("message_id"),
             vector_clock=data.get("vector_clock", {}),
             timestamp=data.get("timestamp"),
-            ttl=data.get("ttl", 10)
+            ttl=data.get("ttl", 10),
         )
+
 
 class GossipNode:
     """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence.
-Communicates via a shared ledger directory (file-backed mesh) or local bus."""
-    def __init__(self, node_id: str, mesh_dir: str | None = None, public_key: Optional[str] = None, pow_difficulty: int = 0, pow_nonce: Optional[int] = None):
+    Communicates via a shared ledger directory (file-backed mesh) or local bus."""
+
+    def __init__(
+        self,
+        node_id: str,
+        mesh_dir: str | None = None,
+        public_key: Optional[str] = None,
+        pow_difficulty: int = 0,
+        pow_nonce: Optional[int] = None,
+    ):
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh_ledger")
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
         self.public_key = public_key or str(uuid.uuid4())
         self.pow_difficulty = pow_difficulty
-        
+
         if pow_nonce is not None:
             self.pow_nonce = pow_nonce
             if pow_difficulty > 0 and not verify_pow(self.public_key, self.pow_nonce, self.pow_difficulty):
@@ -72,8 +93,8 @@ Communicates via a shared ledger directory (file-backed mesh) or local bus."""
             self.pow_nonce = 0
 
         self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
-        self.seen_messages = set()
-        self.recent_messages = deque(maxlen=1000)
+        self.seen_messages: Set[str] = set()
+        self.recent_messages: deque[GossipMessage] = deque(maxlen=1000)
         self._load_seen_history()
 
     def _load_seen_history(self):
@@ -95,15 +116,11 @@ Communicates via a shared ledger directory (file-backed mesh) or local bus."""
             self.subscribers[topic] = []
         self.subscribers[topic].append(handler)
 
-    def publish(self, topic: GossipTopic, payload: Dict[str, Any], repo: str='global', ttl: int=10) -> GossipMessage:
+    def publish(
+        self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
+    ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh."""
-        msg = GossipMessage(
-            topic=topic,
-            origin_node=self.node_id,
-            payload=payload,
-            repo=repo,
-            ttl=ttl
-        )
+        msg = GossipMessage(topic=topic, origin_node=self.node_id, payload=payload, repo=repo, ttl=ttl)
         self.recent_messages.append(msg)
         self.seen_messages.add(msg.message_id)
 
@@ -118,8 +135,8 @@ Communicates via a shared ledger directory (file-backed mesh) or local bus."""
 
     def sync(self) -> List[GossipMessage]:
         """Runs anti-entropy synchronization: scans the shared ledger for newly
-arrived gossip messages from other peer nodes."""
-        new_messages = []
+        arrived gossip messages from other peer nodes."""
+        new_messages: List[GossipMessage] = []
         if not self.mesh_dir.exists():
             return new_messages
 
@@ -151,7 +168,7 @@ arrived gossip messages from other peer nodes."""
         """Updates this node's live liveness timestamp."""
         self.publish(GossipTopic.HEARTBEAT, {"status": "alive", "timestamp": time.time(), "pow_nonce": self.pow_nonce})
 
-    def get_recent_messages(self, topic: Optional[GossipTopic]=None, limit: int=50) -> List[GossipMessage]:
+    def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
         """Fetches the latest gossip messages from the in-memory cache."""
         msgs = list(self.recent_messages)
         if topic:

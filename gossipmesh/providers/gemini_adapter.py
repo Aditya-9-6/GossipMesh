@@ -1,9 +1,10 @@
 from typing import AsyncGenerator
 import time
-import google.generativeai as genai
+import google.generativeai as genai  # type: ignore
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
+
 
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
@@ -39,7 +40,7 @@ class GeminiProvider(BaseProvider):
                 max_output_tokens=request.max_tokens,
                 stop_sequences=request.stop_sequences,
             ),
-            request_options={"timeout": request.timeout} if request.timeout else None
+            request_options={"timeout": request.timeout} if request.timeout else None,
         )
 
         time.time()
@@ -48,7 +49,7 @@ class GeminiProvider(BaseProvider):
             prompt_tokens=self.count_tokens(" ".join([m.content for m in request.messages])),
             completion_tokens=self.count_tokens(response.text),
             total_tokens=0,
-            cost_estimate_usd=0.0
+            cost_estimate_usd=0.0,
         )
         usage.total_tokens = usage.prompt_tokens + usage.completion_tokens
 
@@ -56,10 +57,10 @@ class GeminiProvider(BaseProvider):
             content=response.text,
             model=request.model,
             usage=usage,
-            raw_response={"prompt_feedback": str(response.prompt_feedback)}
+            raw_response={"prompt_feedback": str(response.prompt_feedback)},
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -71,7 +72,7 @@ class GeminiProvider(BaseProvider):
                 max_output_tokens=request.max_tokens,
                 stop_sequences=request.stop_sequences,
             ),
-            request_options={"timeout": request.timeout} if request.timeout else None
+            request_options={"timeout": request.timeout} if request.timeout else None,
         )
         async for chunk in response:
             yield chunk.text

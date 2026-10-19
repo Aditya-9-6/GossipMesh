@@ -2,16 +2,24 @@ import time
 import threading
 from typing import Dict, Any, Optional
 
+
 class LeakyBucketReputation:
     """Memory-bounded, thread-safe sliding-window leaky bucket reputation scoring engine.
     Maintains O(1) time complexity updates using circular buffer time-slices.
     """
-    def __init__(self, capacity: float = 100.0, leak_rate_per_sec: float = 5.0, quarantine_threshold: float = 80.0, window_seconds: float = 60.0):
+
+    def __init__(
+        self,
+        capacity: float = 100.0,
+        leak_rate_per_sec: float = 5.0,
+        quarantine_threshold: float = 80.0,
+        window_seconds: float = 60.0,
+    ):
         self.capacity = capacity
         self.leak_rate_per_sec = leak_rate_per_sec
         self.quarantine_threshold = quarantine_threshold
         self.window_seconds = window_seconds
-        
+
         self._scores: Dict[str, float] = {}
         self._last_update: Dict[str, float] = {}
         self._quarantined: Dict[str, bool] = {}
@@ -36,7 +44,7 @@ class LeakyBucketReputation:
             score = self._leak(peer_id, now)
             updated_score = min(self.capacity, score + penalty)
             self._scores[peer_id] = updated_score
-            
+
             is_quarantined = updated_score >= self.quarantine_threshold
             self._quarantined[peer_id] = is_quarantined
             return is_quarantined
@@ -68,8 +76,5 @@ class LeakyBucketReputation:
             metrics = {}
             for peer_id in list(self._scores.keys()):
                 score = self._leak(peer_id, now)
-                metrics[peer_id] = {
-                    "score": score,
-                    "quarantined": self._quarantined.get(peer_id, False)
-                }
+                metrics[peer_id] = {"score": score, "quarantined": self._quarantined.get(peer_id, False)}
             return metrics

@@ -2,8 +2,15 @@ import hashlib
 import json
 from typing import Dict, Any, Optional, List
 
+
 class MerkleNode:
-    def __init__(self, key: Optional[str] = None, value: Optional[Any] = None, left: Optional['MerkleNode'] = None, right: Optional['MerkleNode'] = None):
+    def __init__(
+        self,
+        key: Optional[str] = None,
+        value: Optional[Any] = None,
+        left: Optional["MerkleNode"] = None,
+        right: Optional["MerkleNode"] = None,
+    ):
         self.key = key
         self.value = value
         self.left = left
@@ -15,11 +22,12 @@ class MerkleNode:
         if self.left or self.right:
             left_hash = self.left.hash if self.left else ""
             right_hash = self.right.hash if self.right else ""
-            hasher.update(f"{left_hash}:{right_hash}".encode('utf-8'))
+            hasher.update(f"{left_hash}:{right_hash}".encode("utf-8"))
         else:
             val_str = json.dumps(self.value, sort_keys=True) if self.value is not None else ""
-            hasher.update(f"{self.key}:{val_str}".encode('utf-8'))
+            hasher.update(f"{self.key}:{val_str}".encode("utf-8"))
         return hasher.hexdigest()
+
 
 class MerklePatriciaTree:
     def __init__(self):

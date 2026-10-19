@@ -53,5 +53,5 @@ class TestConsensusMerkleAndSyncer(unittest.TestCase):
         self.assertEqual(syncer.get_sync_manifest(), {})
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
