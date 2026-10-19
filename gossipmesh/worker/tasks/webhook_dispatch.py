@@ -9,6 +9,8 @@ from sqlalchemy.orm import sessionmaker
 from gossipmesh.worker.celery_app import celery_app
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.core.config import settings
+from gossipmesh.core.concurrency_limit import ConcurrencyLimiter
+from gossipmesh.core.exceptions import ConcurrencyLimitError
 
 # Needs sync functions
 from gossipmesh.jobs.pr_review import PRReviewJob
@@ -66,10 +68,47 @@ def process_webhook_event(self, webhook_event_id: int):
         db.commit()
 
         try:
-            asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload))
+            payload = webhook_record.payload or {}
+            org_id = None
+
+            # Robust payload parsing
+            if payload and isinstance(payload, dict):
+                org = payload.get("organization")
+                if org and isinstance(org, dict) and "id" in org:
+                    org_id = str(org["id"])
+                else:
+                    repo = payload.get("repository")
+                    if repo and isinstance(repo, dict):
+                        owner = repo.get("owner")
+                        if owner and isinstance(owner, dict) and "id" in owner:
+                            org_id = str(owner["id"])
+
+            if not org_id:
+                org_id = "default_tenant"
+
+            # 5 active operations per organization limit
+            limiter = ConcurrencyLimiter(limit=5)
+
+            with limiter.limit_concurrency(identifier=org_id, operation_type="webhook_dispatch"):
+                asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload))
 
             webhook_record.status = "processed"
             db.commit()
+
+        except ConcurrencyLimitError as e:
+            logger.warning(f"Concurrency limit exceeded for webhook {webhook_event_id}, retrying...")
+            # We want to retry faster since this is just a limit, maybe exponential backoff still applies
+            webhook_record.retries += 1
+            if webhook_record.retries >= MAX_RETRIES:
+                webhook_record.status = "dead_letter"
+            else:
+                webhook_record.status = "failed"
+                delay = 2**webhook_record.retries
+                webhook_record.next_retry_at = datetime.utcnow() + timedelta(minutes=delay)
+            db.commit()
+
+            if webhook_record.retries < MAX_RETRIES:
+                raise self.retry(exc=e, countdown=delay * 60)
 
         except Exception as e:
             logger.error(f"Failed to process webhook {webhook_event_id}: {e}")
