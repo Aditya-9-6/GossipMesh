@@ -2,10 +2,12 @@ import time
 import threading
 from typing import Optional, Dict
 
+
 class RingBufferDedup:
     """High-throughput, thread-safe message deduplication cache using a fixed-capacity ring buffer
     combined with an amortized TTL-based expiration index for O(1) insertion and lookup.
     """
+
     def __init__(self, capacity: int = 10000, default_ttl: float = 60.0):
         self.capacity = capacity
         self.default_ttl = default_ttl
@@ -37,9 +39,9 @@ class RingBufferDedup:
         with self._lock:
             now = time.time()
             effective_ttl = ttl if ttl is not None else self.default_ttl
-            
+
             self._evict_expired(now)
-            
+
             if message_id in self._index:
                 idx = self._index[message_id]
                 if now - self._timestamps[idx] <= effective_ttl:

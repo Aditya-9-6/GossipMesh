@@ -19,16 +19,11 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
-TestingSessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
-)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
-<<<<<<< HEAD
-=======
 Base.metadata.create_all(bind=engine)
 
 
->>>>>>> origin/main
 def override_get_db():
     db = TestingSessionLocal()
     try:

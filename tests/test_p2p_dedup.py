@@ -3,6 +3,7 @@ import unittest
 import threading
 from gossipmesh.p2p.dedup import RingBufferDedup
 
+
 class TestRingBufferDedup(unittest.TestCase):
     def test_normal_operation(self):
         dedup = RingBufferDedup(capacity=3, default_ttl=5.0)
@@ -17,7 +18,7 @@ class TestRingBufferDedup(unittest.TestCase):
         self.assertTrue(dedup.check_and_add("msg-1"))
         self.assertTrue(dedup.check_and_add("msg-2"))
         self.assertEqual(dedup.size(), 2)
-        
+
         # Adding third should evict msg-1
         self.assertTrue(dedup.check_and_add("msg-3"))
         self.assertFalse(dedup.contains("msg-1"))
@@ -36,6 +37,7 @@ class TestRingBufferDedup(unittest.TestCase):
 
     def test_concurrent_access(self):
         dedup = RingBufferDedup(capacity=1000, default_ttl=10.0)
+
         def worker(start_idx: int):
             for i in range(100):
                 dedup.check_and_add(f"msg-{start_idx}-{i}")
@@ -47,6 +49,7 @@ class TestRingBufferDedup(unittest.TestCase):
             t.join()
 
         self.assertGreaterEqual(dedup.size(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

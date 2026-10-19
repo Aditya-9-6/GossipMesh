@@ -7,6 +7,7 @@ from pathlib import Path
 # Path to the repository root (mounted in container)
 REPO_ROOT = Path(os.getenv("REPO_ROOT", ".")).resolve()
 
+
 def run_ai_reviewer(pr_number: int):
     """Invoke the existing ai_pr_reviewer script for a given PR number.
     Returns the JSON status file content.
@@ -34,6 +35,7 @@ def run_ai_reviewer(pr_number: int):
     if status_file.exists():
         return json.loads(status_file.read_text())
     return None
+
 
 def process_pr_event(payload: bytes):
     """RQ worker entry point. Parses a GitHub webhook payload and triggers review.
