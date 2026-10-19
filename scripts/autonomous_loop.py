@@ -110,6 +110,67 @@ def get_python_bin(workspace: Path) -> str:
             return str(cand)
     return sys.executable
 
+def get_tool_bin(workspace: Path, tool_name: str) -> str:
+    """Finds binary across Linux (.venv/bin) and Windows (.venv/Scripts)."""
+    for cand in [
+        workspace / ".venv" / "bin" / tool_name,
+        workspace / ".venv" / "Scripts" / f"{tool_name}.exe",
+        workspace / ".venv" / "Scripts" / tool_name,
+    ]:
+        if cand.is_file():
+            return str(cand)
+    return tool_name
+
+def verify_and_auto_fix_preflight(workspace: Path) -> tuple[bool, str]:
+    """
+    Executes strict pre-flight quality gate:
+    1. Fast deterministic auto-fix: ruff check --fix & ruff format (0 API tokens, <100ms)
+    2. Syntax compilation: compileall (zero syntax errors allowed)
+    3. Strict linting: ruff check . (zero errors allowed)
+    4. Unit test verification: pytest
+    Returns (is_green: bool, error_report: str)
+    """
+    py_bin = get_python_bin(workspace)
+    ruff_bin = get_tool_bin(workspace, "ruff")
+
+    # Pass 1: Deterministic auto-fix
+    try:
+        ruff_fix_cmd = [ruff_bin, "check", "--fix", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "--fix", "."]
+        subprocess.run(ruff_fix_cmd, cwd=workspace, capture_output=True, text=True, timeout=20)
+        ruff_fmt_cmd = [ruff_bin, "format", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "format", "."]
+        subprocess.run(ruff_fmt_cmd, cwd=workspace, capture_output=True, text=True, timeout=20)
+    except Exception:
+        pass
+
+    errors = []
+
+    # Pass 2: Syntax compilation check
+    comp_res = subprocess.run(
+        [py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"],
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
+    )
+    if comp_res.returncode != 0:
+        errors.append(f"Syntax/Compilation Failure:\n{comp_res.stderr.strip() or comp_res.stdout.strip()}")
+
+    # Pass 3: Strict Ruff Lint Check
+    ruff_check_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
+    ruff_res = subprocess.run(ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+    if ruff_res.returncode != 0:
+        errors.append(f"Ruff Lint Failure:\n{ruff_res.stdout.strip() or ruff_res.stderr.strip()}")
+
+    # Pass 4: Pytest Unit Tests
+    test_res = subprocess.run(
+        [py_bin, "-m", "pytest", "tests/", "-q", "--durations=5"],
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300
+    )
+    if test_res.returncode != 0:
+        combined_tests = (test_res.stdout + "\n" + test_res.stderr).strip()
+        errors.append(f"Pytest Failures:\n{combined_tests}")
+
+    if errors:
+        return False, "\n\n".join(errors)
+    return True, ""
+
 def get_open_advancement_issues(workspace: Path):
     """Fetches open advancement issues, filtering out those that already have active or merged PRs."""
     try:
@@ -219,34 +280,34 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         print(f"[!] Solver failed: {res.stderr}", file=sys.stderr, flush=True)
         return False
 
-    # Pre-commit Quality Assurance Gate
-    py_bin = get_python_bin(workspace)
+    # Pre-commit Hard Quality Assurance Gate & Self-Healing Loop
+    print(f"[*] Running Pre-Flight Quality Gate (deterministic auto-fix, compileall, ruff, pytest)...", flush=True)
+    is_green, err_report = verify_and_auto_fix_preflight(workspace)
 
-    print(f"[*] Tidying Python files with compileall (project dirs only)...", flush=True)
-    run_cmd([py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"], cwd=workspace, check=False, timeout=15)
+    if not is_green:
+        print(f"[!] Pre-flight checks failed. Entering self-healing loop (up to 3 passes)...", flush=True)
+        max_fix_passes = 3
+        for fix_pass in range(1, max_fix_passes + 1):
+            print(f"[*] Self-healing pass {fix_pass}/{max_fix_passes} for Issue #{issue_num}...", flush=True)
+            ci_fixer_cmd = [
+                sys.executable, "scripts/ai_ci_fixer.py",
+                "--pr-number", str(issue_num),
+                "--workspace", str(workspace)
+            ]
+            subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
-    print("[*] Formatting Python codebase with black (project dirs only)...", flush=True)
-    run_cmd(["black", "gossipmesh", "tests", "scripts"], cwd=workspace, check=False, timeout=30)
+            is_green, err_report = verify_and_auto_fix_preflight(workspace)
+            if is_green:
+                print(f"[SUCCESS] Code repaired and 100% green on pass {fix_pass}!", flush=True)
+                break
+            else:
+                print(f"[!] Code still failing after pass {fix_pass}.", flush=True)
 
-    print("[*] Verifying Python linting & static analysis (flake8)...", flush=True)
-    vet_failed = False
-    try:
-        vet_res = subprocess.run(["flake8", "--exclude", ".venv,.git", "gossipmesh", "tests", "scripts"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
-        if vet_res.returncode != 0:
-            vet_failed = True
-    except FileNotFoundError:
-        pass
-    check_res = subprocess.run([py_bin, "-m", "pytest", "tests/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
-
-    if vet_failed or check_res.returncode != 0:
-        print(f"[!] CI failed. Calling AI CI Fixer...", flush=True)
-        ci_fixer_cmd = [
-            sys.executable, "scripts/ai_ci_fixer.py",
-            "--pr-number", str(issue_num), # Fake PR number if it is not created yet
-            "--workspace", str(workspace)
-        ]
-        fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        print(fix_res.stdout, flush=True)
+    if not is_green:
+        print(f"[ABORT] Cannot create PR for Issue #{issue_num}: Code does not pass pre-flight verification gate.\n{err_report[:1000]}", file=sys.stderr, flush=True)
+        run_cmd("git reset --hard HEAD", cwd=workspace, check=False)
+        run_cmd("git clean -fd", cwd=workspace, check=False)
+        return False
 
 
     branch_name = f"ai/solve-issue-{issue_num}"
@@ -517,12 +578,24 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 run_cmd("git add -A", cwd=workspace, check=False)
                 run_cmd(["git", "commit", "-m", "merge: resolve tooling and scripts conflicts with origin/main", "--no-edit"], cwd=workspace, check=False)
 
-            # Run test suite
-            test_res = subprocess.run([py_bin, "-m", "pytest", "tests/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+            # Run pre-flight quality verification gate (deterministic auto-fix, compileall, ruff, pytest)
+            is_green, err_report = verify_and_auto_fix_preflight(workspace)
             has_fix_request = any("/fix" in c.get("body", "") for c in pr.get("comments", []))
 
-            if test_res.returncode != 0 or has_fix_request:
-                print(f"[*] PR #{pr_num} requires repair (exit code: {test_res.returncode}, /fix: {has_fix_request}). Invoking AI CI Fixer...", flush=True)
+            # If auto-fix repaired changes (e.g. ruff imports/formatting), commit them
+            diff_check = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True)
+            if diff_check.stdout.strip() and is_green:
+                print(f"[*] Fast deterministic auto-fix resolved issues on PR #{pr_num}. Pushing repair commit...", flush=True)
+                run_cmd(["git", "config", "--replace-all", "user.name", USER_NAME], cwd=workspace, check=False)
+                run_cmd(["git", "config", "--replace-all", "user.email", USER_EMAIL], cwd=workspace, check=False)
+                run_cmd("git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
+                run_cmd(["git", "add", "-A"], cwd=workspace)
+                run_cmd("git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
+                run_cmd(["git", "commit", "--author", f"{USER_NAME} <{USER_EMAIL}>", "-m", f"style(ci): deterministic ruff import and formatting auto-fix for PR #{pr_num}"], cwd=workspace, check=False)
+                run_cmd(["git", "push", "origin", head_ref], cwd=workspace, check=False)
+
+            if not is_green or has_fix_request:
+                print(f"[*] PR #{pr_num} requires repair (green: {is_green}, /fix: {has_fix_request}). Invoking AI CI Fixer...", flush=True)
                 fixer_env = env.copy()
                 fixer_env["GEMINI_SOLVER_KEY"] = GLOBAL_POOL.next_key()
                 fixer_env["GH_REPO"] = REPO
@@ -535,18 +608,20 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=fixer_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
                 print(fix_res.stdout, flush=True)
 
-                run_cmd(["git", "config", "--replace-all", "user.name", USER_NAME], cwd=workspace, check=False)
-                run_cmd(["git", "config", "--replace-all", "user.email", USER_EMAIL], cwd=workspace, check=False)
-                run_cmd("git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
-                run_cmd(["git", "add", "-A"], cwd=workspace)
-                run_cmd("git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
-                run_cmd(["git", "commit", "--author", f"{USER_NAME} <{USER_EMAIL}>", "-m", f"fix(ci): automated self-healing repair for PR #{pr_num}"], cwd=workspace, check=False)
-                run_cmd(["git", "push", "origin", head_ref], cwd=workspace, check=False)
-
-                test_res = subprocess.run([py_bin, "-m", "pytest", "tests/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+                is_green, err_report = verify_and_auto_fix_preflight(workspace)
+                if is_green:
+                    run_cmd(["git", "config", "--replace-all", "user.name", USER_NAME], cwd=workspace, check=False)
+                    run_cmd(["git", "config", "--replace-all", "user.email", USER_EMAIL], cwd=workspace, check=False)
+                    run_cmd("git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
+                    run_cmd(["git", "add", "-A"], cwd=workspace)
+                    run_cmd("git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
+                    run_cmd(["git", "commit", "--author", f"{USER_NAME} <{USER_EMAIL}>", "-m", f"fix(ci): automated self-healing repair for PR #{pr_num}"], cwd=workspace, check=False)
+                    run_cmd(["git", "push", "origin", head_ref], cwd=workspace, check=False)
+                else:
+                    print(f"[!] PR #{pr_num} repair pass did not achieve 100% green. Skipping push to avoid broken commits.", flush=True)
 
             # Proceed to architectural review if tests pass
-            if test_res.returncode == 0:
+            if is_green:
                 print(f"[*] PR #{pr_num} tests 100% green. Running Autonomous Reviewer...", flush=True)
                 rev_env = env.copy()
                 rev_env["GEMINI_REVIEWER_KEY"] = GLOBAL_POOL.next_key()

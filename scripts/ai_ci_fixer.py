@@ -562,15 +562,67 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
 
     return "\n\n".join(ci_reports).strip()
 
+def get_tool_bin(workspace: Path, tool_name: str) -> str:
+    """Locate tool binary across Linux (.venv/bin) and Windows (.venv/Scripts)."""
+    candidates = [
+        workspace / ".venv" / "bin" / tool_name,
+        workspace / ".venv" / "Scripts" / f"{tool_name}.exe",
+        workspace / ".venv" / "Scripts" / tool_name,
+    ]
+    for c in candidates:
+        if c.is_file():
+            return str(c)
+    return tool_name
+
 def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
-    print("[*] Running local diagnostic checks (pytest, ruff, mypy)...", flush=True)
+    print("[*] Running local diagnostic checks (ruff auto-fix, compileall, ruff, pytest)...", flush=True)
     out_lines = []
 
-    # Locate virtualenv python and tools
-    venv_py = workspace / ".venv" / "Scripts" / "python.exe"
-    py_bin = str(venv_py) if venv_py.is_file() else sys.executable
+    py_bin = get_tool_bin(workspace, "python")
+    if py_bin == "python":
+        py_bin = sys.executable
 
-    # Check tests FIRST via pytest
+    ruff_bin = get_tool_bin(workspace, "ruff")
+
+    # Step 0: Fast deterministic auto-fix pass (0 API tokens, sub-100ms)
+    try:
+        ruff_fix_cmd = [ruff_bin, "check", "--fix", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "--fix", "."]
+        subprocess.run(ruff_fix_cmd, cwd=workspace, capture_output=True, text=True, timeout=15)
+        ruff_fmt_cmd = [ruff_bin, "format", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "format", "."]
+        subprocess.run(ruff_fmt_cmd, cwd=workspace, capture_output=True, text=True, timeout=15)
+    except Exception:
+        pass
+
+    # Step 1: Syntax & Bytecode Compilation Check
+    compile_failed = False
+    try:
+        comp_res = subprocess.run(
+            [py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"],
+            cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
+        )
+        if comp_res.returncode != 0:
+            compile_failed = True
+            out_lines.append("=== PYTHON SYNTAX / COMPILATION ERRORS ===")
+            out_lines.append(comp_res.stderr.strip() or comp_res.stdout.strip())
+            out_lines.append("")
+    except Exception as e:
+        compile_failed = True
+        out_lines.append(f"=== COMPILE ERROR ===\n{e}\n")
+
+    # Step 2: Strict Ruff Lint Check
+    ruff_failed = False
+    try:
+        ruff_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
+        ruff_res = subprocess.run(ruff_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        if ruff_res.returncode != 0 and ruff_res.stdout.strip():
+            ruff_failed = True
+            out_lines.append("=== RUFF LINT ERRORS ===")
+            out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
+            out_lines.append("")
+    except Exception:
+        pass
+
+    # Step 3: Pytest Unit Tests
     test_failed = False
     try:
         test_res = subprocess.run(
@@ -587,23 +639,11 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
         test_failed = True
         out_lines.append(f"=== TEST RUN ERROR ===\n{e}\n")
 
-    # Check ruff if available (non-blocking)
+    # Step 4: Check mypy if available (non-blocking)
     try:
-        venv_ruff = workspace / ".venv" / "Scripts" / "ruff.exe"
-        ruff_cmd = [str(venv_ruff)] if venv_ruff.is_file() else [py_bin, "-m", "ruff"]
-        ruff_res = subprocess.run(ruff_cmd + ["check", "."], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
-        if ruff_res.returncode != 0 and ruff_res.stdout.strip():
-            out_lines.append("=== RUFF LINT ERRORS ===")
-            out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
-            out_lines.append("")
-    except Exception:
-        pass
-
-    # Check mypy if available (non-blocking)
-    try:
-        venv_mypy = workspace / ".venv" / "Scripts" / "mypy.exe"
-        mypy_cmd = [str(venv_mypy)] if venv_mypy.is_file() else [py_bin, "-m", "mypy"]
-        mypy_res = subprocess.run(mypy_cmd + ["gossipmesh/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        mypy_bin = get_tool_bin(workspace, "mypy")
+        mypy_cmd = [mypy_bin, "gossipmesh/"] if mypy_bin != "mypy" else [py_bin, "-m", "mypy", "gossipmesh/"]
+        mypy_res = subprocess.run(mypy_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         if mypy_res.returncode != 0 and mypy_res.stdout.strip():
             out_lines.append("=== MYPY TYPE ERRORS ===")
             out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
@@ -619,7 +659,7 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
             out_lines.append(remote_ci)
 
     combined_output = "\n".join(out_lines).strip()
-    total_exit = 1 if (test_failed or bool(remote_ci)) else 0
+    total_exit = 1 if (compile_failed or ruff_failed or test_failed or bool(remote_ci)) else 0
     return total_exit, combined_output
 
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:

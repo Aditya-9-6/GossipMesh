@@ -72,7 +72,7 @@ include = ["gossipmesh*"]
 
 [project.optional-dependencies]
 api = ["fastapi", "httpx"]
-dev = ["pytest", "pytest-asyncio", "pytest-cov", "coverage"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "coverage", "ruff>=0.4.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
