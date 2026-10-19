@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Any, Set, Tuple
+from typing import Dict, Any, Set, Tuple, Optional
 from gossipmesh.agents.crdt_store import DeltaORSetCRDT
 
 class TombstoneGarbageCollector:
