@@ -5,18 +5,17 @@ import uuid
 from collections import deque
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Any
+from typing import Callable, Dict, List, Optional, Any, Set
 from gossipmesh.p2p.pow import mine_pow, verify_pow
 from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
-from gossipmesh.p2p.liveness import PeerLivenessTracker
 
 
 class GossipTopic(str, Enum):
-    CODE_CHANGE = "code_change"
-    REVIEW_FEEDBACK = "review_feedback"
-    SECURITY_ALERT = "security_alert"
+    AGENT_EVENT = "agent_event"
+    CODE_REVIEW = "code_review"
+    CONSENSUS = "consensus"
     HEARTBEAT = "heartbeat"
-    AGENT_STATE = "agent_state"
+    TASK_BID = "task_bid"
 
 
 class GossipMessage:
@@ -42,11 +41,11 @@ class GossipMessage:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "message_id": self.message_id,
             "topic": self.topic,
             "origin_node": self.origin_node,
             "payload": self.payload,
             "repo": self.repo,
+            "message_id": self.message_id,
             "vector_clock": self.vector_clock,
             "timestamp": self.timestamp,
             "ttl": self.ttl,
@@ -67,8 +66,9 @@ class GossipMessage:
 
 
 class GossipNode:
-    """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence,
-    Adaptive Scatter-Width CPU-Load Feedback Shaping, and Windowed Liveness Tracking."""
+    """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence
+    and Adaptive Scatter-Width CPU-Load Feedback Shaping.
+    Communicates via a shared ledger directory (file-backed mesh) or local bus."""
 
     def __init__(
         self,
@@ -80,97 +80,93 @@ class GossipNode:
         base_scatter: int = 4,
     ):
         self.node_id = node_id
-        self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh")
+        self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
         self.public_key = public_key
         self.pow_difficulty = pow_difficulty
         self.pow_nonce = pow_nonce
         self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
-        self.seen_messages: set = set()
-        self.message_cache: deque = deque(maxlen=200)
+        self.seen_messages: Set[str] = set()
+        self.recent_messages: deque = deque(maxlen=200)
         self._load_seen_history()
         self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
-        self.liveness_tracker = PeerLivenessTracker()
 
     def _load_seen_history(self):
         """Loads message IDs previously witnessed to prevent duplicate processing."""
-        seen_file = self.mesh_dir / f"{self.node_id}_seen.json"
-        if seen_file.exists():
+        if not self.mesh_dir.exists():
+            return
+        for file_path in self.mesh_dir.glob("*.json"):
             try:
-                with open(seen_file, "r") as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.seen_messages = set(data)
+                    if "message_id" in data:
+                        self.seen_messages.add(data["message_id"])
             except Exception:
-                self.seen_messages = set()
+                continue
 
     def subscribe(self, topic: GossipTopic, handler: Callable[[GossipMessage], None]):
         """Registers a reactive listener callback for a gossip topic."""
-        t_str = str(topic)
-        if t_str not in self.subscribers:
-            self.subscribers[t_str] = []
-        self.subscribers[t_str].append(handler)
+        topic_str = topic.value if isinstance(topic, GossipTopic) else topic
+        if topic_str not in self.subscribers:
+            self.subscribers[topic_str] = []
+        self.subscribers[topic_str].append(handler)
 
     def publish(
         self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
     ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
-        msg = GossipMessage(topic=str(topic), origin_node=self.node_id, payload=payload, repo=repo, ttl=ttl)
-        self.seen_messages.add(msg.message_id)
-        self.message_cache.append(msg)
+        current_scatter = self.scatter_governor.update()
 
-        # Persist to shared mesh ledger file
-        ledger_file = self.mesh_dir / f"{msg.message_id}.json"
-        with open(ledger_file, "w") as f:
-            json.dump(msg.to_dict(), f)
+        topic_str = topic.value if isinstance(topic, GossipTopic) else topic
+        msg = GossipMessage(
+            topic=topic_str,
+            origin_node=self.node_id,
+            payload={**payload, "_adaptive_scatter": current_scatter},
+            repo=repo,
+            ttl=ttl,
+        )
+
+        if self.pow_difficulty > 0:
+            nonce, _ = mine_pow(msg.message_id, self.pow_difficulty, self.pow_nonce)
+            msg.payload["pow_nonce"] = nonce
+
+        self.seen_messages.add(msg.message_id)
+        self.recent_messages.append(msg)
+
+        file_path = self.mesh_dir / f"{msg.message_id}.json"
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(msg.to_dict(), f)
+        except Exception as e:
+            print(f"Error writing gossip message to ledger: {e}")
 
         self._dispatch_to_subscribers(msg)
         return msg
 
     def sync(self) -> List[GossipMessage]:
-        """Runs anti-entropy synchronization: scans the shared ledger for newly
-        arrived gossip messages from other peer nodes."""
-        new_messages: List[GossipMessage] = []
+        """Synchronizes state by reading new gossip messages from the shared mesh directory."""
         if not self.mesh_dir.exists():
-            return new_messages
+            return []
 
+        new_messages: List[GossipMessage] = []
         for file_path in self.mesh_dir.glob("*.json"):
-            if file_path.name.endswith("_seen.json"):
-                continue
-            msg_id = file_path.stem
-            if msg_id not in self.seen_messages:
-                try:
-                    with open(file_path, "r") as f:
-                        data = json.load(f)
-                        msg = GossipMessage.from_dict(data)
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    msg = GossipMessage.from_dict(data)
+                    if msg.message_id not in self.seen_messages:
                         self.seen_messages.add(msg.message_id)
-                        self.message_cache.append(msg)
                         new_messages.append(msg)
+                        self.recent_messages.append(msg)
                         self._dispatch_to_subscribers(msg)
-                except Exception:
-                    pass
+            except Exception:
+                continue
         return new_messages
 
     def _dispatch_to_subscribers(self, msg: GossipMessage):
         handlers = self.subscribers.get(msg.topic, [])
-        for h in handlers:
+        for handler in handlers:
             try:
-                h(msg)
-            except Exception:
-                pass
-
-    def heartbeat(self):
-        """Updates this node's live liveness timestamp and resource governor."""
-        if hasattr(self.scatter_governor, "record_heartbeat"):
-            getattr(self.scatter_governor, "record_heartbeat")()
-        self.publish(GossipTopic.HEARTBEAT, {"node_id": self.node_id, "status": "alive"}, ttl=2)
-
-    def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
-        """Fetches the latest gossip messages from the in-memory cache."""
-        msgs = list(self.message_cache)
-        if topic:
-            msgs = [m for m in msgs if m.topic == str(topic)]
-        return msgs[-limit:]
-
-    def cleanup_ledger(self):
-        """Removes expired messages from the ledger based on TTL."""
-        pass
+                handler(msg)
+            except Exception as e:
+                print(f"Error in gossip subscriber handler for {msg.topic}: {e}")
