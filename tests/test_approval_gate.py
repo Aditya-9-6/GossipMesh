@@ -40,32 +40,21 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
-<<<<<<< HEAD
     try:
         user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
         if not user:
-            user = User(email="approver@gossipmesh.test", hashed_password="dummy", is_active=True, is_superuser=True)
+            user = User(
+                email="approver@gossipmesh.test",
+                hashed_password="dummy",
+                is_active=True,
+                is_superuser=True,
+            )
             db.add(user)
             db.commit()
             db.refresh(user)
         return user
     finally:
         db.close()
-=======
-    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
-    if not user:
-        user = User(
-            email="approver@gossipmesh.test",
-            hashed_password="dummy",
-            is_active=True,
-            is_superuser=True,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    db.close()
-    return user
->>>>>>> origin/main
 
 
 @pytest.fixture(autouse=True)

@@ -1,40 +1,17 @@
 import asyncio
-<<<<<<< HEAD
-import logging
-from typing import List, Optional
-from gossipmesh.p2p.fragmentation import MessageFragmenter, MessageReassembler, PacketFragment
-
-logger = logging.getLogger(__name__)
-
-
-class P2PTransport:
-    def __init__(self, mtu: int = 1024, timeout: float = 30.0):
-        self.mtu = mtu
-        self.reassembler = MessageReassembler(timeout_seconds=timeout)
-
-    def prepare_outgoing(self, data: bytes) -> List[dict]:
-        fragments = MessageFragmenter.fragment(data, chunk_size=self.mtu)
-        return [f.to_dict() for f in fragments]
-
-    def handle_incoming_fragment(self, fragment_dict: dict) -> Optional[bytes]:
-        try:
-            fragment = PacketFragment.from_dict(fragment_dict)
-            return self.reassembler.add_fragment(fragment)
-        except Exception as e:
-            logger.error(f"Failed to process incoming fragment: {e}")
-            raise
-=======
 import json
 import logging
 import time
 import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
+from gossipmesh.p2p.fragmentation import MessageFragmenter, MessageReassembler, PacketFragment
 
 logger = logging.getLogger(__name__)
+
 
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
@@ -118,6 +95,25 @@ class TransportTelemetry:
             "received_bytes": self.received_bytes,
             "dropped_messages": self.dropped_messages,
         }
+
+
+class P2PTransport:
+    """Handles packet fragmentation and reassembly for P2P transport streams."""
+    def __init__(self, mtu: int = 1024, timeout: float = 30.0):
+        self.mtu = mtu
+        self.reassembler = MessageReassembler(timeout_seconds=timeout)
+
+    def prepare_outgoing(self, data: bytes) -> List[dict]:
+        fragments = MessageFragmenter.fragment(data, chunk_size=self.mtu)
+        return [f.to_dict() for f in fragments]
+
+    def handle_incoming_fragment(self, fragment_dict: dict) -> Optional[bytes]:
+        try:
+            fragment = PacketFragment.from_dict(fragment_dict)
+            return self.reassembler.add_fragment(fragment)
+        except Exception as e:
+            logger.error(f"Failed to process incoming fragment: {e}")
+            raise
 
 
 class GossipTransport:
@@ -245,4 +241,3 @@ class TransportSocketReader:
         _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
 
         return msg_type, msg_id, payload_view
->>>>>>> origin/main
