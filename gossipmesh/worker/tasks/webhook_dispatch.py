@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
@@ -81,7 +81,7 @@ def process_webhook_event(self, webhook_event_id: int):
                 webhook_record.status = "failed"
                 # Exponential backoff: 2^retries minutes
                 delay = 2**webhook_record.retries
-                webhook_record.next_retry_at = datetime.utcnow() + timedelta(minutes=delay)
+                webhook_record.next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=delay)
 
             db.commit()
 

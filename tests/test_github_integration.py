@@ -4,12 +4,12 @@ from gossipmesh.integrations.github import GitHubIntegration
 from gossipmesh.integrations.github_pr import GitHubPRService
 from gossipmesh.models.pr_review import SecurityFinding
 
-
 class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.github_pr_service = MagicMock(spec=GitHubPRService)
         self.github_pr_service.get_pr_diff = AsyncMock()
         self.github_pr_service.get_pr_review_comments = AsyncMock(return_value=[])
+        self.github_pr_service.get_pr_reviews = AsyncMock(return_value=[])
         self.github_pr_service.post_pr_review_comment = AsyncMock()
         self.github_pr_service.post_pr_review = AsyncMock()
         self.integration = GitHubIntegration(
@@ -29,10 +29,12 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         self.github_pr_service.get_pr_diff.return_value = diff
 
         valid_finding = SecurityFinding(
-            id="f1", file_path="file1.txt", line=11, side="RIGHT", commit_sha="abc1234", severity="HIGH", message="msg1"
+            id="f1", file_path="file1.txt", line=11, side="RIGHT",
+            commit_sha="abc1234", severity="HIGH", message="msg1"
         )
         invalid_finding = SecurityFinding(
-            id="f2", file_path="file1.txt", line=99, side="RIGHT", commit_sha="abc1234", severity="LOW", message="msg2"
+            id="f2", file_path="file1.txt", line=99, side="RIGHT",
+            commit_sha="abc1234", severity="LOW", message="msg2"
         )
 
         self.github_pr_service.post_pr_review_comment.return_value = {"id": 12345}
@@ -71,24 +73,14 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         self.github_pr_service.get_pr_diff.return_value = diff
 
         finding1 = SecurityFinding(
-            id="f1",
-            file_path="file1.txt",
-            line=11,
-            side="RIGHT",
-            commit_sha="abc1234",
-            severity="HIGH",
-            message="msg1",
-            fingerprint="fp1",
+            id="f1", file_path="file1.txt", line=11, side="RIGHT",
+            commit_sha="abc1234", severity="HIGH", message="msg1",
+            fingerprint="fp1"
         )
         finding2 = SecurityFinding(
-            id="f2",
-            file_path="file1.txt",
-            line=12,
-            side="RIGHT",
-            commit_sha="abc1234",
-            severity="LOW",
-            message="msg2",
-            fingerprint="fp1",  # duplicate fingerprint
+            id="f2", file_path="file1.txt", line=12, side="RIGHT",
+            commit_sha="abc1234", severity="LOW", message="msg2",
+            fingerprint="fp1" # duplicate fingerprint
         )
 
         self.github_pr_service.post_pr_review_comment.return_value = {"id": 12345}
@@ -114,14 +106,19 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         self.github_pr_service.get_pr_diff.return_value = diff
 
         finding1 = SecurityFinding(
-            id="f1", file_path="file1.txt", line=11, side="RIGHT", commit_sha="abc1234", severity="HIGH", message="msg1"
+            id="f1", file_path="file1.txt", line=11, side="RIGHT",
+            commit_sha="abc1234", severity="HIGH", message="msg1"
         )
         finding2 = SecurityFinding(
-            id="f2", file_path="file1.txt", line=12, side="RIGHT", commit_sha="abc1234", severity="LOW", message="msg2"
+            id="f2", file_path="file1.txt", line=12, side="RIGHT",
+            commit_sha="abc1234", severity="LOW", message="msg2"
         )
 
         # First call fails, second succeeds
-        self.github_pr_service.post_pr_review_comment.side_effect = [Exception("API error"), {"id": 54321}]
+        self.github_pr_service.post_pr_review_comment.side_effect = [
+            Exception("API error"),
+            {"id": 54321}
+        ]
 
         await self.integration.generate_inline_comments([finding1, finding2])
 
@@ -155,14 +152,9 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         ]
 
         finding = SecurityFinding(
-            id="f1",
-            file_path="file1.txt",
-            line=11,
-            side="RIGHT",
-            commit_sha="abc1234",
-            severity="HIGH",
-            message="msg",
-            fingerprint="fp_retry",
+            id="f1", file_path="file1.txt", line=11, side="RIGHT",
+            commit_sha="abc1234", severity="HIGH", message="msg",
+            fingerprint="fp_retry"
         )
 
         await self.integration.generate_inline_comments([finding])
@@ -184,7 +176,8 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         self.github_pr_service.get_pr_diff.return_value = diff
 
         valid_finding_left = SecurityFinding(
-            id="f1", file_path="file1.txt", line=11, side="LEFT", commit_sha="abc1234", severity="HIGH", message="msg1"
+            id="f1", file_path="file1.txt", line=11, side="LEFT",
+            commit_sha="abc1234", severity="HIGH", message="msg1"
         )
 
         self.github_pr_service.post_pr_review_comment.return_value = {"id": 12345}
@@ -199,6 +192,5 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["side"], "LEFT")
         self.github_pr_service.post_pr_review.assert_not_called()
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

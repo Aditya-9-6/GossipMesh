@@ -10,10 +10,8 @@ from gossipmesh.core.retry import with_retry_and_circuit_breaker, CircuitBreaker
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
-
 class OpenAIProvider(BaseProvider):
     _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
-
     def __init__(self, api_key: str):
         super().__init__(api_key)
         self.client = AsyncOpenAI(api_key=self.api_key, timeout=60.0)
@@ -30,11 +28,11 @@ class OpenAIProvider(BaseProvider):
 
         try:
             response = await self.client.chat.completions.create(
-                model=request.model,
-                messages=formatted_messages,
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
-                stop=request.stop_sequences,
+            model=request.model,
+            messages=formatted_messages,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            stop=request.stop_sequences
             )
         except (APIError, APIConnectionError) as e:
             raise ProviderError("Provider API error") from None
@@ -45,18 +43,18 @@ class OpenAIProvider(BaseProvider):
             prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
             completion_tokens=response.usage.completion_tokens if response.usage else 0,
             total_tokens=response.usage.total_tokens if response.usage else 0,
-            cost_estimate_usd=0.0,  # To be implemented properly via a pricing table
+            cost_estimate_usd=0.0 # To be implemented properly via a pricing table
         )
 
         return GenerationResponse(
             content=response.choices[0].message.content or "",
             model=response.model,
             usage=usage,
-            raw_response=response.model_dump(),
+            raw_response=response.model_dump()
         )
 
     @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         formatted_messages: list[Any] = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         try:
             stream: Any = await self.client.chat.completions.create(
@@ -65,7 +63,7 @@ class OpenAIProvider(BaseProvider):
                 temperature=request.temperature,
                 max_tokens=request.max_tokens,
                 stop=request.stop_sequences,
-                stream=True,
+                stream=True
             )
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:

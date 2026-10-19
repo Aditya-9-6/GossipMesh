@@ -9,13 +9,6 @@ Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tes
 
 import os
 import sys
-
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
 import json
 import re
 import argparse
@@ -25,15 +18,18 @@ import subprocess
 import time
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-flash-lite-latest"
+DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-3.8-flash",
-    "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+    "gemini-2.5-pro",
 ]
 
 DEFAULT_KEYS = []
-
 
 def load_gemini_keys() -> list[str]:
     """Dynamically loads Gemini API keys from environment variables and local .gemini_keys files."""
@@ -60,7 +56,6 @@ def load_gemini_keys() -> list[str]:
         if k not in keys:
             keys.append(k)
     return keys
-
 
 SYSTEM_PROMPT = """You are an expert autonomous Python systems engineer and architectural repair agent for GossipMesh.
 Your mission is to fix failing Python build errors, lint errors (ruff), type errors (mypy), broken unit tests, AND refactor spaghetti code based on review feedback.
@@ -107,7 +102,6 @@ Respond ONLY with a single valid JSON object:
 }
 """
 
-
 def extract_json_response(raw_text: str) -> dict:
     raw_text = raw_text.strip()
     try:
@@ -128,13 +122,10 @@ def extract_json_response(raw_text: str) -> dict:
     first_brace = raw_text.find("{")
     last_brace = raw_text.rfind("}")
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        return json.loads(raw_text[first_brace : last_brace + 1], strict=False)
+        return json.loads(raw_text[first_brace:last_brace + 1], strict=False)
     raise ValueError(f"Could not parse valid JSON from model response: {raw_text[:200]}")
 
-
-def call_gemini(
-    api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT, fallback_key: str = "", model: str = DEFAULT_MODEL
-) -> dict:
+def call_gemini(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT, fallback_key: str = "", model: str = DEFAULT_MODEL) -> dict:
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
     for m in ordered:
@@ -151,8 +142,18 @@ def call_gemini(
         for current_model in models_to_try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
-                "contents": [{"parts": [{"text": system_prompt}, {"text": prompt}]}],
-                "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"},
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": system_prompt},
+                            {"text": prompt}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "responseMimeType": "application/json"
+                }
             }
 
             print(f"[*] [Gemini] Querying {current_model}...", flush=True)
@@ -162,7 +163,7 @@ def call_gemini(
                     url,
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
-                    method="POST",
+                    method="POST"
                 )
                 try:
                     with urllib.request.urlopen(req, timeout=120) as resp:
@@ -190,31 +191,28 @@ def call_gemini(
 
     raise RuntimeError(f"Gemini API exhausted. Last error: {last_err}")
 
-
 def call_openrouter(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
     if not api_key:
         raise ValueError("Missing OPENROUTER_API_KEY")
     url = "https://openrouter.ai/api/v1/chat/completions"
-    models = [
-        "deepseek/deepseek-chat",
-        "meta-llama/llama-3.3-70b-instruct",
-        "google/gemini-2.5-flash",
-        "mistralai/mistral-large-2411",
-    ]
+    models = ["deepseek/deepseek-chat", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.5-flash", "mistralai/mistral-large-2411"]
     last_err = None
     for model in models:
         print(f"[*] [OpenRouter] Querying {model}...", flush=True)
         payload = {
             "model": model,
-            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
             "temperature": 0.1,
-            "response_format": {"type": "json_object"},
+            "response_format": {"type": "json_object"}
         }
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            method="POST",
+            method="POST"
         )
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
@@ -227,7 +225,6 @@ def call_openrouter(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMP
             continue
     raise RuntimeError(f"OpenRouter calls failed: {last_err}")
 
-
 def call_cohere(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
     """Calls Cohere Chat API as resilient fallback."""
     if not api_key:
@@ -239,8 +236,11 @@ def call_cohere(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -
         print(f"[*] [Cohere] Querying {model}...", flush=True)
         payload = {
             "model": model,
-            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"}
         }
         req = urllib.request.Request(
             url,
@@ -248,9 +248,9 @@ def call_cohere(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": "GossipMesh-CI/1.0",
+                "User-Agent": "GossipMesh-CI/1.0"
             },
-            method="POST",
+            method="POST"
         )
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
@@ -265,7 +265,6 @@ def call_cohere(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -
             continue
     raise RuntimeError(f"Cohere calls failed. Last error: {last_err}")
 
-
 def call_huggingface(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
     """Calls Hugging Face Inference Router API as resilient fallback."""
     if not api_key:
@@ -277,15 +276,18 @@ def call_huggingface(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROM
         print(f"[*] [HuggingFace] Querying {model}...", flush=True)
         payload = {
             "model": model,
-            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
             "temperature": 0.1,
-            "response_format": {"type": "json_object"},
+            "response_format": {"type": "json_object"}
         }
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            method="POST",
+            method="POST"
         )
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
@@ -298,31 +300,28 @@ def call_huggingface(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROM
             continue
     raise RuntimeError(f"HuggingFace calls failed. Last error: {last_err}")
 
-
 def call_nvidia_nim(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
     if not api_key:
         raise ValueError("Missing NVIDIA_API_KEY")
     url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    models = [
-        "nvidia/llama-3.1-nemotron-70b-instruct",
-        "meta/llama-3.1-8b-instruct",
-        "meta/llama-3.1-70b-instruct",
-        "deepseek-ai/deepseek-r1",
-    ]
+    models = ["nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.1-8b-instruct", "meta/llama-3.1-70b-instruct", "deepseek-ai/deepseek-r1"]
     last_err = None
     for model in models:
         print(f"[*] [NVIDIA NIM] Querying {model}...", flush=True)
         payload = {
             "model": model,
-            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
             "temperature": 0.1,
-            "response_format": {"type": "json_object"},
+            "response_format": {"type": "json_object"}
         }
         req = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            method="POST",
+            method="POST"
         )
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
@@ -335,12 +334,9 @@ def call_nvidia_nim(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMP
             continue
     raise RuntimeError(f"NVIDIA NIM calls failed: {last_err}")
 
-
 def call_ai_model(prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
     primary_gemini = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
-    fallback_gemini = (
-        os.environ.get("GEMINI_REVIEWER_KEY", "").strip() or os.environ.get("GEMINI_ISSUE_KEY", "").strip()
-    )
+    fallback_gemini = os.environ.get("GEMINI_REVIEWER_KEY", "").strip() or os.environ.get("GEMINI_ISSUE_KEY", "").strip()
     try:
         return call_gemini(primary_gemini, prompt, system_prompt=system_prompt, fallback_key=fallback_gemini)
     except Exception as e:
@@ -374,10 +370,7 @@ def call_ai_model(prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
         except Exception as e:
             print(f"[!] OpenRouter failed: {e}. Trying next provider...", file=sys.stderr)
 
-    raise RuntimeError(
-        "All AI model providers (Gemini, Cohere, HuggingFace, NVIDIA NIM, OpenRouter) exhausted without response."
-    )
-
+    raise RuntimeError("All AI model providers (Gemini, Cohere, HuggingFace, NVIDIA NIM, OpenRouter) exhausted without response.")
 
 def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -> list[str]:
     conflicted_files = set()
@@ -404,12 +397,7 @@ def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -
     print(f"[*] ⚠️ Detected {len(conflicted_files)} conflicted file(s): {sorted(list(conflicted_files))}", flush=True)
     for rel_path in sorted(list(conflicted_files)):
         target_file = workspace / rel_path
-        if (
-            rel_path.startswith(".github/")
-            or rel_path.startswith("scripts/ai_")
-            or rel_path.startswith("scripts/auto_merge")
-            or rel_path == "fix_conflict.py"
-        ):
+        if rel_path.startswith(".github/") or rel_path.startswith("scripts/ai_") or rel_path.startswith("scripts/auto_merge") or rel_path == "fix_conflict.py":
             print(f"[*] Preserving master workflow/tooling from origin/main for {rel_path}...", flush=True)
             code = subprocess.run(["git", "checkout", "origin/main", "--", rel_path], cwd=workspace).returncode
             if code == 0:
@@ -420,9 +408,7 @@ def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -
             continue
 
         if not target_file.is_file():
-            print(
-                f"[*] Handling deleted/missing conflicted file {rel_path} by restoring from origin/main...", flush=True
-            )
+            print(f"[*] Handling deleted/missing conflicted file {rel_path} by restoring from origin/main...", flush=True)
             subprocess.run(["git", "checkout", "origin/main", "--", rel_path], cwd=workspace)
             subprocess.run(["git", "add", rel_path], cwd=workspace)
             resolved.append(rel_path)
@@ -436,11 +422,7 @@ def detect_and_resolve_conflicts(workspace: Path, user_instructions: str = "") -
             continue
 
         print(f"[*] Resolving Git merge conflicts in {rel_path} via AI...", flush=True)
-        user_inst_block = (
-            f"\n=== USER SPECIFIC INSTRUCTIONS ===\n{user_instructions}\nYou MUST follow these instructions while resolving the conflict.\n"
-            if user_instructions
-            else ""
-        )
+        user_inst_block = f"\n=== USER SPECIFIC INSTRUCTIONS ===\n{user_instructions}\nYou MUST follow these instructions while resolving the conflict.\n" if user_instructions else ""
         prompt = f"""Resolve the Git merge conflicts in `{rel_path}`.
 
 CRITICAL INSTRUCTIONS:
@@ -468,9 +450,7 @@ CRITICAL INSTRUCTIONS:
 
     # Resolve any remaining unmerged paths
     try:
-        remaining_res = subprocess.run(
-            ["git", "diff", "--name-only", "--diff-filter=U"], cwd=workspace, capture_output=True, text=True
-        )
+        remaining_res = subprocess.run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=workspace, capture_output=True, text=True)
         remaining = [l.strip() for l in remaining_res.stdout.splitlines() if l.strip()]
         for rem in remaining:
             print(f"[*] Fallback: resolving remaining unmerged file {rem} using origin/main...", flush=True)
@@ -484,21 +464,13 @@ CRITICAL INSTRUCTIONS:
         subprocess.run(["git", "add", "-A"], cwd=workspace)
         merge_head = workspace / ".git" / "MERGE_HEAD"
         if merge_head.exists():
-            subprocess.run(
-                [
-                    "git",
-                    "commit",
-                    "-m",
-                    "fix(merge): resolve merge conflicts with origin/main",
-                    "-m",
-                    "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>",
-                ],
-                cwd=workspace,
-            )
+            subprocess.run([
+                "git", "commit", "-m", "fix(merge): resolve merge conflicts with origin/main",
+                "-m", "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>"
+            ], cwd=workspace)
             print("[*] Completed merge commit after conflict resolution.", flush=True)
 
     return resolved
-
 
 def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
     """Fetches failed GitHub Actions logs and check annotations for this PR if available."""
@@ -507,9 +479,7 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
         # 1. Inspect statusCheckRollup to find all failing checks and matrix jobs
         pr_view = subprocess.run(
             ["gh", "pr", "view", pr_number, "--json", "headRefName,statusCheckRollup"],
-            cwd=workspace,
-            capture_output=True,
-            text=True,
+            cwd=workspace, capture_output=True, text=True
         )
         if pr_view.returncode == 0:
             pr_data = json.loads(pr_view.stdout)
@@ -522,14 +492,12 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
                     print(f"[*] Identified failing CI check: {name} (URL: {url})", flush=True)
 
                     # Extract check run ID (e.g., /runs/123456)
-                    match_cr = re.search(r"/runs/(\d+)$", url)
+                    match_cr = re.search(r'/runs/(\d+)$', url)
                     if match_cr:
                         cr_id = match_cr.group(1)
                         ann_res = subprocess.run(
                             ["gh", "api", f"/repos/:owner/:repo/check-runs/{cr_id}/annotations"],
-                            cwd=workspace,
-                            capture_output=True,
-                            text=True,
+                            cwd=workspace, capture_output=True, text=True
                         )
                         if ann_res.returncode == 0 and ann_res.stdout.strip():
                             try:
@@ -545,18 +513,17 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
                                 pass
 
                     # Extract job ID (e.g., /job/123456)
-                    match_job = re.search(r"/job/(\d+)", url)
+                    match_job = re.search(r'/job/(\d+)', url)
                     if match_job:
                         job_id = match_job.group(1)
                         job_log = subprocess.run(
                             ["gh", "run", "view", "--job", job_id, "--log-failed"],
-                            cwd=workspace,
-                            capture_output=True,
-                            text=True,
+                            cwd=workspace, capture_output=True, text=True
                         )
                         if job_log.stdout.strip():
                             ci_reports.append(
-                                f"=== FAILED CI JOB ({name} [Job #{job_id}]) ===\n" + job_log.stdout.strip()[:8000]
+                                f"=== FAILED CI JOB ({name} [Job #{job_id}]) ===\n"
+                                + job_log.stdout.strip()[:8000]
                             )
 
         # 2. Fallback: check recent workflow runs for this branch
@@ -572,23 +539,14 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
                 data = json.loads(res.stdout)
                 for run in data:
                     run_name = run.get("name", "").lower()
-                    if any(
-                        x in run_name for x in ("ai ci", "ai-ci", "auto-approve", "auto-merge", "autonomous", "fixer")
-                    ):
+                    if any(x in run_name for x in ("ai ci", "ai-ci", "auto-approve", "auto-merge", "autonomous", "fixer")):
                         continue
                     if run.get("conclusion") in ("failure", "timed_out", "startup_failure"):
                         run_id = str(run.get("databaseId"))
-                        print(
-                            f"[*] Found failed GitHub Actions run {run_id} ({run.get('name')}). Fetching failed logs...",
-                            flush=True,
-                        )
+                        print(f"[*] Found failed GitHub Actions run {run_id} ({run.get('name')}). Fetching failed logs...", flush=True)
                         log_res = subprocess.run(
                             ["gh", "run", "view", "--log-failed", run_id],
-                            cwd=workspace,
-                            capture_output=True,
-                            text=True,
-                            encoding="utf-8",
-                            errors="replace",
+                            cwd=workspace, capture_output=True, text=True
                         )
                         if log_res.stdout.strip():
                             ci_reports.append(
@@ -601,122 +559,32 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
 
     return "\n\n".join(ci_reports).strip()
 
-
-def get_tool_bin(workspace: Path, tool_name: str) -> str:
-    """Locate tool binary across Linux (.venv/bin) and Windows (.venv/Scripts)."""
-    candidates = [
-        workspace / ".venv" / "bin" / tool_name,
-        workspace / ".venv" / "Scripts" / f"{tool_name}.exe",
-        workspace / ".venv" / "Scripts" / tool_name,
-    ]
-    for c in candidates:
-        if c.is_file():
-            return str(c)
-    return tool_name
-
-
 def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
-    print("[*] Running local diagnostic checks (ruff auto-fix, compileall, ruff, pytest)...", flush=True)
+    print("[*] Running local diagnostic checks (ruff check, mypy, unittest)...", flush=True)
     out_lines = []
 
-    py_bin = get_tool_bin(workspace, "python")
-    if py_bin == "python":
-        py_bin = sys.executable
+    # Check ruff
+    ruff_res = subprocess.run(["ruff", "check", "."], cwd=workspace, capture_output=True, text=True)
+    if ruff_res.returncode != 0:
+        out_lines.append("=== RUFF LINT ERRORS ===")
+        out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
+        out_lines.append("")
 
-    ruff_bin = get_tool_bin(workspace, "ruff")
+    # Check mypy
+    mypy_res = subprocess.run(["mypy", "gossipmesh/"], cwd=workspace, capture_output=True, text=True)
+    if mypy_res.returncode != 0:
+        out_lines.append("=== MYPY TYPE ERRORS ===")
+        out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
+        out_lines.append("")
 
-    # Step 0: Fast deterministic auto-fix pass (0 API tokens, sub-100ms)
-    try:
-        ruff_fix_cmd = (
-            [ruff_bin, "check", "--fix", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "--fix", "."]
-        )
-        subprocess.run(ruff_fix_cmd, cwd=workspace, capture_output=True, text=True, timeout=15)
-        ruff_fmt_cmd = [ruff_bin, "format", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "format", "."]
-        subprocess.run(ruff_fmt_cmd, cwd=workspace, capture_output=True, text=True, timeout=15)
-    except Exception:
-        pass
+    # Check unittest
+    test_res = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True)
+    if test_res.returncode != 0:
+        out_lines.append("=== PYTHON TEST FAILURES ===")
+        combined = (test_res.stdout + "\n" + test_res.stderr).strip()
+        out_lines.append(combined)
 
-    # Step 1: Syntax & Bytecode Compilation Check
-    compile_failed = False
-    try:
-        comp_res = subprocess.run(
-            [
-                py_bin,
-                "-m",
-                "compileall",
-                "-q",
-                "-x",
-                r"(\.venv|\.git|tests/fixtures)",
-                "gossipmesh",
-                "tests",
-                "scripts",
-            ],
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-        )
-        if comp_res.returncode != 0:
-            compile_failed = True
-            out_lines.append("=== PYTHON SYNTAX / COMPILATION ERRORS ===")
-            out_lines.append(comp_res.stderr.strip() or comp_res.stdout.strip())
-            out_lines.append("")
-    except Exception as e:
-        compile_failed = True
-        out_lines.append(f"=== COMPILE ERROR ===\n{e}\n")
-
-    # Step 2: Strict Ruff Lint Check
-    ruff_failed = False
-    try:
-        ruff_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
-        ruff_res = subprocess.run(
-            ruff_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
-        )
-        if ruff_res.returncode != 0 and ruff_res.stdout.strip():
-            ruff_failed = True
-            out_lines.append("=== RUFF LINT ERRORS ===")
-            out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
-            out_lines.append("")
-    except Exception:
-        pass
-
-    # Step 3: Pytest Unit Tests
-    test_failed = False
-    try:
-        test_res = subprocess.run(
-            [py_bin, "-m", "pytest", "tests/", "-m", "not integration", "-q", "--maxfail=3", "--durations=3"],
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=90,
-        )
-        if test_res.returncode != 0:
-            test_failed = True
-            out_lines.append("=== PYTHON TEST FAILURES ===")
-            combined = (test_res.stdout + "\n" + test_res.stderr).strip()
-            out_lines.append(combined)
-            out_lines.append("")
-    except Exception as e:
-        test_failed = True
-        out_lines.append(f"=== TEST RUN ERROR ===\n{e}\n")
-
-    # Step 4: Check mypy if available (non-blocking)
-    try:
-        mypy_bin = get_tool_bin(workspace, "mypy")
-        mypy_cmd = [mypy_bin, "gossipmesh/"] if mypy_bin != "mypy" else [py_bin, "-m", "mypy", "gossipmesh/"]
-        mypy_res = subprocess.run(
-            mypy_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
-        )
-        if mypy_res.returncode != 0 and mypy_res.stdout.strip():
-            out_lines.append("=== MYPY TYPE ERRORS ===")
-            out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
-            out_lines.append("")
-    except Exception:
-        pass
+    local_errors = bool(out_lines)
 
     # Always fetch remote GitHub CI failures and security alerts if pr_number is provided
     remote_ci = ""
@@ -726,39 +594,27 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
             out_lines.append(remote_ci)
 
     combined_output = "\n".join(out_lines).strip()
-    total_exit = 1 if (compile_failed or ruff_failed or test_failed or bool(remote_ci)) else 0
+    total_exit = 1 if (local_errors or bool(remote_ci)) else 0
     return total_exit, combined_output
-
 
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
     found = set()
-    pattern = re.compile(r"([\w/\\.-]+\.py)(?::\d+)?")
-    search_dirs = [workspace / d for d in ("gossipmesh", "tests", "scripts") if (workspace / d).is_dir()]
+    pattern = re.compile(r'([\w/\\.-]+\.py)(?::\d+)?')
     for match in pattern.finditer(error_log):
         rel_str = match.group(1).replace("\\", "/")
         p = workspace / rel_str
-        if p.is_file() and not any(part in p.parts for part in (".venv", ".git", "__pycache__")):
+        if p.is_file():
             found.add(rel_str)
         else:
-            for sdir in search_dirs:
-                for sub in sdir.rglob("*.py"):
-                    if any(part in sub.parts for part in (".venv", ".git", "__pycache__")):
-                        continue
-                    if sub.name == Path(rel_str).name:
-                        try:
-                            found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
-                        except ValueError:
-                            pass
+            for sub in workspace.rglob("*.py"):
+                if sub.name == Path(rel_str).name:
+                    try:
+                        found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
+                    except ValueError:
+                        pass
 
     try:
-        diff_names = subprocess.run(
-            ["git", "diff", "--name-only", "origin/main...HEAD"],
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
+        diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
         for line in diff_names.stdout.splitlines():
             line = line.strip().replace("\\", "/")
             if line.endswith(".py") and (workspace / line).is_file():
@@ -767,7 +623,6 @@ def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
         pass
 
     return sorted(list(found))
-
 
 def get_pr_diff(workspace: Path) -> str:
     try:
@@ -784,30 +639,24 @@ def get_pr_diff(workspace: Path) -> str:
         pass
     return "No git diff available."
 
-
 def extract_instructions_from_pr(pr_number: str, workspace: Path) -> str:
     """Extracts custom user instructions from the latest /fix comment on the PR."""
     try:
-        res = subprocess.run(
-            ["gh", "pr", "view", pr_number, "--json", "comments"],
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
+        res = subprocess.run([
+            "gh", "pr", "view", pr_number, "--json", "comments"
+        ], cwd=workspace, capture_output=True, text=True, encoding="utf-8")
         if res.returncode == 0 and res.stdout:
             data = json.loads(res.stdout)
             comments = data.get("comments", [])
             for c in reversed(comments):
                 body = c.get("body", "")
                 if "/fix" in body:
-                    m = re.search(r"/fix[:\s-]*(.*)", body, re.DOTALL | re.IGNORECASE)
+                    m = re.search(r'/fix[:\s-]*(.*)', body, re.DOTALL | re.IGNORECASE)
                     if m and m.group(1).strip():
                         return m.group(1).strip()
     except Exception as e:
         print(f"[*] Warning: Could not extract comments from PR #{pr_number}: {e}", file=sys.stderr)
     return ""
-
 
 def main():
     parser = argparse.ArgumentParser(description="GossipMesh Autonomous CI Auto-Fixer & Conflict Resolver")
@@ -815,9 +664,7 @@ def main():
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
     parser.add_argument("--error-log-file", default="", help="Optional pre-captured error log file")
     parser.add_argument("--review-feedback-file", default="", help="Optional reviewer feedback markdown file")
-    parser.add_argument(
-        "--user-instructions", default="", help="Optional user instructions from comment or workflow dispatch"
-    )
+    parser.add_argument("--user-instructions", default="", help="Optional user instructions from comment or workflow dispatch")
     parser.add_argument("--user-instructions-file", default="", help="Optional file containing user instructions")
     parser.add_argument("--max-iterations", type=int, default=6, help="Maximum self-healing passes")
     args = parser.parse_args()
@@ -890,11 +737,7 @@ def main():
         prompt_header = f"""Pull Request #{args.pr_number} has failing Python checks or tests (Pass {iteration}/{max_iterations}).
 Your goal: Fix all lint errors, type errors, and broken tests so that all diagnostics pass 100% GREEN."""
 
-        user_inst_block = (
-            f"\n=== USER GUIDANCE & SPECIFIC INSTRUCTIONS ===\n{user_instructions}\nStrictly adhere to and implement these instructions.\n"
-            if user_instructions
-            else ""
-        )
+        user_inst_block = f"\n=== USER GUIDANCE & SPECIFIC INSTRUCTIONS ===\n{user_instructions}\nStrictly adhere to and implement these instructions.\n" if user_instructions else ""
 
         prompt = f"""{prompt_header}
 
@@ -940,10 +783,7 @@ Instructions:
                 orig_lines = len(target.read_text(encoding="utf-8", errors="replace").splitlines())
                 new_lines = len(content.splitlines())
                 if orig_lines > 80 and new_lines < int(orig_lines * 0.65):
-                    print(
-                        f"[!] WARNING: Proposed fix for {rel_path} shrunk lines from {orig_lines} to {new_lines}. Skipping destructive overwrite.",
-                        flush=True,
-                    )
+                    print(f"[!] WARNING: Proposed fix for {rel_path} shrunk lines from {orig_lines} to {new_lines}. Skipping destructive overwrite.", flush=True)
                     continue
 
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -951,19 +791,7 @@ Instructions:
             all_repaired_files.add(rel_path)
             print(f"    [+] Wrote fixed file: {rel_path}", flush=True)
 
-        ruff_bin = get_tool_bin(workspace, "ruff")
-        py_bin = get_tool_bin(workspace, "python")
-        try:
-            ruff_cmd = (
-                [ruff_bin, "check", "--fix", "."]
-                if ruff_bin != "ruff"
-                else [py_bin, "-m", "ruff", "check", "--fix", "."]
-            )
-            subprocess.run(ruff_cmd, cwd=workspace, capture_output=True, text=True, timeout=20)
-            ruff_fmt = [ruff_bin, "format", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "format", "."]
-            subprocess.run(ruff_fmt, cwd=workspace, capture_output=True, text=True, timeout=20)
-        except Exception:
-            pass
+        subprocess.run(["ruff", "check", "--fix", "."], cwd=workspace)
 
     final_code, final_log = run_diagnostics(workspace, pr_number=args.pr_number)
     post_code = final_code
@@ -1004,7 +832,6 @@ Instructions:
     else:
         print(f"[!] Tests still failing after repair passes.")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

@@ -9,12 +9,10 @@ from gossipmesh.core.retry import with_retry_and_circuit_breaker, CircuitBreaker
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
-
 class OllamaProvider(BaseProvider):
     _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
-
     def __init__(self, base_url: str = "http://localhost:11434"):
-        super().__init__(api_key="")  # Ollama usually doesn't need an API key
+        super().__init__(api_key="") # Ollama usually doesn't need an API key
         self.base_url = base_url
 
     @property
@@ -38,10 +36,10 @@ class OllamaProvider(BaseProvider):
                         "options": {
                             "temperature": request.temperature,
                             "num_predict": request.max_tokens,
-                            "stop": request.stop_sequences,
-                        },
+                            "stop": request.stop_sequences
+                        }
                     },
-                    timeout=300.0,
+                    timeout=300.0
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -54,18 +52,18 @@ class OllamaProvider(BaseProvider):
             prompt_tokens=data.get("prompt_eval_count", 0),
             completion_tokens=data.get("eval_count", 0),
             total_tokens=data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
-            cost_estimate_usd=0.0,
+            cost_estimate_usd=0.0
         )
 
         return GenerationResponse(
             content=data.get("message", {}).get("content", ""),
             model=data.get("model", request.model),
             usage=usage,
-            raw_response=data,
+            raw_response=data
         )
 
     @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
 
         try:
@@ -80,10 +78,10 @@ class OllamaProvider(BaseProvider):
                         "options": {
                             "temperature": request.temperature,
                             "num_predict": request.max_tokens,
-                            "stop": request.stop_sequences,
-                        },
+                            "stop": request.stop_sequences
+                        }
                     },
-                    timeout=300.0,
+                    timeout=300.0
                 ) as response:
                     response.raise_for_status()
                     async for chunk in response.aiter_lines():
