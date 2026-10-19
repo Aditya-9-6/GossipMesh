@@ -68,7 +68,11 @@ def get_approval_gate(
     if not gate:
         raise HTTPException(status_code=404, detail="Approval gate not found")
     
-    if gate.status == "pending" and gate.expires_at < datetime.now(timezone.utc):
+    expires_at = gate.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if gate.status == "pending" and expires_at < datetime.now(timezone.utc):
         gate.status = "expired"
         db.commit()
         db.refresh(gate)
@@ -89,7 +93,11 @@ def decide_approval(
     if gate.status != "pending":
         raise HTTPException(status_code=400, detail=f"Approval gate is already {gate.status}")
 
-    if gate.expires_at < datetime.now(timezone.utc):
+    expires_at = gate.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < datetime.now(timezone.utc):
         gate.status = "expired"
         db.commit()
         raise HTTPException(status_code=400, detail="Approval gate has expired")
