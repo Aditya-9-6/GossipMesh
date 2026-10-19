@@ -1,7 +1,9 @@
 import math
-<<<<<<< HEAD
 import json
-from typing import List, Dict, Any, Optional
+import hashlib
+import base64
+import threading
+from typing import Set, List, Dict, Any, Optional
 
 class HyperLogLogDigest:
     """HyperLogLog cardinality estimation digest for peer state sets."""
@@ -68,11 +70,7 @@ class HyperLogLogDigest:
     def deserialize(cls, data_str: str) -> 'HyperLogLogDigest':
         data = json.loads(data_str)
         return cls(precision=data["precision"], registers=data["registers"])
-=======
-import hashlib
-import base64
-import threading
-from typing import Set, List, Dict, Any, Optional
+
 
 class BloomFilterDigest:
     """Space-efficient dynamic Bloom filter digest for P2P anti-entropy state reconciliation."""
@@ -154,4 +152,3 @@ class BloomFilterDigest:
         decoded = base64.b64decode(data["bits"].encode('utf-8'))
         instance._bits = [int.from_bytes(decoded[i:i+8], byteorder='big', signed=False) for i in range(0, len(decoded), 8)]
         return instance
->>>>>>> origin/main
