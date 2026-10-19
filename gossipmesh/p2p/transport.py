@@ -1,6 +1,17 @@
-<<<<<<< HEAD
-from typing import Dict, Any, Optional
+import asyncio
+import json
+import logging
+import threading
+import time
+from typing import Any, Callable, Dict, Optional, Tuple, Union
+
+from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, decrypt_payload, encrypt_payload
+from gossipmesh.p2p.parser import ZeroCopyPacketParser
+from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.scoring import ScoringRegistry
+
+logger = logging.getLogger(__name__)
+
 
 class P2PTransport:
     def __init__(self, node_id: str, scoring_registry: Optional[ScoringRegistry] = None):
@@ -12,29 +23,19 @@ class P2PTransport:
             return False
         return True
 
-    def receive_message(self, source_node_id: str, payload: Dict[str, Any], latency: float, valid: bool, protocol_error: bool = False) -> bool:
+    def receive_message(
+        self, source_node_id: str, payload: Dict[str, Any], latency: float, valid: bool, protocol_error: bool = False
+    ) -> bool:
         self.scoring_registry.record(source_node_id, latency, valid, protocol_error)
         if self.scoring_registry.is_blacklisted(source_node_id):
             return False
         return True
-=======
-import asyncio
-import json
-import logging
-import time
-import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-from gossipmesh.p2p.parser import ZeroCopyPacketParser
-from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
-from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
-
-logger = logging.getLogger(__name__)
 
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
     every 1000 messages or 300 seconds without dropping streams."""
-    
+
     def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.rotator = EphemeralSessionKeyRotator()
         self.max_messages = max_messages
@@ -219,13 +220,13 @@ class TransportSocketReader:
             header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
         except asyncio.IncompleteReadError:
             return None
-        
+
         if not header_data:
             return None
-        
+
         header_view = memoryview(header_data)
         magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(header_view)
-        
+
         if magic != self.expected_magic:
             logger.warning(f"Invalid packet magic received: {hex(magic)}")
             raise ValueError(f"Invalid packet magic: {hex(magic)}")
@@ -240,4 +241,3 @@ class TransportSocketReader:
         _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
 
         return msg_type, msg_id, payload_view
->>>>>>> origin/main

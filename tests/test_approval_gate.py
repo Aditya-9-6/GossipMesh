@@ -1,9 +1,5 @@
 import pytest
 from fastapi.testclient import TestClient
-<<<<<<< HEAD
-from gossipmesh.api import app
-from gossipmesh.models.approval import ApprovalStatus
-=======
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -13,7 +9,7 @@ from gossipmesh.api import deps
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
 from gossipmesh.core.config import settings
-from gossipmesh.models.approval import ApprovalGate
+from gossipmesh.models.approval import ApprovalGate, ApprovalStatus
 import gossipmesh.models
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -62,7 +58,6 @@ def setup_overrides():
     yield
     app.dependency_overrides.pop(deps.get_db, None)
     app.dependency_overrides.pop(deps.get_current_user, None)
->>>>>>> origin/main
 
 
 client = TestClient(app)
@@ -86,12 +81,9 @@ def test_approval_gate_lifecycle():
 
     res_get = client.get(f"{settings.API_V1_STR}/approvals/{approval_id}")
     assert res_get.status_code == 200
-<<<<<<< HEAD
     get_data = res_get.json()
     assert get_data["id"] == approval_id
     assert get_data["status"] == "pending"
-=======
-    assert res_get.json()["status"] == "pending"
 
     res_decide = client.post(
         f"{settings.API_V1_STR}/approvals/{approval_id}/decision",
@@ -102,4 +94,3 @@ def test_approval_gate_lifecycle():
     assert decide_data["status"] == "approved"
     assert decide_data["approver_id"] is not None
     assert decide_data["approved_at"] is not None
->>>>>>> origin/main
