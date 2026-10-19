@@ -68,6 +68,8 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
           HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY || '' }}
+          NVIDIA_API_KEY_2: ${{ secrets.NVIDIA_API_KEY_2 || '' }}
         run: |
           ITER="${{ github.event.inputs.iterations || '30' }}"
           python3 scripts/autonomous_loop.py --workspace . --worker-id ${{ matrix.worker }} --num-workers 5 --interval 5 --iterations "$ITER" --max-minutes 180
