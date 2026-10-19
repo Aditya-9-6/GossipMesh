@@ -13,9 +13,7 @@ class Workflow(SoftDeleteMixin, Base):
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
     __mapper_args__ = {"version_id_col": version_id}
-    organization_id: Mapped[int] = mapped_column(
-        ForeignKey("organizations.id"), nullable=False, index=True
-    )
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         String, default="pending"
@@ -54,9 +52,7 @@ class Budget(SoftDeleteMixin, Base):
     __tablename__ = "budgets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    organization_id: Mapped[int] = mapped_column(
-        ForeignKey("organizations.id"), unique=True, nullable=False
-    )
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), unique=True, nullable=False)
     monthly_limit_usd: Mapped[float] = mapped_column(Float, default=100.0)
     current_spend_usd: Mapped[float] = mapped_column(Float, default=0.0)
 

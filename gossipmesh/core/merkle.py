@@ -23,7 +23,13 @@ def hash_nodes(left_hash: str, right_hash: str) -> str:
 class MerkleNode:
     """Represents a node in the Merkle-DAG."""
 
-    def __init__(self, key: Optional[str] = None, value: Any = None, left: Optional['MerkleNode'] = None, right: Optional['MerkleNode'] = None):
+    def __init__(
+        self,
+        key: Optional[str] = None,
+        value: Any = None,
+        left: Optional["MerkleNode"] = None,
+        right: Optional["MerkleNode"] = None,
+    ):
         self.key = key
         self.value = value
         self.left = left
@@ -33,7 +39,7 @@ class MerkleNode:
     def _compute_node_hash(self) -> str:
         if self.key is not None:
             return hash_leaf(self.key, self.value)
-        
+
         left_h = self.left.hash if self.left else "0" * 64
         right_h = self.right.hash if self.right else "0" * 64
         return hash_nodes(left_h, right_h)

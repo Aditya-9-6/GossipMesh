@@ -3,7 +3,6 @@ from gossipmesh.core.merkle import MerkleDAG, hash_leaf, hash_nodes, compute_has
 
 
 class TestMerkleDAG(unittest.TestCase):
-
     def test_hash_primitives(self):
         h1 = compute_hash(b"test")
         self.assertEqual(len(h1), 64)

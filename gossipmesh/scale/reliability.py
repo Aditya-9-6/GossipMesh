@@ -2,10 +2,13 @@
 Scale and reliability features for GossipMesh.
 Milestone 10 Implementation.
 """
+
 from typing import Dict, List
+
 
 class RateLimiter:
     """Handles rate limiting for API requests and agent actions."""
+
     def __init__(self, limit: int = 100):
         self.limit = limit
         self.requests: Dict[str, Dict[str, int]] = {}
@@ -24,8 +27,10 @@ class RateLimiter:
         self.requests[entity_id][limit_type] = self.requests[entity_id].get(limit_type, 0) + 1
         return True
 
+
 class QueuePartitionManager:
     """Manages queue partitioning for horizontal worker scaling."""
+
     def __init__(self, num_partitions: int = 4):
         self.num_partitions = num_partitions
         self.task_assignments: Dict[str, str] = {}
@@ -42,8 +47,10 @@ class QueuePartitionManager:
         self.task_assignments.clear()
         return True
 
+
 class MultiRegionDRManager:
     """Handles multi-region deployment and disaster recovery."""
+
     def __init__(self):
         self.active_region = "us-east-1"
         self.synced_regions: List[str] = ["us-east-1"]
@@ -59,8 +66,10 @@ class MultiRegionDRManager:
             self.synced_regions.append(region)
         return True
 
+
 class SLOMonitor:
     """Monitors Service Level Objectives (SLOs) and error budgets."""
+
     def __init__(self, target_slo: float = 99.9):
         self.target_slo = target_slo
         self.metrics: Dict[str, List[float]] = {}

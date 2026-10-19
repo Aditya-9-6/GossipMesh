@@ -2,6 +2,7 @@ from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from gossipmesh.models.base import Base
 
+
 class OrganizationSAMLConfig(Base):
     __tablename__ = "organization_saml_configs"
 

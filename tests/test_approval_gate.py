@@ -8,13 +8,9 @@ from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
-<<<<<<< HEAD
-from gossipmesh.models.approval import ApprovalGate
-=======
 from gossipmesh.core.config import settings
 from gossipmesh.models.approval import ApprovalGate
 import gossipmesh.models
->>>>>>> origin/main
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -23,9 +19,7 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
-TestingSessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
-)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
 Base.metadata.create_all(bind=engine)
 
