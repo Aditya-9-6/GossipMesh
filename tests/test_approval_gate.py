@@ -5,16 +5,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from gossipmesh.api import app
-from gossipmesh.api.deps import get_db, get_current_user
+from gossipmesh.api import deps
+from gossipmesh.core.config import settings
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
-<<<<<<< HEAD
 from gossipmesh.models.approval import ApprovalGate
-=======
-from gossipmesh.core.config import settings
-from gossipmesh.models.approval import ApprovalGate
-import gossipmesh.models
->>>>>>> origin/main
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -37,55 +32,37 @@ def override_get_db():
     finally:
         db.close()
 
-<<<<<<< HEAD
-app.dependency_overrides[get_db] = override_get_db
-
-client = TestClient(app)
-
-@pytest.fixture(autouse=True)
-def setup_auth_override():
-    Base.metadata.create_all(bind=engine)
-=======
 
 def override_get_current_user():
->>>>>>> origin/main
     db = TestingSessionLocal()
     user = db.query(User).filter(User.email == "test@example.com").first()
     if not user:
-<<<<<<< HEAD
-        user = User(id=1, email="test@example.com", hashed_password="dummy", is_active=True, is_superuser=True)
-=======
         user = User(
-            email="approver@gossipmesh.test",
+            id=1,
+            email="test@example.com",
             hashed_password="dummy",
             is_active=True,
             is_superuser=True,
         )
->>>>>>> origin/main
         db.add(user)
         db.commit()
         db.refresh(user)
     db.close()
+    return user
 
-<<<<<<< HEAD
-    app.dependency_overrides[get_current_user] = lambda: User(id=1, email="test@example.com", is_active=True, is_superuser=True)
-    yield
-    app.dependency_overrides.clear()
-    app.dependency_overrides[get_db] = override_get_db
-    Base.metadata.drop_all(bind=engine)
-=======
 
 @pytest.fixture(autouse=True)
 def setup_overrides():
     app.dependency_overrides[deps.get_db] = override_get_db
     app.dependency_overrides[deps.get_current_user] = override_get_current_user
+    Base.metadata.create_all(bind=engine)
     yield
     app.dependency_overrides.pop(deps.get_db, None)
     app.dependency_overrides.pop(deps.get_current_user, None)
+    Base.metadata.drop_all(bind=engine)
 
 
 client = TestClient(app)
->>>>>>> origin/main
 
 
 def test_approval_gate_lifecycle():
