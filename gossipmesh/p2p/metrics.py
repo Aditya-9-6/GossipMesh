@@ -1,8 +1,8 @@
-import time
 from typing import Dict
 
+
 class PeerMetricsTracker:
-    def __init__(self, alpha: float = 0.2):
+    def __init__(self, alpha: float = 0.2) -> None:
         self.alpha = alpha
         self.rtt_map: Dict[str, float] = {}
         self.queue_depth_map: Dict[str, int] = {}

@@ -4,13 +4,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from gossipmesh.api import app
-from gossipmesh.models.base import Base
-from gossipmesh.api import deps
-from gossipmesh.models.user import User
+from gossipmesh.api import app, deps
 from gossipmesh.core.config import settings
 from gossipmesh.models.approval import ApprovalGate
-import gossipmesh.models
+from gossipmesh.models.base import Base
+from gossipmesh.models.user import User
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -33,20 +31,6 @@ def override_get_db():
     finally:
         db.close()
 
-<<<<<<< HEAD
-async def override_get_current_user():
-    return User(
-        id="test-user-id",
-        email="test@gossipmesh.internal",
-        name="testuser",
-        hashed_password="hashed",
-        is_active=True,
-        is_superuser=False
-    )
-
-app.dependency_overrides[deps.get_db] = override_get_db
-app.dependency_overrides[deps.get_current_user] = override_get_current_user
-=======
 
 def override_get_current_user():
     db = TestingSessionLocal()
@@ -74,7 +58,6 @@ def setup_overrides():
     app.dependency_overrides.pop(deps.get_current_user, None)
 
 
->>>>>>> origin/main
 client = TestClient(app)
 
 
@@ -86,14 +69,9 @@ def test_approval_gate_lifecycle():
             "action_type": "push_commit",
             "diff_content": "--- a/file.py\n+++ b/file.py\n+print('hello')",
             "commit_sha": "abc1234",
-<<<<<<< HEAD
-            "expires_in_hours": 1
-        },
-        headers=headers
-=======
             "expires_in_hours": 1,
         },
->>>>>>> origin/main
+        headers=headers,
     )
     assert response.status_code == 201
     data = response.json()
@@ -101,23 +79,23 @@ def test_approval_gate_lifecycle():
     assert data["status"] == "pending"
     assert data["commit_sha"] == "abc1234"
 
-<<<<<<< HEAD
-    res_get = client.get(f"/api/v1/approvals/{approval_id}", headers=headers)
-=======
-    res_get = client.get(f"{settings.API_V1_STR}/approvals/{approval_id}")
->>>>>>> origin/main
+    # Verify DB persistence
+    db = TestingSessionLocal()
+    gate = db.query(ApprovalGate).filter(ApprovalGate.id == approval_id).first()
+    assert gate is not None
+    db.close()
+
+    res_get = client.get(
+        f"{settings.API_V1_STR}/approvals/{approval_id}",
+        headers=headers,
+    )
     assert res_get.status_code == 200
     assert res_get.json()["status"] == "pending"
 
     res_decide = client.post(
-<<<<<<< HEAD
-        f"/api/v1/approvals/{approval_id}/decision",
-        json={"decision": "approved"},
-        headers=headers
-=======
         f"{settings.API_V1_STR}/approvals/{approval_id}/decision",
         json={"decision": "approved"},
->>>>>>> origin/main
+        headers=headers,
     )
     assert res_decide.status_code == 200
     decide_data = res_decide.json()
