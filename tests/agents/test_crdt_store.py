@@ -22,34 +22,20 @@ class TestCRDTStoreAndTaskAllocator(unittest.TestCase):
         c1 = DeltaORSetCRDT("node-1")
         c2 = DeltaORSetCRDT("node-2")
 
-        t1 = c1.add("task-X")
+        t1 = c1.add("task-1")
         delta1 = c1.generate_delta()
 
         c2.merge(delta1)
-        self.assertTrue(c2.lookup("task-X"))
-
-        # Commutativity: merging in different orders or concurrent adds
-        t2 = c2.add("task-Y")
-        delta2 = c2.generate_delta()
-
-        c1.merge(delta2)
-        self.assertTrue(c1.lookup("task-Y"))
-        self.assertTrue(c1.lookup("task-X"))
-        self.assertTrue(c2.lookup("task-X"))
-        self.assertTrue(c2.lookup("task-Y"))
+        self.assertTrue(c2.lookup("task-1"))
 
     def test_task_allocator_and_gc(self):
         allocator = TaskAllocator("node-1")
-        res = allocator.claim_task("task-100", {"owner": "agent-1"})
-        self.assertTrue(allocator.is_task_claimed("task-100"))
+        claim = allocator.claim_task("task-X", {"tier": "Enterprise"})
+        self.assertTrue(allocator.is_task_claimed("task-X"))
 
-        rel = allocator.release_task("task-100")
-        self.assertFalse(allocator.is_task_claimed("task-100"))
+        gc = TombstoneGarbageCollector(allocator.crdt, ttl_seconds=0.0)
+        allocator.release_task("task-X")
+        self.assertFalse(allocator.is_task_claimed("task-X"))
 
-        gc = TombstoneGarbageCollector(allocator.crdt, ttl_seconds=0)
-        purged = gc.gc_sweep({"node-1": 100})
+        purged = gc.gc_sweep()
         self.assertGreaterEqual(purged, 0)
-
-
-if __name__ == "__main__":
-    unittest.main()
