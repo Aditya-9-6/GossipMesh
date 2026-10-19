@@ -57,7 +57,11 @@ dependencies = [
     "pgvector>=0.2.5",
     "networkx>=3.2.1",
     "boto3>=1.34.0",
-    "google-cloud-aiplatform>=1.40.0"
+    "google-cloud-aiplatform>=1.40.0",
+    "tree-sitter>=0.21.3",
+    "tree-sitter-rust>=0.21.2",
+    "tree-sitter-cpp>=0.21.2",
+    "gitpython>=3.1.43"
 ]
 
 [project.scripts]
