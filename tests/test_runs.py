@@ -5,6 +5,7 @@ import datetime
 
 from gossipmesh.api.main import app
 from gossipmesh.models.base import Base
+from gossipmesh.core.config import settings
 
 # Initialize the database engine and session
 engine = create_engine("sqlite:///:memory:", echo=False)
@@ -26,13 +27,8 @@ def test_track_run():
         "workflow_type": "CI",
         "run_id": "123456",
         "status": "success",
-<<<<<<< HEAD
-        "start_time": datetime.datetime(2024, 1, 1, 12, 0),
-        "end_time": datetime.datetime(2024, 1, 1, 12, 30),
-=======
         "start_time": datetime.datetime(2024, 1, 1, 12, 0).isoformat(),
         "end_time": datetime.datetime(2024, 1, 1, 12, 30).isoformat(),
->>>>>>> origin/main
         "failure_reason": "None",
         "branch": "main",
         "commit_sha": "abc123",
@@ -43,12 +39,7 @@ def test_track_run():
     }
 
     # Send a POST request to track the run
-<<<<<<< HEAD
-    response = client.post("/runs/", json=run_data)
-=======
-    from gossipmesh.core.config import settings
     response = client.post(f"{settings.API_V1_STR}/runs/", json=run_data)
->>>>>>> origin/main
 
     # Assert that the response status code is 200 OK
     assert response.status_code == 200

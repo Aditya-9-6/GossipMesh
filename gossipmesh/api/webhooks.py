@@ -5,16 +5,14 @@ import hashlib
 import hmac
 import os
 import json
+import uuid
 from sqlalchemy.orm import Session
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
-<<<<<<< HEAD
-from gossipmesh.models.runtime import Job as BackgroundJob
-=======
+from gossipmesh.models.installations import GithubAppInstallation
 from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
->>>>>>> origin/main
 
 from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
@@ -55,9 +53,7 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
     return True
 
 
-<<<<<<< HEAD
-
-def dispatch_webhook(event: str, payload: dict, db: Session):
+def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTasks, db: Session):
     action = payload.get("action")
     if event == "installation":
         installation = payload.get("installation", {})
@@ -119,59 +115,27 @@ def dispatch_webhook(event: str, payload: dict, db: Session):
             )
             db.add(audit)
 
-    task_id = str(uuid.uuid4())
-
-=======
-def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTasks):
->>>>>>> origin/main
     if event == "pull_request":
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
-<<<<<<< HEAD
-
-            job_record = BackgroundJob(agent_name="process_pr_review", workflow_id=1)
-            db.add(job_record)
-            db.commit()
-
-            pass # temporarily disabled due to merge conflict removed tasks
-=======
             job = PRReviewJob(pr_data)
             background_tasks.add_task(job.execute)
->>>>>>> origin/main
 
     # Milestone 7: Issue Solver
     elif event == "issues":
         action = payload.get("action")
         if action == "opened":
             issue_data = payload.get("issue", {})
-<<<<<<< HEAD
-
-            job_record = BackgroundJob(agent_name="process_issue_solver", workflow_id=1)
-            db.add(job_record)
-            db.commit()
-
-            pass # temporarily disabled due to merge conflict removed tasks
-=======
             workflow = IssueSolverWorkflow(issue_data)
             background_tasks.add_task(workflow.execute)
->>>>>>> origin/main
 
     # Milestone 7: CI Fixer (Triggered by workflow_run completion)
     elif event == "workflow_run":
         action = payload.get("action")
         run_data = payload.get("workflow_run", {})
         if action == "completed" and run_data.get("conclusion") == "failure":
-<<<<<<< HEAD
-
-            job_record = BackgroundJob(agent_name="process_ci_fixer", workflow_id=1)
-            db.add(job_record)
-            db.commit()
-
-            pass # temporarily disabled due to merge conflict removed tasks
-=======
             ci_workflow = CIFixerWorkflow(run_data)
             background_tasks.add_task(ci_workflow.execute)
->>>>>>> origin/main
 
     elif event == "issue_comment":
         action = payload.get("action")
@@ -228,7 +192,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks, db
         raise e
 
     try:
-        dispatch_webhook(event, payload, background_tasks)
+        dispatch_webhook(event, payload, background_tasks, db)
         webhook_record.status = "processed"
     except Exception as e:
         webhook_record.status = "failed"
@@ -258,7 +222,7 @@ async def replay_github_webhook(
         raise HTTPException(status_code=404, detail="Webhook event not found")
 
     try:
-        dispatch_webhook(event_record.event, event_record.payload, background_tasks)
+        dispatch_webhook(event_record.event, event_record.payload, background_tasks, db)
         event_record.replayed_at = func.now()
         event_record.replayed_by = current_user.id
 
