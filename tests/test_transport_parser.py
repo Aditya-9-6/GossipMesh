@@ -1,8 +1,8 @@
-<<<<<<< HEAD
 import asyncio
 import unittest
+import struct
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
-from gossipmesh.p2p.transport import TransportReader
+from gossipmesh.p2p.transport import TransportReader, TransportSocketReader
 
 class TestTransportAndParser(unittest.TestCase):
 
@@ -41,6 +41,28 @@ class TestTransportAndParser(unittest.TestCase):
         self.assertEqual(bytes(payload), payload_data)
         self.assertIsInstance(payload, memoryview)
 
+    def test_parser_serialization_and_deserialization(self):
+        magic = 0x474D4553
+        msg_type = 1
+        msg_id = "test-msg-uuid-12345678901234567890"
+        payload = b"hello gossipmesh zero copy"
+
+        wire_data = ZeroCopyPacketParser.serialize_header(magic, msg_type, msg_id, payload)
+        buf = memoryview(wire_data)
+
+        parsed_magic, parsed_type, parsed_id, parsed_len, parsed_payload = ZeroCopyPacketParser.parse_header(buf)
+
+        self.assertEqual(parsed_magic, magic)
+        self.assertEqual(parsed_type, msg_type)
+        self.assertTrue(parsed_id.startswith("test-msg-uuid"))
+        self.assertEqual(parsed_len, len(payload))
+        self.assertEqual(bytes(parsed_payload), payload)
+
+    def test_parser_buffer_too_small(self):
+        buf = memoryview(b"short")
+        with self.assertRaises(ValueError):
+            ZeroCopyPacketParser.parse_header(buf)
+
     def test_transport_reader_dispatch(self):
         async def run():
             packet = ZeroCopyPacketParser.serialize_packet(b'A', b'gossip-data')
@@ -67,36 +89,6 @@ class TestTransportAndParser(unittest.TestCase):
             self.assertEqual(received[0], b'gossip-data')
 
         asyncio.run(run())
-=======
-import unittest
-import asyncio
-import struct
-from gossipmesh.p2p.parser import ZeroCopyPacketParser
-from gossipmesh.p2p.transport import TransportSocketReader
-
-class TestZeroCopyParserAndTransport(unittest.TestCase):
-
-    def test_parser_serialization_and_deserialization(self):
-        magic = 0x474D4553
-        msg_type = 1
-        msg_id = "test-msg-uuid-12345678901234567890"
-        payload = b"hello gossipmesh zero copy"
-
-        wire_data = ZeroCopyPacketParser.serialize_header(magic, msg_type, msg_id, payload)
-        buf = memoryview(wire_data)
-
-        parsed_magic, parsed_type, parsed_id, parsed_len, parsed_payload = ZeroCopyPacketParser.parse_header(buf)
-
-        self.assertEqual(parsed_magic, magic)
-        self.assertEqual(parsed_type, msg_type)
-        self.assertTrue(parsed_id.startswith("test-msg-uuid"))
-        self.assertEqual(parsed_len, len(payload))
-        self.assertEqual(bytes(parsed_payload), payload)
-
-    def test_parser_buffer_too_small(self):
-        buf = memoryview(b"short")
-        with self.assertRaises(ValueError):
-            ZeroCopyPacketParser.parse_header(buf)
 
     def test_transport_socket_reader_valid_packet(self):
         magic = 0x474D4553
@@ -136,7 +128,6 @@ class TestZeroCopyParserAndTransport(unittest.TestCase):
                 await transport_reader.read_packet()
 
         asyncio.run(run_test())
->>>>>>> origin/main
 
 if __name__ == '__main__':
     unittest.main()
