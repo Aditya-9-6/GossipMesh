@@ -1,34 +1,32 @@
 import struct
-from typing import Tuple, Optional
+import asyncio
+import logging
+from typing import Any, Optional, Tuple, AsyncIterator
+
+logger = logging.getLogger(__name__)
 
 class ZeroCopyPacketParser:
-    @staticmethod
-    def serialize_header(magic: int, msg_type: int, msg_id: str, payload: bytes) -> bytes:
-        msg_id_bytes = msg_id.encode('utf-8').ljust(32, b'\x00')[:32]
-        length = len(payload)
-        header = struct.pack('!I B 32s I', magic, msg_type, msg_id_bytes, length)
-        return header + payload
+    """Zero-copy packet parser for high-performance Gossip transport frames."""
+    
+    HEADER_FORMAT = "!IBH"  # Magic (4B), Version/Flags (1B), Payload Length (2B)
+    HEADER_SIZE = struct.calc0size(HEADER_FORMAT) if hasattr(struct, 'calc0size') else struct.calcsize(HEADER_FORMAT)
 
     @staticmethod
-    def parse_header(buf: memoryview) -> Tuple[int, int, str, int]:
-        # 4 (magic) + 1 (type) + 32 (id) + 4 (length) = 41 bytes
-        header_bytes = bytes(buf[:41])
-        magic, msg_type, msg_id_bytes, length = struct.unpack('!I B 32s I', header_bytes)
-        msg_id = msg_id_bytes.rstrip(b'\x00').decode('utf-8', errors='ignore')
-        return magic, msg_type, msg_id, length
+    def parse_header(buffer: bytes) -> Tuple[int, int, int]:
+        if len(buffer) < ZeroCopyPacketParser.HEADER_SIZE:
+            raise ValueError("Buffer too small for packet header")
+        magic, flags, length = struct.unpack(ZeroCopyPacketParser.HEADER_FORMAT, buffer[:ZeroCopyPacketParser.HEADER_SIZE])
+        return magic, flags, length
 
 class TransportSocketReader:
     def __init__(self, reader: Any, expected_magic: int = 0x474D4553) -> None:
         self.reader = reader
         self.expected_magic = expected_magic
 
-    async def read_packet(self) -> Optional[Tuple[int, str, bytes]]:
-        header_data = await self.reader.readexactly(41)
-        if not header_data or len(header_data) < 41:
-            return None
-        buf = memoryview(header_data)
-        magic, msg_type, msg_id, length = ZeroCopyPacketParser.parse_header(buf)
+    async def read_packet(self) -> bytes:
+        header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
+        magic, flags, length = ZeroCopyPacketParser.parse_header(header_data)
         if magic != self.expected_magic:
             raise ValueError(f"Invalid magic number: {hex(magic)}")
         payload = await self.reader.readexactly(length)
-        return msg_type, msg_id, bytes(payload)
+        return payload
