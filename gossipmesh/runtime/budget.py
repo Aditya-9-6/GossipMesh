@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class BudgetManager:
     def __init__(self, db: Session):
         self.db = db

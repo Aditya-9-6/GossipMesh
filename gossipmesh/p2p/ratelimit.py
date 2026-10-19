@@ -87,9 +87,7 @@ class PeerEntry:
 
     def __init__(self, config: RateLimitConfig, now: float):
         self.msg_bucket = TokenBucket(config.burst_capacity, config.max_rate_per_sec)
-        self.bandwidth_bucket = TokenBucket(
-            config.burst_bandwidth_bytes, config.max_bandwidth_bytes_per_sec
-        )
+        self.bandwidth_bucket = TokenBucket(config.burst_bandwidth_bytes, config.max_bandwidth_bytes_per_sec)
         self.last_seen = now
 
 
@@ -118,9 +116,7 @@ class PeerRateLimiter:
         self.peers[peer_id] = entry
         return entry
 
-    async def check_and_consume(
-        self, peer_id: str, payload_size_bytes: int = 1
-    ) -> Tuple[bool, str]:
+    async def check_and_consume(self, peer_id: str, payload_size_bytes: int = 1) -> Tuple[bool, str]:
         """
         Validates whether incoming peer message complies with rate and bandwidth caps.
         Returns (is_allowed, reason).

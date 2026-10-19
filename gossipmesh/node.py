@@ -12,6 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Any
 
+
 class GossipTopic(str, Enum):
     ANTI_PATTERNS = "anti_patterns"
     BEST_PRACTICES = "best_practices"
@@ -21,6 +22,7 @@ class GossipTopic(str, Enum):
     PERF_TELEMETRY = "perf_telemetry"
     TASK_AUCTIONS = "task_auctions"
     HEARTBEATS = "heartbeats"
+
 
 class GossipMessage:
     def __init__(
@@ -68,11 +70,13 @@ class GossipMessage:
             ttl=data.get("ttl", 10),
         )
 
+
 class GossipNode:
     """
     Decentralized Gossip Peer Node.
     Communicates via a shared ledger directory (file-backed mesh) or local bus.
     """
+
     def __init__(self, node_id: str, mesh_dir: str | None = None):
         self.node_id = node_id
         if mesh_dir:
@@ -126,7 +130,9 @@ class GossipNode:
             self.subscriptions[t_val] = []
         self.subscriptions[t_val].append(handler)
 
-    def publish(self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10) -> GossipMessage:
+    def publish(
+        self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
+    ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh."""
         t_val = topic.value if isinstance(topic, GossipTopic) else str(topic)
         self.clock_seq += 1

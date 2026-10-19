@@ -2,6 +2,7 @@ import unittest
 import time
 from gossipmesh.p2p.matrix_clock import MatrixClockMessage, BoundedMatrixClockEngine
 
+
 class TestBoundedMatrixClockEngine(unittest.TestCase):
     def setUp(self):
         self.engine = BoundedMatrixClockEngine(
@@ -79,6 +80,7 @@ class TestBoundedMatrixClockEngine(unittest.TestCase):
         self.assertEqual(restored.message_id, msg.message_id)
         self.assertEqual(restored.matrix_clock, msg.matrix_clock)
         self.assertEqual(restored.payload, msg.payload)
+
 
 if __name__ == "__main__":
     unittest.main()
