@@ -67,7 +67,6 @@ def process_webhook_event(self, webhook_event_id: int):
         db.commit()
 
         try:
-<<<<<<< HEAD
             payload = webhook_record.payload or {}
             org_id = None
 
@@ -90,10 +89,7 @@ def process_webhook_event(self, webhook_event_id: int):
             limiter = ConcurrencyLimiter(limit=5)
 
             with limiter.limit_concurrency(identifier=org_id, operation_type="webhook_dispatch"):
-                asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload))
-=======
-            asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload, db=db))
->>>>>>> origin/main
+                asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload, db=db))
 
             webhook_record.status = "processed"
             db.commit()
