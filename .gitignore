@@ -12,6 +12,11 @@ dist/
 *.key
 *.pem
 *.test
+*private_key*
+*.token
+*.jwt
+*.lic
+!enterprise/public_key.pem
 
 # OS & IDE
 .DS_Store
