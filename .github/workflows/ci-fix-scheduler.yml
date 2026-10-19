@@ -6,12 +6,12 @@ name: CI Fixer Scheduler
 on:
   schedule:
     - cron: '*/5 * * * *'   # every 5 minutes
+  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
-  actions: read
-  # the default GITHUB_TOKEN is sufficient for gh CLI operations
+  actions: write
 
 jobs:
   trigger-ci-fixer:
@@ -22,19 +22,14 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Set up GitHub CLI
-        uses: cli/cli@v2
-        with:
-          version: latest
-
       - name: Trigger AI CI Fixer for all open PRs
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Listing open PRs..."
           PR_NUMBERS=$(gh pr list --state open --json number --jq '.[].number')
           echo "Found PRs: $PR_NUMBERS"
           for PR in $PR_NUMBERS; do
             echo "Triggering AI CI Fixer for PR #$PR"
-            gh workflow run ai-ci-fixer.yml -f pr_number=$PR --ref main || true
+            gh workflow run "AI CI Test Fixer Bot" -f pr_number="$PR" || true
           done
