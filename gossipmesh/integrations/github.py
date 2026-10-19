@@ -101,6 +101,8 @@ class GitHubIntegration:
                 grouped_findings[group_key] = []
             grouped_findings[group_key].append(finding)
 
+        review_comments = []
+
         for group_key, findings_group in grouped_findings.items():
             file_path, line, end_line, side = group_key
 
@@ -109,8 +111,12 @@ class GitHubIntegration:
                 body += f"**{f.severity}**: {f.message}\n"
                 if f.evidence:
                     body += f"**Evidence**: {f.evidence}\n"
-                if f.remediation:
+
+                if getattr(f.remediation, "auto_patch", None):
+                    body += f"**Remediation**: {f.remediation.description}\n\n```suggestion\n{f.remediation.auto_patch}\n```\n"
+                elif f.remediation:
                     body += f"**Remediation**: {f.remediation}\n"
+
                 if f.confidence_score is not None:
                     body += f"**Confidence**: {f.confidence_score}%\n"
                 if f.source_scanner:
@@ -119,30 +125,45 @@ class GitHubIntegration:
                     body += f"\n<!-- fingerprint: {f.fingerprint} -->\n"
                 body += "\n---\n"
 
-            # Use commit_sha from the first finding in the group
-            commit_sha = findings_group[0].commit_sha
-
-            payload = {
+            comment_payload = {
                 "body": body,
-                "commit_id": commit_sha,
                 "path": file_path,
                 "side": side,
                 "line": line
             }
             if end_line and end_line != line:
-                payload["start_line"] = line
-                payload["line"] = end_line
+                comment_payload["start_line"] = line
+                comment_payload["line"] = end_line
+
+            review_comments.append((comment_payload, findings_group))
+
+        if review_comments:
+            payloads = [cp for cp, _ in review_comments]
+            # Use commit_sha from the first finding
+            commit_sha = review_comments[0][1][0].commit_sha
 
             try:
-                response = await self.github_pr_service.post_pr_review_comment(
-                    self.owner, self.repo, self.pr_number, payload
+                review_payload = {
+                    "commit_id": commit_sha,
+                    "body": "### AI Code Review Findings",
+                    "event": "COMMENT",
+                    "comments": payloads
+                }
+                response = await self.github_pr_service.post_pr_review(
+                    self.owner, self.repo, self.pr_number, review_payload
                 )
-                comment_id = str(response.get("id"))
-                for f in findings_group:
-                    f.github_comment_id = comment_id
+
+                # We can't map exact comment IDs back easily from a batched PR review post unless we parse the response.
+                # Assuming success, we just skip setting github_comment_id or set it to the review ID.
+                review_id = str(response.get("id"))
+                for _, f_group in review_comments:
+                    for f in f_group:
+                        f.github_comment_id = review_id
+
             except Exception as e:
-                logger.error(f"Failed to post inline comment for {file_path}:{line}: {e}")
-                fallback_findings.extend(findings_group)
+                logger.error(f"Failed to post PR review with inline comments: {e}")
+                for _, f_group in review_comments:
+                    fallback_findings.extend(f_group)
 
         if fallback_findings:
             fallback_body = "### Review Findings (Fallback)\n\nThe following findings could not be placed inline:\n\n"
@@ -150,8 +171,12 @@ class GitHubIntegration:
                 fallback_body += f"- **{f.file_path}:{f.line}** ({f.severity}): {f.message}\n"
                 if f.evidence:
                     fallback_body += f"  - **Evidence**: {f.evidence}\n"
-                if f.remediation:
+
+                if getattr(f.remediation, "auto_patch", None):
+                    fallback_body += f"  - **Remediation**: {f.remediation.description}\n\n```suggestion\n{f.remediation.auto_patch}\n```\n"
+                elif f.remediation:
                     fallback_body += f"  - **Remediation**: {f.remediation}\n"
+
                 if f.confidence_score is not None:
                     fallback_body += f"  - **Confidence**: {f.confidence_score}%\n"
                 if f.source_scanner:
