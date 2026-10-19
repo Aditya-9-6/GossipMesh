@@ -81,7 +81,9 @@ jobs:
             exit 0
           fi
 
-          echo "Evaluating PR #$PR_NUM..."
+          echo "Evaluating PR #$PR_NUM with Master Implementation Plan Reviewer..."
+          PR_NUMBER="$PR_NUM" python3 scripts/reviewer_bot.py || true
+
           MERGEABLE=$(gh pr view $PR_NUM --json mergeable -q .mergeable)
           SCORE_LABEL=$(gh pr view $PR_NUM --json labels -q '.labels[] | select(.name | startswith("score-"))?.name')
           SCORE=${SCORE_LABEL#score-}
