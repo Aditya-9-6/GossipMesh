@@ -1,15 +1,27 @@
+from cryptography.hazmat.primitives.asymmetric import x25519
+from cryptography.hazmat.primitives import serialization
+from typing import Tuple
+
 class EphemeralSessionKeyRotator:
-    """Manages ephemeral session keys for secure P2P channels."""
     def __init__(self) -> None:
-        self._public_bytes = b"mock_ephemeral_pub_key_32_bytes"
+        self._private_key = x25519.X25519PrivateKey.generate()
 
     def get_public_bytes(self) -> bytes:
-        return self._public_bytes
+        return self._private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw
+        )
 
-def encrypt_payload(plaintext: bytes, key: bytes) -> bytes:
-    return b"enc_" + plaintext
+    def derive_session_key(self, peer_public_bytes: bytes) -> bytes:
+        peer_pub_key = x25519.X25519PublicKey.from_public_bytes(peer_public_bytes)
+        return self._private_key.exchange(peer_pub_key)
 
-def decrypt_payload(ciphertext: bytes, key: bytes) -> bytes:
-    if ciphertext.startswith(b"enc_"):
-        return ciphertext[4:]
-    return ciphertext
+    def rotate(self) -> Tuple[bytes, bytes]:
+        self._private_key = x25519.X25519PrivateKey.generate()
+        pub_bytes = self.get_public_bytes()
+        priv_bytes = self._private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        return priv_bytes, pub_bytes

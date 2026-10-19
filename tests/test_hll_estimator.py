@@ -3,7 +3,6 @@ import time
 from gossipmesh.p2p.hll import WindowedHyperLogLog
 
 class TestWindowedHyperLogLog(unittest.TestCase):
-<<<<<<< HEAD
     def test_initial_zero_cardinality(self):
         hll = WindowedHyperLogLog(num_registers=1024, window_seconds=60)
         self.assertEqual(hll.count(), 0)
@@ -18,30 +17,6 @@ class TestWindowedHyperLogLog(unittest.TestCase):
         error_margin = estimated * 0.25
         self.assertAlmostEqual(estimated, items_added, delta=error_margin + 150)
 
-    def test_window_sliding_decay(self):
-        now = time.time()
-        hll = WindowedHyperLogLog(num_registers=1024, window_seconds=10)
-        
-        hll.add("old_peer", timestamp=now - 20)
-        self.assertEqual(hll.count(current_time=now), 0)
-
-        hll.add("recent_peer", timestamp=now - 2)
-        self.assertEqual(hll.count(current_time=now), 1)
-
-    def test_merge_operation(self):
-        now = time.time()
-        hll1 = WindowedHyperLogLog(num_registers=1024, window_seconds=60)
-        hll2 = WindowedHyperLogLog(num_registers=1024, window_seconds=60)
-
-        hll1.add("peer_a", timestamp=now)
-        hll2.add("peer_b", timestamp=now)
-
-        hll1.merge(hll2, current_time=now)
-        est = hll1.count(current_time=now)
-        self.assertGreaterEqual(est, 1)
-
-if __name__ == "__main__":
-=======
     def test_initialization_validation(self):
         with self.assertRaises(ValueError):
             WindowedHyperLogLog(num_registers=100) # Not power of 2
@@ -67,14 +42,35 @@ if __name__ == "__main__":
         self.assertTrue(80 <= est <= 120, f"Estimate {est} incorrect after duplicate insertions")
 
     def test_window_sliding_decay(self):
-        hll = WindowedHyperLogLog(num_registers=256, window_ttl=10.0)
+        now = time.time()
+        hll = WindowedHyperLogLog(num_registers=1024, window_seconds=10)
+        
+        hll.add("old_peer", timestamp=now - 20)
+        self.assertEqual(hll.count(current_time=now), 0)
+
+        hll.add("recent_peer", timestamp=now - 2)
+        self.assertEqual(hll.count(current_time=now), 1)
+
+        hll2 = WindowedHyperLogLog(num_registers=256, window_ttl=10.0)
         t0 = 1000.0
-        hll.add("peer-a", current_time=t0)
-        self.assertAlmostEqual(hll.estimate(current_time=t0), 1.0, delta=1.0)
+        hll2.add("peer-a", current_time=t0)
+        self.assertAlmostEqual(hll2.estimate(current_time=t0), 1.0, delta=1.0)
         
         # Advance time past TTL
-        hll.decay(current_time=t0 + 15.0)
-        self.assertEqual(hll.estimate(current_time=t0 + 15.0), 0.0)
+        hll2.decay(current_time=t0 + 15.0)
+        self.assertEqual(hll2.estimate(current_time=t0 + 15.0), 0.0)
+
+    def test_merge_operation(self):
+        now = time.time()
+        hll1 = WindowedHyperLogLog(num_registers=1024, window_seconds=60)
+        hll2 = WindowedHyperLogLog(num_registers=1024, window_seconds=60)
+
+        hll1.add("peer_a", timestamp=now)
+        hll2.add("peer_b", timestamp=now)
+
+        hll1.merge(hll2, current_time=now)
+        est = hll1.count(current_time=now)
+        self.assertGreaterEqual(est, 1)
 
     def test_merge_estimators(self):
         hll1 = WindowedHyperLogLog(num_registers=512)
@@ -102,6 +98,5 @@ if __name__ == "__main__":
         with self.assertRaises(TypeError):
             hll.add(12345)
 
-if __name__ == '__main__':
->>>>>>> origin/main
+if __name__ == "__main__":
     unittest.main()
