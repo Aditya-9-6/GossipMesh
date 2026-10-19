@@ -1,16 +1,17 @@
-from typing import Dict, List, Tuple, Optional
-from gossipmesh.p2p.entropy import EntropyEvaluator as VectorClockEntropy
+import logging
+from typing import Any, Dict, Optional
+from gossipmesh.p2p.entropy import EntropyEvaluator
+
+logger = logging.getLogger(__name__)
 
 
-class AntiEntropySyncer:
-    """Anti-entropy synchronization daemon coordinating peer sessions using entropy-driven selection."""
+class PeerSyncer:
+    """Handles peer synchronization and entropy evaluation."""
 
-    def __init__(self, node_id: str, window_size: int = 100):
-        self.node_id = node_id
-        self.entropy_evaluator = VectorClockEntropy(window_size=window_size)
+    def __init__(self, evaluator: Optional[EntropyEvaluator] = None) -> None:
+        self.evaluator = evaluator or EntropyEvaluator()
 
-    def select_sync_peers(
-        self, local_clock: Dict[str, int], active_peers: Dict[str, Dict[str, int]], limit: int = 3
-    ) -> List[Tuple[str, float]]:
-        """Selects the best peers to synchronize with based on vector clock entropy."""
-        return self.entropy_evaluator.select_best_peers(local_clock, active_peers, top_k=limit)
+    def sync_peer(self, peer_data: Dict[str, Any]) -> bool:
+        """Evaluates peer entropy and performs synchronization."""
+        score = self.evaluator.evaluate(peer_data)
+        return score >= 0.0
