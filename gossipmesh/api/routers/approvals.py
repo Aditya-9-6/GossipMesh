@@ -69,7 +69,11 @@ def get_approval_gate(
         raise HTTPException(status_code=404, detail="Approval gate not found")
     
     expires_at = gate.expires_at
+<<<<<<< HEAD
     if expires_at and expires_at.tzinfo is None:
+=======
+    if expires_at.tzinfo is None:
+>>>>>>> origin/main
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if gate.status == "pending" and expires_at < datetime.now(timezone.utc):
@@ -94,7 +98,11 @@ def decide_approval(
         raise HTTPException(status_code=400, detail=f"Approval gate is already {gate.status}")
 
     expires_at = gate.expires_at
+<<<<<<< HEAD
     if expires_at and expires_at.tzinfo is None:
+=======
+    if expires_at.tzinfo is None:
+>>>>>>> origin/main
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if expires_at < datetime.now(timezone.utc):

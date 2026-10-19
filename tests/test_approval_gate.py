@@ -8,8 +8,14 @@ from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
+<<<<<<< HEAD
 from gossipmesh.models.approval import ApprovalGate  # noqa: F401
 import gossipmesh.models  # noqa: F401
+=======
+from gossipmesh.core.config import settings
+from gossipmesh.models.approval import ApprovalGate
+import gossipmesh.models
+>>>>>>> origin/main
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -23,6 +29,7 @@ TestingSessionLocal = sessionmaker(
 )
 
 
+
 def override_get_db():
     db = TestingSessionLocal()
     try:
@@ -33,6 +40,7 @@ def override_get_db():
 
 def override_get_current_user():
     db = TestingSessionLocal()
+<<<<<<< HEAD
     try:
         user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
         if not user:
@@ -49,6 +57,22 @@ def override_get_current_user():
     finally:
         db.close()
 
+=======
+    user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
+    if not user:
+        user = User(
+            email="approver@gossipmesh.test",
+            hashed_password="dummy",
+            is_active=True,
+            is_superuser=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    db.close()
+    return user
+>>>>>>> origin/main
+
 
 @pytest.fixture(autouse=True)
 def setup_overrides():
@@ -61,12 +85,13 @@ def setup_overrides():
     Base.metadata.drop_all(bind=engine)
 
 
+
 client = TestClient(app)
 
 
 def test_approval_gate_lifecycle():
     response = client.post(
-        "/api/v1/approvals/",
+        f"{settings.API_V1_STR}/approvals/",
         json={
             "action_type": "push_commit",
             "diff_content": "--- a/file.py\n+++ b/file.py\n+print('hello')",
@@ -80,12 +105,16 @@ def test_approval_gate_lifecycle():
     assert data["status"] == "pending"
     assert data["commit_sha"] == "abc1234"
 
-    res_get = client.get(f"/api/v1/approvals/{approval_id}")
+    res_get = client.get(f"{settings.API_V1_STR}/approvals/{approval_id}")
     assert res_get.status_code == 200
     assert res_get.json()["status"] == "pending"
 
     res_decide = client.post(
+<<<<<<< HEAD
         f"/api/v1/approvals/{approval_id}/decision",
+=======
+        f"{settings.API_V1_STR}/approvals/{approval_id}/decision",
+>>>>>>> origin/main
         json={"decision": "approved"},
     )
     assert res_decide.status_code == 200
