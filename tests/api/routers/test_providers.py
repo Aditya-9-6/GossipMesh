@@ -36,7 +36,7 @@ def test_register_provider_success(test_client, mock_current_user, mock_provider
     mock_db_session = MagicMock()
     # authorized check
     mock_db_session.query.return_value.filter.return_value.first.side_effect = [
-        UserOrganization(user_id=1, organization_id=1, role="member"),
+        UserOrganization(user_id=1, organization_id=1, role="developer"),
         None # no existing cred
     ]
     app.dependency_overrides[deps.get_db] = lambda: mock_db_session

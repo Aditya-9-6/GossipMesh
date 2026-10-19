@@ -20,6 +20,8 @@ class Workflow(SoftDeleteMixin, Base):
     status: Mapped[str] = mapped_column(
         String, default="pending"
     )  # pending, running, completed, failed, cancelled, blocked
+    timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -41,6 +43,8 @@ class Job(SoftDeleteMixin, Base):
     agent_name: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")
     state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     workflow = relationship("Workflow", back_populates="jobs")
