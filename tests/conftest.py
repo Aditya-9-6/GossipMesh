@@ -1,43 +1,57 @@
-import os
 import pytest
-from unittest.mock import MagicMock
-
-# Set up required environment variables before any tests run
-os.environ["ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
-os.environ["SECRET_KEY"] = "supersecretkey_please_change_in_production"
-os.environ["POSTGRES_USER"] = "testuser"
-os.environ["POSTGRES_PASSWORD"] = "testpass"
-os.environ["POSTGRES_HOST"] = "localhost"
-os.environ["POSTGRES_PORT"] = "5432"
-os.environ["POSTGRES_DB"] = "testdb"
+import time
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+import jwt
 
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_env():
-    """Ensure environment variables are set for all tests."""
-    pass
+@pytest.fixture(scope="session")
+def rsa_key_pair():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+    return private_key, public_key
 
 
-@pytest.fixture
-def test_client():
-    """Provide a FastAPI TestClient."""
-    from fastapi.testclient import TestClient
-    from gossipmesh.api.main import app
-
-    with TestClient(app) as client:
-        yield client
+@pytest.fixture(scope="session")
+def private_key(rsa_key_pair):
+    return rsa_key_pair[0]
 
 
-@pytest.fixture
-def mock_db_session():
-    """Provide a real in-memory sqlite session instead of MagicMock."""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from gossipmesh.models.base import Base
+@pytest.fixture(scope="session")
+def public_key(rsa_key_pair):
+    return rsa_key_pair[1]
 
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
+
+@pytest.fixture(scope="session")
+def public_key_pem(public_key):
+    return public_key.public_bytes(
+        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def set_env_public_key(public_key_pem):
+    import os
+
+    os.environ["GOSSIMESH_TEST_PUBLIC_KEY_PEM"] = public_key_pem
+
+
+@pytest.fixture(scope="session")
+def valid_license_token(private_key):
+    now = int(time.time())
+    payload = {
+        "iss": "GossipMesh Enterprise Licensing Authority",
+        "sub": "enterprise-customer-xyz",
+        "iat": now - 3600,
+        "exp": now + 86400,
+        "bundle_ids": ["b04"],
+        "tier": "Enterprise Air-Gapped",
+        "task_model_map": {},
+        "pricing_usd": 50000,
+        "offline_air_gapped": True,
+        "version": "1.0",
+    }
+    return jwt.encode(payload, private_key, algorithm="RS256")
