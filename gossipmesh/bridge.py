@@ -5,6 +5,7 @@ Keeps DevProxy (Go) and Spryzen (Rust) type definitions in automated lockstep.
 
 from typing import Dict, Any, List
 
+
 class WireContract:
     def __init__(self, name: str, version: int, fields: Dict[str, str], source_repo: str):
         self.name = name
@@ -29,7 +30,7 @@ class WireContract:
             go_type = type_map.get(f_type, "string")
             # PascalCase field name
             pascal_name = "".join(part.capitalize() for part in field.split("_"))
-            lines.append(f"\t{pascal_name} {go_type} `json:\"{field}\"`")
+            lines.append(f'\t{pascal_name} {go_type} `json:"{field}"`')
         lines.append("}")
         return "\n".join(lines)
 
@@ -38,7 +39,7 @@ class WireContract:
         lines = [
             f"/// {self.name} (v{self.version}) - Synchronized via GossipMesh from {self.source_repo}",
             "#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]",
-            f"pub struct {self.name} {{"
+            f"pub struct {self.name} {{",
         ]
         type_map = {
             "string": "String",
@@ -55,8 +56,10 @@ class WireContract:
         lines.append("}")
         return "\n".join(lines)
 
+
 class CrossRepoBridge:
     """Manages shared wire schemas between Go and Rust repositories."""
+
     def __init__(self):
         self.contracts: Dict[str, WireContract] = {}
 

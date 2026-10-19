@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Dict, List
+from typing import Dict, List, Set
 from gossipmesh.models.pr_review import SecurityFinding, TestResult
 from gossipmesh.integrations.github_pr import GitHubPRService
 
@@ -8,15 +8,14 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubIntegration:
-
     def __init__(self, owner: str, repo: str, pr_number: int, github_pr_service: GitHubPRService):
         self.owner = owner
         self.repo = repo
         self.pr_number = pr_number
         self.github_pr_service = github_pr_service
 
-    def _parse_unified_diff(self, diff: str) -> Dict[str, Dict[str, set[int]]]:
-        valid_lines = {"RIGHT": {}, "LEFT": {}}
+    def _parse_unified_diff(self, diff: str) -> Dict[str, Dict[str, Set[int]]]:
+        valid_lines: Dict[str, Dict[str, Set[int]]] = {"RIGHT": {}, "LEFT": {}}
         current_file = None
         current_right_line = 0
         current_left_line = 0
@@ -55,7 +54,7 @@ class GitHubIntegration:
 
         # Fetch existing comments to support cross-run retry safety
         try:
-            existing_comments = await self.github_pr_service.get_pr_review_comments(self.owner, self.repo, self.pr_number)
+            existing_comments = await self.github_pr_service.get_pr_comments(self.owner, self.repo, self.pr_number)
             for comment in existing_comments:
                 body = comment.get("body", "")
                 for fp in re.findall(r"<!-- fingerprint: (.*?) -->", body):
@@ -70,7 +69,7 @@ class GitHubIntegration:
         except Exception as e:
             logger.warning(f"Failed to fetch existing PR comments for deduplication: {e}")
 
-        grouped_findings = {}
+        grouped_findings: Dict[tuple[str, int, int | None, str], List[SecurityFinding]] = {}
         fallback_findings = []
 
         for finding in findings:
@@ -120,13 +119,7 @@ class GitHubIntegration:
             # Use commit_sha from the first finding in the group
             commit_sha = findings_group[0].commit_sha
 
-            payload = {
-                "body": body,
-                "commit_id": commit_sha,
-                "path": file_path,
-                "side": side,
-                "line": line
-            }
+            payload = {"body": body, "commit_id": commit_sha, "path": file_path, "side": side, "line": line}
             if end_line and end_line != line:
                 payload["start_line"] = line
                 payload["line"] = end_line
@@ -159,10 +152,7 @@ class GitHubIntegration:
 
             try:
                 await self.github_pr_service.post_pr_review(
-                    self.owner,
-                    self.repo,
-                    self.pr_number,
-                    {"body": fallback_body, "event": "COMMENT"}
+                    self.owner, self.repo, self.pr_number, {"body": fallback_body, "event": "COMMENT"}
                 )
             except Exception as e:
                 logger.error(f"Failed to post fallback review summary: {e}")

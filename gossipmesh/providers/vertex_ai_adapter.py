@@ -10,8 +10,10 @@ from vertexai.generative_models import GenerativeModel, Part, Content
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
+
 class VertexAIProvider(BaseProvider):
     _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
+
     def __init__(self, project_id: str, location: str):
         # BaseProvider expects an api_key, we will pass a placeholder since Vertex uses application default credentials or explicit project info
         super().__init__("vertex_placeholder")
@@ -28,10 +30,7 @@ class VertexAIProvider(BaseProvider):
         # In Vertex AI (Gemini), system instructions are passed to the model initialization
         system_instruction = next((msg.content for msg in request.messages if msg.role == "system"), None)
 
-        model = GenerativeModel(
-            model_name=request.model,
-            system_instruction=system_instruction
-        )
+        model = GenerativeModel(model_name=request.model, system_instruction=system_instruction)
 
         contents = []
         for msg in request.messages:
@@ -42,14 +41,11 @@ class VertexAIProvider(BaseProvider):
         generation_config = {
             "max_output_tokens": request.max_tokens,
             "temperature": request.temperature,
-            "stop_sequences": request.stop_sequences
+            "stop_sequences": request.stop_sequences,
         }
 
         try:
-            response = await model.generate_content_async(
-                contents=contents,
-                generation_config=generation_config
-            )
+            response = await model.generate_content_async(contents=contents, generation_config=generation_config)
         except GoogleAPIError as e:
             raise ProviderError("Provider API error") from None
 
@@ -57,24 +53,18 @@ class VertexAIProvider(BaseProvider):
             prompt_tokens=response.usage_metadata.prompt_token_count if response.usage_metadata else 0,
             completion_tokens=response.usage_metadata.candidates_token_count if response.usage_metadata else 0,
             total_tokens=response.usage_metadata.total_token_count if response.usage_metadata else 0,
-            cost_estimate_usd=0.0
+            cost_estimate_usd=0.0,
         )
 
         return GenerationResponse(
-            content=response.text or "",
-            model=request.model,
-            usage=usage,
-            raw_response=response.to_dict()
+            content=response.text or "", model=request.model, usage=usage, raw_response=response.to_dict()
         )
 
     @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
         system_instruction = next((msg.content for msg in request.messages if msg.role == "system"), None)
 
-        model = GenerativeModel(
-            model_name=request.model,
-            system_instruction=system_instruction
-        )
+        model = GenerativeModel(model_name=request.model, system_instruction=system_instruction)
 
         contents = []
         for msg in request.messages:
@@ -85,14 +75,12 @@ class VertexAIProvider(BaseProvider):
         generation_config = {
             "max_output_tokens": request.max_tokens,
             "temperature": request.temperature,
-            "stop_sequences": request.stop_sequences
+            "stop_sequences": request.stop_sequences,
         }
 
         try:
             response = await model.generate_content_async(
-                contents=contents,
-                generation_config=generation_config,
-                stream=True
+                contents=contents, generation_config=generation_config, stream=True
             )
 
             async for chunk in response:
