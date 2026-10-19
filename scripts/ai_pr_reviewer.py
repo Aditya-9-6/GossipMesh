@@ -42,6 +42,24 @@ FALLBACK_MODELS = [
     "gemini-flash-latest",
 ]
 
+def load_multi_provider_keys():
+    """Loads auxiliary LLM keys (OpenRouter, NVIDIA, Cohere, HuggingFace) from .llm_keys files if present."""
+    for check_dir in (Path("."), Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent, Path.home()):
+        llm_file = check_dir / ".llm_keys"
+        if llm_file.exists():
+            try:
+                for line in llm_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip()
+                        if k and v and k not in os.environ:
+                            os.environ[k] = v
+            except Exception:
+                pass
+
+load_multi_provider_keys()
+
 def load_gemini_keys() -> list[str]:
     """Dynamically loads Gemini API keys from environment variables and local .gemini_keys files."""
     keys = []
@@ -270,6 +288,157 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
             time.sleep(1 * attempt)
 
     raise RuntimeError(f"Failed to obtain PR review from Gemini API. Last error: {last_err}")
+
+def extract_json_response(raw_text: str) -> dict:
+    raw_text = raw_text.strip()
+    if raw_text.startswith("```"):
+        lines = raw_text.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        raw_text = "\n".join(lines).strip()
+        try:
+            return json.loads(raw_text, strict=False)
+        except json.JSONDecodeError:
+            pass
+    first_brace = raw_text.find("{")
+    last_brace = raw_text.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        return json.loads(raw_text[first_brace:last_brace + 1], strict=False)
+    raise ValueError(f"Could not parse valid JSON from model response: {raw_text[:200]}")
+
+def call_openrouter_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing OPENROUTER_API_KEY")
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    models = ["google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
+    last_err = None
+    for model in models:
+        print(f"[*] [OpenRouter Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"}
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [OpenRouter] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"OpenRouter calls failed: {last_err}")
+
+def call_nvidia_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing NVIDIA_API_KEY")
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    models = ["nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"]
+    last_err = None
+    for model in models:
+        print(f"[*] [NVIDIA Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [NVIDIA] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"NVIDIA calls failed: {last_err}")
+
+def call_cohere_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing COHERE_API_KEY")
+    url = "https://api.cohere.com/v2/chat"
+    models = ["command-r-plus-08-2024", "command-r-08-2024", "command-r"]
+    last_err = None
+    for model in models:
+        print(f"[*] [Cohere Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"}
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                content = data.get("message", {}).get("content", [])
+                if content and isinstance(content, list):
+                    text = content[0].get("text", "")
+                    return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [Cohere] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"Cohere calls failed: {last_err}")
+
+def call_huggingface_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing HUGGINGFACE_API_KEY")
+    url = "https://router.huggingface.co/hf-inference/v1/chat/completions"
+    models = ["Qwen/Qwen2.5-Coder-32B-Instruct", "meta-llama/Llama-3.3-70B-Instruct"]
+    last_err = None
+    for model in models:
+        print(f"[*] [HuggingFace Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"}
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [HuggingFace] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"HuggingFace calls failed: {last_err}")
 
 def log_enterprise_audit(workspace: Path, pr_number: str, verdict: str, metrics: dict, privacy_audit: str):
     """Logs an immutable JSON audit trail for enterprise readiness."""
@@ -517,16 +686,53 @@ def main():
 Audit the code against all anti-spaghetti, concurrency, performance, and security requirements. Provide your verdict in the required JSON schema.
 """
 
-    # High-speed single-pass review via primary model (gemini-flash-lite-latest)
+    # High-speed single-pass review via primary Gemini models with rotation
     audit = None
     for model_candidate in [DEFAULT_MODEL, "gemini-3.8-flash", "gemini-flash-latest"]:
         try:
-            print(f"[*] Requesting architectural review from {model_candidate}...", flush=True)
+            print(f"[*] Requesting architectural review from Gemini {model_candidate}...", flush=True)
             audit = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model_candidate)
             if audit and isinstance(audit, dict) and "verdict" in audit:
                 break
         except Exception as e:
-            print(f"[!] Review model {model_candidate} failed: {e}", file=sys.stderr)
+            print(f"[!] Gemini model {model_candidate} failed: {e}", file=sys.stderr)
+
+    # Multi-provider resilient failover chain if Gemini quota/limits hit:
+    if not audit or not isinstance(audit, dict):
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+        if openrouter_key:
+            try:
+                print("[*] Gemini exhausted. Falling back to OpenRouter pool...", flush=True)
+                audit = call_openrouter_review(openrouter_key, prompt)
+            except Exception as e:
+                print(f"[!] OpenRouter failover failed: {e}", file=sys.stderr)
+
+    if not audit or not isinstance(audit, dict):
+        nvidia_key = os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip()
+        if nvidia_key:
+            try:
+                print("[*] Falling back to NVIDIA NIM models...", flush=True)
+                audit = call_nvidia_review(nvidia_key, prompt)
+            except Exception as e:
+                print(f"[!] NVIDIA NIM failover failed: {e}", file=sys.stderr)
+
+    if not audit or not isinstance(audit, dict):
+        cohere_key = os.environ.get("COHERE_API_KEY", "").strip()
+        if cohere_key:
+            try:
+                print("[*] Falling back to Cohere Command-R models...", flush=True)
+                audit = call_cohere_review(cohere_key, prompt)
+            except Exception as e:
+                print(f"[!] Cohere failover failed: {e}", file=sys.stderr)
+
+    if not audit or not isinstance(audit, dict):
+        hf_key = os.environ.get("HUGGINGFACE_API_KEY", "").strip()
+        if hf_key:
+            try:
+                print("[*] Falling back to HuggingFace Inference Router...", flush=True)
+                audit = call_huggingface_review(hf_key, prompt)
+            except Exception as e:
+                print(f"[!] HuggingFace failover failed: {e}", file=sys.stderr)
 
     if not audit or not isinstance(audit, dict):
         audit = {
