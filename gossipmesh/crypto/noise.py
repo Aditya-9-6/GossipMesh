@@ -16,10 +16,10 @@ class NoiseHandshakeState:
         self.s_pub = s_priv.public_key()
         self.e_priv = x25519.X25519PrivateKey.generate()
         self.e_pub = self.e_priv.public_key()
-        
+
         self.remote_s_pub = None
         self.remote_e_pub = None
-        
+
         self.h = hashlib.sha256(b"Noise_XX_25519_ChaChaPoly_SHA256").digest()
         self.ck = self.h
         self.key = None
@@ -51,7 +51,7 @@ class NoiseHandshakeState:
     def decrypt_and_hash(self, ciphertext: bytes) -> bytes:
         if self.key is None:
             self._mix_hash(ciphertext)
-            return plaintext if 'plaintext' in locals() else ciphertext # type: ignore
+            return ciphertext
         cipher = ChaCha20Poly1305(self.key)
         plaintext = cipher.decrypt(self.nonce.to_bytes(12, "big"), ciphertext, self.h)
         self.nonce += 1
@@ -74,12 +74,12 @@ class NoiseHandshakeState:
         e_bytes = self.e_pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         self._mix_hash(e_bytes)
         self._mix_key(self.e_priv.exchange(self.remote_e_pub))
-        
+
         s_bytes = self.s_pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         self._mix_hash(s_bytes)
         enc_s = self.encrypt_and_hash(s_bytes)
         self._mix_key(self.e_priv.exchange(self.remote_s_pub) if self.remote_s_pub else b"\x00" * 32)
-        
+
         payload = b""
         enc_payload = self.encrypt_and_hash(payload)
         return e_bytes + enc_s + enc_payload
@@ -90,14 +90,14 @@ class NoiseHandshakeState:
         self.remote_e_pub = x25519.X25519PublicKey.from_public_bytes(e_bytes)
         self._mix_hash(e_bytes)
         self._mix_key(self.e_priv.exchange(self.remote_e_pub))
-        
-        enc_s = message[32:32 + 32 + 16]
+
+        enc_s = message[32 : 32 + 32 + 16]
         s_bytes = self.decrypt_and_hash(enc_s)
         self._mix_hash(s_bytes)
         self.remote_s_pub = x25519.X25519PublicKey.from_public_bytes(s_bytes)
         self._mix_key(self.e_priv.exchange(self.remote_s_pub) if self.remote_s_pub else b"\x00" * 32)
-        
-        enc_payload = message[32 + 32 + 16:]
+
+        enc_payload = message[32 + 32 + 16 :]
         self.decrypt_and_hash(enc_payload)
 
     def write_message_3(self) -> bytes:
@@ -106,18 +106,18 @@ class NoiseHandshakeState:
         self._mix_hash(s_bytes)
         enc_s = self.encrypt_and_hash(s_bytes)
         self._mix_key(self.s_priv.exchange(self.remote_e_pub) if self.remote_e_pub else b"\x00" * 32)
-        
+
         payload = b""
         enc_payload = self.encrypt_and_hash(payload)
         return enc_s + enc_payload
 
     def read_message_3(self, message: bytes):
         assert not self.is_initiator
-        enc_s = message[:32 + 16]
+        enc_s = message[: 32 + 16]
         s_bytes = self.decrypt_and_hash(enc_s)
         self._mix_hash(s_bytes)
         self.remote_s_pub = x25519.X25519PublicKey.from_public_bytes(s_bytes)
         self._mix_key(self.s_priv.exchange(self.remote_e_pub) if self.remote_e_pub else b"\x00" * 32)
-        
-        enc_payload = message[32 + 16:]
+
+        enc_payload = message[32 + 16 :]
         self.decrypt_and_hash(enc_payload)

@@ -18,26 +18,31 @@ from cryptography.hazmat.backends import default_backend
 
 class LicenseError(Exception):
     """Base exception for all licensing errors."""
+
     pass
 
 
 class LicenseMissingError(LicenseError):
     """Raised when no license token or file is found."""
+
     pass
 
 
 class LicenseExpiredError(LicenseError):
     """Raised when the license has expired."""
+
     pass
 
 
 class LicenseInvalidError(LicenseError):
     """Raised when the signature or payload is tampered/invalid."""
+
     pass
 
 
 class BundleNotAuthorizedError(LicenseError):
     """Raised when the license does not grant access to the requested model bundle."""
+
     pass
 
 
@@ -63,9 +68,7 @@ def _find_public_key_path() -> Path:
     if container_path.is_file():
         return container_path
 
-    raise FileNotFoundError(
-        f"RSA-4096 public key not found. Expected at {local_path} or set LICENSE_PUBLIC_KEY_PATH."
-    )
+    raise FileNotFoundError(f"RSA-4096 public key not found. Expected at {local_path} or set LICENSE_PUBLIC_KEY_PATH.")
 
 
 def load_public_key(key_path: Optional[Path] = None):
@@ -157,8 +160,7 @@ def verify_license(
         is_allowed = (req_b in allowed_bundles) or (req_b in task_map.values())
         if not is_allowed:
             raise BundleNotAuthorizedError(
-                f"License tier does not authorize bundle '{required_bundle}'. "
-                f"Allowed bundles: {allowed_bundles}"
+                f"License tier does not authorize bundle '{required_bundle}'. Allowed bundles: {allowed_bundles}"
             )
 
     if required_task:
@@ -167,8 +169,7 @@ def verify_license(
             assigned_bundle = task_map[req_t]
             if assigned_bundle not in allowed_bundles:
                 raise BundleNotAuthorizedError(
-                    f"Task '{required_task}' is mapped to '{assigned_bundle}', "
-                    f"which is not authorized in this license."
+                    f"Task '{required_task}' is mapped to '{assigned_bundle}', which is not authorized in this license."
                 )
 
     return payload

@@ -4,7 +4,13 @@ from gossipmesh.crypto.noise import NoiseHandshakeState
 
 
 class SecureTransport:
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, priv_key: x25519.X25519PrivateKey, is_initiator: bool):
+    def __init__(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        priv_key: x25519.X25519PrivateKey,
+        is_initiator: bool,
+    ):
         self.reader = reader
         self.writer = writer
         self.state = NoiseHandshakeState(is_initiator, priv_key)
@@ -15,11 +21,11 @@ class SecureTransport:
             msg1 = self.state.write_message_1()
             self.writer.write(len(msg1).to_bytes(2, "big") + msg1)
             await self.writer.drain()
-            
+
             len_bytes = await self.reader.readexactly(2)
             msg2 = await self.reader.readexactly(int.from_bytes(len_bytes, "big"))
             self.state.read_message_2(msg2)
-            
+
             msg3 = self.state.write_message_3()
             self.writer.write(len(msg3).to_bytes(2, "big") + msg3)
             await self.writer.drain()
@@ -27,15 +33,15 @@ class SecureTransport:
             len_bytes = await self.reader.readexactly(2)
             msg1 = await self.reader.readexactly(int.from_bytes(len_bytes, "big"))
             self.state.read_message_1(msg1)
-            
+
             msg2 = self.state.write_message_2()
             self.writer.write(len(msg2).to_bytes(2, "big") + msg2)
             await self.writer.drain()
-            
+
             len_bytes = await self.reader.readexactly(2)
             msg3 = await self.reader.readexactly(int.from_bytes(len_bytes, "big"))
             self.state.read_message_3(msg3)
-        
+
         self.transport_key = self.state.key
 
     async def send(self, data: bytes):

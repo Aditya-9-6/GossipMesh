@@ -8,12 +8,6 @@ from gossipmesh.api import app
 from gossipmesh.models.base import Base
 from gossipmesh.api.deps import get_current_user
 from gossipmesh.models.user import User
-<<<<<<< HEAD
-
-engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-=======
 from gossipmesh.core.config import settings
 from gossipmesh.models.approval import ApprovalGate
 import gossipmesh.models
@@ -25,9 +19,7 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
-TestingSessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
-)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
 Base.metadata.create_all(bind=engine)
 
@@ -38,16 +30,9 @@ def override_get_db():
         yield db
     finally:
         db.close()
->>>>>>> origin/main
 
 
 def override_get_current_user():
-<<<<<<< HEAD
-    return User(id=1, email="test@gossipmesh.com", is_active=True)
-
-
-app.dependency_overrides[get_current_user] = override_get_current_user
-=======
     db = TestingSessionLocal()
     user = db.query(User).filter(User.email == "approver@gossipmesh.test").first()
     if not user:
@@ -66,12 +51,9 @@ app.dependency_overrides[get_current_user] = override_get_current_user
 
 @pytest.fixture(autouse=True)
 def setup_overrides():
-    app.dependency_overrides[deps.get_db] = override_get_db
-    app.dependency_overrides[deps.get_current_user] = override_get_current_user
+    app.dependency_overrides[get_current_user] = override_get_current_user
     yield
-    app.dependency_overrides.pop(deps.get_db, None)
-    app.dependency_overrides.pop(deps.get_current_user, None)
->>>>>>> origin/main
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 client = TestClient(app)
@@ -93,20 +75,13 @@ def test_approval_gate_lifecycle():
     assert data["action_type"] == "push_commit"
     assert data["status"] == "pending"
 
-<<<<<<< HEAD
     approval_id = data["id"]
-    response_decide = client.post(
-        f"/api/v1/approvals/{approval_id}/decide",
-        json={"decision": "approved", "reason": "Looks good"}
-=======
     res_get = client.get(f"{settings.API_V1_STR}/approvals/{approval_id}")
     assert res_get.status_code == 200
     assert res_get.json()["status"] == "pending"
 
-    res_decide = client.post(
-        f"{settings.API_V1_STR}/approvals/{approval_id}/decision",
-        json={"decision": "approved"},
->>>>>>> origin/main
+    response_decide = client.post(
+        f"{settings.API_V1_STR}/approvals/{approval_id}/decide", json={"decision": "approved", "reason": "Looks good"}
     )
     assert response_decide.status_code == 200
     assert response_decide.json()["status"] == "approved"

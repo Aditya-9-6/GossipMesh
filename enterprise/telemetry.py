@@ -45,7 +45,7 @@ def report_telemetry_event(
 ) -> bool:
     """
     Send an asynchronous-safe telemetry event to the SaaS backend.
-    
+
     Returns True if successfully sent, False if disabled or failed.
     Guaranteed NEVER to raise an exception.
     """
@@ -67,6 +67,7 @@ def report_telemetry_event(
 
     try:
         import httpx
+
         payload_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
         signature = sign_payload(payload_bytes, secret)
 

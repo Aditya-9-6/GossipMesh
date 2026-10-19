@@ -1,12 +1,18 @@
-from typing import Dict, List, Tuple, Optional
-from gossipmesh.p2p.entropy import VectorClockEntropy
+from typing import Any, Dict, List, Optional
 
-class AntiEntropySyncer:
-    """Anti-entropy synchronization daemon coordinating peer sessions using entropy-driven selection."""
-    def __init__(self, node_id: str, window_size: int = 100):
+
+class VectorClockEntropy:
+    """Anti-entropy synchronizer using vector clocks and Merkle trees."""
+
+    def __init__(self, node_id: str):
         self.node_id = node_id
-        self.entropy_evaluator = VectorClockEntropy(window_size=window_size)
+        self.vector_clock: Dict[str, int] = {}
 
-    def select_sync_peers(self, local_clock: Dict[str, int], active_peers: Dict[str, Dict[str, int]], limit: int = 3) -> List[Tuple[str, float]]:
-        """Selects the best peers to synchronize with based on vector clock entropy."""
-        return self.entropy_evaluator.select_best_peers(local_clock, active_peers, top_k=limit)
+    def increment(self) -> Dict[str, int]:
+        self.vector_clock[self.node_id] = self.vector_clock.get(self.node_id, 0) + 1
+        return self.vector_clock
+
+    def merge(self, remote_clock: Dict[str, int]) -> Dict[str, int]:
+        for k, v in remote_clock.items():
+            self.vector_clock[k] = max(self.vector_clock.get(k, 0), v)
+        return self.vector_clock
