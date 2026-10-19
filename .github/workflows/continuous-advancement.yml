@@ -3,6 +3,8 @@ name: Continuous Autonomous Advancement Engine
 on:
   schedule:
     - cron: '*/5 * * * *' # Executes 24/7 every 5 minutes in GitHub Actions Cloud
+  push:
+    branches: [main]     # Instantly trigger next cycle whenever a PR is merged into main
   issues:
     types: [opened]       # Instant event-driven trigger whenever an issue is created
   workflow_dispatch:
@@ -10,7 +12,7 @@ on:
       iterations:
         description: 'Number of autonomous development cycles to run'
         required: false
-        default: '5'
+        default: '2'
 
 permissions:
   contents: write
@@ -21,28 +23,33 @@ permissions:
 jobs:
   advance:
     name: Autonomous Engine (Worker ${{ matrix.worker }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
     strategy:
       matrix:
-        worker: [1, 2, 3]
+        worker: [1, 2, 3, 4, 5]
       fail-fast: false
     concurrency:
       group: continuous-advancement-worker-${{ matrix.worker }}
-      cancel-in-progress: false
+      cancel-in-progress: true
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Install uv & Setup Python
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Install Dependencies
         run: |
-          pip install -e .[api,dev]
+          uv venv --allow-existing
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+          uv pip install -e ".[api,dev]"
 
       - name: Configure Git User Identity
         run: |
@@ -61,5 +68,16 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
           HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY || '' }}
+          NVIDIA_API_KEY_2: ${{ secrets.NVIDIA_API_KEY_2 || '' }}
         run: |
-          python3 scripts/autonomous_loop.py --workspace . --interval 5 --once
+          ITER="${{ github.event.inputs.iterations || '30' }}"
+          python3 scripts/autonomous_loop.py --workspace . --worker-id ${{ matrix.worker }} --num-workers 5 --interval 5 --iterations "$ITER" --max-minutes 180
+
+      - name: Chain Next 24/7 Cloud Advancement Batch
+        if: always() && matrix.worker == 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[*] Chaining next 24/7 autonomous advancement batch in GitHub Actions Cloud..."
+          gh workflow run continuous-advancement.yml --ref main || true

@@ -1,23 +1,19 @@
 from typing import AsyncGenerator
 import time
-from anthropic import AsyncAnthropic, APIError
-from gossipmesh.core.exceptions import ProviderError
-from gossipmesh.core.retry import with_retry_and_circuit_breaker, CircuitBreaker
+from anthropic import AsyncAnthropic
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
 class AnthropicProvider(BaseProvider):
-    _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
     def __init__(self, api_key: str):
         super().__init__(api_key)
-        self.client = AsyncAnthropic(api_key=self.api_key, timeout=60.0)
+        self.client = AsyncAnthropic(api_key=self.api_key)
 
     @property
     def provider_name(self) -> str:
         return "anthropic"
 
-    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         time.time()
 
@@ -25,17 +21,15 @@ class AnthropicProvider(BaseProvider):
         system_prompt = next((msg.content for msg in request.messages if msg.role == "system"), "")
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages if msg.role != "system"]
 
-        try:
-            response = await self.client.messages.create(
-                model=request.model,
-                system=system_prompt,
-                messages=messages, # type: ignore
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
-                stop_sequences=request.stop_sequences or []
-            )
-        except APIError as e:
-            raise ProviderError("Provider API error") from None
+        response = await self.client.messages.create(
+            model=request.model,
+            system=system_prompt,
+            messages=messages, # type: ignore
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            stop_sequences=request.stop_sequences or [],
+            timeout=request.timeout
+        )
 
         time.time()
 
@@ -57,24 +51,21 @@ class AnthropicProvider(BaseProvider):
             raw_response={"id": response.id, "type": response.type}
         )
 
-    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         system_prompt = next((msg.content for msg in request.messages if msg.role == "system"), "")
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages if msg.role != "system"]
 
-        try:
-            async with self.client.messages.stream(
-                model=request.model,
-                system=system_prompt,
-                messages=messages, # type: ignore
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
-                stop_sequences=request.stop_sequences or []
-            ) as stream:
-                async for text in stream.text_stream:
-                    yield text
-        except APIError as e:
-            raise ProviderError("Provider API error") from None
+        async with self.client.messages.stream(
+            model=request.model,
+            system=system_prompt,
+            messages=messages, # type: ignore
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            stop_sequences=request.stop_sequences or [],
+            timeout=request.timeout
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
 
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()
@@ -88,7 +79,7 @@ class AnthropicProvider(BaseProvider):
             latency = (time.time() - start_time) * 1000
             return ProviderHealth(is_healthy=True, latency_ms=latency)
         except Exception as e:
-            return ProviderHealth(is_healthy=False, error="Provider connection failed")
+            return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
         # Client side token counting for Anthropic is typically done via their API,

@@ -1,15 +1,11 @@
 from typing import AsyncGenerator
 import time
 import google.generativeai as genai
-from google.api_core.exceptions import GoogleAPIError
-from gossipmesh.core.exceptions import ProviderError
-from gossipmesh.core.retry import with_retry_and_circuit_breaker, CircuitBreaker
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
 class GeminiProvider(BaseProvider):
-    _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
     def __init__(self, api_key: str):
         super().__init__(api_key)
         # Avoid global state by passing the api_key implicitly via client instances or config overrides
@@ -30,25 +26,21 @@ class GeminiProvider(BaseProvider):
             converted.append({"role": role, "parts": [msg.content]})
         return converted
 
-    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         time.time()
 
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
-        try:
-            response = await model.generate_content_async(
-                contents,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=request.temperature,
-                    max_output_tokens=request.max_tokens,
-                    stop_sequences=request.stop_sequences,
-                ),
-                request_options={"timeout": 60.0}
-            )
-        except GoogleAPIError as e:
-            raise ProviderError("Provider API error") from None
+        response = await model.generate_content_async(
+            contents,
+            generation_config=genai.types.GenerationConfig(
+                temperature=request.temperature,
+                max_output_tokens=request.max_tokens,
+                stop_sequences=request.stop_sequences,
+            ),
+            request_options={"timeout": request.timeout} if request.timeout else None
+        )
 
         time.time()
 
@@ -67,36 +59,32 @@ class GeminiProvider(BaseProvider):
             raw_response={"prompt_feedback": str(response.prompt_feedback)}
         )
 
-    @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
-        try:
-            response = await model.generate_content_async(
-                contents,
-                stream=True,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=request.temperature,
-                    max_output_tokens=request.max_tokens,
-                    stop_sequences=request.stop_sequences,
-                ),
-                request_options={"timeout": 60.0}
-            )
-            async for chunk in response:
-                yield chunk.text
-        except GoogleAPIError as e:
-            raise ProviderError("Provider API error") from None
+        response = await model.generate_content_async(
+            contents,
+            stream=True,
+            generation_config=genai.types.GenerationConfig(
+                temperature=request.temperature,
+                max_output_tokens=request.max_tokens,
+                stop_sequences=request.stop_sequences,
+            ),
+            request_options={"timeout": request.timeout} if request.timeout else None
+        )
+        async for chunk in response:
+            yield chunk.text
 
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()
         try:
             model = genai.GenerativeModel("gemini-1.5-flash")
-            await model.generate_content_async("ping", request_options={"timeout": 60.0})
+            await model.generate_content_async("ping")
             latency = (time.time() - start_time) * 1000
             return ProviderHealth(is_healthy=True, latency_ms=latency)
         except Exception as e:
-            return ProviderHealth(is_healthy=False, error="Provider connection failed")
+            return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
         model = genai.GenerativeModel("gemini-1.5-flash")
