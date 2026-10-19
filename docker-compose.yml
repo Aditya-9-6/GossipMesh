@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GH_TOKEN=${GH_TOKEN}
+      - GEMINI_REVIEWER_KEY=${GEMINI_REVIEWER_KEY}
+    depends_on:
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    build: .
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GH_TOKEN=${GH_TOKEN}
+      - GEMINI_REVIEWER_KEY=${GEMINI_REVIEWER_KEY}
+    depends_on:
+      - redis
+    entrypoint: ["/bin/bash", "run_worker.sh"]
