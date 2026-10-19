@@ -549,7 +549,8 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
                         print(f"[*] Found failed GitHub Actions run {run_id} ({run.get('name')}). Fetching failed logs...", flush=True)
                         log_res = subprocess.run(
                             ["gh", "run", "view", "--log-failed", run_id],
-                            cwd=workspace, capture_output=True, text=True
+                            cwd=workspace, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace"
                         )
                         if log_res.stdout.strip():
                             ci_reports.append(
@@ -860,7 +861,15 @@ Instructions:
             all_repaired_files.add(rel_path)
             print(f"    [+] Wrote fixed file: {rel_path}", flush=True)
 
-        subprocess.run(["ruff", "check", "--fix", "."], cwd=workspace)
+        ruff_bin = get_tool_bin(workspace, "ruff")
+        py_bin = get_tool_bin(workspace, "python")
+        try:
+            ruff_cmd = [ruff_bin, "check", "--fix", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "--fix", "."]
+            subprocess.run(ruff_cmd, cwd=workspace, capture_output=True, text=True, timeout=20)
+            ruff_fmt = [ruff_bin, "format", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "format", "."]
+            subprocess.run(ruff_fmt, cwd=workspace, capture_output=True, text=True, timeout=20)
+        except Exception:
+            pass
 
     final_code, final_log = run_diagnostics(workspace, pr_number=args.pr_number)
     post_code = final_code
