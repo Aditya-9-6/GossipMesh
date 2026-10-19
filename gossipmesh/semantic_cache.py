@@ -43,9 +43,13 @@ class SemanticCache:
         best_match = None
         best_score = 0.0
 
-        from gossipmesh.rag import VectorDB
-        db = VectorDB()
-        query_embedding = db.get_embedding(key_text)
+        query_embedding = None
+        try:
+            from gossipmesh.rag import VectorDB
+            db = VectorDB()
+            query_embedding = db.get_embedding(key_text)
+        except Exception:
+            pass
 
         if not query_embedding:
             # Fallback to exact match if embedding generation fails
@@ -92,9 +96,13 @@ class SemanticCache:
         cache_key = hashlib.sha256(key_text.encode("utf-8")).hexdigest()
         cache_file = self.cache_dir / f"{cache_key}.json"
 
-        from gossipmesh.rag import VectorDB
-        db = VectorDB()
-        embedding = db.get_embedding(key_text)
+        embedding = None
+        try:
+            from gossipmesh.rag import VectorDB
+            db = VectorDB()
+            embedding = db.get_embedding(key_text)
+        except Exception:
+            pass
 
         try:
             cache_file.write_text(json.dumps(value), encoding="utf-8")

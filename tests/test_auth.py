@@ -156,7 +156,7 @@ class TestAuth(unittest.TestCase):
             "email": "testoidc@example.com",
             "sub": "user123",
             "iss": "https://provider.com",
-            "groups": ["engineering", "admin"]
+            "groups": ["engineering", "organization_admin"]
         }
 
         # Mock DB logic

@@ -4,8 +4,7 @@ from pydantic import BaseModel
 import datetime
 
 from gossipmesh.api import deps
-from gossipmesh.api.errors import handle_exceptions
-from gossipmesh.database import get_db
+from gossipmesh.api.deps import get_db
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -27,14 +26,8 @@ class Run(BaseModel):
     token_usage: int
     estimated_cost: float
 
-# Dependency to get the database session
-@router.dependency
-def get_db_session(db: Session = Depends(get_db)):
-    return db
-
 @router.post("/")
-@handle_exceptions
-def track_run(run: Run, db: Session = Depends(get_db_session)):
+def track_run(run: Run, db: Session = Depends(get_db)):
     # Implement logic to track the run details in the database
     # This is a placeholder, replace with actual database interaction code
     print(f"Tracking run: {{run}}")
