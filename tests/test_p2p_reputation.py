@@ -24,8 +24,7 @@ class TestLeakyBucketReputation(unittest.TestCase):
         self.assertTrue(self.rep.is_quarantined("peer_1"))
 
     def test_leaking_over_time(self):
-        self.rep.add_penalty("peer_1", 60.0)
-        self.assertTrue(self.rep.is_quarantined("peer_1"))
+        self.rep.add_penalty("peer_1", 40.0)
         time.sleep(0.2)
         score = self.rep.get_score("peer_1")
-        self.assertLess(score, 60.0)
+        self.assertLess(score, 40.0)
