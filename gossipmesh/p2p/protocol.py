@@ -1,22 +1,36 @@
-from typing import Dict, Any, Optional
-from gossipmesh.p2p.retransmit import RetransmissionCache
+import logging
+from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class GossipProtocolHandler:
-    """Protocol handler integrating retransmission caching and backpressure telemetry."""
+    """Handles serialization, deserialization, and routing of gossip messages."""
 
-    def __init__(self, capacity: int = 1000, max_memory_bytes: int = 16 * 1024 * 1024):
-        self.retransmit_cache = RetransmissionCache(capacity=capacity, max_memory_bytes=max_memory_bytes)
+    def __init__(self, node_id: str) -> None:
+        self._node_id = node_id
 
-    def handle_broadcast(self, message_id: str, payload: Dict[str, Any]) -> bool:
-        """Buffers broadcasted message and signals backpressure if threshold reached."""
-        success = self.retransmit_cache.put(message_id, payload)
-        return success
+    def pack_message(self, msg_type: str, payload: Dict[str, Any]) -> bytes:
+        """Packs a gossip message into wire format."""
+        import json
 
-    def request_retransmit(self, message_id: str) -> Optional[Dict[str, Any]]:
-        """Fetches cached message for dropped packet recovery."""
-        return self.retransmit_cache.get(message_id)
+        envelope = {
+            "node_id": self._node_id,
+            "type": msg_type,
+            "payload": payload,
+        }
+        return json.dumps(envelope).encode("utf-8")
 
-    def is_congested(self) -> bool:
-        """Checks downstream backpressure status."""
-        return self.retransmit_cache.check_backpressure()
+    def unpack_message(self, raw_data: bytes) -> Optional[Dict[str, Any]]:
+        """Unpacks and validates a gossip message from wire format."""
+        import json
+
+        try:
+            return json.loads(raw_data.decode("utf-8"))
+        except Exception as e:
+            logger.error("Failed to unpack gossip message: %s", e)
+            return None
+
+
+# Provide alias for backward compatibility
+GossipProtocol = GossipProtocolHandler
