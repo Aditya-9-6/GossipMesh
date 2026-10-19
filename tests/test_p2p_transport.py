@@ -1,7 +1,8 @@
 import unittest
-<<<<<<< HEAD
-from gossipmesh.p2p.transport import AdaptiveTransport
+import time
+from gossipmesh.p2p.transport import AdaptiveTransport, P2PSessionTransport
 from gossipmesh.p2p.node import P2PNodeExtension
+from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator
 
 class TestAdaptiveTransport(unittest.TestCase):
     def setUp(self):
@@ -28,11 +29,6 @@ class TestAdaptiveTransport(unittest.TestCase):
         targets = node.select_targets(["peer-a", "peer-b"])
         self.assertIsInstance(targets, list)
 
-if __name__ == "__main__":
-=======
-import time
-from gossipmesh.p2p.transport import P2PSessionTransport
-from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator
 
 class TestP2PTransport(unittest.TestCase):
     def test_transport_flow_and_rotation(self):
@@ -54,6 +50,5 @@ class TestP2PTransport(unittest.TestCase):
         
         self.assertTrue(transport_a.should_rotate())
 
-if __name__ == '__main__':
->>>>>>> origin/main
+if __name__ == "__main__":
     unittest.main()

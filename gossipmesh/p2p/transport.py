@@ -1,7 +1,16 @@
-<<<<<<< HEAD
-import time
+import asyncio
+import json
+import logging
 import math
-from typing import Dict, List
+import time
+import threading
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+from gossipmesh.p2p.parser import ZeroCopyPacketParser
+from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
+from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
+
+logger = logging.getLogger(__name__)
 
 class AdaptiveTransport:
     """
@@ -53,19 +62,7 @@ class AdaptiveTransport:
             return peers[:min(len(peers), count)]
             
         return selected
-=======
-import asyncio
-import json
-import logging
-import time
-import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-from gossipmesh.p2p.parser import ZeroCopyPacketParser
-from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
-from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
-
-logger = logging.getLogger(__name__)
 
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
@@ -276,4 +273,3 @@ class TransportSocketReader:
         _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
 
         return msg_type, msg_id, payload_view
->>>>>>> origin/main
