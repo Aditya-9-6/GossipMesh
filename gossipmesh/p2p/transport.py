@@ -1,28 +1,15 @@
-<<<<<<< HEAD
-import logging
-import json
-from typing import List, Any, Optional, Dict, Callable
-from gossipmesh.p2p.fanout import AdaptiveFanoutController
-from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
-
-logger = logging.getLogger(__name__)
-
-class TransportTelemetry:
-    def __init__(self):
-        self.sent_messages = 0
-        self.received_messages = 0
-        self.dropped_messages = 0
-=======
 import asyncio
 import json
 import logging
 import time
 import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+import random
+from typing import Any, Callable, Dict, Optional, Tuple, Union, List
 
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
+from gossipmesh.p2p.fanout import AdaptiveFanoutController
 
 logger = logging.getLogger(__name__)
 
@@ -99,99 +86,28 @@ class TransportTelemetry:
 
     def record_dropped(self) -> None:
         self.dropped_messages += 1
->>>>>>> origin/main
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "sent_messages": self.sent_messages,
             "received_messages": self.received_messages,
-<<<<<<< HEAD
-=======
             "sent_bytes": self.sent_bytes,
             "received_bytes": self.received_bytes,
->>>>>>> origin/main
             "dropped_messages": self.dropped_messages,
         }
 
+
 class GossipTransport:
-<<<<<<< HEAD
-    """Manages peer-to-peer transport layer with adaptive fanout controls and rate limiting."""
-    def __init__(self, node_id: str, initial_fanout: int = 6, config: Optional[RateLimitConfig] = None):
-        self.node_id = node_id
-        self.fanout_controller = AdaptiveFanoutController(initial_fanout=initial_fanout)
-        self.rate_limiter = PeerRateLimiter(config or RateLimitConfig())
-        self.handlers: Dict[str, Callable[[Any], Any]] = {}
-        self.telemetry = TransportTelemetry()
-
-    def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
-        self.handlers[topic] = handler
-
-    async def receive_payload(self, peer_id: str, payload: Any) -> Optional[Any]:
-        allowed = await self.rate_limiter.allow_request(peer_id)
-        if not allowed:
-            self.telemetry.dropped_messages += 1
-            return None
-        self.telemetry.received_messages += 1
-        
-        parsed_payload = payload
-        if isinstance(payload, bytes):
-            try:
-                parsed_payload = json.loads(payload.decode('utf-8'))
-            except Exception:
-                pass
-        
-        # Dispatch to registered handlers if applicable
-        topic = None
-        if isinstance(parsed_payload, dict):
-            topic = parsed_payload.get("topic") or parsed_payload.get("type")
-        
-        result = None
-        if topic and topic in self.handlers:
-            try:
-                result = self.handlers[topic](parsed_payload)
-            except Exception as e:
-                logger.error(f"Handler error for topic {topic}: {e}")
-                raise
-        elif "chat" in self.handlers:
-            try:
-                result = self.handlers["chat"](parsed_payload)
-            except Exception as e:
-                logger.error(f"Chat handler error: {e}")
-                raise
-        elif "test_err" in self.handlers:
-            try:
-                result = self.handlers["test_err"](parsed_payload)
-            except Exception as e:
-                logger.error(f"Test err handler error: {e}")
-                raise
-                
-        return result
-
-    async def send_payload(self, peer_id: str, payload: Any) -> bool:
-        self.telemetry.sent_messages += 1
-        return True
-
-    async def get_telemetry_metrics(self) -> Dict[str, Any]:
-        return {
-            "transport": self.telemetry.to_dict(),
-            "fanout": self.fanout_controller.get_fanout(),
-        }
-
-    def select_peers(self, all_peers: List[str], is_duplicate: bool = False) -> List[str]:
-        current_fanout = self.fanout_controller.record_message(is_duplicate=is_duplicate)
-        import random
-        selected = random.sample(all_peers, min(len(all_peers), current_fanout))
-        logger.debug(f"Node {self.node_id} selected {len(selected)} peers with fanout {current_fanout}")
-        return selected
-=======
-    """High-level P2P gossip transport integrating rate limiting, framing, and topic dispatch."""
+    """High-level P2P gossip transport integrating rate limiting, adaptive fanout, framing, and topic dispatch."""
 
     def __init__(
         self,
         node_id: str,
+        initial_fanout: int = 6,
         config: Optional[RateLimitConfig] = None,
     ) -> None:
         self.node_id = node_id
+        self.fanout_controller = AdaptiveFanoutController(initial_fanout=initial_fanout)
         self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
         self.telemetry = TransportTelemetry()
         self.handlers: Dict[str, Callable[[Any], Any]] = {}
@@ -241,15 +157,23 @@ class GossipTransport:
         else:
             parsed_data = {"raw": str(payload)}
 
-        if topic in self.handlers:
-            try:
-                res = self.handlers[topic](parsed_data)
-                if asyncio.iscoroutine(res):
-                    await res
-            except Exception as e:
-                logger.error(f"Error in transport handler for topic {topic}: {e}")
+        resolved_topic = topic
+        if isinstance(parsed_data, dict):
+            resolved_topic = parsed_data.get("topic") or parsed_data.get("type") or topic
 
-        return parsed_data
+        result = None
+        if resolved_topic in self.handlers:
+            try:
+                res = self.handlers[resolved_topic](parsed_data)
+                if asyncio.iscoroutine(res):
+                    result = await res
+                else:
+                    result = res
+            except Exception as e:
+                logger.error(f"Error in transport handler for topic {resolved_topic}: {e}")
+                raise
+
+        return result
 
     async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict]) -> bool:
         """Simulates sending a payload to a peer with telemetry recording."""
@@ -266,12 +190,19 @@ class GossipTransport:
         return True
 
     async def get_telemetry_metrics(self) -> Dict[str, Any]:
-        """Returns comprehensive telemetry metrics for transport and rate limiter."""
+        """Returns comprehensive telemetry metrics for transport, fanout, and rate limiter."""
         limiter_metrics = await self.rate_limiter.get_metrics()
         return {
             "transport": self.telemetry.to_dict(),
             "rate_limiter": limiter_metrics,
+            "fanout": self.fanout_controller.get_fanout(),
         }
+
+    def select_peers(self, all_peers: List[str], is_duplicate: bool = False) -> List[str]:
+        current_fanout = self.fanout_controller.record_message(is_duplicate=is_duplicate)
+        selected = random.sample(all_peers, min(len(all_peers), current_fanout))
+        logger.debug(f"Node {self.node_id} selected {len(selected)} peers with fanout {current_fanout}")
+        return selected
 
 
 class TransportSocketReader:
@@ -308,4 +239,3 @@ class TransportSocketReader:
         _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
 
         return msg_type, msg_id, payload_view
->>>>>>> origin/main

@@ -1,7 +1,7 @@
-<<<<<<< HEAD
 import time
 from collections import deque
 from typing import Dict, Any, Optional
+from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
 
 class AdaptiveFanoutController:
     """Adapts the gossip broadcast fanout based on local peer message density and congestion."""
@@ -40,9 +40,7 @@ class AdaptiveFanoutController:
 
     def get_fanout(self) -> int:
         return self.fanout
-=======
-from typing import Dict, Any, Optional
-from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
+
 
 class DynamicFanoutController:
     """Computes localized message spread efficiency and adjusts node-specific
@@ -65,9 +63,9 @@ class DynamicFanoutController:
     def update_peer_feedback(self, peer_id: str, success: bool) -> None:
         self.matrix.record_ack(peer_id, success)
 
-    get_metrics = lambda self: {
-        "node_id": self.node_id,
-        "current_fanout": self.compute_fanout(),
-        "matrix": self.matrix.to_dict()
-    }
->>>>>>> origin/main
+    def get_metrics(self) -> Dict[str, Any]:
+        return {
+            "node_id": self.node_id,
+            "current_fanout": self.compute_fanout(),
+            "matrix": self.matrix.to_dict()
+        }
