@@ -38,7 +38,8 @@ class GeminiProvider(BaseProvider):
                 temperature=request.temperature,
                 max_output_tokens=request.max_tokens,
                 stop_sequences=request.stop_sequences,
-            )
+            ),
+            request_options={"timeout": request.timeout} if request.timeout else None
         )
 
         time.time()
@@ -69,7 +70,8 @@ class GeminiProvider(BaseProvider):
                 temperature=request.temperature,
                 max_output_tokens=request.max_tokens,
                 stop_sequences=request.stop_sequences,
-            )
+            ),
+            request_options={"timeout": request.timeout} if request.timeout else None
         )
         async for chunk in response:
             yield chunk.text

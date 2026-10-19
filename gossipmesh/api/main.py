@@ -12,7 +12,11 @@ from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI
 from gossipmesh.core.config import settings
+<<<<<<< HEAD
 from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs
+=======
+from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs, approvals
+>>>>>>> origin/main
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
@@ -96,7 +100,12 @@ app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/servi
 
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
+<<<<<<< HEAD
 app.include_router(runs.router, prefix=f"{settings.API_V1_STR}/runs", tags=["runs"])
+=======
+app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(approvals.router)
+>>>>>>> origin/main
 
 app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
 app.add_exception_handler(Exception, global_exception_handler) # type: ignore
