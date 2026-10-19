@@ -21,6 +21,8 @@ from gossipmesh.api.routers import (
     sso,
     users,
     vector_search,
+    runs,
+    approvals,
 )
 from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
 from gossipmesh.core.logging import setup_logging
@@ -28,6 +30,7 @@ from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception
 from gossipmesh.core.exceptions import GossipMeshException
 
 setup_logging()
+
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -43,6 +46,7 @@ async def lifespan(app: FastAPI):
 
     try:
         from gossipmesh.database import SessionLocal
+        from sqlalchemy import text
         with SessionLocal() as session:
             result = session.execute(text("PRAGMA user_version;")).fetchone()
             if result:
@@ -64,14 +68,14 @@ app.add_middleware(CorrelationIdMiddleware)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail, "correlation_id": get_correlation_id()},
+        content={"error": {"code": "HTTP_ERROR", "message": exc.detail}, "correlation_id": get_correlation_id()},
     )
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors(), "correlation_id": get_correlation_id()},
+        content={"error": {"code": "VALIDATION_ERROR", "message": str(exc.errors())}, "correlation_id": get_correlation_id()},
     )
 
 @app.exception_handler(Exception)
@@ -106,3 +110,5 @@ app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/servi
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
 app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector-search", tags=["vector-search"])
+app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(approvals.router)
