@@ -37,31 +37,27 @@ class MerkleTree:
         left_node = self._build_tree(items[:mid])
         right_node = self._build_tree(items[mid:])
         
-        combined_key = items[mid][0]
-        hasher = hashlib.sha256()
-        if left_node:
-            hasher.update(left_node.hash.encode('utf-8'))
-        if right_node:
-            hasher.update(right_node.hash.encode('utf-8'))
-        
-        return MerkleNode(combined_key, hasher.hexdigest(), left=left_node, right=right_node)
+        k, v = items[mid]
+        val_hash = hashlib.sha256(v.encode('utf-8')).hexdigest()
+        return MerkleNode(k, val_hash, left=left_node, right=right_node)
 
-    def get_root_hash(self) -> str:
-        return self.root.hash if self.root else hashlib.sha256(b"empty").hexdigest()
+    def get_root_hash(self) -> Optional[str]:
+        return self.root.hash if self.root else None
 
 class AntiEntropyReconciler:
     def __init__(self, node_id: str):
         self.node_id = node_id
-        self.vector_clock = VectorClock({node_id: 0})
         self.store: Dict[str, str] = {}
+        self.vector_clock = VectorClock()
 
-    def set_state(self, key: str, value: str):
+    def set_state(self, key: str, value: str) -> None:
         self.store[key] = value
         self.vector_clock.increment(self.node_id)
 
     def get_merkle_tree(self) -> MerkleTree:
         return MerkleTree(self.store)
 
+<<<<<<< HEAD
     def reconcile(self, peer_id: str, peer_vector_clock: Dict[str, int], peer_root_hash: str) -> str:
         peer_vc = VectorClock.from_dict(peer_vector_clock)
         comparison = self.vector_clock.compare(peer_vc)
@@ -72,6 +68,8 @@ class AntiEntropyReconciler:
         else:
             return "EXCHANGE_MERKLE"
 
+=======
+>>>>>>> origin/main
     def find_differences(self, peer_store: Dict[str, str]) -> List[str]:
         diffs = []
         all_keys = set(self.store.keys()).union(set(peer_store.keys()))
@@ -79,3 +77,18 @@ class AntiEntropyReconciler:
             if self.store.get(k) != peer_store.get(k):
                 diffs.append(k)
         return diffs
+
+    def reconcile(self, peer_id: str, peer_vc_dict: Dict[str, int], peer_root_hash: Optional[str]) -> str:
+        peer_vc = VectorClock.from_dict(peer_vc_dict)
+        comparison = self.vector_clock.compare(peer_vc)
+        
+        local_tree = self.get_merkle_tree()
+        if local_tree.get_root_hash() == peer_root_hash:
+            return "NO_SYNC_NEEDED"
+        
+        if comparison == "BEFORE":
+            return "PULL_FROM_PEER"
+        elif comparison == "AFTER":
+            return "PUSH_TO_PEER"
+        else:
+            return "EXCHANGE_MERKLE"
