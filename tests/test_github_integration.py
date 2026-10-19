@@ -9,7 +9,6 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         self.github_pr_service = MagicMock(spec=GitHubPRService)
         self.github_pr_service.get_pr_diff = AsyncMock()
         self.github_pr_service.get_pr_review_comments = AsyncMock(return_value=[])
-        self.github_pr_service.get_pr_reviews = AsyncMock(return_value=[])
         self.github_pr_service.post_pr_review_comment = AsyncMock()
         self.github_pr_service.post_pr_review = AsyncMock()
         self.integration = GitHubIntegration(
