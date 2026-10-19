@@ -2,15 +2,13 @@ from typing import Dict, Any, Optional
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class PeerSyncer:
-    """Handles peer synchronization using vector clock entropy reconciliation."""
+class P2PSyncer:
+    """Synchronizes P2P state across nodes using entropy and vector clocks."""
 
-    def __init__(self, node_id: str, max_epochs: int = 1024):
+    def __init__(self, node_id: str):
         self.node_id = node_id
-        self.entropy_tracker = VectorClockEntropy(node_id, max_epochs=max_epochs)
+        self.entropy_calculator = VectorClockEntropy(node_id)
 
-    def sync_clock(self, remote_node: str, remote_clock: Dict[str, int]) -> None:
-        self.entropy_tracker.update(remote_clock)
-
-    def get_entropy(self) -> Dict[str, int]:
-        return dict(self.entropy_tracker.clock)
+    def evaluate_sync_priority(self, local_clock: Dict[str, int], remote_clock: Dict[str, int]) -> float:
+        """Evaluates synchronization priority based on clock divergence entropy."""
+        return self.entropy_calculator.compute_divergence(local_clock, remote_clock)
