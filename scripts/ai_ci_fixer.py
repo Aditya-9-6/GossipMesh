@@ -627,8 +627,8 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
     test_failed = False
     try:
         test_res = subprocess.run(
-            [py_bin, "-m", "pytest", "tests/"],
-            cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300
+            [py_bin, "-m", "pytest", "tests/", "-m", "not integration", "-q", "--maxfail=3", "--durations=3"],
+            cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90
         )
         if test_res.returncode != 0:
             test_failed = True

@@ -422,11 +422,12 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         ci_fixer_cmd = [
             sys.executable, "scripts/ai_ci_fixer.py",
             "--pr-number", str(pr_num),
-            "--workspace", str(workspace)
+            "--workspace", str(workspace),
+            "--max-iterations", "3"
         ]
         if review_md_file.exists():
             ci_fixer_cmd.extend(["--review-feedback-file", str(review_md_file)])
-        fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
         print(fix_res.stdout, flush=True)
 
         # Re-commit and push if fixed
@@ -621,9 +622,10 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 ci_fixer_cmd = [
                     sys.executable, "scripts/ai_ci_fixer.py",
                     "--pr-number", str(pr_num),
-                    "--workspace", str(workspace)
+                    "--workspace", str(workspace),
+                    "--max-iterations", "3"
                 ]
-                fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=fixer_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+                fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=fixer_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
                 print(fix_res.stdout, flush=True)
 
                 is_green, err_report = verify_and_auto_fix_preflight(workspace)
