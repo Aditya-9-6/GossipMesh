@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 class PeerTier(str, enum.Enum):
     """Classification tier for gossip peers based on sustained throughput."""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -16,6 +17,7 @@ class PeerTier(str, enum.Enum):
 @dataclass(frozen=True)
 class BandwidthProfilerConfig:
     """Configuration parameters for windowed EWMA bandwidth profiler."""
+
     window_size_seconds: float = 60.0
     bucket_count: int = 6
     alpha: float = 0.3
@@ -26,6 +28,7 @@ class BandwidthProfilerConfig:
 @dataclass
 class PeerBandwidthSample:
     """Represents a data transfer sample."""
+
     timestamp: float
     bytes_transferred: int
 

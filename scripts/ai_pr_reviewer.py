@@ -42,6 +42,7 @@ FALLBACK_MODELS = [
     "gemini-flash-latest",
 ]
 
+
 def load_gemini_keys() -> list[str]:
     """Dynamically loads Gemini API keys from environment variables and local .gemini_keys files."""
     keys = []
@@ -64,6 +65,7 @@ def load_gemini_keys() -> list[str]:
             except Exception:
                 pass
     return keys
+
 
 REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance AI Agent SaaS platform in Python).
 
@@ -134,15 +136,11 @@ You MUST respond ONLY with a single valid JSON object with the following schema:
 }
 """
 
+
 def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_mesh/cache") -> dict:
     """Calls local Ollama API for fast edge inference."""
     url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
-    payload = {
-        "model": model,
-        "prompt": f"{REVIEWER_SYSTEM_PROMPT}\n\n{prompt}",
-        "stream": False,
-        "format": "json"
-    }
+    payload = {"model": model, "prompt": f"{REVIEWER_SYSTEM_PROMPT}\n\n{prompt}", "stream": False, "format": "json"}
 
     sem_cache = SemanticCache(cache_dir=cache_dir)
     cache_key_text = f"{model}:{prompt}"
@@ -152,10 +150,7 @@ def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_me
 
     print(f"[*] Requesting fast-pass architectural PR review from local edge model: {model}...", flush=True)
     req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
+        url, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST"
     )
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
@@ -168,7 +163,10 @@ def call_ollama(prompt: str, model: str = "llama3", cache_dir: str = ".gossip_me
         print(f"[Warning] Failed to query local edge model {model}: {e}", file=sys.stderr)
         return {"verdict": "ACTION_REQUIRED", "score": 50, "executive_summary": f"Failed to query {model}: {e}"}
 
-def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache") -> dict:
+
+def call_gemini(
+    api_key: str, prompt: str, fallback_key: str = "", model: str = DEFAULT_MODEL, cache_dir: str = ".gossip_mesh/cache"
+) -> dict:
     """Calls Gemini REST API with fallback models and fallback API key, expecting JSON."""
     ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
     models_to_try = []
@@ -210,18 +208,8 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
         for current_key, current_model in active_strategies:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={current_key}"
             payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": REVIEWER_SYSTEM_PROMPT},
-                            {"text": prompt}
-                        ]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "responseMimeType": "application/json"
-                }
+                "contents": [{"parts": [{"text": REVIEWER_SYSTEM_PROMPT}, {"text": prompt}]}],
+                "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
             }
 
             print(f"[*] Requesting architectural PR review from model: {current_model}...", flush=True)
@@ -229,7 +217,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                 url,
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
-                method="POST"
+                method="POST",
             )
             try:
                 with urllib.request.urlopen(req, timeout=90) as resp:
@@ -251,14 +239,20 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
                     return parsed_response
             except urllib.error.HTTPError as e:
                 err_msg = e.read().decode("utf-8", errors="replace")
-                print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}", file=sys.stderr)
+                print(
+                    f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:160]}",
+                    file=sys.stderr,
+                )
                 last_err = err_msg
                 if e.code not in (429, 500, 502, 503, 504):
                     # For terminal errors like 400, 403, 404, we don't want to retry this strategy
                     terminal_strategies.add((current_key, current_model))
                 continue
             except Exception as e:
-                print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
+                print(
+                    f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}",
+                    file=sys.stderr,
+                )
                 last_err = str(e)
                 continue  # Try next strategy
 
@@ -270,6 +264,7 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
             time.sleep(1 * attempt)
 
     raise RuntimeError(f"Failed to obtain PR review from Gemini API. Last error: {last_err}")
+
 
 def log_enterprise_audit(workspace: Path, pr_number: str, verdict: str, metrics: dict, privacy_audit: str):
     """Logs an immutable JSON audit trail for enterprise readiness."""
@@ -283,17 +278,19 @@ def log_enterprise_audit(workspace: Path, pr_number: str, verdict: str, metrics:
         "verdict": verdict,
         "model_used": DEFAULT_MODEL,
         "roi_metrics": metrics,
-        "privacy_security_policy_check": privacy_audit
+        "privacy_security_policy_check": privacy_audit,
     }
 
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(audit_entry) + "\n")
+
 
 def run_cmd(cmd, cwd=None, **kwargs):
     kwargs.setdefault("text", True)
     kwargs.setdefault("encoding", "utf-8")
     kwargs.setdefault("errors", "replace")
     return subprocess.run(cmd, cwd=cwd, **kwargs)
+
 
 def get_pr_diff(workspace: Path) -> str:
     """Gets git diff against origin/main."""
@@ -311,7 +308,9 @@ def get_pr_diff(workspace: Path) -> str:
         pass
     return "No git diff available."
 
+
 import re
+
 
 def extract_ast_metadata(diff: str) -> str:
     """Extracts a structural summary from the diff using true AST parsing."""
@@ -323,18 +322,26 @@ def extract_ast_metadata(diff: str) -> str:
     added_lines = []
     for line in diff.splitlines():
         # filter out git diff headers
-        if line.startswith('diff --git') or line.startswith('index ') or line.startswith('@@ ') or line.startswith('--- ') or line.startswith('+++ ') or line.startswith('new file mode') or line.startswith('deleted file mode'):
+        if (
+            line.startswith("diff --git")
+            or line.startswith("index ")
+            or line.startswith("@@ ")
+            or line.startswith("--- ")
+            or line.startswith("+++ ")
+            or line.startswith("new file mode")
+            or line.startswith("deleted file mode")
+        ):
             continue
 
-        if line.startswith('+') and not line.startswith('+++'):
+        if line.startswith("+") and not line.startswith("+++"):
             added_lines.append(line[1:])
-        elif not line.startswith('-') and not line.startswith('---'):
-             # to keep indentations and context
-             # if the line starts with a space, keep it as context, otherwise just append (e.g. empty lines)
-             if line.startswith(' '):
-                 added_lines.append(line[1:])
-             else:
-                 added_lines.append(line)
+        elif not line.startswith("-") and not line.startswith("---"):
+            # to keep indentations and context
+            # if the line starts with a space, keep it as context, otherwise just append (e.g. empty lines)
+            if line.startswith(" "):
+                added_lines.append(line[1:])
+            else:
+                added_lines.append(line)
 
     code_block = "\n".join(added_lines)
 
@@ -357,7 +364,7 @@ def extract_ast_metadata(diff: str) -> str:
         # Fallback to naive approach for partial snippets.
         lines = diff.splitlines()
         for line in lines:
-            clean_line = line[1:].lstrip() if line.startswith('+') or line.startswith('-') else ""
+            clean_line = line[1:].lstrip() if line.startswith("+") or line.startswith("-") else ""
             if clean_line.startswith("def ") or clean_line.startswith("class ") or clean_line.startswith("async def "):
                 summary.append(clean_line.strip())
 
@@ -374,6 +381,7 @@ def extract_ast_metadata(diff: str) -> str:
 
     return "### Extracted Structural Changes (AST Summary):\n" + "\n".join(dedup)
 
+
 def get_head_sha(workspace: Path) -> str:
     """Gets current HEAD commit SHA."""
     try:
@@ -381,6 +389,7 @@ def get_head_sha(workspace: Path) -> str:
         return res.stdout.strip()
     except Exception:
         return ""
+
 
 def set_commit_status(head_sha: str, state: str, description: str, context: str = "ai/architectural-review"):
     """Posts a commit status check to GitHub."""
@@ -391,9 +400,9 @@ def set_commit_status(head_sha: str, state: str, description: str, context: str 
 
     url = f"https://api.github.com/repos/{gh_repo}/statuses/{head_sha}"
     payload = {
-        "state": state, # success, failure, pending
+        "state": state,  # success, failure, pending
         "description": description[:140],
-        "context": context
+        "context": context,
     }
     req = urllib.request.Request(
         url,
@@ -401,15 +410,16 @@ def set_commit_status(head_sha: str, state: str, description: str, context: str 
         headers={
             "Authorization": f"Bearer {gh_token}",
             "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         },
-        method="POST"
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=15):
             print(f"[OK] Commit status set to {state} ({context})")
     except Exception as e:
         print(f"[Warning] Failed to set commit status: {e}", file=sys.stderr)
+
 
 def main():
     parser = argparse.ArgumentParser(description="GossipMesh Autonomous PR Reviewer & Architectural Gate")
@@ -421,7 +431,9 @@ def main():
     primary_key = os.environ.get("GEMINI_REVIEWER_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
     if not primary_key and all_keys:
         primary_key = all_keys[0]
-    fallback_key = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or (all_keys[1] if len(all_keys) > 1 else primary_key)
+    fallback_key = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or (
+        all_keys[1] if len(all_keys) > 1 else primary_key
+    )
 
     if not primary_key:
         print("MISSING_KEY: No Gemini API keys found in environment or .gemini_keys.", file=sys.stderr)
@@ -437,7 +449,8 @@ def main():
     try:
         pr_json = run_cmd(
             ["gh", "pr", "view", args.pr_number, "--json", "title,body,headRefName,baseRefName,files"],
-            cwd=workspace, capture_output=True
+            cwd=workspace,
+            capture_output=True,
         )
         pr_data = json.loads(pr_json.stdout) if pr_json.returncode == 0 else {}
     except Exception:
@@ -463,14 +476,15 @@ def main():
             red_team_findings += f"  Attack Vector: {p.attack_vector}\n"
             red_team_findings += f"  Suggested Test:\n{p.exploit_test_stub}\n"
 
-
     ast_metadata = extract_ast_metadata(diff)
 
     # Run tests directly to override llm fake approvals
     import sys as _sys
     from pathlib import Path as _Path
+
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
     from ai_ci_fixer import run_diagnostics
+
     diag_code, diag_log = run_diagnostics(workspace)
     if diag_code != 0:
         red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
@@ -481,6 +495,7 @@ def main():
     infra_findings = []
     try:
         from infrastructure_reviewer import review as run_infra_review
+
         infra_res = run_infra_review(repo_root=workspace)
         infra_grade = infra_res.get("grade", "A")
         infra_score = infra_res.get("score", 100)
@@ -488,12 +503,13 @@ def main():
         if infra_findings:
             crit = infra_res["severity_summary"].get("critical", 0)
             high = infra_res["severity_summary"].get("high", 0)
-            red_team_findings += f"\n### 🛡️ INFRASTRUCTURE SECURITY FINDINGS (Grade: {infra_grade}, Score: {infra_score}/100):\n"
+            red_team_findings += (
+                f"\n### 🛡️ INFRASTRUCTURE SECURITY FINDINGS (Grade: {infra_grade}, Score: {infra_score}/100):\n"
+            )
             for f in infra_findings[:5]:
                 red_team_findings += f"- **[{f['severity'].upper()}]** `{f['file']}:{f['line']}` - {f['message']}\n"
     except Exception as _ie:
         print(f"[!] Infrastructure review error: {_ie}", file=sys.stderr)
-
 
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
@@ -541,11 +557,11 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
             "system_impact": "Positive system throughput and modularity impact.",
             "roi_metrics": {"estimated_review_time_saved_minutes": 15, "defects_prevented": 1},
             "action_items": [],
-            "safe_auto_fixes": []
+            "safe_auto_fixes": [],
         }
 
     verdict_val = audit.get("verdict", "APPROVED").strip().upper()
-    is_approved = (verdict_val == "APPROVED")
+    is_approved = verdict_val == "APPROVED"
     score = int(audit.get("score", 95 if is_approved else 75))
 
     summary = audit.get("executive_summary", "Autonomous architectural audit completed.")
@@ -581,12 +597,13 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         score = min(score, 50)
         for f in infra_findings:
             if f.get("severity") in ("critical", "high"):
-                action_items.append(f"Infrastructure Security ({f.get('rule_id')}): {f.get('file')}:{f.get('line')} - {f.get('message')}. Remediation: {f.get('remediation')}")
+                action_items.append(
+                    f"Infrastructure Security ({f.get('rule_id')}): {f.get('file')}:{f.get('line')} - {f.get('message')}. Remediation: {f.get('remediation')}"
+                )
 
     auto_patch = audit.get("auto_patch", "")
 
     auto_patch_md = f"\n### 🛠️ Auto-Generated Patch\n```diff\n{auto_patch}\n```\n" if auto_patch else ""
-
 
     # Memetic memory extraction
     meme_prompt = f"""
@@ -632,7 +649,7 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
                 rule=meme_result.get("rule", ""),
                 anti_pattern=meme_result.get("anti_pattern", ""),
                 correct_pattern=meme_result.get("correct_pattern", ""),
-                repo="GossipMesh"
+                repo="GossipMesh",
             )
             if score >= 95:
                 kb.reward(m_id)
@@ -677,8 +694,8 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 {system_impact}
 
 ### 📈 Measurable ROI & Outcomes
-- **Estimated Review Time Saved**: {roi_metrics.get('estimated_review_time_saved_minutes', 0)} minutes
-- **Defects Prevented**: {roi_metrics.get('defects_prevented', 0)}
+- **Estimated Review Time Saved**: {roi_metrics.get("estimated_review_time_saved_minutes", 0)} minutes
+- **Defects Prevented**: {roi_metrics.get("defects_prevented", 0)}
 
 ### 🍝 Anti-Spaghetti & Modularity Verification
 {anti_spaghetti}
@@ -707,7 +724,11 @@ To complete the merge into `main`:
         commit_desc = f"Architectural Review Passed ({score}/100) - Ready to merge"
         set_commit_status(head_sha, "success", commit_desc)
     else:
-        action_bullets = "\n".join(f"- {item}" for item in action_items) if action_items else "- Address structural feedback and missing test cases."
+        action_bullets = (
+            "\n".join(f"- {item}" for item in action_items)
+            if action_items
+            else "- Address structural feedback and missing test cases."
+        )
         review_md = f"""## ⚠️ Autonomous Architectural Review: ACTION REQUIRED (Score: {score}/100)
 
 {badges_md}
@@ -716,8 +737,8 @@ To complete the merge into `main`:
 {summary}
 
 ### 📈 Measurable ROI & Outcomes
-- **Estimated Review Time Saved**: {roi_metrics.get('estimated_review_time_saved_minutes', 0)} minutes
-- **Defects Prevented**: {roi_metrics.get('defects_prevented', 0)}
+- **Estimated Review Time Saved**: {roi_metrics.get("estimated_review_time_saved_minutes", 0)} minutes
+- **Defects Prevented**: {roi_metrics.get("defects_prevented", 0)}
 
 ### 🍝 Anti-Spaghetti & Modularity Findings
 {anti_spaghetti}
@@ -761,23 +782,32 @@ To complete the merge into `main`:
         "score": score,
         "needs_improvement": not is_approved,
         "action_items": action_items,
-        "system_impact": system_impact
+        "system_impact": system_impact,
     }
     status_file.write_text(json.dumps(status_data, indent=2), encoding="utf-8")
 
     log_enterprise_audit(workspace, str(args.pr_number), status_data["verdict"], roi_metrics, privacy_sec)
 
-    print(f"[OK] Audit finished: Verdict={status_data['verdict']} Score={score} (Written to {review_file} & {status_file})")
+    print(
+        f"[OK] Audit finished: Verdict={status_data['verdict']} Score={score} (Written to {review_file} & {status_file})"
+    )
 
     if not is_approved:
         print("[*] Triggering Autonomous CI Fixer to resolve issues...", flush=True)
         fix_env = os.environ.copy()
-        subprocess.run([
-            sys.executable, str(Path(__file__).resolve().parent / "ai_ci_fixer.py"),
-            "--pr-number", args.pr_number,
-            "--workspace", str(workspace),
-            "--review-feedback-file", str(review_file)
-        ], env=fix_env)
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).resolve().parent / "ai_ci_fixer.py"),
+                "--pr-number",
+                args.pr_number,
+                "--workspace",
+                str(workspace),
+                "--review-feedback-file",
+                str(review_file),
+            ],
+            env=fix_env,
+        )
 
         # Check if fixer made changes
         status_check = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True)
@@ -786,11 +816,18 @@ To complete the merge into `main`:
             head_ref = pr_data.get("headRefName")
             if head_ref:
                 subprocess.run(["git", "add", "-u"], cwd=workspace)
-                subprocess.run(["git", "reset", "--", "ai_pr_review.md", "ai_review_status.json", "ci_fix_summary.md"], cwd=workspace, check=False)
+                subprocess.run(
+                    ["git", "reset", "--", "ai_pr_review.md", "ai_review_status.json", "ci_fix_summary.md"],
+                    cwd=workspace,
+                    check=False,
+                )
                 subprocess.run(["git", "config", "user.name", "Aditya Dahale"], cwd=workspace)
                 subprocess.run(["git", "config", "user.email", "aditya-9-6@users.noreply.github.com"], cwd=workspace)
-                subprocess.run(["git", "commit", "-m", "fix(ai): autonomous ci and architectural review fixes"], cwd=workspace)
+                subprocess.run(
+                    ["git", "commit", "-m", "fix(ai): autonomous ci and architectural review fixes"], cwd=workspace
+                )
                 subprocess.run(["git", "push", "origin", f"HEAD:{head_ref}"], cwd=workspace)
+
 
 if __name__ == "__main__":
     main()

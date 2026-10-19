@@ -6,12 +6,12 @@ from typing import Optional, Dict, Any
 
 class CountingBloomFilter:
     """A memory-efficient counting Bloom filter for approximate membership testing and O(1) duplicate packet rejection."""
-    
+
     def __init__(self, capacity: int = 10000, error_rate: float = 0.01) -> None:
         self.capacity = capacity
         self.error_rate = error_rate
         # Simple bit array / integer counter array representation
-        self.size = max(1000, int(-capacity * (error_rate ** 0.5) / (0.693 ** 2)))
+        self.size = max(1000, int(-capacity * (error_rate**0.5) / (0.693**2)))
         self.num_hashes = max(1, int((self.size / capacity) * 0.693))
         self.table = [0] * self.size
         self._lock = threading.Lock()

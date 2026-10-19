@@ -84,9 +84,7 @@ class TestPeerRateLimiter:
         assert (await limiter.check_and_consume("peer2", 50))[0] is True
 
     async def test_lru_eviction(self):
-        config = RateLimitConfig(
-            burst_capacity=10.0, max_rate_per_sec=1.0, max_tracked_peers=2
-        )
+        config = RateLimitConfig(burst_capacity=10.0, max_rate_per_sec=1.0, max_tracked_peers=2)
         limiter = PeerRateLimiter(config=config)
 
         await limiter.check_and_consume("p1", 10)
@@ -102,9 +100,7 @@ class TestPeerRateLimiter:
         assert "p3" in limiter.peers
 
     async def test_telemetry_metrics(self):
-        limiter = PeerRateLimiter(
-            config=RateLimitConfig(burst_capacity=1.0, max_rate_per_sec=1.0)
-        )
+        limiter = PeerRateLimiter(config=RateLimitConfig(burst_capacity=1.0, max_rate_per_sec=1.0))
         await limiter.check_and_consume("peer_x", 128)
         await limiter.check_and_consume("peer_x", 256)  # dropped
 
@@ -116,9 +112,7 @@ class TestPeerRateLimiter:
         assert metrics["tracked_peers_count"] == 1
 
     async def test_reset_peer(self):
-        limiter = PeerRateLimiter(
-            config=RateLimitConfig(burst_capacity=1.0, max_rate_per_sec=0.1)
-        )
+        limiter = PeerRateLimiter(config=RateLimitConfig(burst_capacity=1.0, max_rate_per_sec=0.1))
         await limiter.check_and_consume("peer_z", 10)
         assert (await limiter.check_and_consume("peer_z", 10))[0] is False
 
@@ -147,9 +141,7 @@ class TestGossipTransport:
 
         res1 = await transport.receive_payload("spammer", {"msg": 1})
         res2 = await transport.receive_payload("spammer", {"msg": 2})
-        res3 = await transport.receive_payload(
-            "spammer", {"msg": 3}
-        )  # dropped silently
+        res3 = await transport.receive_payload("spammer", {"msg": 3})  # dropped silently
 
         assert res1 is not None
         assert res2 is not None
@@ -182,9 +174,7 @@ class TestGossipTransport:
 
         transport.register_handler("test_err", buggy_handler)
         # Should not crash transport receive loop
-        res = await transport.receive_payload(
-            "peer_err", {"ok": True}, topic="test_err"
-        )
+        res = await transport.receive_payload("peer_err", {"ok": True}, topic="test_err")
         assert res == {"ok": True}
 
     async def test_send_payload(self):

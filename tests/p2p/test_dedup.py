@@ -3,7 +3,6 @@ from gossipmesh.p2p.dedup import CountingBloomFilter, BoundedLRUGossipRingBuffer
 
 
 class TestDedupSubsystem(unittest.TestCase):
-
     def test_counting_bloom_filter_basic(self):
         bf = CountingBloomFilter(capacity=100)
         self.assertNotIn("msg-1", bf)
@@ -17,7 +16,7 @@ class TestDedupSubsystem(unittest.TestCase):
         buf = BoundedLRUGossipRingBuffer(capacity=2)
         buf.put("m1", {"data": 1})
         buf.put("m2", {"data": 2})
-        
+
         self.assertIn("m1", buf)
         self.assertIn("m2", buf)
         self.assertEqual(len(buf), 2)
