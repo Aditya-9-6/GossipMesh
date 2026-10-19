@@ -12,6 +12,7 @@ import re
 import json
 import subprocess
 import argparse
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
@@ -213,7 +214,7 @@ def format_issue_content(task: PlanTask) -> Tuple[str, str]:
     title = f"feat(plan): Task {task.num} — {task.name}"
     body = f"""## 🚀 Enterprise SaaS Implementation Task: Task {task.num} — {task.name}
 
-**Phase**: {task.phase}  
+**Phase**: {task.phase}
 **Specification Source**: `docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md`
 
 ---
@@ -224,8 +225,8 @@ def format_issue_content(task: PlanTask) -> Tuple[str, str]:
 ---
 
 ### ⚙️ Jules Task Operating Rules & Mandate
-> **Repository**: https://github.com/Aditya-9-6/GossipMesh  
-> 
+> **Repository**: https://github.com/Aditya-9-6/GossipMesh
+>
 > Work only on this task. First inspect the existing repository and explain the relevant files. Do not rewrite unrelated code. Do not remove existing functionality without documenting a migration path. Add tests for all new behavior. Run the complete test suite before finishing. If the task cannot be safely completed, stop and explain why instead of creating fake implementations.
 
 ---
@@ -272,6 +273,7 @@ def main():
     parser.add_argument("--next", action="store_true", help="Display next pending task without creating issue")
     parser.add_argument("--create-next", action="store_true", help="Create GitHub issue for the next pending task")
     parser.add_argument("--solve-next", action="store_true", help="Create issue and trigger cloud AI solver immediately")
+    parser.add_argument("--batch", type=int, default=0, help="Batch create issues and dispatch AI solver for N pending tasks concurrently")
     args = parser.parse_args()
 
     workspace = Path(args.workspace).resolve()
@@ -296,6 +298,35 @@ def main():
             icon = "✅" if t.status == "COMPLETED" else ("⏳" if t.status == "IN_PROGRESS" else "⬜")
             ev = f" ({t.evidence})" if t.evidence else ""
             print(f"[{icon} {t.status:<11}] Task {t.num:>3}: {t.name}{ev}")
+        return
+
+    if args.batch > 0:
+        batch_tasks = pending[:args.batch]
+        if not batch_tasks:
+            print("[INFO] No pending tasks available to batch-advance!")
+            return
+
+        print(f"🚀 Batch-advancing next {len(batch_tasks)} pending tasks in parallel...\n")
+        dispatched = []
+        for t in batch_tasks:
+            print(f"[*] Creating GitHub Issue for Task {t.num} — {t.name}...")
+            iss_num = create_github_issue(t, workspace)
+            if iss_num:
+                print(f"[*] Triggering AI Issue Solver Bot for Issue #{iss_num}...")
+                subprocess.run([
+                    "gh", "workflow", "run", "ai-issue-solver.yml",
+                    "--repo", "Aditya-9-6/GossipMesh",
+                    "-f", f"issue_number={iss_num}"
+                ], cwd=workspace)
+                dispatched.append((t.num, t.name, iss_num))
+                print(f"[OK] Dispatched solver for Issue #{iss_num} (Task {t.num})\n")
+            time.sleep(2)
+
+        print("===============================================================================")
+        print(f"🎉 Successfully dispatched {len(dispatched)} tasks concurrently:")
+        for t_num, t_name, iss_num in dispatched:
+            print(f"   - Task {t_num:>3}: {t_name} (Issue #{iss_num})")
+        print("===============================================================================")
         return
 
     next_task = get_next_pending_task(tasks)

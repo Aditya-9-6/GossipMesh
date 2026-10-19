@@ -9,7 +9,6 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
-import re
 import math
 import operator
 
@@ -77,10 +76,14 @@ class VectorDB:
         return dot_product / (norm_a * norm_b)
 
     def index_workspace(self, workspace_path: Path):
-        """Indexes all .py files in the workspace, skipping tests if necessary."""
-        print("[*] Indexing workspace into VectorDB...")
-        for root, dirs, files in os.walk(workspace_path):
-            dirs[:] = [d for d in dirs if d not in [".git", "vendor", ".gossip_mesh", "__pycache__", "node_modules"]]
+        """Indexes all .py files in gossipmesh directory, strictly skipping .venv and tests."""
+        print("[*] Indexing gossipmesh into VectorDB...")
+        target_dir = workspace_path / "gossipmesh"
+        if not target_dir.exists():
+            target_dir = workspace_path
+
+        for root, dirs, files in os.walk(target_dir):
+            dirs[:] = [d for d in dirs if d not in [".git", "vendor", ".gossip_mesh", "__pycache__", "node_modules", ".venv", ".pytest_cache", ".ruff_cache", "tests"]]
             for file in files:
                 if file.endswith(".py") and not file.startswith("test_"):
                     full_path = Path(root) / file
@@ -88,7 +91,6 @@ class VectorDB:
 
                     try:
                         content = full_path.read_text(encoding="utf-8")
-                        # Simple chunking if file is too large (Gemini has high limits, but good to be safe)
                         chunk = content[:15000]
                         embedding = self.get_embedding(chunk)
 
@@ -103,51 +105,19 @@ class VectorDB:
         self.save()
         print(f"[*] Workspace indexing complete. Total files: {len(self.embeddings)}")
 
-    def _lexical_similarity(self, query: str, content: str, path: str) -> float:
-        """Fallback lexical similarity based on token overlap in path and content."""
-        q_tokens = set(re.findall(r"\w+", query.lower()))
-        if not q_tokens:
-            return 0.0
-        path_tokens = set(re.findall(r"\w+", path.lower()))
-        content_tokens = set(re.findall(r"\w+", content.lower()[:5000]))
-        score = len(q_tokens & path_tokens) * 3.0 + len(q_tokens & content_tokens)
-        return score / (len(q_tokens) + 1.0)
-
     def search(self, query: str, top_k: int = 3, api_key: str = "") -> List[Tuple[str, str, float]]:
         """Searches the VectorDB for the most relevant files based on the query."""
         if not self.embeddings:
-            # Fallback to local file scanning if embeddings empty
-            results = []
-            for root, dirs, files in os.walk(Path(".")):
-                dirs[:] = [d for d in dirs if d not in [".git", "vendor", ".gossip_mesh", "__pycache__", "node_modules", "tests"]]
-                for f in files:
-                    if f.endswith(".py"):
-                        p = (Path(root) / f).relative_to(Path(".")).as_posix()
-                        try:
-                            c = (Path(root) / f).read_text(encoding="utf-8", errors="ignore")[:10000]
-                            sim = self._lexical_similarity(query, c, p)
-                            if sim > 0:
-                                results.append((p, c, sim))
-                        except Exception:
-                            pass
-            results.sort(key=lambda x: x[2], reverse=True)
-            return results[:top_k]
+            return []
 
         query_embedding = self.get_embedding(query, api_key)
         if not query_embedding:
-            # Lexical fallback over indexed items
-            results = []
-            for path, data in self.embeddings.items():
-                sim = self._lexical_similarity(query, data["content"], path)
-                results.append((path, data["content"], sim))
-            results.sort(key=lambda x: x[2], reverse=True)
-            return results[:top_k]
+            return []
 
         results = []
         for path, data in self.embeddings.items():
-            if data.get("embedding"):
-                sim = self._cosine_similarity(query_embedding, data["embedding"])
-                results.append((path, data["content"], sim))
+            sim = self._cosine_similarity(query_embedding, data["embedding"])
+            results.append((path, data["content"], sim))
 
         results.sort(key=lambda x: x[2], reverse=True)
         return results[:top_k]

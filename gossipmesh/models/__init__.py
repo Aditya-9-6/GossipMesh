@@ -13,6 +13,7 @@ from gossipmesh.models.runtime import Workflow, Job, Budget, Artifact
 from gossipmesh.models.service_account import ServiceAccount, APIKey
 from gossipmesh.repository.vector_store import DocumentChunk
 from gossipmesh.models.session import UserSession, RefreshToken
+from gossipmesh.models.approval import ApprovalGate
 
 __all__ = [
     "Base",
@@ -37,5 +38,5 @@ __all__ = [
     "UserSession",
     "RefreshToken",
     "OrganizationSAMLConfig",
+    "ApprovalGate",
 ]
-from gossipmesh.models.jobs import BackgroundJob

@@ -7,16 +7,11 @@ celery_app = Celery(
     backend=settings.REDIS_URI
 )
 
-celery_app.conf.update(
-    task_acks_late=True,
-    task_reject_on_worker_lost=True,
-    broker_transport_options={'visibility_timeout': 3600},
-    task_routes={
-        "gossipmesh.worker.tasks.*": "main-queue"
-    }
-)
+celery_app.conf.task_routes = {
+    "gossipmesh.worker.tasks.*": "main-queue"
+}
 
-# Includes for tasks
-celery_app.conf.imports = (
-    "gossipmesh.worker.tasks",
-)
+# Example task
+@celery_app.task
+def test_celery(word: str) -> str:
+    return f"test task return {word}"
