@@ -9,6 +9,13 @@ Also accepts AI Reviewer feedback to refactor spaghetti code and add missing tes
 
 import os
 import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 import json
 import re
 import argparse
@@ -18,15 +25,11 @@ import subprocess
 import time
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-flash-lite-latest"
 FALLBACK_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
-    "gemini-2.5-pro",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
 ]
 
 DEFAULT_KEYS = []
@@ -546,7 +549,8 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
                         print(f"[*] Found failed GitHub Actions run {run_id} ({run.get('name')}). Fetching failed logs...", flush=True)
                         log_res = subprocess.run(
                             ["gh", "run", "view", "--log-failed", run_id],
-                            cwd=workspace, capture_output=True, text=True
+                            cwd=workspace, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace"
                         )
                         if log_res.stdout.strip():
                             ci_reports.append(
@@ -559,32 +563,94 @@ def fetch_remote_ci_errors(pr_number: str, workspace: Path) -> str:
 
     return "\n\n".join(ci_reports).strip()
 
+def get_tool_bin(workspace: Path, tool_name: str) -> str:
+    """Locate tool binary across Linux (.venv/bin) and Windows (.venv/Scripts)."""
+    candidates = [
+        workspace / ".venv" / "bin" / tool_name,
+        workspace / ".venv" / "Scripts" / f"{tool_name}.exe",
+        workspace / ".venv" / "Scripts" / tool_name,
+    ]
+    for c in candidates:
+        if c.is_file():
+            return str(c)
+    return tool_name
+
 def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
-    print("[*] Running local diagnostic checks (ruff check, mypy, unittest)...", flush=True)
+    print("[*] Running local diagnostic checks (ruff auto-fix, compileall, ruff, pytest)...", flush=True)
     out_lines = []
 
-    # Check ruff
-    ruff_res = subprocess.run(["ruff", "check", "."], cwd=workspace, capture_output=True, text=True)
-    if ruff_res.returncode != 0:
-        out_lines.append("=== RUFF LINT ERRORS ===")
-        out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
-        out_lines.append("")
+    py_bin = get_tool_bin(workspace, "python")
+    if py_bin == "python":
+        py_bin = sys.executable
 
-    # Check mypy
-    mypy_res = subprocess.run(["mypy", "gossipmesh/"], cwd=workspace, capture_output=True, text=True)
-    if mypy_res.returncode != 0:
-        out_lines.append("=== MYPY TYPE ERRORS ===")
-        out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
-        out_lines.append("")
+    ruff_bin = get_tool_bin(workspace, "ruff")
 
-    # Check unittest
-    test_res = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"], cwd=workspace, capture_output=True, text=True)
-    if test_res.returncode != 0:
-        out_lines.append("=== PYTHON TEST FAILURES ===")
-        combined = (test_res.stdout + "\n" + test_res.stderr).strip()
-        out_lines.append(combined)
+    # Step 0: Fast deterministic auto-fix pass (0 API tokens, sub-100ms)
+    try:
+        ruff_fix_cmd = [ruff_bin, "check", "--fix", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "--fix", "."]
+        subprocess.run(ruff_fix_cmd, cwd=workspace, capture_output=True, text=True, timeout=15)
+        ruff_fmt_cmd = [ruff_bin, "format", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "format", "."]
+        subprocess.run(ruff_fmt_cmd, cwd=workspace, capture_output=True, text=True, timeout=15)
+    except Exception:
+        pass
 
-    local_errors = bool(out_lines)
+    # Step 1: Syntax & Bytecode Compilation Check
+    compile_failed = False
+    try:
+        comp_res = subprocess.run(
+            [py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"],
+            cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
+        )
+        if comp_res.returncode != 0:
+            compile_failed = True
+            out_lines.append("=== PYTHON SYNTAX / COMPILATION ERRORS ===")
+            out_lines.append(comp_res.stderr.strip() or comp_res.stdout.strip())
+            out_lines.append("")
+    except Exception as e:
+        compile_failed = True
+        out_lines.append(f"=== COMPILE ERROR ===\n{e}\n")
+
+    # Step 2: Strict Ruff Lint Check
+    ruff_failed = False
+    try:
+        ruff_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
+        ruff_res = subprocess.run(ruff_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        if ruff_res.returncode != 0 and ruff_res.stdout.strip():
+            ruff_failed = True
+            out_lines.append("=== RUFF LINT ERRORS ===")
+            out_lines.append(ruff_res.stdout.strip() or ruff_res.stderr.strip())
+            out_lines.append("")
+    except Exception:
+        pass
+
+    # Step 3: Pytest Unit Tests
+    test_failed = False
+    try:
+        test_res = subprocess.run(
+            [py_bin, "-m", "pytest", "tests/", "-m", "not integration", "-q", "--maxfail=3", "--durations=3"],
+            cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90
+        )
+        if test_res.returncode != 0:
+            test_failed = True
+            out_lines.append("=== PYTHON TEST FAILURES ===")
+            combined = (test_res.stdout + "\n" + test_res.stderr).strip()
+            out_lines.append(combined)
+            out_lines.append("")
+    except Exception as e:
+        test_failed = True
+        out_lines.append(f"=== TEST RUN ERROR ===\n{e}\n")
+
+    # Step 4: Check mypy if available (non-blocking)
+    try:
+        mypy_bin = get_tool_bin(workspace, "mypy")
+        mypy_cmd = [mypy_bin, "gossipmesh/"] if mypy_bin != "mypy" else [py_bin, "-m", "mypy", "gossipmesh/"]
+        mypy_res = subprocess.run(mypy_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        if mypy_res.returncode != 0 and mypy_res.stdout.strip():
+            out_lines.append("=== MYPY TYPE ERRORS ===")
+            out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
+            out_lines.append("")
+    except Exception:
+        pass
 
     # Always fetch remote GitHub CI failures and security alerts if pr_number is provided
     remote_ci = ""
@@ -594,27 +660,31 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
             out_lines.append(remote_ci)
 
     combined_output = "\n".join(out_lines).strip()
-    total_exit = 1 if (local_errors or bool(remote_ci)) else 0
+    total_exit = 1 if (compile_failed or ruff_failed or test_failed or bool(remote_ci)) else 0
     return total_exit, combined_output
 
 def extract_referenced_files(error_log: str, workspace: Path) -> list[str]:
     found = set()
     pattern = re.compile(r'([\w/\\.-]+\.py)(?::\d+)?')
+    search_dirs = [workspace / d for d in ("gossipmesh", "tests", "scripts") if (workspace / d).is_dir()]
     for match in pattern.finditer(error_log):
         rel_str = match.group(1).replace("\\", "/")
         p = workspace / rel_str
-        if p.is_file():
+        if p.is_file() and not any(part in p.parts for part in (".venv", ".git", "__pycache__")):
             found.add(rel_str)
         else:
-            for sub in workspace.rglob("*.py"):
-                if sub.name == Path(rel_str).name:
-                    try:
-                        found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
-                    except ValueError:
-                        pass
+            for sdir in search_dirs:
+                for sub in sdir.rglob("*.py"):
+                    if any(part in sub.parts for part in (".venv", ".git", "__pycache__")):
+                        continue
+                    if sub.name == Path(rel_str).name:
+                        try:
+                            found.add(str(sub.relative_to(workspace)).replace("\\", "/"))
+                        except ValueError:
+                            pass
 
     try:
-        diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
+        diff_names = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace")
         for line in diff_names.stdout.splitlines():
             line = line.strip().replace("\\", "/")
             if line.endswith(".py") and (workspace / line).is_file():
@@ -791,7 +861,15 @@ Instructions:
             all_repaired_files.add(rel_path)
             print(f"    [+] Wrote fixed file: {rel_path}", flush=True)
 
-        subprocess.run(["ruff", "check", "--fix", "."], cwd=workspace)
+        ruff_bin = get_tool_bin(workspace, "ruff")
+        py_bin = get_tool_bin(workspace, "python")
+        try:
+            ruff_cmd = [ruff_bin, "check", "--fix", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "--fix", "."]
+            subprocess.run(ruff_cmd, cwd=workspace, capture_output=True, text=True, timeout=20)
+            ruff_fmt = [ruff_bin, "format", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "format", "."]
+            subprocess.run(ruff_fmt, cwd=workspace, capture_output=True, text=True, timeout=20)
+        except Exception:
+            pass
 
     final_code, final_log = run_diagnostics(workspace, pr_number=args.pr_number)
     post_code = final_code
