@@ -9,6 +9,7 @@ from gossipmesh.models.organization import Organization
 from gossipmesh.models.repository import Repository
 from gossipmesh.runtime.workflow import WorkflowManager
 
+
 class TestCancellationAndDeadlines(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
@@ -49,10 +50,7 @@ class TestCancellationAndDeadlines(unittest.TestCase):
 
         past_deadline = datetime.now(timezone.utc) - timedelta(hours=1)
         workflow = Workflow(
-            organization_id=self.org_id,
-            repository_id=self.repo_id,
-            status="running",
-            deadline=past_deadline
+            organization_id=self.org_id, repository_id=self.repo_id, status="running", deadline=past_deadline
         )
         db.add(workflow)
         db.flush()
@@ -78,10 +76,7 @@ class TestCancellationAndDeadlines(unittest.TestCase):
 
         future_deadline = datetime.now(timezone.utc) + timedelta(hours=1)
         workflow = Workflow(
-            organization_id=self.org_id,
-            repository_id=self.repo_id,
-            status="running",
-            deadline=future_deadline
+            organization_id=self.org_id, repository_id=self.repo_id, status="running", deadline=future_deadline
         )
         db.add(workflow)
         db.commit()
@@ -92,5 +87,6 @@ class TestCancellationAndDeadlines(unittest.TestCase):
         self.assertEqual(workflow.status, "running")
         db.close()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

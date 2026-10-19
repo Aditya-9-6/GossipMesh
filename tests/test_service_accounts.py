@@ -15,6 +15,7 @@ from gossipmesh.models.user import User
 def dummy_verify(plain, hashed):
     return hashed == f"hashed_{plain}"
 
+
 class TestServiceAccounts(unittest.TestCase):
     def setUp(self):
         self.test_client = TestClient(app)
@@ -44,8 +45,7 @@ class TestServiceAccounts(unittest.TestCase):
         self.mock_db_session.refresh.side_effect = side_effect
 
         response = self.test_client.post(
-            "/api/v1/service-accounts/",
-            json={"organization_id": 1, "name": "CI Bot", "description": "Used for CI/CD"}
+            "/api/v1/service-accounts/", json={"organization_id": 1, "name": "CI Bot", "description": "Used for CI/CD"}
         )
 
         self.assertEqual(response.status_code, 200)
@@ -66,7 +66,6 @@ class TestServiceAccounts(unittest.TestCase):
             elif model == UserOrganization:
                 return user_org
 
-
         query_mock = MagicMock()
         filter_mock = MagicMock()
         filter_mock.first.side_effect = [account, user_org]
@@ -86,7 +85,7 @@ class TestServiceAccounts(unittest.TestCase):
 
         response = self.test_client.post(
             "/api/v1/service-accounts/1/keys",
-            json={"name": "Deploy Key", "scopes": ["read", "write"], "expires_in_days": 30}
+            json={"name": "Deploy Key", "scopes": ["read", "write"], "expires_in_days": 30},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -118,7 +117,7 @@ class TestServiceAccounts(unittest.TestCase):
             hashed_key="hashed",
             scopes=["read"],
             is_revoked=False,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
         query_mock = MagicMock()
@@ -138,8 +137,8 @@ class TestServiceAccounts(unittest.TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["name"], "Deploy Key")
         self.assertEqual(data[0]["prefix"], "gm_abc123")
-        self.assertNotIn("key", data[0]) # The raw key should not be returned here
-        self.assertNotIn("hashed_key", data[0]) # Nor the hashed key
+        self.assertNotIn("key", data[0])  # The raw key should not be returned here
+        self.assertNotIn("hashed_key", data[0])  # Nor the hashed key
 
     def test_revoke_api_key(self):
         user = User(id=1, email="test@example.com")
@@ -161,5 +160,6 @@ class TestServiceAccounts(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(api_key.is_revoked)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
