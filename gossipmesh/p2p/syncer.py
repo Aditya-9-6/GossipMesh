@@ -1,12 +1,23 @@
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Any, List
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
-class AntiEntropySyncer:
-    """Anti-entropy synchronization daemon coordinating peer sessions using entropy-driven selection."""
-    def __init__(self, node_id: str, window_size: int = 100):
-        self.node_id = node_id
-        self.entropy_evaluator = VectorClockEntropy(window_size=window_size)
 
-    def select_sync_peers(self, local_clock: Dict[str, int], active_peers: Dict[str, Dict[str, int]], limit: int = 3) -> List[Tuple[str, float]]:
-        """Selects the best peers to synchronize with based on vector clock entropy."""
-        return self.entropy_evaluator.select_best_peers(local_clock, active_peers, top_k=limit)
+class AntiEntropySyncer:
+    """Handles anti-entropy state synchronization between GossipMesh peers."""
+
+    def __init__(self, node_id: str):
+        self.node_id = node_id
+        self.entropy = VectorClockEntropy(node_id)
+
+    def prepare_sync_payload(self) -> Dict[str, Any]:
+        self.entropy.increment()
+        return {
+            "node_id": self.node_id,
+            "vector_clock": self.entropy.to_dict(),
+        }
+
+    def reconcile(self, remote_payload: Dict[str, Any]) -> int:
+        remote_clock = remote_payload.get("vector_clock", {})
+        divergence = self.entropy.compute_divergence(remote_clock)
+        self.entropy.update(remote_clock)
+        return divergence

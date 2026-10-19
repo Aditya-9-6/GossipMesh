@@ -2,6 +2,7 @@ import time
 import asyncio
 from typing import Dict, Tuple
 
+
 class TokenBucketRateLimiter:
     def __init__(self, capacity: float, refill_rate: float, max_tracked_peers: int = 10000):
         self.capacity = float(capacity)
@@ -21,11 +22,11 @@ class TokenBucketRateLimiter:
             if peer_id not in self.buckets:
                 await self._evict_lru_if_needed()
                 self.buckets[peer_id] = (self.capacity, now)
-            
+
             tokens_available, last_update = self.buckets[peer_id]
             delta = now - last_update
             tokens_available = min(self.capacity, tokens_available + delta * self.refill_rate)
-            
+
             if tokens_available >= tokens:
                 tokens_available -= tokens
                 self.buckets[peer_id] = (tokens_available, now)

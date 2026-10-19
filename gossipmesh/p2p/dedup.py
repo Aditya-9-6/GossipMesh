@@ -2,10 +2,12 @@ import time
 import threading
 from typing import Dict, Optional, Tuple
 
+
 class DedupCache:
     """Thread-safe message deduplication cache using a fixed-capacity ring buffer
     and amortized TTL-based expiration index for O(1) insertion and O(1) lookup.
     """
+
     def __init__(self, capacity: int = 10000, default_ttl: float = 60.0):
         self.capacity = max(1, capacity)
         self.default_ttl = default_ttl
