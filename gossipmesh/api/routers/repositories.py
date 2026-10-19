@@ -1,6 +1,11 @@
 from typing import Any
+<<<<<<< HEAD
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import BackgroundTasks
+=======
+import logging
+
+>>>>>>> origin/main
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -8,11 +13,13 @@ from pydantic import BaseModel
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
-from gossipmesh.models.repository import Repository, IndexState
 from gossipmesh.repository.github import GitHubIntegration
 from gossipmesh.core.config import settings
 from gossipmesh.core.exceptions import AuthorizationError
+<<<<<<< HEAD
 import logging
+=======
+>>>>>>> origin/main
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

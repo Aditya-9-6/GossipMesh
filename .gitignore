@@ -42,4 +42,9 @@ build/
 *.db
 *.sqlite3
 venv/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.gossip_mesh/
 .coverage
+*.db-*

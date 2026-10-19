@@ -7,13 +7,18 @@ from gossipmesh.integrations.github import GitHubIntegration
 logger = logging.getLogger(__name__)
 
 
+from sqlalchemy.orm import Session
+from gossipmesh.runtime.workflow import WorkflowManager
+
 class PRReviewJob:
     """
     Orchestrates the PR Review process (Milestone 6).
     """
 
-    def __init__(self, pr_data: Dict[str, Any]):
+    def __init__(self, pr_data: Dict[str, Any], workflow_id: int | None = None, db: Session | None = None):
         self.pr_data = pr_data
+        self.workflow_id = workflow_id
+        self.db = db
 
     async def execute(self):
         """
@@ -21,6 +26,12 @@ class PRReviewJob:
         """
         pr_number = self.pr_data.get("number")
         logger.info(f"Starting PR review workflow for PR #{pr_number}")
+
+        if self.db and self.workflow_id:
+            manager = WorkflowManager(self.db)
+            if manager.check_cancellation(self.workflow_id):
+                logger.warning(f"Workflow {self.workflow_id} for PR #{pr_number} was cancelled or timed out.")
+                return
 
         owner = self.pr_data.get("owner", "dummy_owner")
         repo = self.pr_data.get("repo", "dummy_repo")

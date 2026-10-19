@@ -1,13 +1,18 @@
 import logging
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import httpx
 
+<<<<<<< HEAD
 from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError, AuthorizationError
+=======
+from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
+>>>>>>> origin/main
 
 logger = logging.getLogger(__name__)
 
 class GitHubPRService:
+<<<<<<< HEAD
     def __init__(
         self,
         token: str,
@@ -19,6 +24,12 @@ class GitHubPRService:
         self.max_retries = max_retries
         self.timeout = timeout
         self.permissions = permissions
+=======
+    def __init__(self, token: str, max_retries: int = 3, timeout: float = 10.0):
+        self.token = token
+        self.max_retries = max_retries
+        self.timeout = timeout
+>>>>>>> origin/main
         self.base_url = "https://api.github.com"
         self.headers = {
             "Accept": "application/vnd.github.v3+json",
@@ -26,6 +37,7 @@ class GitHubPRService:
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
+<<<<<<< HEAD
     def _check_permissions(self, required_permissions: Dict[str, str]) -> None:
         """
         Validates that the provided permissions dictionary contains the required scopes.
@@ -56,6 +68,8 @@ class GitHubPRService:
                     details={"required": required_permissions, "granted": self.permissions}
                 )
 
+=======
+>>>>>>> origin/main
     async def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """Make an HTTP request with retry, timeout, and rate limit handling."""
         headers = dict(self.headers)
@@ -149,6 +163,11 @@ class GitHubPRService:
         """Get list of commits in the pull request."""
         self._check_permissions({"pull_requests": "read"})
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/commits"
+        return await self._get_paginated(url)
+
+    async def get_pr_reviews(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
+        """Fetch all reviews for a pull request."""
+        url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
         return await self._get_paginated(url)
 
     async def get_pr_details(self, owner: str, repo: str, pull_number: int) -> Dict[str, Any]:

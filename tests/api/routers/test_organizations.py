@@ -53,9 +53,9 @@ def test_create_organization_exists(test_client, mock_db, mock_current_user):
     assert response.status_code == 400
 
 def test_create_invitation(test_client, mock_db, mock_current_user):
-    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(role="admin", is_suspended=False)
+    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(role="organization_admin", is_suspended=False)
 
-    response = test_client.post("/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "member"})
+    response = test_client.post("/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "developer"})
 
     assert response.status_code == 200
     assert "token" in response.json()
@@ -63,13 +63,13 @@ def test_create_invitation(test_client, mock_db, mock_current_user):
 def test_create_invitation_unauthorized(test_client, mock_db, mock_current_user):
     mock_db.query.return_value.filter.return_value.first.return_value = None # Not an admin
 
-    response = test_client.post("/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "member"})
+    response = test_client.post("/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "developer"})
 
     assert response.status_code == 403
 
 def test_accept_invitation(test_client, mock_db, mock_current_user):
     # Mock finding the invitation
-    mock_invitation = OrganizationInvitation(id=1, email="invite@example.com", token="valid_token", organization_id=1, role="member")
+    mock_invitation = OrganizationInvitation(id=1, email="invite@example.com", token="valid_token", organization_id=1, role="developer")
 
     # First query is for invitation, second is for existing member
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_invitation, None]
@@ -82,17 +82,17 @@ def test_accept_invitation(test_client, mock_db, mock_current_user):
 
 def test_assign_role(test_client, mock_db, mock_current_user):
     # First query checks admin, second finds the user to update
-    mock_admin_check = UserOrganization(role="admin", is_suspended=False)
-    mock_user_org = UserOrganization(organization_id=1, user_id=2, role="member")
+    mock_admin_check = UserOrganization(role="organization_admin", is_suspended=False)
+    mock_user_org = UserOrganization(organization_id=1, user_id=2, role="developer")
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_admin_check, mock_user_org]
 
-    response = test_client.patch("/api/v1/organizations/1/members/2/role", json={"role": "admin"})
+    response = test_client.patch("/api/v1/organizations/1/members/2/role", json={"role": "organization_admin"})
 
     assert response.status_code == 200
-    assert mock_user_org.role == "admin"
+    assert mock_user_org.role == "organization_admin"
 
 def test_create_project(test_client, mock_db, mock_current_user):
-    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(role="admin", is_suspended=False)
+    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(role="organization_admin", is_suspended=False)
 
     def side_effect(obj):
         if isinstance(obj, Project):
@@ -106,7 +106,7 @@ def test_create_project(test_client, mock_db, mock_current_user):
 
 def test_connect_repository(test_client, mock_db, mock_current_user):
     # First query admin check, second repo check
-    mock_db.query.return_value.filter.return_value.first.side_effect = [UserOrganization(role="admin", is_suspended=False), None]
+    mock_db.query.return_value.filter.return_value.first.side_effect = [UserOrganization(role="organization_admin", is_suspended=False), None]
 
     def side_effect(obj):
         if isinstance(obj, Repository):
@@ -120,8 +120,8 @@ def test_connect_repository(test_client, mock_db, mock_current_user):
 
 def test_remove_member(test_client, mock_db, mock_current_user):
     # First admin check, second find member
-    mock_admin_check = UserOrganization(role="admin", is_suspended=False)
-    mock_user_org = UserOrganization(organization_id=1, user_id=2, role="member")
+    mock_admin_check = UserOrganization(role="organization_admin", is_suspended=False)
+    mock_user_org = UserOrganization(organization_id=1, user_id=2, role="developer")
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_admin_check, mock_user_org]
 
     response = test_client.delete("/api/v1/organizations/1/members/2")
@@ -131,8 +131,8 @@ def test_remove_member(test_client, mock_db, mock_current_user):
 
 def test_suspend_member(test_client, mock_db, mock_current_user):
     # First admin check, second find member
-    mock_admin_check = UserOrganization(role="admin", is_suspended=False)
-    mock_user_org = UserOrganization(organization_id=1, user_id=2, role="member", is_suspended=False)
+    mock_admin_check = UserOrganization(role="organization_admin", is_suspended=False)
+    mock_user_org = UserOrganization(organization_id=1, user_id=2, role="developer", is_suspended=False)
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_admin_check, mock_user_org]
 
     response = test_client.patch("/api/v1/organizations/1/members/2/suspend")
