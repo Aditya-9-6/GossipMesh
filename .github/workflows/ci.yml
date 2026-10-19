@@ -10,10 +10,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit-testing:
     name: Run Unit Tests & Invariant Verification
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -31,11 +36,12 @@ jobs:
         run: pip install -e .[api,dev]
 
       - name: Run Unit Tests
-        run: find tests -type d -name integration -prune -o -name "test_*.py" -print | xargs python -m unittest -v
+        run: pytest tests -m "not integration" -q --durations=5
 
   integration-testing:
     name: Run Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:15
@@ -115,6 +121,7 @@ jobs:
   test-coverage:
     name: Test Coverage Tracking
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:15
