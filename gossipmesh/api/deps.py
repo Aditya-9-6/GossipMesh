@@ -11,9 +11,8 @@ from gossipmesh.models.user import User
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 from gossipmesh.db.redis import redis_client
 
-reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login/access-token"
-)
+reusable_oauth2 = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login/access-token")
+
 
 def get_db() -> Generator:
     try:
@@ -22,12 +21,12 @@ def get_db() -> Generator:
     finally:
         db.close()
 
+
 from datetime import timedelta
 from gossipmesh.models.session import UserSession
 
-def get_current_user(
-    db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
-) -> User:
+
+def get_current_user(db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)) -> User:
     try:
         payload = jwt.decode(
             token,
@@ -35,7 +34,7 @@ def get_current_user(
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
             issuer=settings.JWT_ISSUER,
-            leeway=timedelta(seconds=10)
+            leeway=timedelta(seconds=10),
         )
         token_type = payload.get("type")
         if token_type != "access":

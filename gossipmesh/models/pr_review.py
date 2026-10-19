@@ -2,10 +2,12 @@ from enum import Enum
 from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
+
 class Verdict(str, Enum):
     APPROVED = "APPROVED"
     ACTION_REQUIRED = "ACTION_REQUIRED"
     REJECTED = "REJECTED"
+
 
 class Severity(str, Enum):
     CRITICAL = "CRITICAL"
@@ -14,28 +16,34 @@ class Severity(str, Enum):
     LOW = "LOW"
     INFO = "INFO"
 
+
 class Confidence(str, Enum):
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
     LOW = "LOW"
+
 
 class UsageSchema(BaseModel):
     prompt_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     total_tokens: int = Field(default=0, ge=0)
 
+
 class Citation(BaseModel):
     source: str
     url: Optional[str] = None
+
 
 class Evidence(BaseModel):
     description: str
     code_snippet: Optional[str] = None
     citations: Optional[List[Citation]] = None
 
+
 class RemediationModel(BaseModel):
     description: str
     auto_patch: Optional[str] = None
+
 
 class SecurityFinding(BaseModel):
     id: str
@@ -59,10 +67,12 @@ class SecurityFinding(BaseModel):
     paths: Optional[List[str]] = None
     lines: Optional[List[int]] = None
 
+
 class ReviewResponse(BaseModel):
     verdict: Verdict
     findings: List[SecurityFinding] = Field(default_factory=list)
     usage: Optional[UsageSchema] = None
+
 
 class TestResult(BaseModel):
     status: str

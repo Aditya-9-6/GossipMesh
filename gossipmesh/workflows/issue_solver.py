@@ -17,9 +17,7 @@ class IssueSolverWorkflow:
         Main entry point for the issue solver workflow.
         """
         issue_number = self.issue_data.get("number")
-        logger.info(
-            f"Starting Issue solver workflow for Issue #{issue_number}"
-        )
+        logger.info(f"Starting Issue solver workflow for Issue #{issue_number}")
 
         plan = await self.create_plan()
         if plan:

@@ -2,6 +2,7 @@ import time
 import threading
 from typing import Dict, List, Optional
 
+
 class PeerScore:
     def __init__(self, node_id: str, window_size: int = 100, reputation_threshold: float = 0.4):
         self.node_id = node_id
@@ -18,15 +19,15 @@ class PeerScore:
         self.latencies.append(latency)
         if len(self.latencies) > self.window_size:
             self.latencies.pop(0)
-        
+
         if valid:
             self.valid_messages += 1
         else:
             self.invalid_messages += 1
-            
+
         if protocol_error:
             self.protocol_errors += 1
-            
+
         self.last_updated = time.time()
         self._evaluate_blacklisting()
 
@@ -34,19 +35,20 @@ class PeerScore:
         total_msgs = self.valid_messages + self.invalid_messages
         if total_msgs == 0:
             return 1.0
-        
+
         validity_ratio = self.valid_messages / total_msgs
         error_penalty = (self.protocol_errors * 0.5) / max(total_msgs, 1)
-        
+
         avg_latency = sum(self.latencies) / len(self.latencies) if self.latencies else 0.0
         latency_penalty = min(avg_latency / 10.0, 0.3)
-        
+
         score = max(0.0, validity_ratio - error_penalty - latency_penalty)
         return float(score)
 
     def _evaluate_blacklisting(self) -> None:
         if self.compute_score() < self.reputation_threshold:
             self.blacklisted = True
+
 
 class ScoringRegistry:
     def __init__(self, window_size: int = 100, reputation_threshold: float = 0.4):

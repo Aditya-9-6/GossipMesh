@@ -3,11 +3,13 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Bool
 from sqlalchemy.sql import func
 from gossipmesh.models.base import Base
 
+
 class ApprovalStatus(str, Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
     EXPIRED = "expired"
+
 
 class ApprovalGate(Base):
     __tablename__ = "approval_gates"
@@ -16,7 +18,9 @@ class ApprovalGate(Base):
     workflow_id = Column(Integer, ForeignKey("workflows.id"), nullable=True, index=True)
     repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=True, index=True)
     action_type = Column(String(50), nullable=False)  # push_commit, create_pr, post_review, apply_patch
-    status = Column(String(20), default=ApprovalStatus.PENDING.value, nullable=False)  # pending, approved, rejected, expired
+    status = Column(
+        String(20), default=ApprovalStatus.PENDING.value, nullable=False
+    )  # pending, approved, rejected, expired
     diff_content = Column(Text, nullable=True)
     commit_sha = Column(String(100), nullable=True)
     approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)

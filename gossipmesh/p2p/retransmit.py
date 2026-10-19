@@ -4,8 +4,10 @@ import hashlib
 from collections import OrderedDict
 from typing import Dict, Any, Optional, List
 
+
 class RetransmissionCache:
     """Fixed-capacity ring-buffer message retransmission cache with strict memory bounds and backpressure signaling."""
+
     def __init__(self, capacity: int = 1000, max_memory_bytes: int = 16 * 1024 * 1024):
         self.capacity = capacity
         self.max_memory_bytes = max_memory_bytes
@@ -14,7 +16,7 @@ class RetransmissionCache:
 
     def _compute_key(self, message_id: str) -> str:
         """Generates a cryptographically secure hash key using SHA-256 to prevent hash flooding/DoS."""
-        return hashlib.sha256(message_id.encode('utf-8')).hexdigest()
+        return hashlib.sha256(message_id.encode("utf-8")).hexdigest()
 
     def put(self, message_id: str, payload: Dict[str, Any]) -> bool:
         """Stores a message in the ring-buffer cache with strict memory bounding and eviction."""
@@ -29,7 +31,9 @@ class RetransmissionCache:
             old_payload = self._cache.pop(key)
             self._current_memory -= sys.getsizeof(str(old_payload))
 
-        while (len(self._cache) >= self.capacity or (self._current_memory + msg_size) > self.max_memory_bytes) and self._cache:
+        while (
+            len(self._cache) >= self.capacity or (self._current_memory + msg_size) > self.max_memory_bytes
+        ) and self._cache:
             _, evicted_val = self._cache.popitem(last=False)
             self._current_memory -= sys.getsizeof(str(evicted_val))
 

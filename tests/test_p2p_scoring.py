@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.scoring import PeerScore, ScoringRegistry
 from gossipmesh.p2p.transport import P2PTransport
 
+
 class TestPeerScoring(unittest.TestCase):
     def test_initial_score(self):
         score = PeerScore("node-1")
@@ -20,24 +21,25 @@ class TestPeerScoring(unittest.TestCase):
         node_id = "bad-node"
         for _ in range(10):
             registry.record(node_id, 0.5, False, protocol_error=True)
-            
+
         self.assertTrue(registry.is_blacklisted(node_id))
 
     def test_transport_routing(self):
         transport = P2PTransport("local-node")
         peer_id = "peer-2"
-        
+
         # Good message
         allowed = transport.receive_message(peer_id, {"data": "test"}, 0.1, True)
         self.assertTrue(allowed)
-        
+
         # Spam / invalid messages to trigger blacklisting
         for _ in range(20):
             transport.receive_message(peer_id, {"data": "bad"}, 2.0, False, protocol_error=True)
-            
+
         # Now should be blacklisted and rejected
         allowed_after = transport.send_message(peer_id, {"data": "test"})
         self.assertFalse(allowed_after)
+
 
 if __name__ == "__main":
     unittest.main()
