@@ -131,9 +131,7 @@ class TestGossipMessageRouter:
         assert router.classify_priority("event") == MessagePriority.NORMAL
         assert router.classify_priority("telemetry") == MessagePriority.LOW
         # Unknown falls back to NORMAL
-        assert (
-            router.classify_priority("custom_unknown_action") == MessagePriority.NORMAL
-        )
+        assert router.classify_priority("custom_unknown_action") == MessagePriority.NORMAL
 
     def test_priority_override(self):
         router = GossipMessageRouter()

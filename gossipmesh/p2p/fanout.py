@@ -3,9 +3,18 @@ from collections import deque
 from typing import Dict, Any, Optional
 from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
 
+
 class AdaptiveFanoutController:
     """Adapts the gossip broadcast fanout based on local peer message density and congestion."""
-    def __init__(self, initial_fanout: int = 6, min_fanout: int = 2, max_fanout: int = 12, window_size: int = 50, target_rate: float = 5.0):
+
+    def __init__(
+        self,
+        initial_fanout: int = 6,
+        min_fanout: int = 2,
+        max_fanout: int = 12,
+        window_size: int = 50,
+        target_rate: float = 5.0,
+    ):
         self.fanout = initial_fanout
         self.min_fanout = min_fanout
         self.max_fanout = max_fanout
@@ -26,16 +35,16 @@ class AdaptiveFanoutController:
     def adapt(self) -> int:
         if len(self.timestamps) < 5:
             return self.fanout
-        
+
         duration = self.timestamps[-1] - self.timestamps[0]
-        rate = len(self.timestamps) / duration if duration > 0 else float('inf')
+        rate = len(self.timestamps) / duration if duration > 0 else float("inf")
         dup_ratio = self.duplicate_count / max(1, self.total_received)
 
         if rate > self.target_rate * 1.5 or dup_ratio > 0.3:
             self.fanout = max(self.min_fanout, self.fanout - 1)
         elif rate < self.target_rate * 0.8 and dup_ratio < 0.1:
             self.fanout = min(self.max_fanout, self.fanout + 1)
-            
+
         return self.fanout
 
     def get_fanout(self) -> int:
@@ -45,6 +54,7 @@ class AdaptiveFanoutController:
 class DynamicFanoutController:
     """Computes localized message spread efficiency and adjusts node-specific
     dissemination fanout without causing flooding storms."""
+
     def __init__(self, node_id: str, base_fanout: int = 4, min_fanout: int = 1, max_fanout: int = 12) -> None:
         self.node_id = node_id
         self.base_fanout = base_fanout
@@ -64,8 +74,4 @@ class DynamicFanoutController:
         self.matrix.record_ack(peer_id, success)
 
     def get_metrics(self) -> Dict[str, Any]:
-        return {
-            "node_id": self.node_id,
-            "current_fanout": self.compute_fanout(),
-            "matrix": self.matrix.to_dict()
-        }
+        return {"node_id": self.node_id, "current_fanout": self.compute_fanout(), "matrix": self.matrix.to_dict()}

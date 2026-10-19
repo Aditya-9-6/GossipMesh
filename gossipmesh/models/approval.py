@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Bool
 from sqlalchemy.sql import func
 from gossipmesh.models.base import Base
 
+
 class ApprovalGate(Base):
     __tablename__ = "approval_gates"
 

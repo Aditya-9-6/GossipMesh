@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 class BackpressureState(str, enum.Enum):
     """Backpressure operating states for connection pool saturation levels."""
+
     NORMAL = "normal"
     ELEVATED = "elevated"
     CRITICAL = "critical"
@@ -16,6 +17,7 @@ class BackpressureState(str, enum.Enum):
 @dataclass(frozen=True)
 class BackpressureConfig:
     """Configuration for saturation thresholds and decay parameters."""
+
     elevated_threshold: float = 0.70
     critical_threshold: float = 0.85
     shedding_threshold: float = 0.95

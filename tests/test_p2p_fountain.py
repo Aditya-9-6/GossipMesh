@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.p2p.fountain import FountainEncoder, FountainDecoder
 
+
 class TestP2PFountain(unittest.TestCase):
     def test_encoder_decoder_roundtrip(self):
         payload = b"Hello, GossipMesh Asynchronous Fountain-Code Mesh Network!"
@@ -32,5 +33,6 @@ class TestP2PFountain(unittest.TestCase):
         self.assertFalse(decoder.is_complete())
         self.assertIsNone(decoder.decode())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

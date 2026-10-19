@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.fanout import AdaptiveFanoutController
 from gossipmesh.p2p.transport import GossipTransport
 
+
 class TestAdaptiveFanoutController(unittest.TestCase):
     def test_initial_fanout(self):
         ctrl = AdaptiveFanoutController(initial_fanout=5)
@@ -19,5 +20,6 @@ class TestAdaptiveFanoutController(unittest.TestCase):
         selected = transport.select_peers(peers, is_duplicate=False)
         self.assertEqual(len(selected), 3)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

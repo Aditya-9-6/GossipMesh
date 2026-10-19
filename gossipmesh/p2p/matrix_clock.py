@@ -3,6 +3,7 @@ import threading
 from collections import deque
 from typing import Dict, List, Optional, Any
 
+
 class MatrixClockMessage:
     def __init__(
         self,
@@ -28,7 +29,7 @@ class MatrixClockMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'MatrixClockMessage':
+    def from_dict(cls, data: Dict[str, Any]) -> "MatrixClockMessage":
         return cls(
             sender_id=data["sender_id"],
             message_id=data["message_id"],
@@ -44,6 +45,7 @@ class BoundedMatrixClockEngine:
     zero-allocation circular buffer and releases them strictly when causal
     preconditions are satisfied.
     """
+
     def __init__(
         self,
         node_id: str,
@@ -53,7 +55,7 @@ class BoundedMatrixClockEngine:
         self.node_id = node_id
         self.max_buffer_size = max_buffer_size
         self.staleness_window_seconds = staleness_window_seconds
-        
+
         self._lock = threading.Lock()
         self._matrix: Dict[str, Dict[str, int]] = {node_id: {}}
         self._buffer: deque[MatrixClockMessage] = deque(maxlen=max_buffer_size)
@@ -113,7 +115,7 @@ class BoundedMatrixClockEngine:
                 self._buffer.popleft()
 
             self._buffer.append(msg)
-            
+
             released: List[MatrixClockMessage] = []
             progress = True
 
