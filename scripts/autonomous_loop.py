@@ -34,6 +34,24 @@ USER_EMAIL = "aditya-9-6@users.noreply.github.com"
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []
 
+def load_multi_provider_keys():
+    """Loads auxiliary LLM keys (OpenRouter, NVIDIA, Cohere, HuggingFace) from .llm_keys files."""
+    for check_dir in (Path("."), Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent, Path.home()):
+        llm_file = check_dir / ".llm_keys"
+        if llm_file.exists():
+            try:
+                for line in llm_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip()
+                        if k and v and k not in os.environ:
+                            os.environ[k] = v
+            except Exception:
+                pass
+
+load_multi_provider_keys()
+
 class KeyPool:
     """Manages round-robin rotation and dynamic failover across Gemini API keys."""
     def __init__(self, initial_keys: list[str] = None):
@@ -46,8 +64,8 @@ class KeyPool:
             if val and val not in extra_keys:
                 extra_keys.append(val)
 
-        # Check local gitignored .gemini_keys file in workspace root
-        for check_dir in (Path("."), Path(__file__).resolve().parent):
+        # Check local gitignored .gemini_keys file across workspace root, script dir, and user home
+        for check_dir in (Path("."), Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent, Path.home()):
             key_file = check_dir / ".gemini_keys"
             if key_file.exists():
                 try:
