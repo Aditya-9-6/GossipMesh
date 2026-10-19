@@ -1,16 +1,13 @@
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, Optional
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class AntiEntropySyncer:
-    """Anti-entropy synchronization daemon coordinating peer sessions using entropy-driven selection."""
+class PeerSyncer:
+    """Handles peer synchronization and vector clock entropy exchanges."""
 
-    def __init__(self, node_id: str, window_size: int = 100):
+    def __init__(self, node_id: str, max_epochs: int = 1024):
         self.node_id = node_id
-        self.entropy_evaluator = VectorClockEntropy(window_size=window_size)
+        self.entropy = VectorClockEntropy(node_id, max_epochs=max_epochs)
 
-    def select_sync_peers(
-        self, local_clock: Dict[str, int], active_peers: Dict[str, Dict[str, int]], limit: int = 3
-    ) -> List[Tuple[str, float]]:
-        """Selects the best peers to synchronize with based on vector clock entropy."""
-        return self.entropy_evaluator.select_best_peers(local_clock, active_peers, top_k=limit)
+    def sync_clock(self, remote_clock: Dict[str, int]) -> None:
+        self.entropy.update(remote_clock)
