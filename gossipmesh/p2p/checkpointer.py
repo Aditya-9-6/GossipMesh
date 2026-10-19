@@ -5,6 +5,7 @@ import threading
 from typing import Dict, Any, Optional, Tuple
 from gossipmesh.p2p.merkle_trie import MerklePatriciaTree
 
+
 class StateCheckpointer:
     def __init__(self):
         self.trie = MerklePatriciaTree()
@@ -25,11 +26,7 @@ class StateCheckpointer:
         start_time = time.perf_counter()
         with self._lock:
             root_hash = self.trie.get_root_hash()
-            snapshot_data = {
-                "root_hash": root_hash,
-                "store": dict(self.trie.store),
-                "timestamp": time.time()
-            }
+            snapshot_data = {"root_hash": root_hash, "store": dict(self.trie.store), "timestamp": time.time()}
             self.snapshots[root_hash] = snapshot_data
         duration = (time.perf_counter() - start_time) * 1000.0
         return root_hash, duration

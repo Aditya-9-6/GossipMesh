@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+
 @dataclass
 class StateCheckpoint:
     epoch: int
@@ -18,7 +19,7 @@ class StateCheckpoint:
             "epoch": self.epoch,
             "node_id": self.node_id,
             "state_root": self.state_root,
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
         }
         encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
@@ -36,6 +37,7 @@ class StateCheckpoint:
         key = public_key_or_secret.encode("utf-8")
         expected = hmac.new(key, msg, hashlib.sha256).hexdigest()
         return hmac.compare_digest(self.signature, expected)
+
 
 def hmac_compare(a: str, b: str) -> bool:
     return hmac.compare_digest(a, b)

@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.retransmit import RetransmissionCache
 from gossipmesh.p2p.protocol import GossipProtocolHandler
 
+
 class TestRetransmissionCache(unittest.TestCase):
     def test_put_and_get(self):
         cache = RetransmissionCache(capacity=10, max_memory_bytes=1024 * 1024)
@@ -15,7 +16,7 @@ class TestRetransmissionCache(unittest.TestCase):
         cache.put("msg-1", {"data": 1})
         cache.put("msg-2", {"data": 2})
         cache.put("msg-3", {"data": 3})
-        
+
         self.assertIsNone(cache.get("msg-1"))
         self.assertEqual(cache.get("msg-2"), {"data": 2})
         self.assertEqual(cache.get("msg-3"), {"data": 3})
@@ -26,9 +27,7 @@ class TestRetransmissionCache(unittest.TestCase):
         cache.put("msg-1", {"data": 1})
         cache.put("msg-2", {"data": 2})
         cache.put("msg-3", {"data": 3})
-        cache.put("msg-4", {
-            "data": 4
-        })
+        cache.put("msg-4", {"data": 4})
         self.assertTrue(cache.check_backpressure())
 
     def test_protocol_handler_integration(self):
@@ -39,6 +38,7 @@ class TestRetransmissionCache(unittest.TestCase):
         handler.handle_broadcast("m2", {"test": True})
         handler.handle_broadcast("m3", {"test": True})
         self.assertTrue(handler.is_congested())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,10 +4,12 @@ import threading
 from collections import deque
 from typing import Dict, List, Optional, Tuple, Any
 
+
 class EntropyChurnDefense:
     """Calculates sliding-window entropy over incoming peer message metadata
     to detect and penalize Sybil nodes flooding fake heartbeat vectors.
     """
+
     def __init__(self, window_size: int = 50, entropy_threshold: float = 1.2, max_ticks_to_drop: int = 3):
         self.window_size = window_size
         self.entropy_threshold = entropy_threshold
@@ -30,7 +32,7 @@ class EntropyChurnDefense:
         """Calculates Shannon entropy over discretized feature values."""
         if not values:
             return 0.0
-        
+
         counts: Dict[Any, int] = {}
         total = len(values)
         for val in values:
@@ -57,7 +59,7 @@ class EntropyChurnDefense:
                 return False
 
             ent = self.calculate_entropy(list(window))
-            
+
             if ent < 0.3 or ent > self.entropy_threshold:
                 violations = self.violation_counts.get(node_id, 0) + 1
                 self.violation_counts[node_id] = violations

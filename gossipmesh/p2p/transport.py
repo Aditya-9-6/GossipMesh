@@ -1,4 +1,5 @@
 """P2P Transport and PlumTree Multicast layer for GossipMesh."""
+
 import asyncio
 import json
 import logging
@@ -12,13 +13,37 @@ from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, d
 
 logger = logging.getLogger(__name__)
 
+
+class BoundedLRUCache:
+    """Bounded LRU cache for deduplicating gossip messages."""
+
+    def __init__(self, capacity: int = 1000):
+        self.capacity = capacity
+        self.cache: Dict[str, Any] = {}
+        self._keys: list[str] = []
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.cache
+
+    def add(self, key: str, value: Any = True) -> None:
+        if key in self.cache:
+            self._keys.remove(key)
+        elif len(self.cache) >= self.capacity:
+            oldest = self._keys.pop(0)
+            self.cache.pop(oldest, None)
+        self.cache[key] = value
+        self._keys.append(key)
+
+
 class PlumTreeMulticast:
     """PlumTree epidemic broadcast multicast implementation with eager and lazy peers."""
+
     def __init__(self, node_id: str):
         self.node_id = node_id
         self.eager_peers: Set[str] = set()
         self.lazy_peers: Set[str] = set()
         self.lock = asyncio.Lock()
+        self.seen_cache = BoundedLRUCache()
 
     async def add_eager_peer(self, peer_id: str):
         async with self.lock:
@@ -30,16 +55,34 @@ class PlumTreeMulticast:
             if peer_id not in self.eager_peers:
                 self.lazy_peers.add(peer_id)
 
-    async def handle_message(self, sender_id: str, message: Dict[str, Any]) -> bool:
+    async def add_peer(self, peer_id: str, eager: bool = True):
+        if eager:
+            await self.add_eager_peer(peer_id)
+        else:
+            await self.add_lazy_peer(peer_id)
+
+    async def remove_peer(self, peer_id: str):
         async with self.lock:
-            if sender_id in self.eager_peers:
-                return True
-            return False
+            self.eager_peers.discard(peer_id)
+            self.lazy_peers.discard(peer_id)
+
+    async def handle_message(self, message_id: str, sender_id: str) -> Dict[str, Any]:
+        async with self.lock:
+            if message_id in self.seen_cache:
+                return {"action": "prune", "notify_lazy": list(self.lazy_peers)}
+            self.seen_cache.add(message_id)
+            return {"action": "deliver", "notify_lazy": list(self.lazy_peers)}
+
+    async def graft(self, peer_id: str):
+        async with self.lock:
+            self.eager_peers.add(peer_id)
+            self.lazy_peers.discard(peer_id)
+
 
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
     every 1000 messages or 300 seconds without dropping streams."""
-    
+
     def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.rotator = EphemeralSessionKeyRotator()
         self.max_messages = max_messages
@@ -211,6 +254,26 @@ class GossipTransport:
         }
 
 
+class P2PTransport(GossipTransport):
+    """Alias/Integration transport class for P2P test compatibility."""
+
+    def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None):
+        super().__init__(node_id=node_id, config=config)
+        self.multicast = PlumTreeMulticast(node_id)
+
+    async def register_peer(self, peer_id: str, eager: bool = True):
+        await self.multicast.add_peer(peer_id, eager=eager)
+
+    async def receive_message(
+        self, message_id: str, sender_id: str, payload: Any = None, topic: str = "default"
+    ) -> Any:
+        await self.multicast.handle_message(message_id, sender_id)
+        return await self.receive_payload(sender_id, payload or {}, topic=topic)
+
+    async def request_graft(self, peer_id: str):
+        await self.multicast.graft(peer_id)
+
+
 class TransportSocketReader:
     """Low-level transport socket reader with zero-allocation memoryview parsing pipelines."""
 
@@ -224,13 +287,13 @@ class TransportSocketReader:
             header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
         except asyncio.IncompleteReadError:
             return None
-        
+
         if not header_data:
             return None
-        
+
         header_view = memoryview(header_data)
         magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(header_view)
-        
+
         if magic != self.expected_magic:
             logger.warning(f"Invalid packet magic received: {hex(magic)}")
             raise ValueError(f"Invalid packet magic: {hex(magic)}")

@@ -3,6 +3,7 @@ import time
 from gossipmesh.p2p.churn import EntropyChurnDefense
 from gossipmesh.p2p.node import GossipNode, GossipMessage, GossipTopic
 
+
 class TestEntropyChurnDefense(unittest.TestCase):
     def setUp(self):
         self.defense = EntropyChurnDefense(window_size=10, entropy_threshold=1.5, max_ticks_to_drop=3)
@@ -12,7 +13,7 @@ class TestEntropyChurnDefense(unittest.TestCase):
         # Feed varied timestamps
         for i in range(10):
             self.defense.record_message(peer_id, float(i * 3.5))
-        
+
         is_dropped = self.defense.evaluate_peer(peer_id)
         self.assertFalse(is_dropped)
         self.assertFalse(self.defense.is_quarantined(peer_id))
@@ -27,7 +28,7 @@ class TestEntropyChurnDefense(unittest.TestCase):
         self.assertFalse(self.defense.evaluate_peer(peer_id))
         self.assertFalse(self.defense.evaluate_peer(peer_id))
         is_dropped = self.defense.evaluate_peer(peer_id)
-        
+
         self.assertTrue(is_dropped)
         self.assertTrue(self.defense.is_quarantined(peer_id))
 
@@ -41,7 +42,7 @@ class TestEntropyChurnDefense(unittest.TestCase):
                 topic=GossipTopic.HEARTBEAT,
                 origin_node=sybil_id,
                 payload={"seq": i},
-                timestamp=100.0 # Constant timestamp -> zero entropy
+                timestamp=100.0,  # Constant timestamp -> zero entropy
             )
             node.ingest_message(msg)
 
@@ -49,12 +50,10 @@ class TestEntropyChurnDefense(unittest.TestCase):
 
         # Further messages from quarantined node should be rejected instantly
         late_msg = GossipMessage(
-            topic=GossipTopic.HEARTBEAT,
-            origin_node=sybil_id,
-            payload={"seq": 999},
-            timestamp=200.0
+            topic=GossipTopic.HEARTBEAT, origin_node=sybil_id, payload={"seq": 999}, timestamp=200.0
         )
         self.assertFalse(node.ingest_message(late_msg))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ from sqlalchemy.sql import func
 from gossipmesh.models.base import Base
 import uuid
 
+
 class Approval(Base):
     __tablename__ = "approvals"
 

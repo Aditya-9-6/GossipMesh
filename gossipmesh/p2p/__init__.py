@@ -5,7 +5,7 @@ from gossipmesh.p2p.merkle import MerkleTree
 from gossipmesh.p2p.merkle_trie import MerklePatriciaTree
 from gossipmesh.p2p.pow import calculate_pow_hash, verify_pow, mine_pow
 from gossipmesh.p2p.ratelimit import TokenBucket, RateLimitConfig, PeerRateLimiter
-from gossipmesh.p2p.rto import RTOEstimator
+from gossipmesh.p2p.rto import RTOEstimator, AdaptiveRTO
 from gossipmesh.p2p.transport import GossipTransport, TransportTelemetry
 from gossipmesh.p2p.checkpointer import StateCheckpointer
 from gossipmesh.p2p.entropy import AntiEntropyEngine
@@ -39,6 +39,7 @@ __all__ = [
     "RateLimitConfig",
     "PeerRateLimiter",
     "RTOEstimator",
+    "AdaptiveRTO",
     "GossipTransport",
     "TransportTelemetry",
     "StateCheckpointer",
@@ -55,5 +56,3 @@ __all__ = [
     "WeightedPriorityQueue",
     "GossipMessageRouter",
 ]
-
-

@@ -3,6 +3,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
 
+
 @dataclass
 class PeerHealthConfig:
     alpha_latency: float = 0.2
@@ -11,6 +12,7 @@ class PeerHealthConfig:
     quarantine_threshold: float = 40.0
     recovery_threshold: float = 75.0
     max_violations: int = 10
+
 
 @dataclass
 class PeerHealthMetrics:
@@ -21,6 +23,7 @@ class PeerHealthMetrics:
     is_quarantined: bool = False
     total_samples: int = 0
     last_updated: float = field(default_factory=time.time)
+
 
 class SlidingWindowPeerHealthScorecard:
     def __init__(self, config: Optional[PeerHealthConfig] = None) -> None:
@@ -33,7 +36,7 @@ class SlidingWindowPeerHealthScorecard:
             m = self.metrics
             m.total_samples += 1
             m.last_updated = time.time()
-            
+
             if m.total_samples == 1:
                 m.ewma_latency = latency_ms
                 m.ewma_drop_rate = 1.0 if dropped else 0.0
@@ -42,7 +45,7 @@ class SlidingWindowPeerHealthScorecard:
                 a_l = self.config.alpha_latency
                 a_d = self.config.alpha_drop
                 a_v = self.config.alpha_violation
-                
+
                 m.ewma_latency = a_l * latency_ms + (1.0 - a_l) * m.ewma_latency
                 drop_val = 1.0 if dropped else 0.0
                 m.ewma_drop_rate = a_d * drop_val + (1.0 - a_d) * m.ewma_drop_rate
@@ -53,7 +56,7 @@ class SlidingWindowPeerHealthScorecard:
             lat_penalty = min(50.0, (m.ewma_latency / 100.0) * 15.0)
             drop_penalty = m.ewma_drop_rate * 40.0
             viot_penalty = m.ewma_violation_rate * 50.0
-            
+
             score = max(0.0, 100.0 - (lat_penalty + drop_penalty + viot_penalty))
             m.health_score = score
 

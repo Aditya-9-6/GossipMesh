@@ -3,6 +3,7 @@ import asyncio
 from typing import Dict, Set, Optional, Any
 from collections import OrderedDict
 
+
 class BoundedLRUCache:
     def __init__(self, capacity: int = 10000):
         self.capacity = capacity
@@ -21,6 +22,7 @@ class BoundedLRUCache:
 
     def clear(self) -> None:
         self._cache.clear()
+
 
 class PlumTreeMulticast:
     def __init__(self, node_id: str, cache_capacity: int = 10000):
@@ -52,9 +54,13 @@ class PlumTreeMulticast:
                     self.lazy_peers.add(sender_id)
                     return {"action": "prune", "peer": sender_id}
                 return {"action": "ignore"}
-            
+
             self.seen_messages.add(msg_id)
-            return {"action": "deliver", "forward_eager": list(self.eager_peers - {sender_id}), "notify_lazy": list(self.lazy_peers - {sender_id})}
+            return {
+                "action": "deliver",
+                "forward_eager": list(self.eager_peers - {sender_id}),
+                "notify_lazy": list(self.lazy_peers - {sender_id}),
+            }
 
     async def graft(self, peer_id: str) -> None:
         async with self._lock:
