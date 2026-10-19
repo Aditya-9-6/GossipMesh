@@ -3,6 +3,7 @@ import time
 import asyncio
 from typing import List, Dict, Optional, Tuple, Any
 
+
 class KademliaNode:
     def __init__(self, node_id: str, address: str, port: int, last_seen: Optional[float] = None):
         self.node_id = node_id
@@ -18,12 +19,8 @@ class KademliaNode:
         self.last_seen = time.time()
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "node_id": self.node_id,
-            "address": self.address,
-            "port": self.port,
-            "last_seen": self.last_seen
-        }
+        return {"node_id": self.node_id, "address": self.address, "port": self.port, "last_seen": self.last_seen}
+
 
 class KademliaBucket:
     def __init__(self, k: int = 20):
@@ -48,6 +45,7 @@ class KademliaBucket:
 
     def remove_node(self, node_id: str):
         self.nodes = [n for n in self.nodes if n.node_id != node_id]
+
 
 class KademliaDHT:
     def __init__(self, local_node_id: str, k: int = 20, alpha: int = 3):
@@ -78,7 +76,7 @@ class KademliaDHT:
         all_nodes = []
         for bucket in self.buckets:
             all_nodes.extend(bucket.nodes)
-        
+
         # Sort by XOR distance
         all_nodes.sort(key=lambda n: n.integer_id ^ target_int)
         return all_nodes[:count]

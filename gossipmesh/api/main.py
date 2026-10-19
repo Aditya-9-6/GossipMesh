@@ -3,7 +3,22 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs, approvals
+from gossipmesh.api.routers import (
+    auth,
+    users,
+    organizations,
+    providers,
+    repositories,
+    runtime,
+    artifacts,
+    enterprise,
+    vector_search,
+    service_accounts,
+    sso,
+    scim,
+    runs,
+    approvals,
+)
 from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
 from gossipmesh.core.logging import setup_logging
 from gossipmesh.api import deps
@@ -15,12 +30,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 # Export get_db and get_current_user for compatibility with tests and external modules
 def get_db():
     yield from deps.get_db()
 
+
 def get_current_user(db: Session = Depends(get_db)):
     return deps.get_current_user(db=db)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,15 +72,14 @@ async def lifespan(app: FastAPI):
 
     yield
 
+
 from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
 from gossipmesh.core.exceptions import GossipMeshException
 
-app = FastAPI(
-    title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
-)
+app = FastAPI(title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json", lifespan=lifespan)
 
 app.add_middleware(CorrelationIdMiddleware)
+
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -71,6 +88,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         content={"detail": exc.detail, "correlation_id": get_correlation_id()},
     )
 
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -78,15 +96,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors(), "correlation_id": get_correlation_id()},
     )
 
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     import logging
+
     logger = logging.getLogger(__name__)
     logger.exception("Unhandled exception")
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "correlation_id": get_correlation_id()},
     )
+
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
@@ -103,8 +124,9 @@ app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["
 app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(approvals.router)
 
-app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
-app.add_exception_handler(Exception, global_exception_handler) # type: ignore
+app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler)  # type: ignore
+app.add_exception_handler(Exception, global_exception_handler)  # type: ignore
+
 
 @app.get("/health")
 def health_check():

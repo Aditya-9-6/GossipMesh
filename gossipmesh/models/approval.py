@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Bool
 from sqlalchemy.sql import func
 from gossipmesh.models.base import Base
 
+
 class ApprovalGate(Base):
     __tablename__ = "approval_gates"
 
@@ -17,6 +18,7 @@ class ApprovalGate(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now(), nullable=False)
+
 
 # Alias for test suite compatibility
 ApprovalGateModel = ApprovalGate

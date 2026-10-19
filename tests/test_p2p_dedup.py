@@ -3,11 +3,12 @@ import threading
 from gossipmesh.p2p.dedup import CompressedBloomFilter
 from gossipmesh.p2p.transport import GossipTransport
 
+
 class TestCompressedBloomFilter(unittest.TestCase):
     def test_bloom_filter_basic(self):
         bf = CompressedBloomFilter(capacity=1000, error_rate=0.01)
         self.assertLessEqual(bf.memory_usage_bytes(), 65536)
-        
+
         msg_id = "msg_abc123"
         self.assertNotIn(msg_id, bf)
         bf.add(msg_id)
@@ -23,7 +24,7 @@ class TestCompressedBloomFilter(unittest.TestCase):
     def test_transport_deduplication(self):
         transport = GossipTransport(capacity=100, error_rate=0.01)
         msg_id = "unique_gossip_id"
-        
+
         self.assertTrue(transport.should_process_message(msg_id))
         self.assertFalse(transport.should_process_message(msg_id))
 
@@ -40,15 +41,16 @@ class TestCompressedBloomFilter(unittest.TestCase):
                 if transport.should_process_message(msg_id):
                     with lock:
                         processed_count += 1
-                
+
         threads = [threading.Thread(target=worker, args=(i * 200,)) for i in range(5)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-            
+
         # Exactly 50 unique messages should be processed despite heavy contention
         self.assertLessEqual(processed_count, 50)
+
 
 if __name__ == "__main__":
     unittest.main()
