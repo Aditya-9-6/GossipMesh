@@ -418,3 +418,95 @@ You can always set the exit code when leaks are encountered with the --exit-code
 1 - leaks or error encountered
 126 - unknown flag
 ```
+
+
+---
+
+# 🛡️ GossipMesh Enterprise: Air-Gapped AI Reviewer & Architecture Engine
+
+GossipMesh Enterprise is an air-gapped, on-premises AI code, security, and infrastructure reviewer container designed specifically for **defense contractors, financial institutions (HFT/fintech), deep tech, and regulated industries**.
+
+Unlike standard syntax-only reviewers (e.g. CodeRabbit), GossipMesh evaluates:
+- **Infrastructure-as-Code**: Terraform, CloudFormation, Kubernetes, and Dockerfile security.
+- **CI/CD Supply Chain Hardening**: GitHub Actions commit pinning and pipeline security.
+- **Deep Architectural & Cross-File Logic**: Using specialized, local open-weight coding foundation models.
+- **True Air-Gapped Operation**: Completely offline RSA-4096 cryptographic signature verification. Zero telemetry or outbound requests required.
+
+---
+
+## 💎 Model Bundles & Parameter-Tiered Pricing
+
+Customers select the open-weight foundation model size that matches their compute environment and security requirements:
+
+| Bundle | Foundation Model | Parameter Size | Primary Task | 6-Month Plan | 1-Year Enterprise Plan |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **B01** | Qwen2.5-Coder | **1.5B** | Fast syntax & linting | \$5,500 | **\$10,000 / yr** |
+| **B02** | Gemma 2 / Qwen2.5-Coder | **2B - 3B** | Medium static analysis & rules | \$8,250 | **\$15,000 / yr** |
+| **B03** | Qwen2.5-Coder | **7B** | Full-code review & unit test checks | \$13,750 | **\$25,000 / yr** |
+| **B04** | Qwen2.5-Coder | **14B** | **Architecture & Infrastructure Review (Flagship)** | \$27,500 | **\$50,000 / yr** |
+| **B05** | Qwen2.5-Coder / Gemma 2 | **27B - 32B** | **Deep Auto-Remediation & Defense HFT** | \$41,250 | **\$75,000 / yr** |
+
+### Deployment Modes:
+1. **Single-Model Deployment**: One model handles all review stages (e.g., Flagship B04 for everything).
+2. **Task-Specific Multi-Model Deployment**: Saves compute by automatically routing tasks to specialized models:
+   - `syntax` ➔ B01 (1.5B)
+   - `security` ➔ B04 (14B)
+   - `architecture` ➔ B04 (14B)
+   - `auto_remediation` ➔ B05 (32B)
+   *(Multi-model packages receive an automatic 15% bundled enterprise discount).*
+
+---
+
+## 🔐 Air-Gapped Cryptographic Licensing (RSA-4096)
+
+Licenses are issued as signed JWT tokens (`license.jwt` or `license.token`) using RSA-4096 (`RS256`). The Docker image contains the public verification key (`enterprise/public_key.pem`) and validates the token locally without making any external network requests.
+
+### Issuing an Enterprise License (B2B Admin CLI)
+High-ticket enterprise licenses are generated post-contract execution via:
+```bash
+python scripts/issue_license.py \
+  --customer-id "lockheed-defense" \
+  --bundle b04 \
+  --plan 1_year \
+  --private-key /secure/path/enterprise_private_key.pem \
+  --output license.jwt
+```
+
+---
+
+## 🚀 Running the Air-Gapped Docker Container
+
+### Option 1: Local Docker Run
+```bash
+# Pull or load the air-gapped container image
+docker pull ghcr.io/aditya-9-6/gossipmesh-reviewer:b04
+
+# Run review on any repository mounted at /workspace
+docker run --rm \
+  -v $(pwd):/workspace \
+  -v $(pwd)/license.jwt:/workspace/license.jwt:ro \
+  ghcr.io/aditya-9-6/gossipmesh-reviewer:b04 \
+  --repo-path /workspace \
+  --output-format text
+```
+
+### Option 2: JSON Output for CI/CD Gates
+```bash
+docker run --rm \
+  -v $(pwd):/workspace \
+  -e LICENSE_TOKEN="<SIGNED_JWT_STRING>" \
+  ghcr.io/aditya-9-6/gossipmesh-reviewer:b04 \
+  --repo-path /workspace \
+  --output-format json \
+  --fail-on-critical
+```
+
+---
+
+## ☁️ Optional SaaS Telemetry & Managed Cloud Mode
+
+For non-air-gapped customers who prefer centralized usage reporting:
+- Set `SAAS_ENDPOINT=https://api.yourdomain.com/v1/telemetry`
+- Set `SAAS_TELEMETRY_SECRET=<HMAC_SECRET>`
+
+Telemetry events are authenticated with HMAC-SHA256 (`X-GossipMesh-Signature`). If the endpoint is unreachable or firewalled, the container logs a notice and continues normally without interrupting the review.
