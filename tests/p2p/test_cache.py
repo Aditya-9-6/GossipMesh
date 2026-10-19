@@ -2,6 +2,7 @@ import time
 import unittest
 from gossipmesh.p2p.cache import GossipMessageCache
 
+
 class TestGossipMessageCache(unittest.TestCase):
     def setUp(self):
         self.cache = GossipMessageCache(capacity=3, default_ttl=1.0)
@@ -16,13 +17,13 @@ class TestGossipMessageCache(unittest.TestCase):
         self.cache.put("msg-1", "p1")
         self.cache.put("msg-2", "p2")
         self.cache.put("msg-3", "p3")
-        
+
         # Access msg-1 to make it recently used
         self.assertEqual(self.cache.get("msg-1"), "p1")
-        
+
         # Adding msg-4 should evict msg-2 (least recently used)
         self.cache.put("msg-4", "p4")
-        
+
         self.assertTrue(self.cache.has("msg-1"))
         self.assertFalse(self.cache.has("msg-2"))
         self.assertTrue(self.cache.has("msg-3"))
@@ -32,7 +33,7 @@ class TestGossipMessageCache(unittest.TestCase):
     def test_ttl_expiration(self):
         self.cache.put("msg-ttl", "data", ttl=0.2)
         self.assertTrue(self.cache.has("msg-ttl"))
-        
+
         # Wait for TTL to expire
         time.sleep(0.3)
         self.assertFalse(self.cache.has("msg-ttl"))
@@ -46,6 +47,7 @@ class TestGossipMessageCache(unittest.TestCase):
         self.cache.clear()
         self.assertEqual(len(self.cache), 0)
         self.assertFalse(self.cache.has("msg-1"))
+
 
 if __name__ == "__main__":
     unittest.main()

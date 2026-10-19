@@ -1,16 +1,24 @@
 import math
 from typing import Optional
 
+
 class RTOEstimator:
     """Windowed EWMA Round-Trip Time Estimator and Adaptive Retransmission Timeout Calculator."""
 
-    def __init__(self, alpha: float = 0.125, beta: float = 0.25, granularity: float = 0.001, min_rto: float = 0.2, max_rto: float = 60.0):
+    def __init__(
+        self,
+        alpha: float = 0.125,
+        beta: float = 0.25,
+        granularity: float = 0.001,
+        min_rto: float = 0.2,
+        max_rto: float = 60.0,
+    ):
         self.alpha = alpha
         self.beta = beta
         self.granularity = granularity
         self.min_rto = min_rto
         self.max_rto = max_rto
-        
+
         self.srtt: Optional[float] = None
         self.rttvar: Optional[float] = None
         self.rto: float = 1.0

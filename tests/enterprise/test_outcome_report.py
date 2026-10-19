@@ -11,11 +11,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 try:
     import pytest
+
     fixture = pytest.fixture
 except ImportError:
     pytest = None
+
     def fixture(fn):
         return fn
+
 
 from gossipmesh.enterprise.outcome_report import (
     AutomationEvent,
@@ -85,22 +88,26 @@ def test_metrics_aggregation(temp_reporter):
     reporter.record_event(AutomationEvent(event_type=AutomationEventType.CI_RUN, repo="test/repo", ci_passed=False))
 
     # 2 Reviews: scores 90 and 100 (avg 95), 1 false positive (50% FP rate)
-    reporter.record_event(AutomationEvent(
-        event_type=AutomationEventType.REVIEW_COMPLETED,
-        repo="test/repo",
-        review_score=90.0,
-        is_false_positive=False,
-        latency_seconds=10.0,
-        cost_usd=0.01,
-    ))
-    reporter.record_event(AutomationEvent(
-        event_type=AutomationEventType.REVIEW_COMPLETED,
-        repo="test/repo",
-        review_score=100.0,
-        is_false_positive=True,
-        latency_seconds=20.0,
-        cost_usd=0.02,
-    ))
+    reporter.record_event(
+        AutomationEvent(
+            event_type=AutomationEventType.REVIEW_COMPLETED,
+            repo="test/repo",
+            review_score=90.0,
+            is_false_positive=False,
+            latency_seconds=10.0,
+            cost_usd=0.01,
+        )
+    )
+    reporter.record_event(
+        AutomationEvent(
+            event_type=AutomationEventType.REVIEW_COMPLETED,
+            repo="test/repo",
+            review_score=100.0,
+            is_false_positive=True,
+            latency_seconds=20.0,
+            cost_usd=0.02,
+        )
+    )
 
     report = reporter.get_daily_report()
 
@@ -130,16 +137,20 @@ def test_metrics_aggregation(temp_reporter):
 def test_tenant_isolation(temp_reporter):
     reporter, _ = temp_reporter
 
-    reporter.record_event(AutomationEvent(
-        event_type=AutomationEventType.ISSUE_PROCESSED,
-        repo="tenant1/repo",
-        tenant_id=1,
-    ))
-    reporter.record_event(AutomationEvent(
-        event_type=AutomationEventType.ISSUE_PROCESSED,
-        repo="tenant2/repo",
-        tenant_id=2,
-    ))
+    reporter.record_event(
+        AutomationEvent(
+            event_type=AutomationEventType.ISSUE_PROCESSED,
+            repo="tenant1/repo",
+            tenant_id=1,
+        )
+    )
+    reporter.record_event(
+        AutomationEvent(
+            event_type=AutomationEventType.ISSUE_PROCESSED,
+            repo="tenant2/repo",
+            tenant_id=2,
+        )
+    )
 
     t1_events = reporter.load_events(tenant_id=1)
     assert len(t1_events) == 1
@@ -155,11 +166,13 @@ def test_weekly_report(temp_reporter):
     now = datetime.datetime.now(datetime.timezone.utc)
     three_days_ago = now - datetime.timedelta(days=3)
 
-    reporter.record_event(AutomationEvent(
-        event_type=AutomationEventType.PR_MERGED,
-        repo="test/repo",
-        timestamp=three_days_ago.isoformat(),
-    ))
+    reporter.record_event(
+        AutomationEvent(
+            event_type=AutomationEventType.PR_MERGED,
+            repo="test/repo",
+            timestamp=three_days_ago.isoformat(),
+        )
+    )
 
     report = reporter.get_weekly_report()
     assert report.prs_merged == 1

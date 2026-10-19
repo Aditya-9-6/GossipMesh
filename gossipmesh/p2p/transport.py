@@ -11,10 +11,12 @@ from gossipmesh.p2p.erasure import ErasureCoder
 
 logger = logging.getLogger(__name__)
 
+
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
-every 1000 messages or 300 seconds without dropping streams."""
-    def __init__(self, max_messages: int=1000, max_time_seconds: float=300.0):
+    every 1000 messages or 300 seconds without dropping streams."""
+
+    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.max_messages = max_messages
         self.max_time_seconds = max_time_seconds
         self.message_count = 0
@@ -63,6 +65,7 @@ every 1000 messages or 300 seconds without dropping streams."""
 
 class TransportTelemetry:
     """Telemetry tracking metrics for gossip transport layer."""
+
     def __init__(self) -> None:
         self.sent_count = 0
         self.received_count = 0
@@ -98,6 +101,7 @@ class TransportTelemetry:
 
 class TransportSocketReader:
     """Reads zero-copy packet structures from an asyncio stream reader."""
+
     def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 0x474D4553) -> None:
         self.reader = reader
         self.expected_magic = expected_magic
@@ -105,13 +109,16 @@ class TransportSocketReader:
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
         header_bytes = await self.reader.readexactly(45)
         buf = memoryview(header_bytes)
-        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(buf, expected_magic=self.expected_magic)
+        magic, msg_type, msg_id, payload_len, payload_view = ZeroCopyPacketParser.parse_header(
+            buf, expected_magic=self.expected_magic
+        )
         payload_bytes = await self.reader.readexactly(payload_len)
         return magic, msg_id, memoryview(payload_bytes)
 
 
 class GossipTransport:
     """Main GossipMesh transport layer integrating erasure coding, rate limiting, and handlers."""
+
     def __init__(self, node_id: str, k: int = 4, m: int = 2, config: Optional[RateLimitConfig] = None) -> None:
         self.node_id = node_id
         self.k = k
@@ -126,13 +133,15 @@ class GossipTransport:
         with self._lock:
             self.handlers[topic] = handler
 
-    async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], use_erasure: bool = False) -> bool:
+    async def send_payload(
+        self, peer_id: str, payload: Union[bytes, str, dict, int], use_erasure: bool = False
+    ) -> bool:
         if isinstance(payload, dict):
-            data = json.dumps(payload).encode('utf-8')
+            data = json.dumps(payload).encode("utf-8")
         elif isinstance(payload, str):
-            data = payload.encode('utf-8')
+            data = payload.encode("utf-8")
         elif isinstance(payload, int):
-            data = str(payload).encode('utf-8')
+            data = str(payload).encode("utf-8")
         elif isinstance(payload, bytes):
             data = payload
         else:
@@ -146,14 +155,16 @@ class GossipTransport:
             self.telemetry.record_sent(len(data))
         return True
 
-    async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = 'default') -> Optional[Any]:
+    async def receive_payload(
+        self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = "default"
+    ) -> Optional[Any]:
         if not self.rate_limiter.allow(peer_id):
             self.telemetry.record_dropped()
             return None
 
         if isinstance(payload, bytes):
             try:
-                payload = json.loads(payload.decode('utf-8'))
+                payload = json.loads(payload.decode("utf-8"))
             except Exception:
                 pass
 

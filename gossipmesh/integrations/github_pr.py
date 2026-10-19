@@ -7,6 +7,7 @@ from gossipmesh.core.exceptions import GitHubIntegrationError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
+
 class GitHubPRService:
     def __init__(self, token: str, max_retries: int = 3, timeout: float = 10.0):
         self.token = token
@@ -25,13 +26,11 @@ class GitHubPRService:
         if "headers" in kwargs:
             headers.update(kwargs.pop("headers"))
 
-        client_kwargs = {
-            "timeout": httpx.Timeout(self.timeout)
-        }
+        client_kwargs = {"timeout": httpx.Timeout(self.timeout)}
 
         for attempt in range(self.max_retries):
             try:
-                async with httpx.AsyncClient(timeout=client_kwargs['timeout']) as client:
+                async with httpx.AsyncClient(timeout=client_kwargs["timeout"]) as client:
                     response = await client.request(method, url, headers=headers, **kwargs)
 
                     if response.status_code in (403, 429):
@@ -39,13 +38,13 @@ class GitHubPRService:
                         if remaining == "0" or response.status_code == 429:
                             raise RateLimitError(
                                 message="GitHub API rate limit exceeded",
-                                details={"reset": response.headers.get("x-ratelimit-reset")}
+                                details={"reset": response.headers.get("x-ratelimit-reset")},
                             )
 
                     if response.status_code >= 500:
                         if attempt == self.max_retries - 1:
                             response.raise_for_status()
-                        await asyncio.sleep(2 ** attempt)
+                        await asyncio.sleep(2**attempt)
                         continue
 
                     response.raise_for_status()
@@ -53,10 +52,10 @@ class GitHubPRService:
             except (httpx.TimeoutException, httpx.RequestError) as e:
                 if attempt == self.max_retries - 1:
                     raise GitHubIntegrationError(f"Request failed: {str(e)}")
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
             except httpx.HTTPStatusError as e:
                 if e.response.status_code >= 500 and attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                     continue
                 raise GitHubIntegrationError(f"HTTP error: {e.response.status_code} - {e.response.text}")
 
@@ -82,7 +81,7 @@ class GitHubPRService:
                 links = link_header.split(",")
                 for link in links:
                     if 'rel="next"' in link:
-                        next_url = link[link.find("<") + 1:link.find(">")]
+                        next_url = link[link.find("<") + 1 : link.find(">")]
                         break
 
         return results
@@ -142,10 +141,12 @@ class GitHubPRService:
             "file_status": file_status,
             "renamed_files": renamed_files,
             "commits": commits,
-            "files_metadata": files
+            "files_metadata": files,
         }
 
-    async def post_pr_review_comment(self, owner: str, repo: str, pull_number: int, comment_payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def post_pr_review_comment(
+        self, owner: str, repo: str, pull_number: int, comment_payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Posts an individual PR review comment.
         """
@@ -153,7 +154,9 @@ class GitHubPRService:
         response = await self._request("POST", url, json=comment_payload)
         return response.json()
 
-    async def post_pr_review(self, owner: str, repo: str, pull_number: int, review_payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def post_pr_review(
+        self, owner: str, repo: str, pull_number: int, review_payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Posts a PR review with inline comments.
         """

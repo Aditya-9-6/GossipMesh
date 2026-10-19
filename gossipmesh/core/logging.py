@@ -2,6 +2,7 @@ import logging
 import json
 from datetime import datetime
 
+
 class JSONFormatter(logging.Formatter):
     def format(self, record):
         from gossipmesh.middleware.correlation import get_correlation_id
@@ -24,6 +25,7 @@ class JSONFormatter(logging.Formatter):
             log_data["exc_info"] = self.formatException(record.exc_info)
 
         return json.dumps(log_data)
+
 
 def setup_logging():
     logger = logging.getLogger()
