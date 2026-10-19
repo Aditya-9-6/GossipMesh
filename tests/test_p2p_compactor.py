@@ -2,6 +2,7 @@ import unittest
 from gossipmesh.p2p.compactor import GossipDigestCompactor
 from gossipmesh.p2p.digest import HyperLogLogDigest
 
+
 class TestGossipDigestCompactor(unittest.TestCase):
     def test_compact_and_diff(self):
         compactor = GossipDigestCompactor(precision=10)
@@ -21,5 +22,6 @@ class TestGossipDigestCompactor(unittest.TestCase):
         deserialized = compactor.deserialize_digest(serialized)
         self.assertEqual(digest.registers, deserialized.registers)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

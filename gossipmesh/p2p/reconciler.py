@@ -78,9 +78,7 @@ class MerkleTree:
                 if i + 1 < len(current_level):
                     right = current_level[i + 1]
                     combined_hash = self._sha256(left.hash_val + right.hash_val)
-                    next_level.append(
-                        MerkleNode(hash_val=combined_hash, left=left, right=right)
-                    )
+                    next_level.append(MerkleNode(hash_val=combined_hash, left=left, right=right))
                 else:
                     next_level.append(left)
             current_level = next_level
@@ -135,11 +133,7 @@ class VectorClockReconciler:
         local_tree = MerkleTree(self.local_state)
         remote_tree = MerkleTree(remote_state)
 
-        if (
-            isinstance(remote_root_digest, str)
-            and local_tree.root_hash == remote_root_digest
-            and not remote_state
-        ):
+        if isinstance(remote_root_digest, str) and local_tree.root_hash == remote_root_digest and not remote_state:
             return []
 
         return local_tree.get_diff(remote_tree)
@@ -171,11 +165,11 @@ class AntiEntropyReconciler:
     def reconcile(self, peer_id: str, peer_vc_dict: Dict[str, int], peer_root_hash: Optional[str]) -> str:
         peer_vc = VectorClock.from_dict(peer_vc_dict)
         comparison = self.vector_clock.compare(peer_vc)
-        
+
         local_tree = self.get_merkle_tree()
         if local_tree.get_root_hash() == peer_root_hash:
             return "NO_SYNC_NEEDED"
-        
+
         if comparison == "BEFORE":
             return "PULL_FROM_PEER"
         elif comparison == "AFTER":

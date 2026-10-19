@@ -6,6 +6,7 @@ import jwt
 from gossipmesh.core.rate_limit import RateLimiter
 from gossipmesh.core.config import settings
 
+
 def get_org_id_from_request(request: Request) -> Optional[int]:
     """Extract organization ID from the request if possible."""
     org_id = request.path_params.get("organization_id")
@@ -23,6 +24,7 @@ def get_org_id_from_request(request: Request) -> Optional[int]:
             pass
 
     return None
+
 
 def get_identifier(request: Request) -> str:
     """Get the identifier for rate limiting."""
@@ -44,6 +46,7 @@ def get_identifier(request: Request) -> str:
 
     client_ip = request.client.host if request.client else "unknown"
     return f"ip:{client_ip}"
+
 
 def rate_limit(limit_type: str, limit: int, window: int):
     limiter = RateLimiter(limit, window)

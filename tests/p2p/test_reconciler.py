@@ -1,29 +1,33 @@
 import unittest
 from gossipmesh.p2p.vector_clock import VectorClock
-<<<<<<< HEAD
-from gossipmesh.p2p.reconciler import MerkleTree, VectorClockReconciler
+from gossipmesh.p2p.reconciler import (
+    AntiEntropyReconciler,
+    MerkleTree,
+    VectorClockReconciler,
+)
+
 
 class TestVectorClockAndReconciler(unittest.TestCase):
     def test_vector_clock_operations(self):
         vc1 = VectorClock({"node_a": 1})
         vc2 = VectorClock({"node_a": 2})
-        
-        self.assertEqual(vc1.compare(vc2), 'before')
-        self.assertEqual(vc2.compare(vc1), 'after')
-        
+
+        self.assertEqual(vc1.compare(vc2), "before")
+        self.assertEqual(vc2.compare(vc1), "after")
+
         vc1.increment("node_a")
-        self.assertEqual(vc1.compare(vc2), 'equal')
-        
+        self.assertEqual(vc1.compare(vc2), "equal")
+
         vc3 = VectorClock({"node_b": 1})
-        self.assertEqual(vc1.compare(vc3), 'concurrent')
+        self.assertEqual(vc1.compare(vc3), "concurrent")
 
     def test_merkle_tree_diff(self):
         data1 = {"k1": "v1", "k2": "v2"}
         data2 = {"k1": "v1", "k2": "v_modified", "k3": "v3"}
-        
+
         t1 = MerkleTree(data1)
         t2 = MerkleTree(data2)
-        
+
         self.assertNotEqual(t1.root_hash, t2.root_hash)
         diffs = t1.get_diff(t2)
         self.assertIn("k2", diffs)
@@ -37,15 +41,12 @@ class TestVectorClockAndReconciler(unittest.TestCase):
 
         vc_b = VectorClock({"node_a": 1, "node_b": 1})
         state_b = {"item1": "val1", "item2": "val2_updated"}
-        
+
         digest_vc, digest_root = reconciler_a.generate_digest()
-        
+
         diffs = reconciler_a.reconcile(digest_vc, digest_root, state_b)
         self.assertEqual(diffs, ["item2"])
 
-if __name__ == '__main__':
-=======
-from gossipmesh.p2p.reconciler import MerkleTree, AntiEntropyReconciler
 
 class TestVectorClock(unittest.TestCase):
     def test_vector_clock_operations(self):
@@ -53,14 +54,15 @@ class TestVectorClock(unittest.TestCase):
         vc2 = VectorClock({"nodeA": 2})
         self.assertEqual(vc1.compare(vc2), "BEFORE")
         self.assertEqual(vc2.compare(vc1), "AFTER")
-        
+
         vc3 = VectorClock({"nodeA": 1, "nodeB": 1})
         vc4 = VectorClock({"nodeA": 1, "nodeB": 2})
         self.assertEqual(vc3.compare(vc4), "BEFORE")
-        
+
         vc5 = VectorClock({"nodeA": 2, "nodeB": 1})
         vc6 = VectorClock({"nodeA": 1, "nodeB": 2})
         self.assertEqual(vc5.compare(vc6), "CONCURRENT")
+
 
 class TestMerkleTreeAndReconciler(unittest.TestCase):
     def test_merkle_tree_hashing(self):
@@ -95,6 +97,6 @@ class TestMerkleTreeAndReconciler(unittest.TestCase):
         diffs = rec1.find_differences(rec2.store)
         self.assertIn("key2", diffs)
 
+
 if __name__ == "__main__":
->>>>>>> origin/main
     unittest.main()

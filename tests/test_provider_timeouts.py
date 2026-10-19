@@ -6,13 +6,11 @@ from gossipmesh.providers.gemini_adapter import GeminiProvider
 from gossipmesh.providers.ollama_adapter import OllamaProvider
 from unittest.mock import patch, MagicMock, AsyncMock
 
-class TestProviderTimeouts(unittest.IsolatedAsyncioTestCase):
 
+class TestProviderTimeouts(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.request = GenerationRequest(
-            messages=[Message(role="user", content="hello")],
-            model="test-model",
-            timeout=15.5
+            messages=[Message(role="user", content="hello")], model="test-model", timeout=15.5
         )
 
     @patch("gossipmesh.providers.openai_adapter.AsyncOpenAI")
@@ -84,6 +82,7 @@ class TestProviderTimeouts(unittest.IsolatedAsyncioTestCase):
         mock_client_instance.post.assert_called_once()
         _, kwargs = mock_client_instance.post.call_args
         self.assertEqual(kwargs.get("timeout"), 15.5)
+
 
 if __name__ == "__main__":
     unittest.main()

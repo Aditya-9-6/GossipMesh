@@ -1,8 +1,10 @@
 from typing import List
 from gossipmesh.p2p.digest import HyperLogLogDigest
 
+
 class GossipDigestCompactor:
     """Compacts node state IDs into HLL digests and computes Jaccard-like distance diffs."""
+
     def __init__(self, precision: int = 12):
         self.precision = precision
 
@@ -17,10 +19,10 @@ class GossipDigestCompactor:
         est_local = local_digest.estimate_cardinality()
         est_remote = remote_digest.estimate_cardinality()
         est_merged = merged.estimate_cardinality()
-        
+
         if est_merged == 0:
             return 0.0
-        
+
         intersection = max(0.0, est_local + est_remote - est_merged)
         union = est_merged
         jaccard_similarity = intersection / union if union > 0 else 1.0

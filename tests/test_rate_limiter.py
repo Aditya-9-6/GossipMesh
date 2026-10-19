@@ -3,6 +3,7 @@ import asyncio
 from gossipmesh.p2p.rate_limiter import TokenBucketRateLimiter
 from gossipmesh.p2p.connection_manager import ConnectionManager
 
+
 @pytest.mark.asyncio
 async def test_rate_limiter_basic():
     limiter = TokenBucketRateLimiter(capacity=2.0, refill_rate=1.0)
@@ -11,6 +12,7 @@ async def test_rate_limiter_basic():
     assert await limiter.consume("peer1", 1.0) is False
     await asyncio.sleep(1.1)
     assert await limiter.consume("peer1", 1.0) is True
+
 
 @pytest.mark.asyncio
 async def test_rate_limiter_memory_bound():
@@ -22,6 +24,7 @@ async def test_rate_limiter_memory_bound():
     assert await limiter.consume("peerC") is True
     assert "peerC" in limiter.buckets
     assert "peerA" not in limiter.buckets
+
 
 @pytest.mark.asyncio
 async def test_connection_manager_admission():

@@ -4,10 +4,12 @@ import time
 from collections import OrderedDict
 from typing import Any, Optional, Tuple
 
+
 class GossipMessageCache:
     """High-performance, bounded-memory LRU message deduplication cache
     with active time-to-live (TTL) eviction and O(1) amortized lookup/insertion.
     """
+
     def __init__(self, capacity: int = 10000, default_ttl: float = 300.0, key: Optional[bytes] = None):
         if capacity <= 0:
             raise ValueError("Cache capacity must be greater than 0.")
@@ -20,13 +22,13 @@ class GossipMessageCache:
 
     def _compute_digest(self, message_id: str) -> str:
         """Computes a collision-resistant digest for the message ID."""
-        if hasattr(hashlib, 'siphash24'):
+        if hasattr(hashlib, "siphash24"):
             h = hashlib.siphash24()
-            h.update(message_id.encode('utf-8'))
+            h.update(message_id.encode("utf-8"))
             return h.hexdigest()
         else:
             # HMAC-SipHash simulation fallback
-            return hmac.new(self.key, message_id.encode('utf-8'), hashlib.sha256).hexdigest()
+            return hmac.new(self.key, message_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def _evict_expired(self, current_time: float) -> None:
         """Active TTL eviction of expired cache entries."""
@@ -76,7 +78,7 @@ class GossipMessageCache:
         digest = self._compute_digest(message_id)
         current_time = time.time()
         self._evict_expired(current_time)
-        
+
         ttl_val = ttl if ttl is not None else self.default_ttl
         if ttl_val <= 0:
             raise ValueError("TTL must be greater than 0.")

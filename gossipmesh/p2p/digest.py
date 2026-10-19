@@ -5,8 +5,10 @@ import base64
 import threading
 from typing import Set, List, Dict, Any, Optional
 
+
 class HyperLogLogDigest:
     """HyperLogLog cardinality estimation digest for peer state sets."""
+
     def __init__(self, precision: int = 12, registers: Optional[List[int]] = None):
         if precision < 4 or precision > 16:
             raise ValueError("Precision must be between 4 and 16 inclusive.")
@@ -19,8 +21,8 @@ class HyperLogLogDigest:
         h = 17
         for char in item:
             h = (h * 31 + ord(char)) & 0xFFFFFFFF
-        h = (h ^ (h >> 16)) * 0x85ebca6b
-        h = (h ^ (h >> 13)) * 0xc2b2ae35
+        h = (h ^ (h >> 16)) * 0x85EBCA6B
+        h = (h ^ (h >> 13)) * 0xC2B2AE35
         h = h ^ (h >> 16)
         return h & 0xFFFFFFFF
 
@@ -36,7 +38,7 @@ class HyperLogLogDigest:
         if w == 0:
             return max_bits + 1
         val = bin(w)[2:].zfill(max_bits)
-        return val.index('1') + 1
+        return val.index("1") + 1
 
     def estimate_cardinality(self) -> float:
         m = self.m
@@ -44,8 +46,8 @@ class HyperLogLogDigest:
         raw_sum = sum(2.0 ** (-r) for r in self.registers)
         if raw_sum == 0:
             return 0.0
-        estimate = alpha * (m ** 2) / raw_sum
-        
+        estimate = alpha * (m**2) / raw_sum
+
         # Small range correction (LinearCounting)
         if estimate <= 2.5 * m:
             zeros = self.registers.count(0)
@@ -53,28 +55,25 @@ class HyperLogLogDigest:
                 estimate = m * math.log(m / zeros)
         return float(estimate)
 
-    def merge(self, other: 'HyperLogLogDigest') -> 'HyperLogLogDigest':
+    def merge(self, other: "HyperLogLogDigest") -> "HyperLogLogDigest":
         if self.precision != other.precision:
             raise ValueError("Cannot merge HyperLogLog digests with different precisions.")
         new_registers = [max(a, b) for a, b in zip(self.registers, other.registers)]
         return HyperLogLogDigest(precision=self.precision, registers=new_registers)
 
     def serialize(self) -> str:
-        data = {
-            "precision": self.precision,
-            "registers": self.registers
-        }
+        data = {"precision": self.precision, "registers": self.registers}
         return json.dumps(data)
 
     @classmethod
-    def deserialize(cls, data_str: str) -> 'HyperLogLogDigest':
+    def deserialize(cls, data_str: str) -> "HyperLogLogDigest":
         data = json.loads(data_str)
         return cls(precision=data["precision"], registers=data["registers"])
 
 
 class BloomFilterDigest:
     """Space-efficient dynamic Bloom filter digest for P2P anti-entropy state reconciliation."""
-    
+
     def __init__(self, capacity: int = 1000, error_rate: float = 0.01) -> None:
         self.capacity = max(1, capacity)
         self.error_rate = min(max(0.0001, error_rate), 0.5)
@@ -100,8 +99,8 @@ class BloomFilterDigest:
         return self._num_hashes
 
     def _get_hashes(self, item: str) -> List[int]:
-        digest1 = int(hashlib.sha256(item.encode('utf-8')).hexdigest(), 16)
-        digest2 = int(hashlib.md5(item.encode('utf-8')).hexdigest(), 16)
+        digest1 = int(hashlib.sha256(item.encode("utf-8")).hexdigest(), 16)
+        digest2 = int(hashlib.md5(item.encode("utf-8")).hexdigest(), 16)
         return [(digest1 + i * digest2) % self._bit_array_size for i in range(self._num_hashes)]
 
     def add(self, item: str) -> None:
@@ -110,7 +109,7 @@ class BloomFilterDigest:
                 idx = h // 64
                 bit = h % 64
                 if not (self._bits[idx] & (1 << bit)):
-                    self._bits[idx] |= (1 << bit)
+                    self._bits[idx] |= 1 << bit
                     self._size += 1
 
     def __contains__(self, item: str) -> bool:
@@ -129,8 +128,8 @@ class BloomFilterDigest:
         with self._lock:
             bit_bytes = bytearray()
             for word in self._bits:
-                bit_bytes.extend(word.to_bytes(8, byteorder='big', signed=False))
-            encoded = base64.b64encode(bytes(bit_bytes)).decode('utf-8')
+                bit_bytes.extend(word.to_bytes(8, byteorder="big", signed=False))
+            encoded = base64.b64encode(bytes(bit_bytes)).decode("utf-8")
             return {
                 "capacity": self.capacity,
                 "error_rate": self.error_rate,
@@ -149,6 +148,8 @@ class BloomFilterDigest:
         instance._size = size_val
         instance._bit_array_size = data.get("bit_array_size", instance._bit_array_size)
         instance._num_hashes = data.get("num_hashes", data.get("hash_count", instance._num_hashes))
-        decoded = base64.b64decode(data["bits"].encode('utf-8'))
-        instance._bits = [int.from_bytes(decoded[i:i+8], byteorder='big', signed=False) for i in range(0, len(decoded), 8)]
+        decoded = base64.b64decode(data["bits"].encode("utf-8"))
+        instance._bits = [
+            int.from_bytes(decoded[i : i + 8], byteorder="big", signed=False) for i in range(0, len(decoded), 8)
+        ]
         return instance

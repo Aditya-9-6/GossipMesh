@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.p2p.digest import HyperLogLogDigest
 
+
 class TestHyperLogLogDigest(unittest.TestCase):
     def test_init_validation(self):
         with self.assertRaises(ValueError):
@@ -13,7 +14,7 @@ class TestHyperLogLogDigest(unittest.TestCase):
         items = [f"msg-{i}" for i in range(1000)]
         for item in items:
             hll.add(item)
-        
+
         estimate = hll.estimate_cardinality()
         error = abs(estimate - 1000) / 1000.0
         self.assertLess(error, 0.05, f"Error {error} exceeds tolerance")
@@ -42,5 +43,6 @@ class TestHyperLogLogDigest(unittest.TestCase):
         with self.assertRaises(ValueError):
             hll1.merge(hll2)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
