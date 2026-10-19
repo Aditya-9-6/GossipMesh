@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubIntegration:
-
     def __init__(self, owner: str, repo: str, pr_number: int, github_pr_service: GitHubPRService):
         self.owner = owner
         self.repo = repo
@@ -125,12 +124,7 @@ class GitHubIntegration:
                     body += f"\n<!-- fingerprint: {f.fingerprint} -->\n"
                 body += "\n---\n"
 
-            comment_payload = {
-                "body": body,
-                "path": file_path,
-                "side": side,
-                "line": line
-            }
+            comment_payload = {"body": body, "path": file_path, "side": side, "line": line}
             if end_line and end_line != line:
                 comment_payload["start_line"] = line
                 comment_payload["line"] = end_line
@@ -147,7 +141,7 @@ class GitHubIntegration:
                     "commit_id": commit_sha,
                     "body": "### AI Code Review Findings",
                     "event": "COMMENT",
-                    "comments": payloads
+                    "comments": payloads,
                 }
                 response = await self.github_pr_service.post_pr_review(
                     self.owner, self.repo, self.pr_number, review_payload
@@ -186,10 +180,7 @@ class GitHubIntegration:
 
             try:
                 await self.github_pr_service.post_pr_review(
-                    self.owner,
-                    self.repo,
-                    self.pr_number,
-                    {"body": fallback_body, "event": "COMMENT"}
+                    self.owner, self.repo, self.pr_number, {"body": fallback_body, "event": "COMMENT"}
                 )
             except Exception as e:
                 logger.error(f"Failed to post fallback review summary: {e}")

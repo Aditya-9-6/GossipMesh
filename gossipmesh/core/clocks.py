@@ -1,11 +1,13 @@
 import threading
 from typing import Dict, Set, Optional, Tuple
 
+
 class VectorClock:
     """
     Thread-safe vector clock supporting zero-copy state comparisons,
     delta encodings, and anti-entropy synchronization.
     """
+
     def __init__(self, node_id: str, clock: Optional[Dict[str, int]] = None):
         self.node_id = node_id
         self._clock: Dict[str, int] = dict(clock) if clock is not None else {node_id: 0}

@@ -4,8 +4,10 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives import serialization
 
+
 class EphemeralSessionKeyRotator:
     """Manages ephemeral Curve25519 keys and derives session keys for transport."""
+
     def __init__(self) -> None:
         self.private_key = x25519.X25519PrivateKey.generate()
         self.public_key = self.private_key.public_key()
@@ -13,10 +15,7 @@ class EphemeralSessionKeyRotator:
         self.session_key = None
 
     def get_public_bytes(self) -> bytes:
-        return self.public_key.public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw
-        )
+        return self.public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
 
     def derive_shared_secret(self, peer_public_bytes: bytes) -> bytes:
         peer_pub = x25519.X25519PublicKey.from_public_bytes(peer_public_bytes)
@@ -31,8 +30,7 @@ class EphemeralSessionKeyRotator:
         self.current_key = AESGCM.generate_key(bit_length=256)
         self.session_key = None
         pub_bytes = self.public_key.public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw
+            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
         )
         return self.current_key, pub_bytes
 

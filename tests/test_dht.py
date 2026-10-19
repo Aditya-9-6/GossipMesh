@@ -2,6 +2,7 @@ import unittest
 import hashlib
 from gossipmesh.p2p.dht import KademliaDHT, KademliaNode
 
+
 class TestKademliaDHT(unittest.TestCase):
     def test_xor_distance_and_routing(self):
         local_id = hashlib.sha256(b"node_local").hexdigest()
@@ -25,6 +26,7 @@ class TestKademliaDHT(unittest.TestCase):
         dht = KademliaDHT(local_node_id=local_id)
         dht.store("agent:alpha", "active")
         self.assertEqual(dht.get("agent:alpha"), "active")
+
 
 if __name__ == "__main__":
     unittest.main()

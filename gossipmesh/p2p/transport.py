@@ -11,11 +11,18 @@ from gossipmesh.p2p.fountain import FountainEncoder, FountainDecoder
 
 logger = logging.getLogger(__name__)
 
+
 class WindowedEMABandwidthThrottler:
     """Calculates rolling byte rates over sliding time windows using Exponential Moving Average (EMA)
     and enforces strict traffic shaping via token bucket algorithms. Decouples stream monitoring from serialization."""
 
-    def __init__(self, capacity: float = 1024.0 * 1024.0, refill_rate: float = 1024.0 * 1024.0, alpha: float = 0.3, window_seconds: float = 1.0):
+    def __init__(
+        self,
+        capacity: float = 1024.0 * 1024.0,
+        refill_rate: float = 1024.0 * 1024.0,
+        alpha: float = 0.3,
+        window_seconds: float = 1.0,
+    ):
         self.capacity = float(capacity)
         self.refill_rate = float(refill_rate)
         self.alpha = float(alpha)
@@ -30,7 +37,7 @@ class WindowedEMABandwidthThrottler:
         Returns (allowed, current_ema_rate)."""
         if now is None:
             now = time.time()
-        
+
         with self._lock:
             elapsed = now - self.last_update_time
             if elapsed > 0:
@@ -57,8 +64,9 @@ class WindowedEMABandwidthThrottler:
 
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
-every 1000 messages or 300 seconds without dropping streams."""
-    def __init__(self, max_messages: int=1000, max_time_seconds: float=300.0):
+    every 1000 messages or 300 seconds without dropping streams."""
+
+    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.max_messages = max_messages
         self.max_time_seconds = max_time_seconds
         self.msg_count = 0
@@ -97,6 +105,7 @@ every 1000 messages or 300 seconds without dropping streams."""
 
 class TransportTelemetry:
     """Telemetry tracking metrics for gossip transport layer."""
+
     def __init__(self) -> None:
         self.sent_bytes = 0
         self.received_bytes = 0
@@ -126,7 +135,8 @@ class TransportTelemetry:
 
 class GossipTransport:
     """High-level P2P gossip transport integrating rate limiting, framing, and topic dispatch."""
-    def __init__(self, node_id: str, config: Optional[RateLimitConfig]=None) -> None:
+
+    def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None) -> None:
         self.node_id = node_id
         self.rate_limiter = PeerRateLimiter(config)
         self.bandwidth_throttler = WindowedEMABandwidthThrottler()
@@ -138,9 +148,11 @@ class GossipTransport:
         """Registers a callback handler for a gossip topic."""
         self.handlers[topic] = handler
 
-    async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str='default') -> Optional[Any]:
+    async def receive_payload(
+        self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = "default"
+    ) -> Optional[Any]:
         """Receives, rate-limits, parses, and dispatches a payload from a peer."""
-        raw_bytes = json.dumps(payload).encode('utf-8') if not isinstance(payload, bytes) else payload
+        raw_bytes = json.dumps(payload).encode("utf-8") if not isinstance(payload, bytes) else payload
         size = len(raw_bytes)
 
         allowed, ema = self.bandwidth_throttler.update_and_check(size)
@@ -154,14 +166,16 @@ class GossipTransport:
             return None
 
         self.telemetry.record_received(size)
-        handler = self.handlers.get(topic) or self.handlers.get('default')
+        handler = self.handlers.get(topic) or self.handlers.get("default")
         if handler:
             if asyncio.iscoroutinefunction(handler):
                 return await handler(payload)
             return handler(payload)
         return payload
 
-    async def receive_fountain_symbol(self, stream_id: str, seq: int, total_symbols: int, symbol: bytes, topic: str='default') -> Optional[Any]:
+    async def receive_fountain_symbol(
+        self, stream_id: str, seq: int, total_symbols: int, symbol: bytes, topic: str = "default"
+    ) -> Optional[Any]:
         size = len(symbol)
         allowed, _ = self.bandwidth_throttler.update_and_check(size)
         if not allowed:
@@ -172,7 +186,7 @@ class GossipTransport:
 
     async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict]) -> bool:
         """Simulates sending a payload to a peer with telemetry recording."""
-        raw_bytes = json.dumps(payload).encode('utf-8') if not isinstance(payload, bytes) else payload
+        raw_bytes = json.dumps(payload).encode("utf-8") if not isinstance(payload, bytes) else payload
         size = len(raw_bytes)
         allowed, _ = self.bandwidth_throttler.update_and_check(size)
         if not allowed:
@@ -192,7 +206,8 @@ class GossipTransport:
 
 class TransportSocketReader:
     """Low-level transport socket reader with zero-allocation memoryview parsing pipelines."""
-    def __init__(self, reader: asyncio.StreamReader, expected_magic: int=1196246355) -> None:
+
+    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 1196246355) -> None:
         self.reader = reader
         self.expected_magic = expected_magic
 
@@ -201,10 +216,10 @@ class TransportSocketReader:
             header = await self.reader.readexactly(12)
             if len(header) < 12:
                 return None
-            magic = int.from_bytes(header[0:4], byteorder='big')
+            magic = int.from_bytes(header[0:4], byteorder="big")
             if magic != self.expected_magic:
                 return None
-            length = int.from_bytes(header[4:12], byteorder='big')
+            length = int.from_bytes(header[4:12], byteorder="big")
             payload_bytes = await self.reader.readexactly(length)
             return (magic, "default", memoryview(payload_bytes))
         except Exception:

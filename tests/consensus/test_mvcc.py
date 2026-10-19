@@ -9,7 +9,7 @@ class TestMVCCStateStash(unittest.TestCase):
     def test_basic_read_write(self):
         epoch, read_set = self.stash.begin_transaction()
         self.assertEqual(epoch, 0)
-        
+
         write_set = {"agent_memory": "state_v1"}
         commit_epoch = self.stash.validate_and_commit(read_set, write_set)
         self.assertEqual(commit_epoch, 1)

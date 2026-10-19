@@ -51,6 +51,11 @@ def load_private_key(key_input: Optional[str] = None):
         p = Path(key_input)
         if p.is_file():
             pem_bytes = p.read_bytes()
+        elif not p.is_absolute() and not p.exists():
+            # Check relative to repo root if current working directory differs
+            repo_root_p = Path(__file__).resolve().parent.parent / key_input
+            if repo_root_p.is_file():
+                pem_bytes = repo_root_p.read_bytes()
         elif "BEGIN" in key_input:
             pem_bytes = key_input.encode("utf-8")
 
@@ -152,9 +157,7 @@ def issue_license(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Issue offline RSA-4096 signed JWT enterprise license tokens."
-    )
+    parser = argparse.ArgumentParser(description="Issue offline RSA-4096 signed JWT enterprise license tokens.")
     parser.add_argument("--customer-id", required=True, help="Customer ID (e.g., acme-fintech-corp)")
     parser.add_argument(
         "--bundle",

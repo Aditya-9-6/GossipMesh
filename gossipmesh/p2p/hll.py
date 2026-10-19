@@ -8,15 +8,16 @@ try:
 except ImportError:
     mmh3 = None
 
+
 class WindowedHyperLogLog:
     """Memory-efficient windowed HyperLogLog cardinality estimator
     using fixed 8-bit registers within a 1KB bytearray, strict O(1) insertion,
     and time-decaying sliding windows."""
-    
+
     def __init__(self, num_registers: int = 1024, window_ttl: float = 300.0) -> None:
         if num_registers < 16 or (num_registers & (num_registers - 1)) != 0:
             raise ValueError("Number of registers must be a power of 2 and at least 16")
-        
+
         self.num_registers = num_registers
         self.window_ttl = window_ttl
         self.p = int(math.log2(num_registers))
@@ -45,15 +46,15 @@ class WindowedHyperLogLog:
     def add(self, item: Union[str, bytes], current_time: Optional[float] = None) -> None:
         if not isinstance(item, (str, bytes)):
             raise TypeError("Item must be str or bytes")
-        
+
         if isinstance(item, str):
-            item_bytes = item.encode('utf-8')
+            item_bytes = item.encode("utf-8")
         else:
             item_bytes = item
-            
+
         t = current_time if current_time is not None else time.time()
-        h = self._hash(item_bytes if isinstance(item, str) else item.decode('utf-8', errors='ignore'))
-        
+        h = self._hash(item_bytes if isinstance(item, str) else item.decode("utf-8", errors="ignore"))
+
         idx = h & (self.num_registers - 1)
         w_val = h >> self.p
         leading_zeros = self._rho(w_val, 64 - self.p)
@@ -80,7 +81,7 @@ class WindowedHyperLogLog:
         with self._lock:
             self.decay(t)
             m = self.num_registers
-            
+
             # Alpha constant determination
             if m == 16:
                 alpha = 0.673
@@ -90,7 +91,7 @@ class WindowedHyperLogLog:
                 alpha = 0.709
             else:
                 alpha = 0.7213 / (1.0 + 1.079 / m)
-                
+
             raw_sum = 0.0
             zero_count = 0
             for val in self.registers:
@@ -99,27 +100,27 @@ class WindowedHyperLogLog:
                     raw_sum += 1.0
                 else:
                     raw_sum += 2.0 ** (-val)
-                    
+
             estimate = alpha * (m * m) / raw_sum
-            
+
             # Small range correction (LinearCounting)
             if estimate <= 2.5 * m and zero_count > 0:
                 estimate = m * math.log(m / zero_count)
-                
+
             return float(estimate)
 
-    def merge(self, other: 'WindowedHyperLogLog') -> None:
+    def merge(self, other: "WindowedHyperLogLog") -> None:
         if not isinstance(other, WindowedHyperLogLog):
             raise TypeError("Can only merge with another WindowedHyperLogLog")
         if self.num_registers != other.num_registers:
             raise ValueError("Cannot merge estimators with differing register counts")
-            
+
         with self._lock, other._lock:
             t = time.time()
             for i in range(self.num_registers):
                 self._decay_register(i, t)
                 other._decay_register(i, t)
-                
+
                 if other.registers[i] > self.registers[i]:
                     self.registers[i] = other.registers[i]
                     self.timestamps[i] = other.timestamps[i]

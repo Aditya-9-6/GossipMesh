@@ -51,9 +51,7 @@ class GossipMessageRouter:
 
     def __init__(self, queue_config: Optional[PriorityQueueConfig] = None) -> None:
         self.queue = WeightedPriorityQueue(config=queue_config)
-        self._type_priorities: Dict[str, MessagePriority] = dict(
-            self.DEFAULT_TYPE_PRIORITIES
-        )
+        self._type_priorities: Dict[str, MessagePriority] = dict(self.DEFAULT_TYPE_PRIORITIES)
         self._incoming_handlers: Dict[str, Callable[[Any], Any]] = {}
         self._dispatched_count: int = 0
         self._lock = threading.Lock()
@@ -64,9 +62,7 @@ class GossipMessageRouter:
         with self._lock:
             return self._type_priorities.get(normalized, MessagePriority.NORMAL)
 
-    def set_priority_override(
-        self, message_type: str, priority: MessagePriority
-    ) -> None:
+    def set_priority_override(self, message_type: str, priority: MessagePriority) -> None:
         """Registers a custom priority level for a specific message type."""
         normalized = message_type.lower().strip()
         with self._lock:
@@ -87,22 +83,14 @@ class GossipMessageRouter:
             raise ValueError("message_type cannot be empty")
 
         msg_id = message_id or str(uuid.uuid4())
-        priority = (
-            priority_override
-            if priority_override is not None
-            else self.classify_priority(message_type)
-        )
-        return self.queue.enqueue(
-            message_id=msg_id, payload=payload, priority=priority, size_bytes=size_bytes
-        )
+        priority = priority_override if priority_override is not None else self.classify_priority(message_type)
+        return self.queue.enqueue(message_id=msg_id, payload=payload, priority=priority, size_bytes=size_bytes)
 
     def get_next_outgoing(self) -> Optional[PrioritizedMessage]:
         """Dequeues the next scheduled outgoing message."""
         return self.queue.dequeue()
 
-    def register_handler(
-        self, message_type: str, handler: Callable[[Any], Any]
-    ) -> None:
+    def register_handler(self, message_type: str, handler: Callable[[Any], Any]) -> None:
         """Registers a callback handler for processing incoming messages of a type."""
         normalized = message_type.lower().strip()
         with self._lock:

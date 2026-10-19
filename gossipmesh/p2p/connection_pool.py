@@ -9,6 +9,7 @@ from gossipmesh.p2p.backpressure import BackpressureSignalManager, BackpressureC
 
 class ConnectionPriority(enum.IntEnum):
     """Connection priority levels (lower integer = higher priority)."""
+
     CRITICAL = 0
     HIGH = 1
     NORMAL = 2
@@ -18,6 +19,7 @@ class ConnectionPriority(enum.IntEnum):
 @dataclass(frozen=True)
 class ConnectionPoolConfig:
     """Configuration parameters for the leaky-bucket connection pool."""
+
     max_capacity: int = 100
     leak_rate: float = 5.0  # Connections drained per second in leaky-bucket mode
     default_priority: ConnectionPriority = ConnectionPriority.NORMAL
@@ -27,6 +29,7 @@ class ConnectionPoolConfig:
 @dataclass
 class PeerConnection:
     """Represents an active peer connection inside the pool with metadata."""
+
     peer_id: str
     socket_ref: Any
     priority: ConnectionPriority
