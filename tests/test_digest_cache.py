@@ -3,6 +3,7 @@ import time
 import threading
 from gossipmesh.p2p.digest import LRUDigestCache
 
+
 class TestLRUDigestCache(unittest.TestCase):
     def test_basic_add_and_contains(self):
         cache = LRUDigestCache(max_size=3, default_ttl=60.0)
@@ -17,7 +18,7 @@ class TestLRUDigestCache(unittest.TestCase):
         cache.add("msg2")
         # Access msg1 so that msg2 becomes the least recently used
         self.assertTrue(cache.contains("msg1"))
-        
+
         # Adding msg3 should evict the least recently used, which is msg2
         cache.add("msg3")
         self.assertTrue(cache.contains("msg1"))
@@ -35,7 +36,7 @@ class TestLRUDigestCache(unittest.TestCase):
 
     def test_concurrent_access(self):
         cache = LRUDigestCache(max_size=1000, default_ttl=60.0)
-        
+
         def worker(start_idx: int):
             for i in range(100):
                 msg_id = f"msg_{start_idx}_{i}"
@@ -49,6 +50,7 @@ class TestLRUDigestCache(unittest.TestCase):
             t.join()
 
         self.assertLessEqual(len(cache), 1000)
+
 
 if __name__ == "__main__":
     unittest.main()

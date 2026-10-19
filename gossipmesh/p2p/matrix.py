@@ -1,9 +1,11 @@
 import time
 from typing import Dict, Any, List
 
+
 class EpidemicReachabilityMatrix:
     """Decentralized epidemic reachability matrix tracking message propagation
     probabilities and reachability metrics across mesh nodes."""
+
     def __init__(self, node_id: str, decay_factor: float = 0.95) -> None:
         self.node_id = node_id
         self.decay_factor = decay_factor
@@ -28,5 +30,5 @@ class EpidemicReachabilityMatrix:
     to_dict = lambda self: {
         "node_id": self.node_id,
         "reachability": self.reachability,
-        "average": self.average_reachability()
+        "average": self.average_reachability(),
     }

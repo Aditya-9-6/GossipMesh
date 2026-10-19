@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.core.clocks import VectorClock
 
+
 class TestVectorClock(unittest.TestCase):
     def test_initialization(self):
         vc = VectorClock("node-A")
@@ -34,6 +35,7 @@ class TestVectorClock(unittest.TestCase):
         vc1 = VectorClock("node-A", {"node-A": 1, "node-B": 2})
         vc2 = VectorClock("node-B", {"node-A": 1, "node-B": 2})
         self.assertEqual(vc1.compare(vc2.snapshot()), "EQUAL")
+
 
 if __name__ == "__main__":
     unittest.main()
