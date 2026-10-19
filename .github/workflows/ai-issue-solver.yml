@@ -84,6 +84,9 @@ jobs:
           GEMINI_KEY_POOL: ${{ secrets.GEMINI_KEY_POOL || '' }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY || '' }}
+          NVIDIA_API_KEY_2: ${{ secrets.NVIDIA_API_KEY_2 || '' }}
           ISSUE_NUM: ${{ steps.meta.outputs.num }}
           ISSUE_TITLE: ${{ steps.meta.outputs.title }}
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
