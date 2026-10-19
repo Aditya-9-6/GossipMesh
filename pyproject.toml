@@ -55,7 +55,17 @@ dependencies = [
     "httpx>=0.27.0",
     "PyGithub>=2.2.0",
     "pgvector>=0.2.5",
+<<<<<<< HEAD
     "networkx>=3.2.1"
+=======
+    "networkx>=3.2.1",
+    "boto3>=1.34.0",
+    "google-cloud-aiplatform>=1.40.0",
+    "tree-sitter>=0.21.3",
+    "tree-sitter-rust>=0.21.2",
+    "tree-sitter-cpp>=0.21.2",
+    "gitpython>=3.1.43"
+>>>>>>> origin/main
 ]
 
 [project.scripts]
@@ -73,7 +83,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "--cov=gossipmesh --cov-report=term-missing"
+addopts = "-q --durations=5"
 markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
