@@ -4,6 +4,7 @@ from gossipmesh.models.base import Base
 
 class GithubAppInstallation(Base):
     __tablename__ = "github_app_installations"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     installation_id = Column(Integer, unique=True, index=True, nullable=False)

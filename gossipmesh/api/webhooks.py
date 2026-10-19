@@ -63,11 +63,9 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
         if action == "created":
             record = GithubAppInstallation(
                 installation_id=inst_id,
+                organization_id=payload.get("organization_id", 1),
                 account_name=account.get("login", ""),
-                target_type=account.get("type", "Unknown"),
-                target_id=account.get("id", 0),
-                repository_selection=installation.get("repository_selection", "all"),
-                permissions=installation.get("permissions", {})
+                target_type=account.get("type", "Unknown")
             )
             db.add(record)
             db.flush()
@@ -121,7 +119,6 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
             job = PRReviewJob(pr_data)
             background_tasks.add_task(job.execute)
 
-    # Milestone 7: Issue Solver
     elif event == "issues":
         action = payload.get("action")
         if action == "opened":
@@ -129,7 +126,6 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
             workflow = IssueSolverWorkflow(issue_data)
             background_tasks.add_task(workflow.execute)
 
-    # Milestone 7: CI Fixer (Triggered by workflow_run completion)
     elif event == "workflow_run":
         action = payload.get("action")
         run_data = payload.get("workflow_run", {})
@@ -140,19 +136,13 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
     elif event == "issue_comment":
         action = payload.get("action")
         if action == "created":
-            # Handle human approval workflow or explicit commands
             comment_body = payload.get("comment", {}).get("body", "")
             if "/approve" in comment_body:
                 logger.info("Human approval received via comment.")
-                # Trigger approval state transition logic here
 
 
 @router.post("/github")
 async def github_webhook(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(deps.get_db)):
-    """
-    Handle incoming GitHub webhooks for Milestone 6 and 7.
-    Supported events: pull_request, issues, issue_comment, workflow_run
-    """
     event = request.headers.get("X-GitHub-Event")
     if not event:
         raise ValidationError(message="Missing X-GitHub-Event header")
@@ -176,13 +166,11 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks, db
 
     logger.info(f"Received GitHub webhook event: {event} with delivery_id: {delivery_id}")
 
-    # Check for idempotency
     existing_event = db.query(WebhookEvent).filter(WebhookEvent.delivery_id == delivery_id).first()
     if existing_event:
         logger.info(f"Webhook {delivery_id} already processed. Skipping.")
         return {"status": "already_processed", "event": event}
 
-    # Store event
     webhook_record = WebhookEvent(delivery_id=delivery_id, event=event, payload=payload, status="pending")
     db.add(webhook_record)
     try:
@@ -211,9 +199,6 @@ async def replay_github_webhook(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
-    """
-    Administrator-only webhook replay mechanism.
-    """
     if not current_user.is_superuser:
         raise AuthorizationError(message="Administrator privileges required")
 
@@ -226,7 +211,6 @@ async def replay_github_webhook(
         event_record.replayed_at = func.now()
         event_record.replayed_by = current_user.id
 
-        # Log AuditEvent
         audit = AuditEvent(
             action="webhook.replayed",
             actor_id=current_user.id,
