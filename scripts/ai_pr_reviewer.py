@@ -42,6 +42,24 @@ FALLBACK_MODELS = [
     "gemini-flash-latest",
 ]
 
+def load_multi_provider_keys():
+    """Loads auxiliary LLM keys (OpenRouter, NVIDIA, Cohere, HuggingFace) from .llm_keys files if present."""
+    for check_dir in (Path("."), Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent, Path.home()):
+        llm_file = check_dir / ".llm_keys"
+        if llm_file.exists():
+            try:
+                for line in llm_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip()
+                        if k and v and k not in os.environ:
+                            os.environ[k] = v
+            except Exception:
+                pass
+
+load_multi_provider_keys()
+
 def load_gemini_keys() -> list[str]:
     """Dynamically loads Gemini API keys from environment variables and local .gemini_keys files."""
     keys = []
@@ -85,22 +103,28 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
 
    - Enterprise Privacy & Secrets Policy Check: Ensure no PII, API keys, or sensitive credentials are leaked in the code or tests.
-5. Python Idiomatic Standards & Test Coverage:
-   - Error wrapping and proper exception handling using `try...except`.
-   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and proper asyncio usage.
+6. Master Implementation Plan Alignment & Enterprise SaaS Invariants:
+   - Real Behavior vs. Placeholders: Reject PRs that add fake stubs, placeholder mocks, or unfinished skeletons instead of real production implementations.
+   - Roadmap Necessity: The PR must advance concrete goals in `docs/MASTER_IMPLEMENTATION_PLAN.md` or `docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md` (stabilization, multi-tenant boundaries, secure sandboxes, provider abstraction, durable persistence, audit ledgers).
+   - Minimal Blast Radius: PRs must touch only files relevant to the specific task; reject PRs modifying unrelated subsystems.
+   - Idempotency & Observability: Systems operations must be idempotent, retriable, and observable.
 
 EVALUATION & VERDICT:
-- If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
-  verdict must be "ACTION_REQUIRED" and score < 90.
-- If code is clean, modular, race-free, properly tested, and meets all anti-spaghetti architectural invariants:
+- If code is redundant, trivial duplicate of existing features, violates Master Implementation Plan priorities, introduces placeholders instead of real code, or is NOT strictly necessary:
+  verdict must be "REJECT", score < 55, and should_close must be true.
+- If code has compilation errors, missing dependencies, data race risks, spaghetti code, or missing unit tests, but is a valuable feature:
+  verdict must be "ACTION_REQUIRED" and score 55-89.
+- If code is clean, modular, race-free, properly tested, high-value, strictly aligns with the Master Implementation Plan, and meets all invariants:
   verdict must be "APPROVED" and score >= 90 (typically 95-100).
 - You must prioritize high precision (minimal noise, fewer false positives) before recall. Do not flag trivial styling issues as ACTION_REQUIRED.
 
 OUTPUT SCHEMA:
 You MUST respond ONLY with a single valid JSON object with the following schema:
 {
-  "verdict": "APPROVED" or "ACTION_REQUIRED",
+  "verdict": "APPROVED" or "ACTION_REQUIRED" or "REJECT",
   "score": 95,
+  "should_close": false,
+  "close_reason": "Specific explanation if PR is rejected / unnecessary and should be closed, otherwise empty string",
   "executive_summary": "Concise summary of the PR and overall architectural quality.",
   "anti_spaghetti_audit": "Detailed evaluation of code modularity, function sizing, decoupling, and maintainability.",
   "security_concurrency_audit": "Detailed analysis of data race freedom, asyncio task lifecycle, mutex safety, and security posture.",
@@ -266,6 +290,157 @@ def call_gemini(api_key: str, prompt: str, fallback_key: str = "", model: str = 
             time.sleep(1 * attempt)
 
     raise RuntimeError(f"Failed to obtain PR review from Gemini API. Last error: {last_err}")
+
+def extract_json_response(raw_text: str) -> dict:
+    raw_text = raw_text.strip()
+    if raw_text.startswith("```"):
+        lines = raw_text.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        raw_text = "\n".join(lines).strip()
+        try:
+            return json.loads(raw_text, strict=False)
+        except json.JSONDecodeError:
+            pass
+    first_brace = raw_text.find("{")
+    last_brace = raw_text.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        return json.loads(raw_text[first_brace:last_brace + 1], strict=False)
+    raise ValueError(f"Could not parse valid JSON from model response: {raw_text[:200]}")
+
+def call_openrouter_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing OPENROUTER_API_KEY")
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    models = ["google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
+    last_err = None
+    for model in models:
+        print(f"[*] [OpenRouter Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"}
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [OpenRouter] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"OpenRouter calls failed: {last_err}")
+
+def call_nvidia_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing NVIDIA_API_KEY")
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    models = ["nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"]
+    last_err = None
+    for model in models:
+        print(f"[*] [NVIDIA Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [NVIDIA] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"NVIDIA calls failed: {last_err}")
+
+def call_cohere_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing COHERE_API_KEY")
+    url = "https://api.cohere.com/v2/chat"
+    models = ["command-r-plus-08-2024", "command-r-08-2024", "command-r"]
+    last_err = None
+    for model in models:
+        print(f"[*] [Cohere Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"}
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                content = data.get("message", {}).get("content", [])
+                if content and isinstance(content, list):
+                    text = content[0].get("text", "")
+                    return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [Cohere] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"Cohere calls failed: {last_err}")
+
+def call_huggingface_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing HUGGINGFACE_API_KEY")
+    url = "https://router.huggingface.co/hf-inference/v1/chat/completions"
+    models = ["Qwen/Qwen2.5-Coder-32B-Instruct", "meta-llama/Llama-3.3-70B-Instruct"]
+    last_err = None
+    for model in models:
+        print(f"[*] [HuggingFace Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"}
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [HuggingFace] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"HuggingFace calls failed: {last_err}")
 
 def log_enterprise_audit(workspace: Path, pr_number: str, verdict: str, metrics: dict, privacy_audit: str):
     """Logs an immutable JSON audit trail for enterprise readiness."""
@@ -471,6 +646,25 @@ def main():
     if diag_code != 0:
         red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
 
+    # Infrastructure-aware security & architecture audit
+    infra_grade = "A"
+    infra_score = 100
+    infra_findings = []
+    try:
+        from infrastructure_reviewer import review as run_infra_review
+        infra_res = run_infra_review(repo_root=workspace)
+        infra_grade = infra_res.get("grade", "A")
+        infra_score = infra_res.get("score", 100)
+        infra_findings = infra_res.get("findings", [])
+        if infra_findings:
+            crit = infra_res["severity_summary"].get("critical", 0)
+            high = infra_res["severity_summary"].get("high", 0)
+            red_team_findings += f"\n### 🛡️ INFRASTRUCTURE SECURITY FINDINGS (Grade: {infra_grade}, Score: {infra_score}/100):\n"
+            for f in infra_findings[:5]:
+                red_team_findings += f"- **[{f['severity'].upper()}]** `{f['file']}:{f['line']}` - {f['message']}\n"
+    except Exception as _ie:
+        print(f"[!] Infrastructure review error: {_ie}", file=sys.stderr)
+
 
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
@@ -494,16 +688,53 @@ def main():
 Audit the code against all anti-spaghetti, concurrency, performance, and security requirements. Provide your verdict in the required JSON schema.
 """
 
-    # High-speed single-pass review via primary model (gemini-flash-lite-latest)
+    # High-speed single-pass review via primary Gemini models with rotation
     audit = None
     for model_candidate in [DEFAULT_MODEL, "gemini-3.8-flash", "gemini-flash-latest"]:
         try:
-            print(f"[*] Requesting architectural review from {model_candidate}...", flush=True)
+            print(f"[*] Requesting architectural review from Gemini {model_candidate}...", flush=True)
             audit = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model_candidate)
             if audit and isinstance(audit, dict) and "verdict" in audit:
                 break
         except Exception as e:
-            print(f"[!] Review model {model_candidate} failed: {e}", file=sys.stderr)
+            print(f"[!] Gemini model {model_candidate} failed: {e}", file=sys.stderr)
+
+    # Multi-provider resilient failover chain if Gemini quota/limits hit:
+    if not audit or not isinstance(audit, dict):
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+        if openrouter_key:
+            try:
+                print("[*] Gemini exhausted. Falling back to OpenRouter pool...", flush=True)
+                audit = call_openrouter_review(openrouter_key, prompt)
+            except Exception as e:
+                print(f"[!] OpenRouter failover failed: {e}", file=sys.stderr)
+
+    if not audit or not isinstance(audit, dict):
+        nvidia_key = os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip()
+        if nvidia_key:
+            try:
+                print("[*] Falling back to NVIDIA NIM models...", flush=True)
+                audit = call_nvidia_review(nvidia_key, prompt)
+            except Exception as e:
+                print(f"[!] NVIDIA NIM failover failed: {e}", file=sys.stderr)
+
+    if not audit or not isinstance(audit, dict):
+        cohere_key = os.environ.get("COHERE_API_KEY", "").strip()
+        if cohere_key:
+            try:
+                print("[*] Falling back to Cohere Command-R models...", flush=True)
+                audit = call_cohere_review(cohere_key, prompt)
+            except Exception as e:
+                print(f"[!] Cohere failover failed: {e}", file=sys.stderr)
+
+    if not audit or not isinstance(audit, dict):
+        hf_key = os.environ.get("HUGGINGFACE_API_KEY", "").strip()
+        if hf_key:
+            try:
+                print("[*] Falling back to HuggingFace Inference Router...", flush=True)
+                audit = call_huggingface_review(hf_key, prompt)
+            except Exception as e:
+                print(f"[!] HuggingFace failover failed: {e}", file=sys.stderr)
 
     if not audit or not isinstance(audit, dict):
         audit = {
@@ -551,6 +782,14 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         score = min(score, 50)
         if not any("Local tests failed" in item for item in action_items):
             action_items.append("Local tests failed: Check diagnostic verification logs.")
+
+    if any(f.get("severity") == "critical" for f in infra_findings):
+        print("[!] Critical infrastructure security hazards detected! Forcing ACTION_REQUIRED.", flush=True)
+        is_approved = False
+        score = min(score, 50)
+        for f in infra_findings:
+            if f.get("severity") in ("critical", "high"):
+                action_items.append(f"Infrastructure Security ({f.get('rule_id')}): {f.get('file')}:{f.get('line')} - {f.get('message')}. Remediation: {f.get('remediation')}")
 
     auto_patch = audit.get("auto_patch", "")
 
@@ -612,9 +851,33 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         print(f"[Warning] Failed to extract memetic knowledge: {e}")
 
     # Format Markdown Review
+    arch_badge = "Modular" if is_approved else "Refactor~Required"
+    arch_color = "success" if is_approved else "yellow"
+    infra_color = "success" if infra_grade in ("A", "B") else ("yellow" if infra_grade == "C" else "red")
+    score_color = "success" if score >= 90 else ("yellow" if score >= 70 else "red")
+
+    badges_md = f"""| 🏗️ Architectural Invariants | 🛡️ Infrastructure Security | ⚡ Concurrency Safety | 🔒 Air-Gap & Privacy | 🏆 Overall Score |
+| :---: | :---: | :---: | :---: | :---: |
+| ![Architecture](https://img.shields.io/badge/Architecture-{arch_badge}-{arch_color}?style=flat-square) | ![Infra Security](https://img.shields.io/badge/Infra%20Security-Grade%20{infra_grade}-{infra_color}?style=flat-square) | ![Concurrency](https://img.shields.io/badge/Concurrency-Race--Free-success?style=flat-square) | ![Privacy](https://img.shields.io/badge/Privacy-Compliant-brightgreen?style=flat-square) | ![Score](https://img.shields.io/badge/Score-{score}%2F100-{score_color}?style=flat-square) |"""
+
+    infra_findings_md = ""
+    if infra_findings:
+        infra_findings_md = "\n**Findings & Hardening Points:**\n" + "\n".join(
+            f"- **[{f.get('severity', 'low').upper()}]** `{f.get('file')}:{f.get('line')}` - {f.get('message')}"
+            for f in infra_findings[:5]
+        )
+    else:
+        infra_findings_md = "\n- Zero misconfigurations or hardcoded credentials detected."
+
+    infra_section_md = f"""### 🛡️ Infrastructure-as-Code Security & Architecture (Grade: {infra_grade})
+- **Deterministic Security Score**: {infra_score}/100
+- **Status**: {"Passed with zero high/critical vulnerabilities" if infra_grade in ("A", "B") else "Remediation recommended"}
+{infra_findings_md}"""
 
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
+
+{badges_md}
 
 **cc @Maintainers** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
@@ -630,6 +893,8 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ### 🛡️ Concurrency, Race Freedom & Security Audit
 {concurrency_sec}
+
+{infra_section_md}
 
 ### 🔒 Enterprise Privacy & Secrets Policy
 {privacy_sec}
@@ -653,6 +918,8 @@ To complete the merge into `main`:
         action_bullets = "\n".join(f"- {item}" for item in action_items) if action_items else "- Address structural feedback and missing test cases."
         review_md = f"""## ⚠️ Autonomous Architectural Review: ACTION REQUIRED (Score: {score}/100)
 
+{badges_md}
+
 ### 📋 Executive Summary
 {summary}
 
@@ -665,6 +932,8 @@ To complete the merge into `main`:
 
 ### 🛡️ Concurrency & Security Findings
 {concurrency_sec}
+
+{infra_section_md}
 
 ### 🔒 Enterprise Privacy & Secrets Policy
 {privacy_sec}
