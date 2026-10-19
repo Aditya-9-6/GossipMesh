@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.p2p.rto import RTOEstimator
 
+
 class TestRTOEstimator(unittest.TestCase):
     def setUp(self):
         self.estimator = RTOEstimator()
@@ -43,5 +44,6 @@ class TestRTOEstimator(unittest.TestCase):
         self.assertIsNone(self.estimator.rttvar)
         self.assertEqual(self.estimator.rto, 1.0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

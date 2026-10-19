@@ -11,6 +11,7 @@ from gossipmesh.runtime.workflow import WorkflowManager
 
 router = APIRouter(prefix="/api/v1/approvals", tags=["approvals"])
 
+
 class ApprovalCreateRequest(BaseModel):
     workflow_id: Optional[int] = None
     repository_id: Optional[int] = None
@@ -19,8 +20,10 @@ class ApprovalCreateRequest(BaseModel):
     commit_sha: Optional[str] = None
     expires_in_hours: int = 24
 
+
 class ApprovalDecisionRequest(BaseModel):
     decision: str
+
 
 class ApprovalResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -36,6 +39,7 @@ class ApprovalResponse(BaseModel):
     approved_at: Optional[datetime]
     expires_at: datetime
     created_at: datetime
+
 
 @router.post("/", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
 def create_approval_gate(
@@ -58,6 +62,7 @@ def create_approval_gate(
     db.refresh(gate)
     return gate
 
+
 @router.get("/{approval_id}", response_model=ApprovalResponse)
 def get_approval_gate(
     approval_id: int,
@@ -67,7 +72,7 @@ def get_approval_gate(
     gate = db.query(ApprovalGate).filter(ApprovalGate.id == approval_id).first()
     if not gate:
         raise HTTPException(status_code=404, detail="Approval gate not found")
-    
+
     expires_at = gate.expires_at
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
@@ -78,6 +83,7 @@ def get_approval_gate(
         db.refresh(gate)
 
     return gate
+
 
 @router.post("/{approval_id}/decision", response_model=ApprovalResponse)
 def decide_approval(

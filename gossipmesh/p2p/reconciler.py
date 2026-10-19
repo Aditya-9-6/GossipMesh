@@ -3,8 +3,11 @@ import json
 from typing import Dict, List, Tuple, Any, Optional
 from gossipmesh.p2p.vector_clock import VectorClock
 
+
 class MerkleNode:
-    def __init__(self, key: str, value_hash: str, left: Optional['MerkleNode'] = None, right: Optional['MerkleNode'] = None):
+    def __init__(
+        self, key: str, value_hash: str, left: Optional["MerkleNode"] = None, right: Optional["MerkleNode"] = None
+    ):
         self.key = key
         self.value_hash = value_hash
         self.left = left
@@ -13,13 +16,14 @@ class MerkleNode:
 
     def _compute_hash(self) -> str:
         hasher = hashlib.sha256()
-        hasher.update(self.key.encode('utf-8'))
-        hasher.update(self.value_hash.encode('utf-8'))
+        hasher.update(self.key.encode("utf-8"))
+        hasher.update(self.value_hash.encode("utf-8"))
         if self.left:
-            hasher.update(self.left.hash.encode('utf-8'))
+            hasher.update(self.left.hash.encode("utf-8"))
         if self.right:
-            hasher.update(self.right.hash.encode('utf-8'))
+            hasher.update(self.right.hash.encode("utf-8"))
         return hasher.hexdigest()
+
 
 class MerkleTree:
     def __init__(self, data: Dict[str, str]):
@@ -30,19 +34,20 @@ class MerkleTree:
             return None
         if len(items) == 1:
             k, v = items[0]
-            val_hash = hashlib.sha256(v.encode('utf-8')).hexdigest()
+            val_hash = hashlib.sha256(v.encode("utf-8")).hexdigest()
             return MerkleNode(k, val_hash)
-        
+
         mid = len(items) // 2
         left_node = self._build_tree(items[:mid])
         right_node = self._build_tree(items[mid:])
-        
+
         k, v = items[mid]
-        val_hash = hashlib.sha256(v.encode('utf-8')).hexdigest()
+        val_hash = hashlib.sha256(v.encode("utf-8")).hexdigest()
         return MerkleNode(k, val_hash, left=left_node, right=right_node)
 
     def get_root_hash(self) -> Optional[str]:
         return self.root.hash if self.root else None
+
 
 class AntiEntropyReconciler:
     def __init__(self, node_id: str):
@@ -68,11 +73,11 @@ class AntiEntropyReconciler:
     def reconcile(self, peer_id: str, peer_vc_dict: Dict[str, int], peer_root_hash: Optional[str]) -> str:
         peer_vc = VectorClock.from_dict(peer_vc_dict)
         comparison = self.vector_clock.compare(peer_vc)
-        
+
         local_tree = self.get_merkle_tree()
         if local_tree.get_root_hash() == peer_root_hash:
             return "NO_SYNC_NEEDED"
-        
+
         if comparison == "BEFORE":
             return "PULL_FROM_PEER"
         elif comparison == "AFTER":

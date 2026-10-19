@@ -56,7 +56,7 @@ class GossipMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'GossipMessage':
+    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
         return cls(
             topic=data["topic"],
             origin_node=data["origin_node"],
@@ -73,6 +73,7 @@ class GossipNode:
     """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence
     and Adaptive Scatter-Width CPU-Load Feedback Shaping.
     Communicates via a shared ledger directory (file-backed mesh) or local bus."""
+
     def __init__(
         self,
         node_id: str,
@@ -87,7 +88,7 @@ class GossipNode:
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
         self.public_key = public_key or node_id
         self.pow_difficulty = pow_difficulty
-        
+
         if self.pow_difficulty > 0:
             if pow_nonce is None:
                 nonce, _ = mine_pow(self.public_key, self.pow_difficulty)
@@ -131,7 +132,7 @@ class GossipNode:
     ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
         current_scatter = self.scatter_governor.update()
-        
+
         topic_str = topic.value if isinstance(topic, GossipTopic) else topic
         msg = GossipMessage(
             topic=topic_str,
@@ -140,7 +141,7 @@ class GossipNode:
             repo=repo,
             ttl=ttl,
         )
-        
+
         if self.pow_difficulty > 0:
             nonce, _ = mine_pow(msg.message_id, self.pow_difficulty, self.pow_nonce)
             msg.payload["pow_nonce"] = nonce
@@ -201,10 +202,7 @@ class GossipNode:
     def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
         """Fetches the latest gossip messages from the in-memory cache."""
         topic_str = topic.value if topic else None
-        filtered = [
-            m for m in self.recent_messages
-            if topic_str is None or m.topic == topic_str
-        ]
+        filtered = [m for m in self.recent_messages if topic_str is None or m.topic == topic_str]
         return list(filtered)[-limit:]
 
     def cleanup_ledger(self):
