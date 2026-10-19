@@ -1,5 +1,7 @@
-<<<<<<< HEAD
-from typing import Dict, List, Optional
+import math
+from collections import deque
+from typing import Any, Dict, List, Optional, Tuple
+
 from gossipmesh.p2p.merkle import MerkleTree
 
 
@@ -22,10 +24,6 @@ class AntiEntropyManager:
         if local_tree.get_root_hash() == peer_tree.get_root_hash():
             return []
         return local_tree.find_divergent_keys(peer_tree.root)
-=======
-import math
-from collections import deque
-from typing import Dict, List, Tuple, Any
 
 
 class VectorClockRingBuffer:
@@ -150,4 +148,3 @@ class AntiEntropyEngine:
 
     def scan_mesh(self, local_clock: Dict[str, int]) -> List[str]:
         return self.scraper.scan_mesh(local_clock)
->>>>>>> origin/main

@@ -1,24 +1,21 @@
 import unittest
 from gossipmesh.p2p.merkle import MerkleTree
-<<<<<<< HEAD
-from gossipmesh.p2p.entropy import AntiEntropyManager
+from gossipmesh.p2p.entropy import AntiEntropyManager, AntiEntropyEngine
 
 
 class TestMerkleAndEntropy(unittest.TestCase):
     def test_merkle_identical_trees(self):
         data = {"a": "1", "b": "2", "c": "3"}
-=======
-from gossipmesh.p2p.entropy import AntiEntropyEngine
-
-class TestMerkleAndEntropy(unittest.TestCase):
-    def test_merkle_tree_identical(self):
-        data = {'a': '1', 'b': '2', 'c': '3'}
->>>>>>> origin/main
         tree1 = MerkleTree(data)
         tree2 = MerkleTree(data)
         self.assertEqual(tree1.get_root_hash(), tree2.get_root_hash())
 
-<<<<<<< HEAD
+    def test_merkle_tree_identical(self):
+        data = {'a': '1', 'b': '2', 'c': '3'}
+        tree1 = MerkleTree(data)
+        tree2 = MerkleTree(data)
+        self.assertEqual(tree1.get_root_hash(), tree2.get_root_hash())
+
     def test_merkle_different_trees(self):
         data1 = {"a": "1", "b": "2"}
         data2 = {"a": "1", "b": "3"}
@@ -27,6 +24,13 @@ class TestMerkleAndEntropy(unittest.TestCase):
         self.assertNotEqual(tree1.get_root_hash(), tree2.get_root_hash())
         diffs = tree1.find_divergent_keys(tree2.root)
         self.assertIn("b", diffs)
+
+    def test_merkle_tree_different(self):
+        data1 = {'a': '1', 'b': '2'}
+        data2 = {'a': '1', 'b': '3'}
+        tree1 = MerkleTree(data1)
+        tree2 = MerkleTree(data2)
+        self.assertNotEqual(tree1.get_root_hash(), tree2.get_root_hash())
 
     def test_anti_entropy_reconciliation(self):
         manager1 = AntiEntropyManager("node-1")
@@ -42,23 +46,6 @@ class TestMerkleAndEntropy(unittest.TestCase):
         diffs = manager1.reconcile_state("node-2", tree2)
         self.assertEqual(diffs, ["k2"])
 
-    def test_empty_trees(self):
-        tree1 = MerkleTree({})
-        tree2 = MerkleTree({})
-        self.assertIsNone(tree1.get_root_hash())
-        self.assertEqual(tree1.find_divergent_keys(tree2.root), [])
-
-
-if __name__ == "__main__":
-=======
-    def test_merkle_tree_different(self):
-        data1 = {'a': '1', 'b': '2'}
-        data2 = {'a': '1', 'b': '3'}
-        tree1 = MerkleTree(data1)
-        tree2 = MerkleTree(data2)
-        self.assertNotEqual(tree1.get_root_hash(), tree2.get_root_hash())
-
-    def test_anti_entropy_reconciliation(self):
         engine1 = AntiEntropyEngine('node-1')
         engine1.set_state('k1', 'v1')
         engine1.set_state('k2', 'v2')
@@ -67,9 +54,15 @@ if __name__ == "__main__":
         engine2.set_state('k1', 'v1')
         engine2.set_state('k2', 'v-modified')
 
-        diffs = engine1.reconcile_divergence(engine2.state_store)
-        self.assertIn('k2', diffs)
+        engine_diffs = engine1.reconcile_divergence(engine2.state_store)
+        self.assertIn('k2', engine_diffs)
 
-if __name__ == '__main__':
->>>>>>> origin/main
+    def test_empty_trees(self):
+        tree1 = MerkleTree({})
+        tree2 = MerkleTree({})
+        self.assertIsNone(tree1.get_root_hash())
+        self.assertEqual(tree1.find_divergent_keys(tree2.root), [])
+
+
+if __name__ == "__main__":
     unittest.main()
