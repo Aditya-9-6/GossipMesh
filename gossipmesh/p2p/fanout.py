@@ -1,6 +1,6 @@
-<<<<<<< HEAD
 import math
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
 
 class AdaptiveFanoutController:
     def __init__(self, base_fanout: int = 4, min_fanout: int = 2, max_fanout: int = 16):
@@ -21,9 +21,7 @@ class AdaptiveFanoutController:
         
         computed = int(round(dynamic_target * (1.0 + 0.1 * log_scale)))
         return max(self.min_fanout, min(self.max_fanout, computed))
-=======
-from typing import Dict, Any, Optional
-from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
+
 
 class DynamicFanoutController:
     """Computes localized message spread efficiency and adjusts node-specific
@@ -46,9 +44,9 @@ class DynamicFanoutController:
     def update_peer_feedback(self, peer_id: str, success: bool) -> None:
         self.matrix.record_ack(peer_id, success)
 
-    get_metrics = lambda self: {
-        "node_id": self.node_id,
-        "current_fanout": self.compute_fanout(),
-        "matrix": self.matrix.to_dict()
-    }
->>>>>>> origin/main
+    def get_metrics(self) -> Dict[str, Any]:
+        return {
+            "node_id": self.node_id,
+            "current_fanout": self.compute_fanout(),
+            "matrix": self.matrix.to_dict()
+        }

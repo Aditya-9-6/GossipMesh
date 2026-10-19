@@ -1,6 +1,23 @@
-<<<<<<< HEAD
-from typing import Dict, Any, List, Optional
+"""
+Gossip Message Priority Router and P2P Router.
+
+Classifies incoming and outgoing gossip protocol packets and delegates them
+to multi-level weighted priority queues to isolate control-plane heartbeats
+from bulky data-plane replication traffic, alongside PlumTree mesh routing.
+"""
+
+import threading
+import uuid
+from typing import Any, Callable, Dict, List, Optional
+
 from gossipmesh.p2p.plumtree import PlumTreeMesh
+from gossipmesh.p2p.priority_queue import (
+    MessagePriority,
+    PrioritizedMessage,
+    PriorityQueueConfig,
+    WeightedPriorityQueue,
+)
+
 
 class P2PRouter:
     def __init__(self, node_id: str):
@@ -33,25 +50,6 @@ class P2PRouter:
             "forward_eager": eager_targets,
             "forward_lazy": lazy_targets,
         }
-=======
-"""
-Gossip Message Priority Router.
-
-Classifies incoming and outgoing gossip protocol packets and delegates them
-to multi-level weighted priority queues to isolate control-plane heartbeats
-from bulky data-plane replication traffic.
-"""
-
-import threading
-import uuid
-from typing import Any, Callable, Dict, Optional
-
-from gossipmesh.p2p.priority_queue import (
-    MessagePriority,
-    PrioritizedMessage,
-    PriorityQueueConfig,
-    WeightedPriorityQueue,
-)
 
 
 class GossipMessageRouter:
@@ -166,4 +164,3 @@ class GossipMessageRouter:
                 "dispatched_incoming": self._dispatched_count,
                 "registered_handlers": list(self._incoming_handlers.keys()),
             }
->>>>>>> origin/main
