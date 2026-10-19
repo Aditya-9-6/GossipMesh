@@ -1,8 +1,10 @@
-<<<<<<< HEAD
 import time
 import threading
+import math
+import hashlib
+import base64
 from collections import OrderedDict
-from typing import Optional, Any
+from typing import Optional, Any, Set, List, Dict
 
 class LRUDigestCache:
     """High-performance, memory-bounded Least Recently Used (LRU) cache
@@ -16,7 +18,6 @@ class LRUDigestCache:
         self._last_evict_time = 0.0
 
     def _evict_expired(self, now: float):
-        # Amortize full scans or only scan if enough time has elapsed or cache is large
         if now - self._last_evict_time < 0.5 and len(self._cache) < self.max_size:
             return
         self._last_evict_time = now
@@ -64,12 +65,7 @@ class LRUDigestCache:
         with self._lock:
             self._evict_expired(now)
             return len(self._cache)
-=======
-import math
-import hashlib
-import base64
-import threading
-from typing import Set, List, Dict, Any, Optional
+
 
 class BloomFilterDigest:
     """Space-efficient dynamic Bloom filter digest for P2P anti-entropy state reconciliation."""
@@ -151,4 +147,3 @@ class BloomFilterDigest:
         decoded = base64.b64decode(data["bits"].encode('utf-8'))
         instance._bits = [int.from_bytes(decoded[i:i+8], byteorder='big', signed=False) for i in range(0, len(decoded), 8)]
         return instance
->>>>>>> origin/main
