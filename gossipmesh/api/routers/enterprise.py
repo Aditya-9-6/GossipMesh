@@ -13,17 +13,17 @@ from gossipmesh.enterprise.outcome_report import AutomationOutcomeReporter
 
 router = APIRouter()
 
+
 @router.get("/audit-logs/{tenant_id}")
 def get_audit_logs(
-    tenant_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
+    tenant_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     # Ensure user has access to organization
-    is_member = db.query(UserOrganization).filter(
-        UserOrganization.user_id == current_user.id,
-        UserOrganization.organization_id == tenant_id
-    ).first()
+    is_member = (
+        db.query(UserOrganization)
+        .filter(UserOrganization.user_id == current_user.id, UserOrganization.organization_id == tenant_id)
+        .first()
+    )
     if not is_member:
         raise AuthorizationError(message="Not authorized for this organization")
 
@@ -37,13 +37,14 @@ def get_outcome_report(
     period: str = Query("daily", regex="^(daily|weekly)$"),
     repo: Optional[str] = Query(None),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """Retrieves operational automation outcome metrics for the tenant."""
-    is_member = db.query(UserOrganization).filter(
-        UserOrganization.user_id == current_user.id,
-        UserOrganization.organization_id == tenant_id
-    ).first()
+    is_member = (
+        db.query(UserOrganization)
+        .filter(UserOrganization.user_id == current_user.id, UserOrganization.organization_id == tenant_id)
+        .first()
+    )
     if not is_member:
         raise AuthorizationError(message="Not authorized for this organization")
 

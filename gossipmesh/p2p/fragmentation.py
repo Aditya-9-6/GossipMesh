@@ -8,9 +8,7 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
 class PacketFragment:
-    def __init__(
-        self, message_id: str, index: int, total: int, payload: bytes, checksum: int
-    ):
+    def __init__(self, message_id: str, index: int, total: int, payload: bytes, checksum: int):
         self.message_id = message_id
         self.index = index
         self.total = total
@@ -43,12 +41,12 @@ class MessageFragmenter:
         if not data:
             checksum = zlib.crc32(b"")
             return [PacketFragment(str(uuid.uuid4()), 0, 1, b"", checksum)]
-        
+
         checksum = zlib.crc32(data)
         message_id = str(uuid.uuid4())
         total = (len(data) + chunk_size - 1) // chunk_size
         fragments = []
-        
+
         for i in range(total):
             start = i * chunk_size
             end = min(start + chunk_size, len(data))
@@ -72,9 +70,7 @@ class MessageReassembler:
 
     def _evict_expired(self, now: float):
         expired_keys = [
-            msg_id
-            for msg_id, state in self.buffers.items()
-            if now - state["last_update"] > self.timeout_seconds
+            msg_id for msg_id, state in self.buffers.items() if now - state["last_update"] > self.timeout_seconds
         ]
         for msg_id in expired_keys:
             del self.buffers[msg_id]

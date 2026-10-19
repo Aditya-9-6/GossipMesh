@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
     every 1000 messages or 300 seconds without dropping streams."""
-    
+
     def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.rotator = EphemeralSessionKeyRotator()
         self.max_messages = max_messages
@@ -99,6 +99,7 @@ class TransportTelemetry:
 
 class P2PTransport:
     """Handles packet fragmentation and reassembly for P2P transport streams."""
+
     def __init__(self, mtu: int = 1024, timeout: float = 30.0):
         self.mtu = mtu
         self.reassembler = MessageReassembler(timeout_seconds=timeout)
@@ -220,13 +221,13 @@ class TransportSocketReader:
             header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
         except asyncio.IncompleteReadError:
             return None
-        
+
         if not header_data:
             return None
-        
+
         header_view = memoryview(header_data)
         magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(header_view)
-        
+
         if magic != self.expected_magic:
             logger.warning(f"Invalid packet magic received: {hex(magic)}")
             raise ValueError(f"Invalid packet magic: {hex(magic)}")

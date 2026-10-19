@@ -2,21 +2,24 @@ import random
 import threading
 from typing import Any, Dict, List, Optional, Tuple
 
+
 class SkipListNode:
-    __slots__ = ('key', 'score', 'latency', 'forward', 'lock')
+    __slots__ = ("key", "score", "latency", "forward", "lock")
+
     def __init__(self, key: str, score: float, latency: float, level: int):
         self.key = key
         self.score = score
         self.latency = latency
-        self.forward: List[Optional['SkipListNode']] = [None] * level
+        self.forward: List[Optional["SkipListNode"]] = [None] * level
         self.lock = threading.Lock()
+
 
 class ConcurrentSkipListRoutingTable:
     def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
         self.max_level = max_level
         self.p = p
         self.capacity = capacity
-        self.head = SkipListNode('', float('inf'), 0.0, max_level)
+        self.head = SkipListNode("", float("inf"), 0.0, max_level)
         self.level = 1
         self.size = 0
         self._global_lock = threading.Lock()
@@ -56,7 +59,7 @@ class ConcurrentSkipListRoutingTable:
     def _evict_worst(self) -> None:
         curr = self.head
         worst_node = None
-        worst_score = float('-inf')
+        worst_score = float("-inf")
         while curr.forward[0]:
             nxt = curr.forward[0]
             if nxt.score > worst_score:

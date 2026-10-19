@@ -1,9 +1,10 @@
 from typing import Set, List, Dict, Any
 from gossipmesh.p2p.digest import BloomFilterDigest
 
+
 class AntiEntropySync:
     """Handles peer state reconciliation via Bloom filter digests."""
-    
+
     @staticmethod
     def create_node_digest(keys: Set[str], capacity: int = 1000, error_rate: float = 0.01) -> Dict[str, Any]:
         digest = BloomFilterDigest(capacity=capacity, error_rate=error_rate)
