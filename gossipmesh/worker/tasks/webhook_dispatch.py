@@ -1,10 +1,6 @@
 import asyncio
 import logging
-<<<<<<< HEAD
-from datetime import datetime, timedelta
-=======
 from datetime import datetime, timedelta, timezone
->>>>>>> origin/main
 from typing import Any, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
@@ -14,10 +10,6 @@ from gossipmesh.worker.celery_app import celery_app
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.core.config import settings
 
-<<<<<<< HEAD
-# Needs sync functions
-=======
->>>>>>> origin/main
 from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
 from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
@@ -30,20 +22,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 MAX_RETRIES = 5
 
 
-<<<<<<< HEAD
-async def async_dispatch(event: str, payload: Dict[str, Any]):
-=======
 async def async_dispatch(event: str, payload: Dict[str, Any], db: Session | None = None):
->>>>>>> origin/main
     if event == "pull_request":
         action = payload.get("action")
         if action in ["opened", "synchronize", "reopened"]:
             pr_data = payload.get("pull_request", {})
-<<<<<<< HEAD
-            job = PRReviewJob(pr_data)
-=======
             job = PRReviewJob(pr_data, workflow_id=1, db=db)
->>>>>>> origin/main
             await job.execute()
 
     elif event == "issues":
@@ -81,11 +65,7 @@ def process_webhook_event(self, webhook_event_id: int):
         db.commit()
 
         try:
-<<<<<<< HEAD
-            asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload))
-=======
             asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload, db=db))
->>>>>>> origin/main
 
             webhook_record.status = "processed"
             db.commit()
@@ -98,22 +78,12 @@ def process_webhook_event(self, webhook_event_id: int):
                 webhook_record.status = "dead_letter"
             else:
                 webhook_record.status = "failed"
-<<<<<<< HEAD
-                # Exponential backoff: 2^retries minutes
-                delay = 2**webhook_record.retries
-                webhook_record.next_retry_at = datetime.utcnow() + timedelta(minutes=delay)
-=======
                 delay = 2**webhook_record.retries
                 webhook_record.next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=delay)
->>>>>>> origin/main
 
             db.commit()
 
             if webhook_record.retries < MAX_RETRIES:
-<<<<<<< HEAD
-                # Multiply by 60 because countdown is in seconds
-=======
->>>>>>> origin/main
                 raise self.retry(exc=e, countdown=delay * 60)
 
     finally:

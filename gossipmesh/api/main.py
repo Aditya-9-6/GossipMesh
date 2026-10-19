@@ -3,30 +3,24 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from gossipmesh.core.config import settings
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime
+from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs, approvals
 from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
 from gossipmesh.core.logging import setup_logging
 
 setup_logging()
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
-from gossipmesh.core.config import settings
-<<<<<<< HEAD
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim
-=======
-from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime, artifacts, enterprise, vector_search, service_accounts, sso, scim, runs, approvals
->>>>>>> origin/main
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine
+from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
+from gossipmesh.core.exceptions import GossipMeshException
 
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup Migration Policy: Prevent accidental destructive migrations by validating state
     logger.info("Validating database migration state...")
     alembic_cfg = Config("alembic.ini")
     script = ScriptDirectory.from_config(alembic_cfg)
@@ -48,13 +42,8 @@ async def lifespan(app: FastAPI):
                 logger.info("Database migration state is up-to-date.")
     except Exception as e:
         logger.error(f"Failed to validate migration state: {e}")
-        # Not exiting here to allow app to start even if db is temporarily down,
-        # but the warning/error is logged per policy.
 
     yield
-    # Cleanup on shutdown can go here if needed
-from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
-from gossipmesh.core.exceptions import GossipMeshException
 
 app = FastAPI(
     title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -79,8 +68,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    import logging
-    logger = logging.getLogger(__name__)
     logger.exception("Unhandled exception")
     return JSONResponse(
         status_code=500,
@@ -97,16 +84,10 @@ app.include_router(artifacts.router, prefix=f"{settings.API_V1_STR}/artifacts", 
 app.include_router(enterprise.router, prefix=f"{settings.API_V1_STR}/enterprise", tags=["enterprise"])
 app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector_search", tags=["vector_search"])
 app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
-<<<<<<< HEAD
-app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
-app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
-=======
-
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
 app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(approvals.router)
->>>>>>> origin/main
 
 app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
 app.add_exception_handler(Exception, global_exception_handler) # type: ignore

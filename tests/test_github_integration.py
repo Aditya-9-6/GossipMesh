@@ -1,21 +1,7 @@
 import unittest
-<<<<<<< HEAD
-from gossipmesh.repository.github import GitHubIntegration
-from gossipmesh.core.exceptions import AuthorizationError
-
-class TestGitHubIntegration(unittest.TestCase):
-    def test_sync_repository_insufficient_permissions(self):
-        # Provide empty permissions to force AuthorizationError on sync_repository
-        github_integration = GitHubIntegration(app_id="test_app_id", private_key="test_key", permissions={})
-
-        with self.assertRaises(AuthorizationError) as context:
-            github_integration.sync_repository("owner/repo", 123)
-
-        self.assertIn("Missing required permission scope: 'metadata'", str(context.exception))
-
-if __name__ == "__main__":
-=======
 from unittest.mock import AsyncMock, MagicMock
+from gossipmesh.repository.github import GitHubIntegration as RepoGitHubIntegration
+from gossipmesh.core.exceptions import AuthorizationError
 from gossipmesh.integrations.github import GitHubIntegration
 from gossipmesh.integrations.github_pr import GitHubPRService
 from gossipmesh.models.pr_review import SecurityFinding, RemediationModel
@@ -31,9 +17,18 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
             owner="owner", repo="repo", pr_number=42, github_pr_service=self.github_pr_service
         )
 
+    def test_sync_repository_insufficient_permissions(self):
+        # Provide empty permissions to force AuthorizationError on sync_repository
+        github_integration = RepoGitHubIntegration(app_id="test_app_id", private_key="test_key", permissions={})
+
+        with self.assertRaises(AuthorizationError) as context:
+            github_integration.sync_repository("owner/repo", 123)
+
+        self.assertIn("Missing required permission scope: 'metadata'", str(context.exception))
+
     async def test_generate_inline_comments_valid_and_fallback(self):
         diff = """--- a/file1.txt
-+++ b/file1.txt
+++ b/file1.txt
 @@ -10,3 +10,4 @@
  unchanged
 -removed
@@ -80,7 +75,7 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_generate_inline_comments_deduplication(self):
         diff = """--- a/file1.txt
-+++ b/file1.txt
+++ b/file1.txt
 @@ -10,3 +10,4 @@
  unchanged
 -removed
@@ -113,7 +108,7 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_generate_inline_comments_partial_failure(self):
         diff = """--- a/file1.txt
-+++ b/file1.txt
+++ b/file1.txt
 @@ -10,3 +10,4 @@
  unchanged
 -removed
@@ -154,7 +149,7 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_generate_inline_comments_retry_safety(self):
         diff = """--- a/file1.txt
-+++ b/file1.txt
+++ b/file1.txt
 @@ -10,3 +10,4 @@
  unchanged
 -removed
@@ -182,7 +177,7 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_generate_inline_comments_auto_patch(self):
         diff = """--- a/file1.txt
-+++ b/file1.txt
+++ b/file1.txt
 @@ -10,3 +10,4 @@
  unchanged
 -removed
@@ -221,7 +216,7 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def test_generate_inline_comments_left_side(self):
         diff = """--- a/file1.txt
-+++ b/file1.txt
+++ b/file1.txt
 @@ -10,3 +10,4 @@
  unchanged
 -removed
@@ -248,5 +243,4 @@ class TestGitHubIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["comments"][0]["side"], "LEFT")
 
 if __name__ == '__main__':
->>>>>>> origin/main
     unittest.main()
