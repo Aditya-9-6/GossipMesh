@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 import jwt
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 
 # Add workspace to path to import enterprise modules
@@ -35,6 +36,21 @@ from enterprise.pricing import (
     calculate_price,
     get_bundle,
 )
+
+
+"""Ensure a fallback test private key exists for testing/development."""
+
+
+def _ensure_test_key_exists(path: Path):
+    if not path.is_file():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+        pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        path.write_bytes(pem)
 
 
 def load_private_key(key_input: Optional[str] = None):
@@ -66,6 +82,7 @@ def load_private_key(key_input: Optional[str] = None):
 
     if not pem_bytes:
         fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
+        _ensure_test_key_exists(fallback)
         if fallback.is_file():
             pem_bytes = fallback.read_bytes()
 
@@ -152,9 +169,7 @@ def issue_license(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Issue offline RSA-4096 signed JWT enterprise license tokens."
-    )
+    parser = argparse.ArgumentParser(description="Issue offline RSA-4096 signed JWT enterprise license tokens.")
     parser.add_argument("--customer-id", required=True, help="Customer ID (e.g., acme-fintech-corp)")
     parser.add_argument(
         "--bundle",

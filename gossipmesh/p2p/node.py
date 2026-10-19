@@ -10,6 +10,7 @@ from gossipmesh.p2p.pow import mine_pow, verify_pow
 from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
 from gossipmesh.p2p.liveness import PeerLivenessTracker
 
+
 class GossipTopic(str, Enum):
     CODE_CHANGE = "code_change"
     REVIEW_FEEDBACK = "review_feedback"
@@ -17,8 +18,19 @@ class GossipTopic(str, Enum):
     HEARTBEAT = "heartbeat"
     AGENT_STATE = "agent_state"
 
+
 class GossipMessage:
-    def __init__(self, topic: str, origin_node: str, payload: Dict[str, Any], repo: str='global', message_id: Optional[str]=None, vector_clock: Optional[Dict[str, int]]=None, timestamp: Optional[float]=None, ttl: int=10):
+    def __init__(
+        self,
+        topic: str,
+        origin_node: str,
+        payload: Dict[str, Any],
+        repo: str = "global",
+        message_id: Optional[str] = None,
+        vector_clock: Optional[Dict[str, int]] = None,
+        timestamp: Optional[float] = None,
+        ttl: int = 10,
+    ):
         self.topic = topic
         self.origin_node = origin_node
         self.payload = payload
@@ -37,11 +49,11 @@ class GossipMessage:
             "repo": self.repo,
             "vector_clock": self.vector_clock,
             "timestamp": self.timestamp,
-            "ttl": self.ttl
+            "ttl": self.ttl,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'GossipMessage':
+    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
         return cls(
             topic=data["topic"],
             origin_node=data["origin_node"],
@@ -50,13 +62,23 @@ class GossipMessage:
             message_id=data.get("message_id"),
             vector_clock=data.get("vector_clock"),
             timestamp=data.get("timestamp"),
-            ttl=data.get("ttl", 10)
+            ttl=data.get("ttl", 10),
         )
+
 
 class GossipNode:
     """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence,
     Adaptive Scatter-Width CPU-Load Feedback Shaping, and Windowed Liveness Tracking."""
-    def __init__(self, node_id: str, mesh_dir: str | None=None, public_key: Optional[str]=None, pow_difficulty: int=0, pow_nonce: Optional[int]=None, base_scatter: int=4):
+
+    def __init__(
+        self,
+        node_id: str,
+        mesh_dir: str | None = None,
+        public_key: Optional[str] = None,
+        pow_difficulty: int = 0,
+        pow_nonce: Optional[int] = None,
+        base_scatter: int = 4,
+    ):
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh")
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
@@ -88,27 +110,29 @@ class GossipNode:
             self.subscribers[t_str] = []
         self.subscribers[t_str].append(handler)
 
-    def publish(self, topic: GossipTopic, payload: Dict[str, Any], repo: str='global', ttl: int=10) -> GossipMessage:
+    def publish(
+        self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
+    ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
         msg = GossipMessage(topic=str(topic), origin_node=self.node_id, payload=payload, repo=repo, ttl=ttl)
         self.seen_messages.add(msg.message_id)
         self.message_cache.append(msg)
-        
+
         # Persist to shared mesh ledger file
         ledger_file = self.mesh_dir / f"{msg.message_id}.json"
         with open(ledger_file, "w") as f:
             json.dump(msg.to_dict(), f)
-            
+
         self._dispatch_to_subscribers(msg)
         return msg
 
     def sync(self) -> List[GossipMessage]:
         """Runs anti-entropy synchronization: scans the shared ledger for newly
-<div>arrived gossip messages from other peer nodes."""
-        new_messages = []
+        arrived gossip messages from other peer nodes."""
+        new_messages: List[GossipMessage] = []
         if not self.mesh_dir.exists():
             return new_messages
-            
+
         for file_path in self.mesh_dir.glob("*.json"):
             if file_path.name.endswith("_seen.json"):
                 continue
@@ -136,10 +160,11 @@ class GossipNode:
 
     def heartbeat(self):
         """Updates this node's live liveness timestamp and resource governor."""
-        self.scatter_governor.record_heartbeat()
+        if hasattr(self.scatter_governor, "record_heartbeat"):
+            getattr(self.scatter_governor, "record_heartbeat")()
         self.publish(GossipTopic.HEARTBEAT, {"node_id": self.node_id, "status": "alive"}, ttl=2)
 
-    def get_recent_messages(self, topic: Optional[GossipTopic]=None, limit: int=50) -> List[GossipMessage]:
+    def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
         """Fetches the latest gossip messages from the in-memory cache."""
         msgs = list(self.message_cache)
         if topic:

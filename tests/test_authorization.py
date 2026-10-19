@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.auth.authorization import AuthorizationService, UserContext, Resource
 
+
 class TestAuthorizationService(unittest.TestCase):
     def setUp(self):
         self.auth_service = AuthorizationService()
@@ -18,7 +19,7 @@ class TestAuthorizationService(unittest.TestCase):
 
     def test_cross_organization(self):
         user = UserContext(user_id="user1", roles={"org1": ["organization_admin"]})
-        resource = Resource(id="org2", type="organization") # Diff org
+        resource = Resource(id="org2", type="organization")  # Diff org
         self.assertFalse(self.auth_service.check_permission(user, resource, "organization:read"))
 
     def test_inactive_user(self):
@@ -46,5 +47,6 @@ class TestAuthorizationService(unittest.TestCase):
         resource = Resource(id="repo1", type="repository")
         self.assertTrue(self.auth_service.check_permission(user, resource, "approval:write"))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

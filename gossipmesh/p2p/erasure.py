@@ -1,9 +1,11 @@
 import math
 from typing import List, Tuple, Optional
 
+
 class GaloisField:
     """GF(2^8) arithmetic using carryless multiplication and log/antilog tables."""
-    def __init__(self, prim: int = 0x11d):
+
+    def __init__(self, prim: int = 0x11D):
         self.exp = [0] * 512
         self.log = [0] * 256
         x = 1
@@ -45,6 +47,7 @@ class ErasureCoder:
     """Reed-Solomon style fragment multiplexer for GossipMesh P2P payloads
     using true Vandermonde matrix inversion over GF(2^8).
     """
+
     def __init__(self, k: int = 4, m: int = 2):
         self.k = k
         self.m = m
@@ -73,20 +76,20 @@ class ErasureCoder:
         chunk_size = math.ceil(len(payload) / self.k)
         if chunk_size == 0:
             chunk_size = 1
-        
+
         padded_len = chunk_size * self.k
-        padded_payload = payload.ljust(padded_len, b'\x00')
-        
+        padded_payload = payload.ljust(padded_len, b"\x00")
+
         shards = []
         for i in range(self.k):
             start = i * chunk_size
             end = start + chunk_size
             shards.append(padded_payload[start:end])
-            
+
         # Generate Vandermonde encoding matrix for parity rows
         # Identity top k x k, Vandermonde bottom m x k
         v_matrix = self._vandermonde_matrix(self.m, self.k)
-        
+
         parity_shards = []
         for j in range(self.m):
             parity_chunk = bytearray(chunk_size)
@@ -98,13 +101,13 @@ class ErasureCoder:
                     acc ^= GF.mul(val, row[i])
                 parity_chunk[b_idx] = acc
             parity_shards.append(bytes(parity_chunk))
-            
+
         all_fragments = []
         for i, shard in enumerate(shards):
             all_fragments.append((i, shard))
         for j, p_shard in enumerate(parity_shards):
             all_fragments.append((self.k + j, p_shard))
-            
+
         return all_fragments
 
     def decode(self, fragments: List[Tuple[int, bytes]], original_size: Optional[int] = None) -> bytes:
@@ -113,23 +116,23 @@ class ErasureCoder:
         """
         if len(fragments) < self.k:
             raise ValueError(f"Insufficient fragments for reconstruction: got {len(fragments)}, need {self.k}")
-            
+
         # Sort and pick first k fragments
-        sorted_frags = sorted(fragments, key=lambda x: x[0])[:self.k]
+        sorted_frags = sorted(fragments, key=lambda x: x[0])[: self.k]
         chunk_size = len(sorted_frags[0][1])
-        
+
         indices = [idx for idx, _ in sorted_frags]
-        
+
         # Check if all data shards are already present
         if all(idx < self.k for idx in indices):
             reconstructed_chunks = [data for _, data in sorted_frags]
-            combined = b''.join(reconstructed_chunks)
+            combined = b"".join(reconstructed_chunks)
             if original_size is not None:
                 return combined[:original_size]
-            return combined.rstrip(b'\x00')
-            
+            return combined.rstrip(b"\x00")
+
         # Build submatrix corresponding to available fragments
-        full_v = self._vandermonde_matrix(self.k, self.k) # Using identity + vandermonde mapping
+        full_v = self._vandermonde_matrix(self.k, self.k)  # Using identity + vandermonde mapping
         sub_matrix = []
         for idx in indices:
             if idx < self.k:
@@ -145,7 +148,7 @@ class ErasureCoder:
 
         # Invert sub_matrix using Gauss-Jordan elimination in GF(2^8)
         inv_matrix = self._invert_matrix(sub_matrix)
-        
+
         # Reconstruct original k shards
         reconstructed_shards = [bytearray(chunk_size) for _ in range(self.k)]
         for b_idx in range(chunk_size):
@@ -155,11 +158,11 @@ class ErasureCoder:
                 for j, (_, data) in enumerate(sorted_frags):
                     acc ^= GF.mul(inv_row[j], data[b_idx])
                 reconstructed_shards[i][b_idx] = acc
-                
-        combined = b''.join(bytes(s) for s in reconstructed_shards)
+
+        combined = b"".join(bytes(s) for s in reconstructed_shards)
         if original_size is not None:
             return combined[:original_size]
-        return combined.rstrip(b'\x00')
+        return combined.rstrip(b"\x00")
 
     def _invert_matrix(self, matrix: List[List[int]]) -> List[List[int]]:
         n = len(matrix)

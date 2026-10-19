@@ -3,11 +3,12 @@ import threading
 from collections import deque
 from typing import Dict, List, Optional, Any
 
+
 class PeerLivenessTracker:
     """Adaptive Windowed Heartbeat Ping-Pong Latency Matrix for Peer Liveness Tracking.
     Maintains bounded round-trip time (RTT) ring buffers per peer and computes
     exponentially weighted moving average (EWMA) health scores."""
-    
+
     def __init__(self, window_size: int = 20, alpha: float = 0.3, max_ttl_ms: float = 5000.0):
         self.window_size = window_size
         self.alpha = alpha
@@ -33,7 +34,7 @@ class PeerLivenessTracker:
                 return None
             rtt = max(0.0, now - sent_time)
             self._last_seen[peer_id] = now
-            
+
             if peer_id not in self._rtt_buffers:
                 self._rtt_buffers[peer_id] = deque(maxlen=self.window_size)
             self._rtt_buffers[peer_id].append(rtt)
@@ -45,7 +46,7 @@ class PeerLivenessTracker:
             buffer = self._rtt_buffers.get(peer_id)
             if not buffer:
                 return self.max_ttl_ms
-            
+
             ewma = buffer[0]
             for rtt in list(buffer)[1:]:
                 ewma = self.alpha * rtt + (1 - self.alpha) * ewma
@@ -61,7 +62,7 @@ class PeerLivenessTracker:
             elapsed = now - last
             if elapsed > self.max_ttl_ms:
                 return 0.0
-            
+
             ewma = self.get_ewma_latency(peer_id)
             # Score decays as latency approaches max_ttl_ms and time since last seen increases
             latency_factor = max(0.0, 1.0 - (ewma / self.max_ttl_ms))

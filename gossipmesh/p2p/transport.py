@@ -253,9 +253,7 @@ class TransportSocketReader:
         try:
             payload_data = await self.reader.readexactly(payload_len)
         except asyncio.IncompleteReadError as e:
-            raise ValueError(
-                f"Incomplete payload read: expected {payload_len} bytes, got {len(e.partial)}"
-            )
+            raise ValueError(f"Incomplete payload read: expected {payload_len} bytes, got {len(e.partial)}")
 
         full_packet = header_data + payload_data
         full_view = memoryview(full_packet)

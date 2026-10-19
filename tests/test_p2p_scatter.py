@@ -13,7 +13,7 @@ class TestAdaptiveScatterGovernor(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
 
-    @patch('gossipmesh.p2p.scatter.psutil')
+    @patch("gossipmesh.p2p.scatter.psutil")
     def test_normal_operation_scatter(self, mock_psutil):
         mock_proc = MagicMock()
         mock_proc.cpu_percent.return_value = 10.0
@@ -26,7 +26,7 @@ class TestAdaptiveScatterGovernor(unittest.TestCase):
         self.assertGreaterEqual(scatter, 2)
         self.assertLessEqual(scatter, 6)
 
-    @patch('gossipmesh.p2p.scatter.psutil')
+    @patch("gossipmesh.p2p.scatter.psutil")
     def test_high_load_reduction(self, mock_psutil):
         mock_proc = MagicMock()
         # CPU and Memory significantly exceed thresholds
@@ -38,7 +38,7 @@ class TestAdaptiveScatterGovernor(unittest.TestCase):
         # Run multiple updates to allow smoothing filter to adapt
         for _ in range(5):
             scatter = governor.update()
-            
+
         # Scatter width should scale down proportionally toward min_scatter
         self.assertLessEqual(scatter, 4)
         metrics = governor.get_metrics()
@@ -56,5 +56,5 @@ class TestAdaptiveScatterGovernor(unittest.TestCase):
         self.assertEqual(len(recent), 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ import time
 import threading
 from gossipmesh.p2p.liveness import PeerLivenessTracker
 
+
 class TestPeerLivenessTracker(unittest.TestCase):
     def setUp(self):
         self.tracker = PeerLivenessTracker(window_size=5, alpha=0.3, max_ttl_ms=1000.0)
@@ -12,7 +13,7 @@ class TestPeerLivenessTracker(unittest.TestCase):
         self.tracker.record_ping_sent(peer_id)
         time.sleep(0.01)
         rtt = self.tracker.record_pong_received(peer_id)
-        
+
         self.assertIsNotNone(rtt)
         self.assertGreater(rtt, 0.0)
         self.assertGreater(self.tracker.get_ewma_latency(peer_id), 0.0)
@@ -22,11 +23,11 @@ class TestPeerLivenessTracker(unittest.TestCase):
         # Unseen peer should have 0 health
         self.assertEqual(self.tracker.get_health_score(peer_id), 0.0)
         self.assertFalse(self.tracker.is_healthy(peer_id))
-        
+
         # Record ping/pong
         self.tracker.record_ping_sent(peer_id)
         self.tracker.record_pong_received(peer_id)
-        
+
         score = self.tracker.get_health_score(peer_id)
         self.assertGreater(score, 0.0)
         self.assertTrue(self.tracker.is_healthy(peer_id))
@@ -35,11 +36,11 @@ class TestPeerLivenessTracker(unittest.TestCase):
         peer_id = "silent-peer"
         self.tracker.record_ping_sent(peer_id)
         self.tracker.record_pong_received(peer_id)
-        
+
         # Simulate expiration by manipulating last_seen
         with self.tracker._lock:
             self.tracker._last_seen[peer_id] = (time.time() * 1000.0) - 2000.0
-            
+
         self.assertEqual(self.tracker.get_health_score(peer_id), 0.0)
         self.assertFalse(self.tracker.is_healthy(peer_id))
         self.assertNotIn(peer_id, self.tracker.get_active_peers())
@@ -68,6 +69,7 @@ class TestPeerLivenessTracker(unittest.TestCase):
 
         for peer in peers:
             self.assertGreaterEqual(len(self.tracker.get_active_peers()), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
