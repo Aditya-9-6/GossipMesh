@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth
 
-class BaseProvider(ABC):
 
+class BaseProvider(ABC):
     def __init__(self, api_key: str):
         self.api_key = api_key
 

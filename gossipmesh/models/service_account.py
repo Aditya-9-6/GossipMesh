@@ -6,6 +6,7 @@ from typing import List
 
 from gossipmesh.models.base import Base
 
+
 class ServiceAccount(Base):
     __tablename__ = "service_accounts"
 
@@ -16,6 +17,7 @@ class ServiceAccount(Base):
 
     organization = relationship("Organization")
     api_keys = relationship("APIKey", back_populates="service_account")
+
 
 class APIKey(Base):
     __tablename__ = "api_keys"

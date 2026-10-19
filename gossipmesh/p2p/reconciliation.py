@@ -27,11 +27,7 @@ class VectorClock:
     def prune(self) -> None:
         """Prunes obsolete vector entries or caps total entries to prevent bloat."""
         if len(self.clock) > self.max_epochs:
-            sorted_items = sorted(
-                self.clock.items(),
-                key=lambda item: item[1],
-                reverse=True
-            )
+            sorted_items = sorted(self.clock.items(), key=lambda item: item[1], reverse=True)
             retained: Dict[str, int] = {}
             for node, ver in sorted_items:
                 if node == self.node_id or len(retained) < self.max_epochs:
@@ -41,13 +37,15 @@ class VectorClock:
                 del retained[last_key]
                 retained[self.node_id] = self.clock[self.node_id]
             self.clock = retained
-        
+
         if self.max_epochs > 0 and len(self.clock) > self.max_epochs:
             # Trim excess items while preserving node_id
             items = list(self.clock.items())
             retained_trimmed: Dict[str, int] = {}
             for k, v in items:
-                if k == self.node_id or len(retained_trimmed) < self.max_epochs - (1 if self.node_id in self.clock else 0):
+                if k == self.node_id or len(retained_trimmed) < self.max_epochs - (
+                    1 if self.node_id in self.clock else 0
+                ):
                     retained_trimmed[k] = v
             if self.node_id in self.clock and self.node_id not in retained_trimmed:
                 retained_trimmed[self.node_id] = self.clock[self.node_id]
@@ -127,8 +125,7 @@ class AntiEntropyEngine:
         with self._lock:
             now = time.time()
             expired_keys = [
-                k for k, (_, _, timestamp) in self.state_store.items()
-                if (now - timestamp) > max_age_seconds
+                k for k, (_, _, timestamp) in self.state_store.items() if (now - timestamp) > max_age_seconds
             ]
             for k in expired_keys:
                 del self.state_store[k]

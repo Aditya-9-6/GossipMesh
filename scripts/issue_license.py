@@ -46,28 +46,43 @@ def load_private_key(key_input: Optional[str] = None):
     4. enterprise/test_private_key.pem (local fallback for development)
     """
     pem_bytes = None
+    script_dir = Path(__file__).resolve().parent
+    repo_root = script_dir.parent
 
+    candidates = []
     if key_input:
-        p = Path(key_input)
+        candidates.append(Path(key_input))
+
+    env_path = os.getenv("LICENSE_PRIVATE_KEY_PATH")
+    if env_path:
+        candidates.append(Path(env_path))
+
+    candidates.append(repo_root / "enterprise" / "test_private_key.pem")
+    candidates.append(script_dir / "enterprise" / "test_private_key.pem")
+    candidates.append(script_dir.parent.parent / "enterprise" / "test_private_key.pem")
+    candidates.append(Path("enterprise/test_private_key.pem"))
+    candidates.append(Path("../enterprise/test_private_key.pem"))
+
+    for c in candidates:
+        p = c if c.is_absolute() else (repo_root / c)
+        if not p.is_file():
+            p = c if c.is_absolute() else (script_dir / c)
+        if not p.is_file():
+            p = Path.cwd() / c
         if p.is_file():
-            pem_bytes = p.read_bytes()
-        elif "BEGIN" in key_input:
-            pem_bytes = key_input.encode("utf-8")
+            try:
+                pem_bytes = p.read_bytes()
+                break
+            except Exception:
+                pass
+
+    if not pem_bytes and key_input and "BEGIN" in key_input:
+        pem_bytes = key_input.encode("utf-8")
 
     if not pem_bytes:
         env_raw = os.getenv("LICENSE_PRIVATE_KEY")
         if env_raw and "BEGIN" in env_raw:
             pem_bytes = env_raw.encode("utf-8")
-
-    if not pem_bytes:
-        env_path = os.getenv("LICENSE_PRIVATE_KEY_PATH")
-        if env_path and Path(env_path).is_file():
-            pem_bytes = Path(env_path).read_bytes()
-
-    if not pem_bytes:
-        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
-        if fallback.is_file():
-            pem_bytes = fallback.read_bytes()
 
     if not pem_bytes:
         raise ValueError(
@@ -152,9 +167,7 @@ def issue_license(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Issue offline RSA-4096 signed JWT enterprise license tokens."
-    )
+    parser = argparse.ArgumentParser(description="Issue offline RSA-4096 signed JWT enterprise license tokens.")
     parser.add_argument("--customer-id", required=True, help="Customer ID (e.g., acme-fintech-corp)")
     parser.add_argument(
         "--bundle",

@@ -3,7 +3,6 @@ from gossipmesh.p2p.reconciliation import VectorClock, AntiEntropyEngine
 
 
 class TestVectorClockReconciliation(unittest.TestCase):
-
     def test_vector_clock_increment_and_compare(self):
         vc1 = VectorClock("node-A")
         vc2 = VectorClock("node-B")
