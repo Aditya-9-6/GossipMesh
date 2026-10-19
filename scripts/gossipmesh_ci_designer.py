@@ -17,7 +17,9 @@ def run_cmd(cmd):
 
 
 def add_label(pr_number, label, token):
-    cmd = f'gh pr edit {pr_number} --add-label "{label}"'
+    # Ensure label exists in repository first
+    run_cmd(f"gh label create \"{label}\" --force 2>/dev/null || true")
+    cmd = f"gh pr edit {pr_number} --add-label \"{label}\"";
     run_cmd(cmd)
     print(f"Added label {label} to PR #{pr_number}")
 
