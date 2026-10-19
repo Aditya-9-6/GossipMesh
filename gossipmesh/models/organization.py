@@ -1,8 +1,20 @@
-from sqlalchemy import Boolean, ForeignKey, String
+import enum
+from sqlalchemy import Boolean, ForeignKey, String, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from gossipmesh.models.base import Base
 from gossipmesh.models.mixins import SoftDeleteMixin
+
+class OrganizationRole(str, enum.Enum):
+    owner = "owner"
+    billing_admin = "billing_admin"
+    organization_admin = "organization_admin"
+    security_admin = "security_admin"
+    developer = "developer"
+    reviewer = "reviewer"
+    auditor = "auditor"
+    analyst = "analyst"
+    service_account = "service_account"
 
 
 class Organization(SoftDeleteMixin, Base):
@@ -25,6 +37,7 @@ class UserOrganization(Base):
     organization_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), primary_key=True
     )
+<<<<<<< HEAD
     role_type: Mapped[str] = mapped_column(
         String, nullable=False, default="member"
     )  # admin, member, owner
@@ -34,6 +47,14 @@ class UserOrganization(Base):
     role_type: Mapped[str] = mapped_column(
         String, nullable=False, default="member"
     )  # admin, member, etc
+=======
+    role: Mapped[OrganizationRole] = mapped_column(
+        SQLAlchemyEnum(OrganizationRole), nullable=False, default=OrganizationRole.developer
+    )
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="active"
+    )  # active, invited, suspended
+>>>>>>> origin/main
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user = relationship("User", back_populates="organizations")
@@ -49,6 +70,8 @@ class OrganizationInvitation(Base):
     organization_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), nullable=False, index=True
     )
-    role: Mapped[str] = mapped_column(String, nullable=False, default="member")
+    role: Mapped[OrganizationRole] = mapped_column(
+        SQLAlchemyEnum(OrganizationRole), nullable=False, default=OrganizationRole.developer
+    )
 
     organization = relationship("Organization")
