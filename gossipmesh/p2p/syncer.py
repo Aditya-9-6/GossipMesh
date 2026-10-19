@@ -1,13 +1,9 @@
-from typing import Dict, List, Optional, Any
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class StateSyncer:
-    """Anti-entropy state synchronizer using vector clocks and Merkle trees."""
+class P2PSyncer:
+    def __init__(self):
+        self.entropy = VectorClockEntropy()
 
-    def __init__(self, node_id: str):
-        self.node_id = node_id
-        self.entropy = VectorClockEntropy(node_id)
-
-    def sync_state(self, peer_clock: Dict[str, int]) -> Dict[str, int]:
-        return self.entropy.merge(peer_clock)
+    def sync(self, node_id: str, vector_clock: dict):
+        return self.entropy.compare(vector_clock)
