@@ -1,8 +1,10 @@
 from typing import Dict, Any, Optional
 from gossipmesh.p2p.retransmit import RetransmissionCache
 
+
 class GossipProtocolHandler:
     """Protocol handler integrating retransmission caching and backpressure telemetry."""
+
     def __init__(self, capacity: int = 1000, max_memory_bytes: int = 16 * 1024 * 1024):
         self.retransmit_cache = RetransmissionCache(capacity=capacity, max_memory_bytes=max_memory_bytes)
 

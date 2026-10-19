@@ -111,9 +111,7 @@ class TestSlidingWindowCongestionController:
         assert rtt is None
 
     def test_loss_detection_and_multiplicative_decrease(self):
-        config = CongestionConfig(
-            initial_cwnd=10.0, loss_reduction_factor=0.5, min_cwnd=1.0
-        )
+        config = CongestionConfig(initial_cwnd=10.0, loss_reduction_factor=0.5, min_cwnd=1.0)
         ctrl = SlidingWindowCongestionController(config=config)
         ctrl.on_packet_sent("p1")
 
@@ -131,9 +129,7 @@ class TestSlidingWindowCongestionController:
         assert ctrl.state == CongestionState.CONGESTION_AVOIDANCE
 
     def test_pacing_delay_calculation(self):
-        config = CongestionConfig(
-            initial_cwnd=4.0, min_pacing_delay=0.001, max_pacing_delay=0.5
-        )
+        config = CongestionConfig(initial_cwnd=4.0, min_pacing_delay=0.001, max_pacing_delay=0.5)
         ctrl = SlidingWindowCongestionController(config=config)
 
         # Before any ACK, uses default RTT

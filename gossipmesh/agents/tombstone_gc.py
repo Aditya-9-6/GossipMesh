@@ -2,11 +2,13 @@ import time
 from typing import Dict, Any, Set, Tuple, Optional
 from gossipmesh.agents.crdt_store import DeltaORSetCRDT
 
+
 class TombstoneGarbageCollector:
     """
     Enforces tombstone garbage collection bounded by a stable vector clock threshold
     and TTL, maintaining strict O(k) delta merge performance and preventing memory leaks.
     """
+
     def __init__(self, crdt_store: DeltaORSetCRDT, ttl_seconds: float = 86400.0):
         self.crdt_store = crdt_store
         self.ttl_seconds = ttl_seconds
@@ -24,10 +26,10 @@ class TombstoneGarbageCollector:
         for tag in self.crdt_store.remove_set:
             _, _, timestamp = tag
             age = current_time - timestamp
-            
+
             # Check if expired by TTL
             is_expired_ttl = age > self.ttl_seconds
-            
+
             # Check if acknowledged by stable vector clock
             is_acknowledged = False
             if stable_vector_clock:

@@ -28,10 +28,7 @@ class TestP2PPow(unittest.TestCase):
     def test_gossip_node_with_pow(self):
         difficulty = 1
         node = GossipNode(
-            node_id="node_alpha",
-            mesh_dir=self.test_dir,
-            public_key="pub_alpha_key",
-            pow_difficulty=difficulty
+            node_id="node_alpha", mesh_dir=self.test_dir, public_key="pub_alpha_key", pow_difficulty=difficulty
         )
         self.assertEqual(node.pow_difficulty, difficulty)
         self.assertTrue(verify_pow(node.public_key, node.pow_nonce, difficulty))
@@ -43,5 +40,5 @@ class TestP2PPow(unittest.TestCase):
                 mesh_dir=self.test_dir,
                 public_key="pub_beta_key",
                 pow_difficulty=2,
-                pow_nonce=12345
+                pow_nonce=12345,
             )

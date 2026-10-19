@@ -3,6 +3,7 @@ import unittest
 from gossipmesh.consensus.checkpoint import StateCheckpoint
 from gossipmesh.consensus.validator import EpochCheckpointValidator
 
+
 class TestCheckpointConsensus(unittest.TestCase):
     def test_checkpoint_hash_and_signature(self):
         cp = StateCheckpoint(epoch=1, node_id="node_a", state_root="root_abc")
@@ -98,6 +99,7 @@ class TestCheckpointConsensus(unittest.TestCase):
         self.assertFalse(validator.check_quorum(30))
         self.assertFalse(validator.is_finalized(30))
         self.assertIsNone(validator.get_finalized_state_root(30))
+
 
 if __name__ == "__main__":
     unittest.main()

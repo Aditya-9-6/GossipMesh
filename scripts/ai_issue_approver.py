@@ -61,6 +61,7 @@ Return ONLY valid JSON with this schema:
 }
 """
 
+
 def load_gemini_keys() -> list[str]:
     keys = []
     pool = os.environ.get("GEMINI_KEY_POOL", "")
@@ -83,12 +84,14 @@ def load_gemini_keys() -> list[str]:
                 pass
     return keys
 
+
 def extract_json_response(text: str) -> dict:
     text = text.strip()
     m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if m:
         text = m.group(1).strip()
     return json.loads(text)
+
 
 def call_gemini(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> dict:
     keys = [api_key] if api_key else []
@@ -101,11 +104,13 @@ def call_gemini(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={current_key}"
             payload = {
                 "contents": [{"parts": [{"text": system_prompt}, {"text": prompt}]}],
-                "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
+                "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
             }
             req = urllib.request.Request(
-                url, data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"}, method="POST"
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
             )
             try:
                 with urllib.request.urlopen(req, timeout=15) as resp:
@@ -122,6 +127,7 @@ def call_gemini(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMPT) -
                 continue
     raise RuntimeError(f"Gemini API exhausted. Last error: {last_err}")
 
+
 def call_openrouter(api_key: str = "", prompt: str = "", system_prompt: str = SYSTEM_PROMPT) -> dict:
     key = api_key or os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not key:
@@ -132,11 +138,14 @@ def call_openrouter(api_key: str = "", prompt: str = "", system_prompt: str = SY
         payload = {
             "model": model,
             "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
-            "temperature": 0.2, "response_format": {"type": "json_object"}
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
         }
         req = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, method="POST"
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
         )
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -145,6 +154,7 @@ def call_openrouter(api_key: str = "", prompt: str = "", system_prompt: str = SY
         except Exception:
             continue
     raise RuntimeError("OpenRouter failed.")
+
 
 def call_ai_model(prompt: str) -> dict:
     primary_gemini = os.environ.get("GEMINI_ISSUE_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
@@ -158,18 +168,19 @@ def call_ai_model(prompt: str) -> dict:
         print(f"[!] OpenRouter failed: {e}", file=sys.stderr)
     raise RuntimeError("All AI models exhausted in issue approver.")
 
+
 def run_cmd(cmd: list[str], cwd: Path = Path(".")) -> tuple[int, str, str]:
     res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return res.returncode, res.stdout.strip(), res.stderr.strip()
+
 
 def evaluate_issue(issue_number: str, workspace: Path, force: bool = False):
     print(f"[*] AI Gatekeeper evaluating Issue #{issue_number} in {workspace}...", flush=True)
 
     # 1. Fetch issue metadata
-    code, stdout, stderr = run_cmd([
-        "gh", "issue", "view", issue_number,
-        "--json", "number,title,body,state,labels,author"
-    ], cwd=workspace)
+    code, stdout, stderr = run_cmd(
+        ["gh", "issue", "view", issue_number, "--json", "number,title,body,state,labels,author"], cwd=workspace
+    )
     if code != 0 or not stdout:
         print(f"[!] Failed to fetch Issue #{issue_number}: {stderr}", file=sys.stderr)
         return False
@@ -188,9 +199,9 @@ def evaluate_issue(issue_number: str, workspace: Path, force: bool = False):
     body = issue.get("body", "")
 
     # 2. Fetch existing issues for context / deduplication
-    _, issues_out, _ = run_cmd([
-        "gh", "issue", "list", "--state", "all", "--limit", "30", "--json", "number,title"
-    ], cwd=workspace)
+    _, issues_out, _ = run_cmd(
+        ["gh", "issue", "list", "--state", "all", "--limit", "30", "--json", "number,title"], cwd=workspace
+    )
     existing_titles = []
     try:
         existing_titles = [i["title"] for i in json.loads(issues_out) if str(i["number"]) != str(issue_number)]
@@ -261,12 +272,21 @@ Instructions:
         # If the AI provided a refined body, update the issue directly!
         if refined_body:
             new_title = refined_title if refined_title else title
-            run_cmd([
-                "gh", "issue", "edit", issue_number,
-                "--title", new_title,
-                "--body", refined_body,
-                "--add-label", "refined"
-            ], cwd=workspace)
+            run_cmd(
+                [
+                    "gh",
+                    "issue",
+                    "edit",
+                    issue_number,
+                    "--title",
+                    new_title,
+                    "--body",
+                    refined_body,
+                    "--add-label",
+                    "refined",
+                ],
+                cwd=workspace,
+            )
             print(f"[+] Successfully updated Issue #{issue_number} title and body.", flush=True)
 
         comment = f"""### 🏛️ Architectural Gatekeeper: Issue Refined & Upgraded 🔄
@@ -303,6 +323,7 @@ Instructions:
         run_cmd(["gh", "issue", "edit", issue_number, "--add-label", "rejected"], cwd=workspace)
         return True
 
+
 def main():
     parser = argparse.ArgumentParser(description="AI Issue Approval & Gatekeeper Bot")
     parser.add_argument("--issue-number", required=True, help="GitHub Issue Number")
@@ -313,6 +334,7 @@ def main():
     workspace = Path(args.workspace).resolve()
     success = evaluate_issue(args.issue_number, workspace, force=args.force)
     sys.exit(0 if success else 1)
+
 
 if __name__ == "__main__":
     main()
