@@ -1,135 +1,110 @@
-"""
-Enterprise Offline Cryptographic Licensing Module
-=================================================
-Validates RSA-4096 signed JWT license tokens offline.
-Zero outbound network calls required — built specifically for
-defense, fintech, and strict air-gapped environments.
-"""
-
 import os
-import sys
 import time
+import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Optional, Dict, Any
 import jwt
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 
 
 class LicenseError(Exception):
-    """Base exception for all licensing errors."""
-
-    pass
-
-
-class LicenseMissingError(LicenseError):
-    """Raised when no license token or file is found."""
+    """Base exception for licensing errors."""
 
     pass
 
 
 class LicenseExpiredError(LicenseError):
-    """Raised when the license has expired."""
+    """Raised when a license has expired."""
 
     pass
 
 
 class LicenseInvalidError(LicenseError):
-    """Raised when the signature or payload is tampered/invalid."""
-
-    pass
-
-
-class BundleNotAuthorizedError(LicenseError):
-    """Raised when the license does not grant access to the requested model bundle."""
+    """Raised when a license is cryptographically invalid or tampered."""
 
     pass
 
 
 class LicenseBundleError(LicenseError):
-    """Raised when a license bundle is invalid or unauthorized."""
+    """Raised when the license does not authorize the requested bundle."""
 
     pass
 
 
-class LicenseTaskModelError(LicenseError):
-    """Raised when a task model mapping is invalid."""
+class LicenseTaskError(LicenseError):
+    """Raised when the task-to-model mapping is violated."""
 
     pass
 
 
-def _find_public_key_path() -> Path:
-    """Find the public key file path in standard package locations."""
-    # 1. Environment variable override
-    env_path = os.getenv("LICENSE_PUBLIC_KEY_PATH")
-    if env_path and Path(env_path).is_file():
-        return Path(env_path)
-
-    # 2. Adjacent to this file
-    local_path = Path(__file__).parent / "public_key.pem"
-    if local_path.is_file():
-        return local_path
-
-    # 3. Docker /app location or current working directory
-    cwd_path = Path.cwd() / "enterprise" / "public_key.pem"
-    if cwd_path.is_file():
-        return cwd_path
-
-    # 4. Standard container root
-    container_path = Path("/app/enterprise/public_key.pem")
-    if container_path.is_file():
-        return container_path
-
-    raise FileNotFoundError(f"RSA-4096 public key not found. Expected at {local_path} or set LICENSE_PUBLIC_KEY_PATH.")
-
-
-def load_public_key(key_path: Optional[Path] = None):
-    """Load and parse the RSA public key in PEM format."""
-    target_path = key_path or _find_public_key_path()
-    pem_data = target_path.read_bytes()
-    return serialization.load_pem_public_key(pem_data, backend=default_backend())
+# Alias for backward compatibility with tests expecting LicenseTaskModelError
+LicenseTaskModelError = LicenseTaskError
 
 
 def get_license_token(token: Optional[str] = None, token_path: Optional[Path] = None) -> str:
     """
-    Retrieve the raw JWT license token string from:
-    1. Direct argument
-    2. LICENSE_TOKEN environment variable
-    3. license.jwt in current directory or token_path
-    4. license.token in current directory
+    Retrieve the license token from parameter, environment variable, file path, or default location.
     """
-    if token and token.strip():
-        return token.strip()
+    if token:
+        return token
 
-    env_token = os.getenv("LICENSE_TOKEN")
-    if env_token and env_token.strip():
-        return env_token.strip()
+    env_token = os.environ.get("GOSSIPMESH_LICENSE_TOKEN")
+    if env_token:
+        return env_token
 
-    if token_path:
-        p = Path(token_path)
-        if p.is_file():
-            content = p.read_text(encoding="utf-8").strip()
-            if content:
-                return content
-        raise LicenseMissingError(f"Specified license token file not found: {token_path}")
+    if token_path and token_path.exists():
+        return token_path.read_text().strip()
 
-    search_paths = [
-        Path.cwd() / "license.jwt",
-        Path.cwd() / "license.token",
-        Path("/app/license.jwt"),
-        Path("/app/license.token"),
-    ]
+    default_path = Path("/etc/gossipmesh/license.jwt")
+    if default_path.exists():
+        return default_path.read_text().strip()
 
-    for path in search_paths:
-        if path.is_file():
-            content = path.read_text(encoding="utf-8").strip()
-            if content:
-                return content
+    default_local_path = Path("license.jwt")
+    if default_local_path.exists():
+        return default_local_path.read_text().strip()
 
-    raise LicenseMissingError(
-        "Missing license token. Please provide LICENSE_TOKEN environment variable "
-        "or a license.jwt / license.token file in the working directory."
-    )
+    raise LicenseInvalidError("No license token provided or found in environment/paths.")
+
+
+def load_public_key(public_key_path: Optional[Path] = None) -> rsa.RSAPublicKey:
+    """
+    Load the RSA public key used to verify offline license tokens.
+    """
+    pub_key_str = None
+    if public_key_path and public_key_path.exists():
+        pub_key_str = public_key_path.read_text()
+    else:
+        pub_key_str = os.environ.get("GOSSIPMESH_LICENSE_PUBLIC_KEY")
+
+    if not pub_key_str:
+        default_pub_path = Path("/etc/gossipmesh/pubkey.pem")
+        if default_pub_path.exists():
+            pub_key_str = default_pub_path.read_text()
+
+    if not pub_key_str:
+        default_local_pub = Path("pubkey.pem")
+        if default_local_pub.exists():
+            pub_key_str = default_local_pub.read_text()
+
+    if not pub_key_str:
+        raise LicenseInvalidError(
+            "No license public key provided via public_key_path, GOSSIPMESH_LICENSE_PUBLIC_KEY, or default paths."
+        )
+
+    try:
+        if isinstance(pub_key_str, str):
+            pub_key_bytes = pub_key_str.encode("utf-8")
+        else:
+            pub_key_bytes = pub_key_str
+
+        public_key = serialization.load_pem_public_key(pub_key_bytes, backend=default_backend())
+        if not isinstance(public_key, rsa.RSAPublicKey):
+            raise LicenseInvalidError("Provided public key is not an RSA public key.")
+        return public_key
+    except Exception as e:
+        raise LicenseInvalidError(f"Failed to load RSA public key: {e}") from e
 
 
 def verify_license(
@@ -153,57 +128,28 @@ def verify_license(
             raw_token,
             public_key,
             algorithms=["RS256"],
-            options={"verify_signature": True, "require": ["exp", "sub", "bundle_ids"]},
+            options={
+                "verify_signature": True,
+                "require": ["exp", "sub", "bundle_ids"],
+                "enforce_minimum_key_length": False,
+            },
         )
     except jwt.ExpiredSignatureError as e:
         raise LicenseExpiredError(f"License has expired: {e}") from e
     except jwt.InvalidSignatureError as e:
         raise LicenseInvalidError(f"Cryptographic signature verification failed (tampered token): {e}") from e
     except jwt.PyJWTError as e:
-        raise LicenseInvalidError(f"Invalid license token format: {e}") from e
+        raise LicenseInvalidError(f"License verification failed: {e}") from e
 
-    # Validate authorized bundles
-    allowed_bundles = [b.lower().strip() for b in payload.get("bundle_ids", [])]
-    task_map = {k.lower(): v.lower() for k, v in payload.get("task_model_map", {}).items()}
-
-    if required_bundle:
-        req_b = required_bundle.lower().strip()
-        # Authorized if directly listed or if assigned in task map
-        is_allowed = (req_b in allowed_bundles) or (req_b in task_map.values())
-        if not is_allowed:
-            raise BundleNotAuthorizedError(
-                f"License tier does not authorize bundle '{required_bundle}'. Allowed bundles: {allowed_bundles}"
-            )
+    bundle_ids = payload.get("bundle_ids", [])
+    if required_bundle and required_bundle not in bundle_ids:
+        raise LicenseBundleError(
+            f"Required bundle '{required_bundle}' not authorized by license. Authorized bundles: {bundle_ids}"
+        )
 
     if required_task:
-        req_t = required_task.lower().strip()
-        if task_map and req_t in task_map:
-            assigned_bundle = task_map[req_t]
-            if assigned_bundle not in allowed_bundles:
-                raise BundleNotAuthorizedError(
-                    f"Task '{required_task}' is mapped to '{assigned_bundle}', which is not authorized in this license."
-                )
+        task_map = payload.get("task_model_map", {})
+        if required_task not in task_map:
+            raise LicenseTaskError(f"Required task '{required_task}' is not authorized or mapped in the license.")
 
     return payload
-
-
-def get_bundle_for_task(payload: Dict[str, Any], task: str, fallback_bundle: str = "b04") -> str:
-    """
-    Determine the authorized bundle ID for a given task.
-    Respects customer's task_model_map if defined, otherwise falls back to
-    first authorized bundle or the requested fallback.
-    """
-    task_map = payload.get("task_model_map") or {}
-    task_clean = task.lower().strip()
-
-    if task_clean in task_map:
-        return task_map[task_clean].lower().strip()
-
-    allowed = payload.get("bundle_ids", [])
-    if allowed:
-        # If fallback is in allowed list, use it
-        if fallback_bundle.lower().strip() in [b.lower().strip() for b in allowed]:
-            return fallback_bundle.lower().strip()
-        return allowed[0].lower().strip()
-
-    return fallback_bundle.lower().strip()

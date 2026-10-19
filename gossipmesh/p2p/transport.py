@@ -115,7 +115,11 @@ class GossipTransport:
         self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = "default"
     ) -> Optional[Any]:
         """Receives, rate-limits, parses, and dispatches a payload from a peer."""
-        if not self.rate_limiter.check_rate_limit(peer_id):
+        if hasattr(self.rate_limiter, "check_rate_limit"):
+            allowed = self.rate_limiter.check_rate_limit(peer_id)
+        else:
+            allowed = self.rate_limiter.allow(peer_id)
+        if not allowed:
             self.telemetry.record_dropped()
             return None
 
@@ -183,3 +187,4 @@ class TransportSocketReader:
 
     def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 1196246355) -> None:
         self.reader = reader
+        self.expected_magic = expected_magic
