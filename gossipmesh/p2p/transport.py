@@ -45,6 +45,14 @@ class PeerRateLimiter:
         return {"burst_capacity": self.config.burst_capacity, "max_rate_per_sec": self.config.max_rate_per_sec}
 
 
+class TransportTelemetry:
+    def __init__(self) -> None:
+        self.dropped_count = 0
+
+    def record_dropped(self) -> None:
+        self.dropped_count += 1
+
+
 class GossipTransport:
     def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None) -> None:
         self.node_id = node_id
@@ -52,13 +60,7 @@ class GossipTransport:
         self.reputation = LeakyBucketReputation()
         self.dedup = GossipDedupFilter()
         self._handlers: Dict[str, Callable[[Any], Any]] = {}
-        self.telemetry = self._Telemetry()
-
-    class _Telemetry:
-        def __init__(self):
-            self.dropped_count = 0
-        def record_dropped(self):
-            self.dropped_count += 1
+        self.telemetry = TransportTelemetry()
 
     def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
         self._handlers[topic] = handler
