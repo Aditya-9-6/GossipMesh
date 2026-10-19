@@ -252,7 +252,7 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     branch_name = f"ai/solve-issue-{issue_num}"
     print(f"[*] Staging changes on branch {branch_name}...", flush=True)
     run_cmd(["git", "checkout", "-B", branch_name], cwd=workspace)
-    run_cmd(["git", "config", "user.name", "GossipMesh Bot"], cwd=workspace)
+    run_cmd(["git", "config", "user.name", USER_NAME], cwd=workspace)
     run_cmd(["git", "config", "user.email", USER_EMAIL], cwd=workspace)
 
     run_cmd("git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
@@ -262,8 +262,8 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     commit_msg = f"feat: automated resolution for issue #{issue_num} ({issue_title})"
     run_cmd([
         "git", "commit",
-        "-m", commit_msg,
-        "-m", f"Co-authored-by: {USER_NAME} <{USER_EMAIL}>"
+        "--author", f"{USER_NAME} <{USER_EMAIL}>",
+        "-m", commit_msg
     ], cwd=workspace, check=False)
 
     print(f"[*] Pushing branch {branch_name} to origin...", flush=True)
@@ -351,8 +351,10 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         print(fix_res.stdout, flush=True)
 
         # Re-commit and push if fixed
+        run_cmd(["git", "config", "user.name", USER_NAME], cwd=workspace)
+        run_cmd(["git", "config", "user.email", USER_EMAIL], cwd=workspace)
         run_cmd(["git", "add", "-A"], cwd=workspace)
-        run_cmd(["git", "commit", "-m", f"fix: incorporate ai reviewer feedback for PR #{pr_num}"], cwd=workspace, check=False)
+        run_cmd(["git", "commit", "--author", f"{USER_NAME} <{USER_EMAIL}>", "-m", f"fix: incorporate ai reviewer feedback for PR #{pr_num}"], cwd=workspace, check=False)
         run_cmd(["git", "push", "origin", branch_name, "--force"], cwd=workspace, check=False)
 
         # Re-run reviewer to verify the fixes
@@ -533,12 +535,12 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 fix_res = subprocess.run(ci_fixer_cmd, cwd=workspace, env=fixer_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
                 print(fix_res.stdout, flush=True)
 
-                run_cmd(["git", "config", "--replace-all", "user.name", "GossipMesh Bot"], cwd=workspace, check=False)
+                run_cmd(["git", "config", "--replace-all", "user.name", USER_NAME], cwd=workspace, check=False)
                 run_cmd(["git", "config", "--replace-all", "user.email", USER_EMAIL], cwd=workspace, check=False)
                 run_cmd("git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
                 run_cmd(["git", "add", "-A"], cwd=workspace)
                 run_cmd("git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False)
-                run_cmd(["git", "commit", "-m", f"fix(ci): automated self-healing repair for PR #{pr_num}"], cwd=workspace, check=False)
+                run_cmd(["git", "commit", "--author", f"{USER_NAME} <{USER_EMAIL}>", "-m", f"fix(ci): automated self-healing repair for PR #{pr_num}"], cwd=workspace, check=False)
                 run_cmd(["git", "push", "origin", head_ref], cwd=workspace, check=False)
 
                 test_res = subprocess.run([py_bin, "-m", "pytest", "tests/"], cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
