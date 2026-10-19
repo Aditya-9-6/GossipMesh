@@ -1,8 +1,19 @@
-<<<<<<< HEAD
-import unittest
+"""
+Unit test suite for GossipMesh P2P Weighted Priority Queue and Message Router.
+"""
+
+import threading
 import time
-from gossipmesh.p2p.priority_queue import WeightedPriorityQueue, PriorityQueueMessage
-from gossipmesh.p2p.router import GossipRouter
+import unittest
+import pytest
+from gossipmesh.p2p.priority_queue import (
+    MessagePriority,
+    PriorityQueueConfig,
+    WeightedPriorityQueue,
+    PriorityQueueMessage,
+)
+from gossipmesh.p2p.router import GossipMessageRouter, GossipRouter
+
 
 class TestPriorityQueue(unittest.TestCase):
     def test_priority_ordering(self):
@@ -45,23 +56,6 @@ class TestPriorityQueue(unittest.TestCase):
         self.assertEqual(router.queue_size(), 2)
         self.assertEqual(router.dequeue_message(), "high")
         self.assertEqual(router.dequeue_message(), "low")
-
-if __name__ == "__main__":
-    unittest.main()
-=======
-"""
-Unit test suite for GossipMesh P2P Weighted Priority Queue and Message Router.
-"""
-
-import threading
-import time
-import pytest
-from gossipmesh.p2p.priority_queue import (
-    MessagePriority,
-    PriorityQueueConfig,
-    WeightedPriorityQueue,
-)
-from gossipmesh.p2p.router import GossipMessageRouter
 
 
 class TestMessagePriorityOrdering:
@@ -291,4 +285,7 @@ class TestSchedulingLatencyAndConcurrency:
         assert len(errors) == 0
         metrics = queue.get_metrics()
         assert metrics["total_enqueued"] == 100
->>>>>>> origin/main
+
+
+if __name__ == "__main__":
+    unittest.main()

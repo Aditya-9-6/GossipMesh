@@ -1,10 +1,23 @@
-<<<<<<< HEAD
-import time
+"""
+Weighted Multi-Level Priority Queue with Anti-Starvation Aging.
+
+Separates control-plane signals (heartbeats, consensus) from data-plane payloads
+under network contention, maintaining O(1) scheduling operations and strict
+latency bounds (<5ms).
+"""
+
+import collections
+import enum
 import heapq
 import threading
-from typing import Any, Optional
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
 
 class PriorityQueueMessage:
+    """Legacy priority queue message container with timestamp-based ordering."""
+
     def __init__(self, priority: int, payload: Any, age_increment: int = 1):
         self.priority = priority
         self.payload = payload
@@ -16,62 +29,6 @@ class PriorityQueueMessage:
         if self.priority != other.priority:
             return self.priority < other.priority
         return self.timestamp < other.timestamp
-
-
-class WeightedPriorityQueue:
-    def __init__(self, aging_factor: float = 0.05, max_size: int = 10000):
-        self._queue: list = []
-        self._lock = threading.Lock()
-        self._aging_factor = aging_factor
-        self._max_size = max_size
-
-    def push(self, priority: int, payload: Any) -> bool:
-        with self._lock:
-            if len(self._queue) >= self._max_size:
-                return False
-            msg = PriorityQueueMessage(priority=priority, payload=payload)
-            heapq.heappush(self._queue, msg)
-            return True
-
-    def pop(self) -> Optional[Any]:
-        with self._lock:
-            if not self._queue:
-                return None
-            self._age_queue_unlocked()
-            msg = heapq.heappop(self._queue)
-            return msg.payload
-
-    def _age_queue_unlocked(self):
-        current_time = time.time()
-        if not self._queue:
-            return
-        for msg in self._queue:
-            elapsed = current_time - msg.timestamp
-            if elapsed > 0:
-                boost = int(elapsed * self._aging_factor)
-                if boost > 0:
-                    msg.priority = max(0, msg.priority - boost)
-                    msg.timestamp = current_time
-        heapq.heapify(self._queue)
-
-    def qsize(self) -> int:
-        with self._lock:
-            return len(self._queue)
-=======
-"""
-Weighted Multi-Level Priority Queue with Anti-Starvation Aging.
-
-Separates control-plane signals (heartbeats, consensus) from data-plane payloads
-under network contention, maintaining O(1) scheduling operations and strict
-latency bounds (<5ms).
-"""
-
-import collections
-import enum
-import threading
-import time
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
 
 
 class MessagePriority(enum.IntEnum):
@@ -117,8 +74,28 @@ class WeightedPriorityQueue:
     and anti-starvation aging increments. Thread-safe with O(1) operations.
     """
 
-    def __init__(self, config: Optional[PriorityQueueConfig] = None) -> None:
-        self.config = config or PriorityQueueConfig()
+    def __init__(
+        self,
+        config: Optional[PriorityQueueConfig] = None,
+        aging_factor: float = 0.05,
+        max_size: Optional[int] = None,
+    ) -> None:
+        if isinstance(config, (int, float)) and max_size is None:
+            # Positional aging_factor passed as first argument
+            aging_factor = float(config)
+            config = None
+
+        if config is None:
+            capacity = max_size if max_size is not None else 10000
+            self.config = PriorityQueueConfig(max_capacity=capacity)
+        else:
+            self.config = config
+            if max_size is not None:
+                object.__setattr__(self.config, "max_capacity", max_size)
+
+        self._aging_factor = aging_factor
+        self._max_size = self.config.max_capacity
+        self._queue: list = []
         self._levels: Dict[int, collections.deque] = {
             p.value: collections.deque() for p in MessagePriority
         }
@@ -129,6 +106,33 @@ class WeightedPriorityQueue:
         self._total_promotions: int = 0
         self._total_dropped: int = 0
         self._lock = threading.Lock()
+
+    def push(self, priority: int, payload: Any = None) -> bool:
+        """
+        Enqueues a message into its priority bucket.
+        Supports both (priority, payload) and (PriorityQueueMessage) signatures.
+        """
+        if isinstance(priority, PriorityQueueMessage) and payload is None:
+            actual_payload = priority.payload
+            actual_priority = priority.priority
+        else:
+            actual_payload = payload
+            actual_priority = priority
+
+        msg_id = f"msg_{time.monotonic_ns()}_{id(actual_payload)}"
+        return self.enqueue(message_id=msg_id, payload=actual_payload, priority=actual_priority)
+
+    def pop(self) -> Optional[Any]:
+        """
+        Extracts and returns the payload of the next scheduled message,
+        or None if the queue is empty.
+        """
+        msg = self.dequeue()
+        return msg.payload if msg is not None else None
+
+    def qsize(self) -> int:
+        """Returns the total number of queued messages."""
+        return self.size()
 
     def enqueue(
         self,
@@ -146,6 +150,19 @@ class WeightedPriorityQueue:
             raise ValueError("message_id cannot be empty")
         if size_bytes <= 0:
             raise ValueError("size_bytes must be positive")
+
+        if not isinstance(priority, MessagePriority):
+            if isinstance(priority, int):
+                if priority <= 0:
+                    priority = MessagePriority.CONTROL
+                elif priority == 1:
+                    priority = MessagePriority.HIGH
+                elif priority == 2:
+                    priority = MessagePriority.NORMAL
+                else:
+                    priority = MessagePriority.LOW
+            else:
+                priority = MessagePriority.NORMAL
 
         timestamp = time.monotonic() if now is None else now
         with self._lock:
@@ -199,6 +216,10 @@ class WeightedPriorityQueue:
         with self._lock:
             return self._apply_aging_locked(timestamp)
 
+    def _age_queue_unlocked(self) -> int:
+        """Aging trigger matching the legacy interface without external lock acquisition."""
+        return self._apply_aging_locked(time.monotonic())
+
     def size(self) -> int:
         """Returns the total number of queued messages."""
         with self._lock:
@@ -215,6 +236,7 @@ class WeightedPriorityQueue:
             for bucket in self._levels.values():
                 bucket.clear()
             self._total_size = 0
+            self._queue.clear()
 
     def get_metrics(self) -> Dict[str, Any]:
         """Returns telemetry on queue occupancy and scheduling counters."""
@@ -309,4 +331,3 @@ class WeightedPriorityQueue:
                 self._levels[lvl].extend(promoted_deque)
 
         return promotions_count
->>>>>>> origin/main

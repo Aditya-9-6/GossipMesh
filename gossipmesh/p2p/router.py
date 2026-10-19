@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-from typing import Any, Optional
-from gossipmesh.p2p.priority_queue import WeightedPriorityQueue
-
-class GossipRouter:
-    def __init__(self, aging_factor: float = 0.05, max_size: int = 10000):
-        self.pq = WeightedPriorityQueue(aging_factor=aging_factor, max_size=max_size)
-
-    def enqueue_message(self, priority: int, payload: Any) -> bool:
-        return self.pq.push(priority, payload)
-
-    def dequeue_message(self) -> Optional[Any]:
-        return self.pq.pop()
-
-    def queue_size(self) -> int:
-        return self.pq.qsize()
-=======
 """
 Gossip Message Priority Router.
 
@@ -35,10 +18,10 @@ from gossipmesh.p2p.priority_queue import (
 )
 
 
-class GossipMessageRouter:
+class GossipRouter:
     """
-    Routes gossip messages according to semantic priority rules and dispatches
-    incoming traffic to registered domain handlers.
+    Legacy and high-performance gossip message router supporting both simple
+    aging priority queues and semantic multi-priority routing with domain handlers.
     """
 
     DEFAULT_TYPE_PRIORITIES: Dict[str, MessagePriority] = {
@@ -66,7 +49,13 @@ class GossipMessageRouter:
         "diagnostics": MessagePriority.LOW,
     }
 
-    def __init__(self, queue_config: Optional[PriorityQueueConfig] = None) -> None:
+    def __init__(
+        self,
+        aging_factor: float = 0.05,
+        max_size: int = 10000,
+        queue_config: Optional[PriorityQueueConfig] = None,
+    ) -> None:
+        self.pq = WeightedPriorityQueue(aging_factor=aging_factor, max_size=max_size)
         self.queue = WeightedPriorityQueue(config=queue_config)
         self._type_priorities: Dict[str, MessagePriority] = dict(
             self.DEFAULT_TYPE_PRIORITIES
@@ -74,6 +63,15 @@ class GossipMessageRouter:
         self._incoming_handlers: Dict[str, Callable[[Any], Any]] = {}
         self._dispatched_count: int = 0
         self._lock = threading.Lock()
+
+    def enqueue_message(self, priority: int, payload: Any) -> bool:
+        return self.pq.push(priority, payload)
+
+    def dequeue_message(self) -> Optional[Any]:
+        return self.pq.pop()
+
+    def queue_size(self) -> int:
+        return self.pq.qsize()
 
     def classify_priority(self, message_type: str) -> MessagePriority:
         """Determines the message priority for a given message type string."""
@@ -147,4 +145,7 @@ class GossipMessageRouter:
                 "dispatched_incoming": self._dispatched_count,
                 "registered_handlers": list(self._incoming_handlers.keys()),
             }
->>>>>>> origin/main
+
+
+# Alias for backward compatibility with incoming main branch classes
+GossipMessageRouter = GossipRouter
