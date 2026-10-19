@@ -4,9 +4,10 @@ import base64
 import threading
 from typing import Set, List, Dict, Any, Optional
 
+
 class BloomFilterDigest:
     """Space-efficient dynamic Bloom filter digest for P2P anti-entropy state reconciliation."""
-    
+
     def __init__(self, capacity: int = 1000, error_rate: float = 0.01) -> None:
         self.capacity = max(1, capacity)
         self.error_rate = min(max(0.0001, error_rate), 0.5)
@@ -32,8 +33,8 @@ class BloomFilterDigest:
         return self._num_hashes
 
     def _get_hashes(self, item: str) -> List[int]:
-        digest1 = int(hashlib.sha256(item.encode('utf-8')).hexdigest(), 16)
-        digest2 = int(hashlib.md5(item.encode('utf-8')).hexdigest(), 16)
+        digest1 = int(hashlib.sha256(item.encode("utf-8")).hexdigest(), 16)
+        digest2 = int(hashlib.md5(item.encode("utf-8")).hexdigest(), 16)
         return [(digest1 + i * digest2) % self._bit_array_size for i in range(self._num_hashes)]
 
     def add(self, item: str) -> None:
@@ -42,7 +43,7 @@ class BloomFilterDigest:
                 idx = h // 64
                 bit = h % 64
                 if not (self._bits[idx] & (1 << bit)):
-                    self._bits[idx] |= (1 << bit)
+                    self._bits[idx] |= 1 << bit
                     self._size += 1
 
     def __contains__(self, item: str) -> bool:
@@ -61,8 +62,8 @@ class BloomFilterDigest:
         with self._lock:
             bit_bytes = bytearray()
             for word in self._bits:
-                bit_bytes.extend(word.to_bytes(8, byteorder='big', signed=False))
-            encoded = base64.b64encode(bytes(bit_bytes)).decode('utf-8')
+                bit_bytes.extend(word.to_bytes(8, byteorder="big", signed=False))
+            encoded = base64.b64encode(bytes(bit_bytes)).decode("utf-8")
             return {
                 "capacity": self.capacity,
                 "error_rate": self.error_rate,
@@ -81,6 +82,8 @@ class BloomFilterDigest:
         instance._size = size_val
         instance._bit_array_size = data.get("bit_array_size", instance._bit_array_size)
         instance._num_hashes = data.get("num_hashes", data.get("hash_count", instance._num_hashes))
-        decoded = base64.b64decode(data["bits"].encode('utf-8'))
-        instance._bits = [int.from_bytes(decoded[i:i+8], byteorder='big', signed=False) for i in range(0, len(decoded), 8)]
+        decoded = base64.b64decode(data["bits"].encode("utf-8"))
+        instance._bits = [
+            int.from_bytes(decoded[i : i + 8], byteorder="big", signed=False) for i in range(0, len(decoded), 8)
+        ]
         return instance

@@ -12,7 +12,7 @@ class TestGossipMessageCache(unittest.TestCase):
     def test_basic_put_and_get(self):
         cache = GossipMessageCache(capacity=3)
         cache.put("msg-1", {"data": "hello"})
-        
+
         self.assertTrue(cache.has("msg-1"))
         self.assertIn("msg-1", cache)
         self.assertEqual(cache.get("msg-1"), {"data": "hello"})
@@ -22,7 +22,7 @@ class TestGossipMessageCache(unittest.TestCase):
         cache = GossipMessageCache(capacity=2)
         cache.put("msg-1", "val1")
         cache.put("msg-2", "val2")
-        
+
         self.assertEqual(len(cache), 2)
         self.assertTrue(cache.has("msg-1"))
         self.assertTrue(cache.has("msg-2"))
@@ -44,7 +44,7 @@ class TestGossipMessageCache(unittest.TestCase):
 
         # Insert "msg-3", which should evict "msg-2" instead of "msg-1"
         cache.put("msg-3", "val3")
-        
+
         self.assertTrue(cache.has("msg-1"))
         self.assertFalse(cache.has("msg-2"))
         self.assertTrue(cache.has("msg-3"))
@@ -54,7 +54,7 @@ class TestGossipMessageCache(unittest.TestCase):
         cache.put("msg-1", "val1")
         cache.put("msg-2", "val2")
         self.assertEqual(len(cache), 2)
-        
+
         cache.clear()
         self.assertEqual(len(cache), 0)
         self.assertFalse(cache.has("msg-1"))

@@ -9,10 +9,12 @@ from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
 from gossipmesh.p2p.fountain import FountainEncoder, FountainDecoder
 
+
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
-every 1000 messages or 300 seconds without dropping streams."""
-    def __init__(self, max_messages: int=1000, max_time_seconds: float=300.0):
+    every 1000 messages or 300 seconds without dropping streams."""
+
+    def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.max_messages = max_messages
         self.max_time_seconds = max_time_seconds
         self.message_count = 0
@@ -38,7 +40,8 @@ every 1000 messages or 300 seconds without dropping streams."""
     def _trigger_rotation_unlocked(self) -> bytes:
         self.message_count = 0
         self.created_at = time.time()
-        return self.rotator.rotate()
+        priv_b, pub_b = self.rotator.rotate()
+        return pub_b
 
     def trigger_rotation(self) -> bytes:
         with self._lock:
@@ -58,8 +61,10 @@ every 1000 messages or 300 seconds without dropping streams."""
                 self._trigger_rotation_unlocked()
             return decrypt_payload(self.rotator.current_key, ciphertext)
 
+
 class TransportTelemetry:
     """Telemetry tracking metrics for gossip transport layer."""
+
     def __init__(self) -> None:
         self.sent_count = 0
         self.received_count = 0
@@ -85,23 +90,18 @@ class TransportTelemetry:
     def to_dict(self) -> Dict[str, Any]:
         with self._lock:
             return {
-                "transport": {
-                    "sent_messages": self.sent_count,
-                    "received_messages": self.received_count,
-                    "dropped_messages": self.dropped_count,
-                    "sent_bytes": self.sent_bytes,
-                    "received_bytes": self.received_bytes
-                },
                 "sent_count": self.sent_count,
                 "received_count": self.received_count,
                 "dropped_count": self.dropped_count,
                 "sent_bytes": self.sent_bytes,
-                "received_bytes": self.received_bytes
+                "received_bytes": self.received_bytes,
             }
+
 
 class GossipTransport:
     """High-level P2P gossip transport integrating rate limiting, framing, and topic dispatch."""
-    def __init__(self, node_id: str, config: Optional[RateLimitConfig]=None) -> None:
+
+    def __init__(self, node_id: str, config: Optional[RateLimitConfig] = None) -> None:
         self.node_id = node_id
         self.rate_limiter = PeerRateLimiter(config or RateLimitConfig())
         self.handlers: Dict[str, Callable[[Any], Any]] = {}
@@ -112,35 +112,36 @@ class GossipTransport:
         """Registers a callback handler for a gossip topic."""
         self.handlers[topic] = handler
 
-    async def receive_payload(self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str='default') -> Optional[Any]:
+    async def receive_payload(
+        self, peer_id: str, payload: Union[bytes, str, dict, int], topic: str = "default"
+    ) -> Optional[Any]:
         """Receives, rate-limits, parses, and dispatches a payload from a peer."""
-        if not self.rate_limiter.allow(peer_id):
+        if not self.rate_limiter.check_rate_limit(peer_id):
             self.telemetry.record_dropped()
             return None
-        
+
         if isinstance(payload, (dict, list)):
-            payload_bytes = json.dumps(payload).encode('utf-8')
+            payload_bytes = json.dumps(payload).encode("utf-8")
         elif isinstance(payload, str):
-            payload_bytes = payload.encode('utf-8')
+            payload_bytes = payload.encode("utf-8")
         elif isinstance(payload, bytes):
             payload_bytes = payload
         elif isinstance(payload, int):
-            payload_bytes = str(payload).encode('utf-8')
+            payload_bytes = str(payload).encode("utf-8")
         else:
-            payload_bytes = str(payload).encode('utf-8')
-            
+            payload_bytes = str(payload).encode("utf-8")
+
         self.telemetry.record_received(len(payload_bytes))
         handler = self.handlers.get(topic)
         if handler:
-            try:
-                if asyncio.iscoroutinefunction(handler):
-                    return await handler(payload)
-                return handler(payload)
-            except Exception:
-                return None
+            if asyncio.iscoroutinefunction(handler):
+                return await handler(payload)
+            return handler(payload)
         return payload
 
-    async def receive_fountain_symbol(self, stream_id: str, seq: int, total_symbols: int, symbol: bytes, topic: str='default') -> Optional[Any]:
+    async def receive_fountain_symbol(
+        self, stream_id: str, seq: int, total_symbols: int, symbol: bytes, topic: str = "default"
+    ) -> Optional[Any]:
         if stream_id not in self.decoders:
             self.decoders[stream_id] = FountainDecoder(total_symbols)
         decoder = self.decoders[stream_id]
@@ -150,7 +151,7 @@ class GossipTransport:
             del self.decoders[stream_id]
             if decoded_data:
                 try:
-                    parsed = json.loads(decoded_data.decode('utf-8'))
+                    parsed = json.loads(decoded_data.decode("utf-8"))
                     return await self.receive_payload(stream_id, parsed, topic)
                 except Exception:
                     return await self.receive_payload(stream_id, decoded_data, topic)
@@ -159,14 +160,14 @@ class GossipTransport:
     async def send_payload(self, peer_id: str, payload: Union[bytes, str, dict]) -> bool:
         """Simulates sending a payload to a peer with telemetry recording."""
         if isinstance(payload, (dict, list)):
-            b = json.dumps(payload).encode('utf-8')
+            b = json.dumps(payload).encode("utf-8")
         elif isinstance(payload, str):
-            b = payload.encode('utf-8')
+            b = payload.encode("utf-8")
         elif isinstance(payload, bytes):
             b = payload
         else:
-            b = str(payload).encode('utf-8')
-            
+            b = str(payload).encode("utf-8")
+
         encoder = FountainEncoder(b)
         for seq in range(len(encoder.symbols)):
             _, _, symbol = encoder.generate_symbol(seq)
@@ -177,18 +178,22 @@ class GossipTransport:
         """Returns comprehensive telemetry metrics for transport and rate limiter."""
         return self.telemetry.to_dict()
 
+
 class TransportSocketReader:
     """Low-level transport socket reader with zero-allocation memoryview parsing pipelines."""
-    def __init__(self, reader: asyncio.StreamReader, expected_magic: int=1196246355) -> None:
+
+    def __init__(self, reader: asyncio.StreamReader, expected_magic: int = 1196246355) -> None:
         self.reader = reader
         self.expected_magic = expected_magic
 
     async def read_packet(self) -> Optional[Tuple[int, str, memoryview]]:
-        header_bytes = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
-        view = memoryview(header_bytes)
-        magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(view)
+        header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
+        if not header_data:
+            return None
+        buf = memoryview(header_data)
+        magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(buf)
         if magic != self.expected_magic:
-            raise ValueError(f"Invalid magic: {magic} != {self.expected_magic}")
-        payload_bytes = await self.reader.readexactly(payload_len)
-        payload_view = memoryview(payload_bytes)
+            raise ValueError(f"Invalid packet magic: {magic:#x} != {self.expected_magic:#x}")
+        payload_data = await self.reader.readexactly(payload_len)
+        payload_view = memoryview(payload_data)
         return (msg_type, msg_id, payload_view)
