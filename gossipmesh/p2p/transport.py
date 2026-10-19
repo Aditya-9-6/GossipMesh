@@ -1,30 +1,14 @@
-<<<<<<< HEAD
-from typing import Dict, Any, List
-from gossipmesh.p2p.fanout import AdaptiveFanoutController
-
-class GossipTransport:
-    def __init__(self, base_fanout: int = 4):
-        self.fanout_controller = AdaptiveFanoutController(base_fanout=base_fanout)
-        self.peers: List[str] = []
-
-    def get_adaptive_fanout(self, latency_ms: float, churn_rate: float) -> int:
-        """Calculates target peer dissemination breadth using the adaptive fanout controller."""
-        return self.fanout_controller.compute_fanout(
-            network_latency_ms=latency_ms,
-            peer_churn_rate=churn_rate,
-            total_peers=len(self.peers)
-        )
-=======
 import asyncio
 import json
 import logging
 import time
 import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union, List
 
 from gossipmesh.p2p.parser import ZeroCopyPacketParser
 from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
 from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
+from gossipmesh.p2p.fanout import AdaptiveFanoutController
 
 logger = logging.getLogger(__name__)
 
@@ -117,13 +101,24 @@ class GossipTransport:
 
     def __init__(
         self,
-        node_id: str,
+        node_id: Optional[str] = None,
         config: Optional[RateLimitConfig] = None,
+        base_fanout: int = 4,
     ) -> None:
-        self.node_id = node_id
+        self.node_id = node_id or "node_default"
         self.rate_limiter = PeerRateLimiter(config=config or RateLimitConfig())
         self.telemetry = TransportTelemetry()
         self.handlers: Dict[str, Callable[[Any], Any]] = {}
+        self.fanout_controller = AdaptiveFanoutController(base_fanout=base_fanout)
+        self.peers: List[str] = []
+
+    def get_adaptive_fanout(self, latency_ms: float, churn_rate: float) -> int:
+        """Calculates target peer dissemination breadth using the adaptive fanout controller."""
+        return self.fanout_controller.compute_fanout(
+            network_latency_ms=latency_ms,
+            peer_churn_rate=churn_rate,
+            total_peers=len(self.peers)
+        )
 
     def register_handler(self, topic: str, handler: Callable[[Any], Any]) -> None:
         """Registers a callback handler for a gossip topic."""
@@ -237,4 +232,3 @@ class TransportSocketReader:
         _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
 
         return msg_type, msg_id, payload_view
->>>>>>> origin/main

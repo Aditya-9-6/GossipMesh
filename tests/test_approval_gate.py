@@ -70,14 +70,9 @@ def test_approval_gate_lifecycle():
             "action_type": "push_commit",
             "diff_content": "--- a/file.py\n+++ b/file.py\n+print('hello')",
             "commit_sha": "abc1234",
-<<<<<<< HEAD
-            "expires_in_hours": 1
-        },
-        headers={"Authorization": "Bearer test-token"}
-=======
             "expires_in_hours": 1,
         },
->>>>>>> origin/main
+        headers={"Authorization": "Bearer test-token"}
     )
     assert response.status_code == 201
     data = response.json()
@@ -85,26 +80,16 @@ def test_approval_gate_lifecycle():
     assert "id" in data
     approval_id = data["id"]
 
-<<<<<<< HEAD
     # Test get approval gate
-    get_response = client.get(f"/api/v1/approvals/{approval_id}", headers={"Authorization": "Bearer test-token"})
+    get_response = client.get(f"{settings.API_V1_STR}/approvals/{approval_id}", headers={"Authorization": "Bearer test-token"})
     assert get_response.status_code == 200
     assert get_response.json()["status"] == "pending"
 
     # Test decide approval gate
     decision_response = client.post(
-        f"/api/v1/approvals/{approval_id}/decision",
-        json={"decision": "approved"},
-        headers={"Authorization": "Bearer test-token"}
-=======
-    res_get = client.get(f"{settings.API_V1_STR}/approvals/{approval_id}")
-    assert res_get.status_code == 200
-    assert res_get.json()["status"] == "pending"
-
-    res_decide = client.post(
         f"{settings.API_V1_STR}/approvals/{approval_id}/decision",
         json={"decision": "approved"},
->>>>>>> origin/main
+        headers={"Authorization": "Bearer test-token"}
     )
     assert decision_response.status_code == 200
     assert decision_response.json()["status"] == "approved"

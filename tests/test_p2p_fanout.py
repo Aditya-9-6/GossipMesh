@@ -1,7 +1,7 @@
 import unittest
-<<<<<<< HEAD
-from gossipmesh.p2p.fanout import AdaptiveFanoutController
+from gossipmesh.p2p.fanout import AdaptiveFanoutController, DynamicFanoutController
 from gossipmesh.p2p.transport import GossipTransport
+from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
 
 class TestAdaptiveFanout(unittest.TestCase):
     def setUp(self):
@@ -27,11 +27,6 @@ class TestAdaptiveFanout(unittest.TestCase):
         fanout = transport.get_adaptive_fanout(latency_ms=100.0, churn_rate=0.2)
         self.assertGreaterEqual(fanout, 2)
         self.assertLessEqual(fanout, 16)
-
-if __name__ == '__main__':
-=======
-from gossipmesh.p2p.matrix import EpidemicReachabilityMatrix
-from gossipmesh.p2p.fanout import DynamicFanoutController
 
 class TestEpidemicReachabilityAndFanout(unittest.TestCase):
     def test_reachability_matrix_basic(self):
@@ -61,6 +56,5 @@ class TestEpidemicReachabilityAndFanout(unittest.TestCase):
         self.assertIn("current_fanout", metrics)
         self.assertIn("matrix", metrics)
 
-if __name__ == "__main__":
->>>>>>> origin/main
+if __name__ == '__main__':
     unittest.main()
