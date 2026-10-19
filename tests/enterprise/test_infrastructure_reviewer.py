@@ -2,8 +2,17 @@
 Unit Tests for Infrastructure-Aware Security & Architecture Reviewer
 """
 
-import pytest
+import sys
 from pathlib import Path
+import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
 from scripts.infrastructure_reviewer import review, scan_file, InfrastructureFinding
 
 
@@ -76,3 +85,27 @@ def test_detect_kubernetes_privileged(tmp_path):
     result = review(repo_root=tmp_path)
     rule_ids = [f["rule_id"] for f in result["findings"]]
     assert "INFRA-K8S-001" in rule_ids
+
+
+if __name__ == "__main__":
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td)
+        test_clean_repo_high_score(p)
+    print("[OK] test_clean_repo_high_score passed.")
+
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td)
+        test_detect_hardcoded_secrets(p)
+    print("[OK] test_detect_hardcoded_secrets passed.")
+
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td)
+        test_detect_docker_root_and_latest(p)
+    print("[OK] test_detect_docker_root_and_latest passed.")
+
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td)
+        test_detect_kubernetes_privileged(p)
+    print("[OK] test_detect_kubernetes_privileged passed.")
+
+    print("\n[SUCCESS] ALL INFRASTRUCTURE REVIEWER TESTS PASSED 100%!")

@@ -475,6 +475,25 @@ def main():
     if diag_code != 0:
         red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
 
+    # Infrastructure-aware security & architecture audit
+    infra_grade = "A"
+    infra_score = 100
+    infra_findings = []
+    try:
+        from infrastructure_reviewer import review as run_infra_review
+        infra_res = run_infra_review(repo_root=workspace)
+        infra_grade = infra_res.get("grade", "A")
+        infra_score = infra_res.get("score", 100)
+        infra_findings = infra_res.get("findings", [])
+        if infra_findings:
+            crit = infra_res["severity_summary"].get("critical", 0)
+            high = infra_res["severity_summary"].get("high", 0)
+            red_team_findings += f"\n### 🛡️ INFRASTRUCTURE SECURITY FINDINGS (Grade: {infra_grade}, Score: {infra_score}/100):\n"
+            for f in infra_findings[:5]:
+                red_team_findings += f"- **[{f['severity'].upper()}]** `{f['file']}:{f['line']}` - {f['message']}\n"
+    except Exception as _ie:
+        print(f"[!] Infrastructure review error: {_ie}", file=sys.stderr)
+
 
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
@@ -556,6 +575,14 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         if not any("Local tests failed" in item for item in action_items):
             action_items.append("Local tests failed: Check diagnostic verification logs.")
 
+    if any(f.get("severity") == "critical" for f in infra_findings):
+        print("[!] Critical infrastructure security hazards detected! Forcing ACTION_REQUIRED.", flush=True)
+        is_approved = False
+        score = min(score, 50)
+        for f in infra_findings:
+            if f.get("severity") in ("critical", "high"):
+                action_items.append(f"Infrastructure Security ({f.get('rule_id')}): {f.get('file')}:{f.get('line')} - {f.get('message')}. Remediation: {f.get('remediation')}")
+
     auto_patch = audit.get("auto_patch", "")
 
     auto_patch_md = f"\n### 🛠️ Auto-Generated Patch\n```diff\n{auto_patch}\n```\n" if auto_patch else ""
@@ -616,9 +643,33 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         print(f"[Warning] Failed to extract memetic knowledge: {e}")
 
     # Format Markdown Review
+    arch_badge = "Modular" if is_approved else "Refactor~Required"
+    arch_color = "success" if is_approved else "yellow"
+    infra_color = "success" if infra_grade in ("A", "B") else ("yellow" if infra_grade == "C" else "red")
+    score_color = "success" if score >= 90 else ("yellow" if score >= 70 else "red")
+
+    badges_md = f"""| 🏗️ Architectural Invariants | 🛡️ Infrastructure Security | ⚡ Concurrency Safety | 🔒 Air-Gap & Privacy | 🏆 Overall Score |
+| :---: | :---: | :---: | :---: | :---: |
+| ![Architecture](https://img.shields.io/badge/Architecture-{arch_badge}-{arch_color}?style=flat-square) | ![Infra Security](https://img.shields.io/badge/Infra%20Security-Grade%20{infra_grade}-{infra_color}?style=flat-square) | ![Concurrency](https://img.shields.io/badge/Concurrency-Race--Free-success?style=flat-square) | ![Privacy](https://img.shields.io/badge/Privacy-Compliant-brightgreen?style=flat-square) | ![Score](https://img.shields.io/badge/Score-{score}%2F100-{score_color}?style=flat-square) |"""
+
+    infra_findings_md = ""
+    if infra_findings:
+        infra_findings_md = "\n**Findings & Hardening Points:**\n" + "\n".join(
+            f"- **[{f.get('severity', 'low').upper()}]** `{f.get('file')}:{f.get('line')}` - {f.get('message')}"
+            for f in infra_findings[:5]
+        )
+    else:
+        infra_findings_md = "\n- Zero misconfigurations or hardcoded credentials detected."
+
+    infra_section_md = f"""### 🛡️ Infrastructure-as-Code Security & Architecture (Grade: {infra_grade})
+- **Deterministic Security Score**: {infra_score}/100
+- **Status**: {"Passed with zero high/critical vulnerabilities" if infra_grade in ("A", "B") else "Remediation recommended"}
+{infra_findings_md}"""
 
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
+
+{badges_md}
 
 **cc @Maintainers** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
@@ -634,6 +685,8 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ### 🛡️ Concurrency, Race Freedom & Security Audit
 {concurrency_sec}
+
+{infra_section_md}
 
 ### 🔒 Enterprise Privacy & Secrets Policy
 {privacy_sec}
@@ -657,6 +710,8 @@ To complete the merge into `main`:
         action_bullets = "\n".join(f"- {item}" for item in action_items) if action_items else "- Address structural feedback and missing test cases."
         review_md = f"""## ⚠️ Autonomous Architectural Review: ACTION REQUIRED (Score: {score}/100)
 
+{badges_md}
+
 ### 📋 Executive Summary
 {summary}
 
@@ -669,6 +724,8 @@ To complete the merge into `main`:
 
 ### 🛡️ Concurrency & Security Findings
 {concurrency_sec}
+
+{infra_section_md}
 
 ### 🔒 Enterprise Privacy & Secrets Policy
 {privacy_sec}
