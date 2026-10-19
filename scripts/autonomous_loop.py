@@ -485,8 +485,23 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
             run_cmd(["git", "checkout", "main"], cwd=workspace)
             return False
     else:
-        print(f"[!] PR #{pr_num} verdict: {verdict} (Score: {score}). Awaiting review fixes.", flush=True)
-        return False
+        s_data = {}
+        if review_status_file.exists():
+            try:
+                s_data = json.loads(review_status_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        if verdict == "REJECT" or score < 60 or s_data.get("should_close", False):
+            print(f"[*] PR #{pr_num} rejected by Architectural Gatekeeper as unnecessary (Score: {score}/100). Closing...", flush=True)
+            reason_text = s_data.get("close_reason") or s_data.get("executive_summary", "Change evaluated as unnecessary, duplicate, or anti-pattern.")
+            full_comment = f"🛑 **Architectural Gatekeeper: PR Closed as Unnecessary**\n\n**Verdict**: {verdict} | **Score**: {score}/100\n\n**Rationale**: {reason_text}\n\n*Closing PR to maintain codebase invariants.*"
+            run_cmd(["gh", "pr", "close", str(pr_num), "--repo", REPO, "--comment", full_comment, "--delete-branch"], cwd=workspace, check=False)
+            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            return False
+        else:
+            print(f"[!] PR #{pr_num} verdict: {verdict} (Score: {score}). Awaiting review fixes.", flush=True)
+            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            return False
 
 def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: int = 5) -> bool:
     """
@@ -571,11 +586,14 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
 
                     if merged_other_pr:
                         print(f"[*] PR #{pr_num} resolves Issue #{linked_issue} which was already resolved by PR #{merged_other_pr}. Closing duplicate PR...", flush=True)
-                        close_reason = f"👋 Closing PR #{pr_num}: Linked Issue #{linked_issue} was already resolved and merged in PR #{merged_other_pr}."
+                        close_reason = f"👋 **Closing PR #{pr_num}**: Linked Issue #{linked_issue} was already resolved and merged in PR #{merged_other_pr}."
                         run_cmd(["gh", "pr", "close", str(pr_num), "--repo", REPO, "--comment", close_reason, "--delete-branch"], cwd=workspace, check=False)
                         continue
                     else:
-                        print(f"[*] Note: Linked Issue #{linked_issue} was closed but PR #{pr_num} was NOT merged. Re-evaluating PR for merge...", flush=True)
+                        print(f"[*] PR #{pr_num}: Linked Issue #{linked_issue} is closed. Closing obsolete PR...", flush=True)
+                        close_reason = f"👋 **Closing PR #{pr_num}**: Linked Issue #{linked_issue} is closed and no longer requires implementation."
+                        run_cmd(["gh", "pr", "close", str(pr_num), "--repo", REPO, "--comment", close_reason, "--delete-branch"], cwd=workspace, check=False)
+                        continue
             except Exception:
                 pass
 
@@ -638,7 +656,10 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                     run_cmd(["git", "commit", "--author", f"{USER_NAME} <{USER_EMAIL}>", "-m", f"fix(ci): automated self-healing repair for PR #{pr_num}"], cwd=workspace, check=False)
                     run_cmd(["git", "push", "origin", head_ref], cwd=workspace, check=False)
                 else:
-                    print(f"[!] PR #{pr_num} repair pass did not achieve 100% green. Skipping push to avoid broken commits.", flush=True)
+                    print(f"[!] PR #{pr_num} repair pass did not achieve 100% green. Closing unviable PR...", flush=True)
+                    close_reason = f"🛑 **CI Quality Gate: PR Closed (Unviable / Invariants Not Satisfied)**\n\nAutomated self-healing repair passes were exhausted without achieving passing test suites.\n\n*Closing PR and deleting branch to keep repository clean.*"
+                    run_cmd(["gh", "pr", "close", str(pr_num), "--repo", REPO, "--comment", close_reason, "--delete-branch"], cwd=workspace, check=False)
+                    continue
 
             # Proceed to architectural review if tests pass
             if is_green:
@@ -657,6 +678,7 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 review_status_file = workspace / "ai_review_status.json"
                 score = 0
                 verdict = "ACTION_REQUIRED"
+                s_data = {}
                 if review_status_file.exists():
                     try:
                         s_data = json.loads(review_status_file.read_text(encoding="utf-8"))
@@ -699,6 +721,12 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                         run_cmd(["gh", "pr", "comment", str(pr_num), "--body", f"⚠️ **Merge Incomplete**: Auto-merge attempted but GitHub reported conflicts or blocked merge:\n```text\n{merge_res}\n```\nBranch preserved for automated self-healing."], cwd=workspace, check=False)
                         run_cmd(["git", "checkout", "main"], cwd=workspace)
                         return False
+                elif verdict == "REJECT" or score < 60 or s_data.get("should_close", False):
+                    print(f"[*] PR #{pr_num} REJECTED as unnecessary/anti-pattern (Score: {score}/100). Closing...", flush=True)
+                    reason_text = s_data.get("close_reason") or s_data.get("executive_summary", "Architectural gatekeeper evaluated this change as unnecessary, duplicate, or anti-pattern.")
+                    full_comment = f"🛑 **Architectural Gatekeeper: PR Closed as Unnecessary / Not Viable**\n\n**Verdict**: {verdict} | **Score**: {score}/100\n\n**Rationale**: {reason_text}\n\n*Closing PR and deleting branch to maintain strict repository invariants.*"
+                    run_cmd(["gh", "pr", "close", str(pr_num), "--repo", REPO, "--comment", full_comment, "--delete-branch"], cwd=workspace, check=False)
+                    continue
                 else:
                     print(f"[*] PR #{pr_num} verdict: {verdict} (Score: {score}). Left open for next review cycle.", flush=True)
         except Exception as e:
@@ -712,7 +740,14 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
 
 def run_loop_iteration(workspace: Path, worker_id: int = 1, num_workers: int = 5):
     """Executes a single cycle of the autonomous loop."""
-    print(f"\n--- [Autonomous GossipMesh Loop Iteration: {time.strftime('%Y-%m-%d %H:%M:%S')} | Worker {worker_id}/{num_workers} | Key Pool: {len(GLOBAL_POOL)} keys] ---", flush=True)
+    # 0. Active Triage & Cleanup Gatekeeper: Automatically close unneeded, obsolete, or duplicate PRs & issues
+    if worker_id == 1:
+        try:
+            from scripts.triage_cleanup import audit_and_close_unneeded_prs, audit_and_close_unneeded_issues
+            audit_and_close_unneeded_prs(workspace)
+            audit_and_close_unneeded_issues(workspace)
+        except Exception as e:
+            print(f"[Warning] Triage cleanup error: {e}", file=sys.stderr, flush=True)
 
     # 1. Active PR Sweeper & Self-Healing: Drain open PRs first
     healed = heal_and_merge_open_prs(workspace, worker_id=worker_id, num_workers=num_workers)

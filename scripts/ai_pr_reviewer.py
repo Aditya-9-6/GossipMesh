@@ -90,17 +90,21 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
    - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and proper asyncio usage.
 
 EVALUATION & VERDICT:
-- If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
-  verdict must be "ACTION_REQUIRED" and score < 90.
-- If code is clean, modular, race-free, properly tested, and meets all anti-spaghetti architectural invariants:
+- If code is redundant, trivial duplicate of existing features, introduces anti-patterns, breaks repository invariants, or is genuinely NOT NEEDED:
+  verdict must be "REJECT", score < 55, and should_close must be true.
+- If code has compilation errors, missing dependencies, data race risks, spaghetti code, or missing unit tests, but is a valuable feature:
+  verdict must be "ACTION_REQUIRED" and score 55-89.
+- If code is clean, modular, race-free, properly tested, high-value, and meets all anti-spaghetti architectural invariants:
   verdict must be "APPROVED" and score >= 90 (typically 95-100).
 - You must prioritize high precision (minimal noise, fewer false positives) before recall. Do not flag trivial styling issues as ACTION_REQUIRED.
 
 OUTPUT SCHEMA:
 You MUST respond ONLY with a single valid JSON object with the following schema:
 {
-  "verdict": "APPROVED" or "ACTION_REQUIRED",
+  "verdict": "APPROVED" or "ACTION_REQUIRED" or "REJECT",
   "score": 95,
+  "should_close": false,
+  "close_reason": "Specific explanation if PR is rejected / unnecessary and should be closed, otherwise empty string",
   "executive_summary": "Concise summary of the PR and overall architectural quality.",
   "anti_spaghetti_audit": "Detailed evaluation of code modularity, function sizing, decoupling, and maintainability.",
   "security_concurrency_audit": "Detailed analysis of data race freedom, asyncio task lifecycle, mutex safety, and security posture.",
