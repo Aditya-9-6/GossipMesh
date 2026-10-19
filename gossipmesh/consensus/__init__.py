@@ -1,15 +1,10 @@
-<<<<<<< HEAD
-from gossipmesh.consensus.backoff import AdaptiveBackoffController
-from gossipmesh.consensus.heartbeat import HeartbeatManager
-from gossipmesh.consensus.engine import ByzantineConsensusEngine, ModelVote
-
-__all__ = ["AdaptiveBackoffController", "HeartbeatManager", "ByzantineConsensusEngine", "ModelVote"]
-=======
 """
 Consensus package initialization.
 """
 
 from .raft import RaftLogCompactionEngine
+from gossipmesh.consensus.backoff import AdaptiveBackoffController
+from gossipmesh.consensus.heartbeat import HeartbeatManager
 
 from typing import List, Dict, Any, Optional
 
@@ -150,9 +145,10 @@ class ByzantineConsensusEngine:
 
 
 __all__ = [
+    "AdaptiveBackoffController",
+    "HeartbeatManager",
     "RaftLogCompactionEngine",
     "ModelVote",
     "ConsensusResult",
     "ByzantineConsensusEngine",
 ]
->>>>>>> origin/main
