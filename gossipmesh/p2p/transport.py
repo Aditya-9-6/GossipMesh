@@ -1,10 +1,32 @@
-<<<<<<< HEAD
+import asyncio
+import json
+import logging
 import random
-from typing import List, Dict, Any
-from gossipmesh.p2p.metrics import PeerMetricsRegistry
+import threading
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, decrypt_payload, encrypt_payload
+from gossipmesh.p2p.metrics import PeerMetricsRegistry, PeerMetricsTracker
+from gossipmesh.p2p.parser import ZeroCopyPacketParser
+from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
+
+logger = logging.getLogger(__name__)
+
+
+def calculate_adaptive_fanout(
+    base_fanout: int, queue_depth: int, rtt: float, threshold_queue: int = 50, threshold_rtt: float = 0.2
+) -> int:
+    """Calculates adaptive fanout based on queue depth and RTT backpressure telemetry."""
+    if queue_depth > threshold_queue or rtt > threshold_rtt:
+        reduction = max(1, base_fanout // 2)
+        return max(1, base_fanout - reduction)
+    return base_fanout
+
 
 class AdaptiveTransport:
     """Handles adaptive P2P gossip fanout and peer pruning based on latency metrics."""
+
     def __init__(self, metrics_registry: PeerMetricsRegistry, base_fanout: int = 4):
         self.metrics_registry = metrics_registry
         self.base_fanout = base_fanout
@@ -35,24 +57,44 @@ class AdaptiveTransport:
         scored_peers.sort(key=lambda x: x[0])
         selected = [peer for _, peer in scored_peers[:fanout]]
         return selected
-=======
-import asyncio
-import json
-import logging
-import time
-import threading
-from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-from gossipmesh.p2p.parser import ZeroCopyPacketParser
-from gossipmesh.p2p.ratelimit import PeerRateLimiter, RateLimitConfig
-from gossipmesh.p2p.crypto import EphemeralSessionKeyRotator, encrypt_payload, decrypt_payload
 
-logger = logging.getLogger(__name__)
+class AdaptiveGossipTransport:
+    """High-level P2P transport incorporating queue depth and RTT backpressure telemetry."""
+
+    def __init__(self, base_fanout: int = 8, threshold_queue: int = 50, threshold_rtt: float = 0.2):
+        self.base_fanout = base_fanout
+        self.threshold_queue = threshold_queue
+        self.threshold_rtt = threshold_rtt
+        self.metrics_tracker = PeerMetricsTracker()
+        self.peer_connections: Dict[str, bool] = {}
+
+    def register_peer(self, peer_id: str) -> None:
+        self.peer_connections[peer_id] = True
+
+    def record_peer_telemetry(self, peer_id: str, queue_depth: int, rtt: float) -> None:
+        self.metrics_tracker.update_queue_depth(peer_id, queue_depth)
+        self.metrics_tracker.update_rtt(peer_id, rtt)
+
+    def get_effective_fanout(self, peer_id: str) -> int:
+        q_depth = self.metrics_tracker.get_queue_depth(peer_id)
+        rtt = self.metrics_tracker.get_rtt(peer_id)
+        return calculate_adaptive_fanout(
+            self.base_fanout, q_depth, rtt, self.threshold_queue, self.threshold_rtt
+        )
+
+    async def send_gossip(self, peer_id: str, payload: dict) -> bool:
+        if not self.peer_connections.get(peer_id, False):
+            return False
+        fanout = self.get_effective_fanout(peer_id)
+        logger.debug(f"Sending gossip to peer {peer_id} with effective fanout {fanout}")
+        return True
+
 
 class P2PSessionTransport:
     """Manages peer-to-peer transport streams with automatic key rotation
     every 1000 messages or 300 seconds without dropping streams."""
-    
+
     def __init__(self, max_messages: int = 1000, max_time_seconds: float = 300.0):
         self.rotator = EphemeralSessionKeyRotator()
         self.max_messages = max_messages
@@ -237,13 +279,13 @@ class TransportSocketReader:
             header_data = await self.reader.readexactly(ZeroCopyPacketParser.HEADER_SIZE)
         except asyncio.IncompleteReadError:
             return None
-        
+
         if not header_data:
             return None
-        
+
         header_view = memoryview(header_data)
         magic, msg_type, msg_id, payload_len, _ = ZeroCopyPacketParser.parse_header(header_view)
-        
+
         if magic != self.expected_magic:
             logger.warning(f"Invalid packet magic received: {hex(magic)}")
             raise ValueError(f"Invalid packet magic: {hex(magic)}")
@@ -258,4 +300,3 @@ class TransportSocketReader:
         _, _, _, _, payload_view = ZeroCopyPacketParser.parse_header(full_view)
 
         return msg_type, msg_id, payload_view
->>>>>>> origin/main

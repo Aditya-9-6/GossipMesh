@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-from gossipmesh.p2p.metrics import PeerMetricsRegistry
-from gossipmesh.p2p.transport import AdaptiveTransport
-
-__all__ = ["PeerMetricsRegistry", "AdaptiveTransport"]
-=======
 from gossipmesh.p2p.cache import GossipMessageCache
 from gossipmesh.p2p.dht import KademliaDHT, KademliaNode
 from gossipmesh.p2p.digest import BloomFilterDigest
@@ -16,6 +10,8 @@ from gossipmesh.p2p.transport import GossipTransport, TransportTelemetry
 from gossipmesh.p2p.checkpointer import StateCheckpointer
 from gossipmesh.p2p.entropy import AntiEntropyEngine
 from gossipmesh.p2p.snapshot import SnapshotTransferProtocol
+from gossipmesh.p2p.metrics import PeerMetricsRegistry
+from gossipmesh.p2p.transport import AdaptiveTransport
 from gossipmesh.p2p.congestion import (
     CongestionState,
     CongestionConfig,
@@ -50,6 +46,8 @@ __all__ = [
     "StateCheckpointer",
     "AntiEntropyEngine",
     "SnapshotTransferProtocol",
+    "PeerMetricsRegistry",
+    "AdaptiveTransport",
     "CongestionState",
     "CongestionConfig",
     "NetworkJitterEstimator",
@@ -61,6 +59,3 @@ __all__ = [
     "WeightedPriorityQueue",
     "GossipMessageRouter",
 ]
-
-
->>>>>>> origin/main
