@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Autonomous PR Auto-Merger for DevProxy & GossipMesh.
+Autonomous PR Reviewer & Labeler for DevProxy & GossipMesh.
 Evaluates PR mergeability and CI check statuses:
 If and only if ALL checks pass (100% green) and zero merge conflicts exist,
-it auto-merges the PR to main and cleans up the branch.
+it marks the PR with the 'ready-to-merge' label for human or automated review.
+Auto-merge is disabled per repository safety policy.
 """
 
 import sys
@@ -93,8 +94,8 @@ def evaluate_checks(pr_number: str, workspace: Path) -> tuple[list[str], list[st
 
 
 def auto_merge_pr(pr_number: str, workspace: Path, notify_on_failure: bool = False) -> bool:
-    """Evaluates PR conditions and merges if 100% green and no conflicts."""
-    print(f"[*] Evaluating Auto-Merge Gate for PR #{pr_number} in {workspace}...", flush=True)
+    """Evaluates PR conditions and adds ready-to-merge label if 100% green and no conflicts."""
+    print(f"[*] Evaluating Quality Gate for PR #{pr_number} in {workspace}...", flush=True)
     pr = get_pr_details(pr_number, workspace)
     if not pr:
         print(f"[!] Could not retrieve metadata for PR #{pr_number}.", file=sys.stderr)
@@ -108,11 +109,11 @@ def auto_merge_pr(pr_number: str, workspace: Path, notify_on_failure: bool = Fal
     base_ref = pr.get("baseRefName", "main")
 
     if state != "OPEN":
-        print(f"[*] PR #{pr_number} is not OPEN (current state: {state}). Skipping merge.", flush=True)
+        print(f"[*] PR #{pr_number} is not OPEN (current state: {state}). Skipping.", flush=True)
         return False
 
     if is_draft:
-        print(f"[*] PR #{pr_number} is currently a Draft. Skipping merge.", flush=True)
+        print(f"[*] PR #{pr_number} is currently a Draft. Skipping.", flush=True)
         return False
 
     passing, failing, pending = evaluate_checks(pr_number, workspace)
@@ -127,38 +128,20 @@ def auto_merge_pr(pr_number: str, workspace: Path, notify_on_failure: bool = Fal
     can_merge = is_mergeable and len(failing) == 0 and len(pending) == 0 and len(passing) > 0
 
     if can_merge:
-        print(f"\n[🎉 READY TO MERGE] PR #{pr_number} meets all conditions! Merging to '{base_ref}'...", flush=True)
-        # Attempt squash merge first, fallback to regular merge
-        code, stdout, stderr = run_cmd(
-            ["gh", "pr", "merge", pr_number, "--squash", "--delete-branch", "--subject", f"{title} (#{pr_number})"],
-            cwd=workspace,
-        )
-
-        if code != 0:
-            print(f"[*] Squash merge failed ({stderr}). Attempting standard merge commit...", flush=True)
-            code, stdout, stderr = run_cmd(
-                ["gh", "pr", "merge", pr_number, "--merge", "--delete-branch"], cwd=workspace
-            )
-
-        if code == 0:
-            print(f"[SUCCESS] Successfully auto-merged PR #{pr_number} into {base_ref}!", flush=True)
-            success_comment = f"""🎉 **Pull Request #{pr_number} Auto-Merged!**
+        print(f"\n[🎉 READY TO MERGE] PR #{pr_number} meets all conditions! Adding ready-to-merge label...", flush=True)
+        run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace)
+        run_cmd(["gh", "pr", "edit", pr_number, "--add-label", "ready-to-merge"], cwd=workspace)
+        success_comment = f"""🎉 **Pull Request #{pr_number} is Ready to Merge!**
 
 - **Mergeability**: Clean (0 conflicts)
 - **CI Validation**: {len(passing)} check(s) passed (100% GREEN)
-- **Branch**: `{head_ref}` merged into `{base_ref}` and deleted.
+- **Label**: `ready-to-merge` applied (Auto-merge disabled per repository policy).
 """
-            run_cmd(["gh", "pr", "comment", pr_number, "--body", success_comment], cwd=workspace)
-            return True
-        else:
-            print(f"[!] Merge execution failed: {stderr}", file=sys.stderr)
-            if notify_on_failure:
-                err_comment = f"⚠️ **Auto-Merge Failed**: GitHub rejected merge command:\n```text\n{stderr}\n```"
-                run_cmd(["gh", "pr", "comment", pr_number, "--body", err_comment], cwd=workspace)
-            return False
+        run_cmd(["gh", "pr", "comment", pr_number, "--body", success_comment], cwd=workspace)
+        return True
 
     # PR cannot be merged at this time
-    print(f"[!] PR #{pr_number} cannot be merged yet.", flush=True)
+    print(f"[!] PR #{pr_number} is not ready yet.", flush=True)
     if has_conflicts:
         print(f"    - Blocked: Merge conflicts detected ({mergeable}).", flush=True)
     if failing:
@@ -182,7 +165,7 @@ def auto_merge_pr(pr_number: str, workspace: Path, notify_on_failure: bool = Fal
 **Pending / In-Progress Checks:**
 {pend_list}
 
-> 💡 *A PR will only auto-merge when 100% of CI checks pass and zero merge conflicts exist.*
+> 💡 *A PR will be labeled ready-to-merge when 100% of CI checks pass and zero merge conflicts exist.*
 > Comment `/fix` to trigger the autonomous repair and conflict resolution agent.
 """
         run_cmd(["gh", "pr", "comment", pr_number, "--body", comment], cwd=workspace)
