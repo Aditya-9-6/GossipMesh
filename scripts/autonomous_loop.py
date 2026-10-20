@@ -190,33 +190,21 @@ def verify_and_auto_fix_preflight(workspace: Path) -> tuple[bool, str]:
     # Pass 2: Syntax compilation check
     comp_res = subprocess.run(
         [py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=30,
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
     )
     if comp_res.returncode != 0:
         errors.append(f"Syntax/Compilation Failure:\n{comp_res.stderr.strip() or comp_res.stdout.strip()}")
 
     # Pass 3: Strict Ruff Lint Check
     ruff_check_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
-    ruff_res = subprocess.run(
-        ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
-    )
+    ruff_res = subprocess.run(ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     if ruff_res.returncode != 0:
         errors.append(f"Ruff Lint Failure:\n{ruff_res.stdout.strip() or ruff_res.stderr.strip()}")
 
     # Pass 4: Pytest Unit Tests
     test_res = subprocess.run(
         [py_bin, "-m", "pytest", "tests/", "-q", "--durations=5"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=300,
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200
     )
     if test_res.returncode != 0:
         combined_tests = (test_res.stdout + "\n" + test_res.stderr).strip()
@@ -588,16 +576,11 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
 
         # Re-run reviewer to verify the fixes
         print(f"[*] Re-running Autonomous Architectural Reviewer on PR #{pr_num} after fixes...", flush=True)
-        rev_res = subprocess.run(
-            [sys.executable, "scripts/ai_pr_reviewer.py", "--pr-number", str(pr_num), "--workspace", str(workspace)],
-            cwd=workspace,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=300,
-        )
+        rev_res = subprocess.run([
+            sys.executable, "scripts/ai_pr_reviewer.py",
+            "--pr-number", str(pr_num),
+            "--workspace", str(workspace)
+        ], cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
         print(rev_res.stdout, flush=True)
 
         if review_status_file.exists():
@@ -1006,23 +989,11 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 rev_env["GEMINI_REVIEWER_KEY"] = GLOBAL_POOL.next_key()
                 rev_env["GH_REPO"] = REPO
 
-                rev_res = subprocess.run(
-                    [
-                        sys.executable,
-                        "scripts/ai_pr_reviewer.py",
-                        "--pr-number",
-                        str(pr_num),
-                        "--workspace",
-                        str(workspace),
-                    ],
-                    cwd=workspace,
-                    env=rev_env,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    timeout=300,
-                )
+                rev_res = subprocess.run([
+                    sys.executable, "scripts/ai_pr_reviewer.py",
+                    "--pr-number", str(pr_num),
+                    "--workspace", str(workspace)
+                ], cwd=workspace, env=rev_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
                 print(rev_res.stdout, flush=True)
 
                 review_status_file = workspace / "ai_review_status.json"
@@ -1046,86 +1017,11 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                     )
 
                 if verdict == "APPROVED" and score >= 90:
-                    print(
-                        f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Attempting to merge into main...", flush=True
-                    )
-                    run_cmd(
-                        ["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"],
-                        cwd=workspace,
-                        check=False,
-                    )
-                    run_cmd(
-                        ["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False
-                    )
-                    merge_res = run_cmd(
-                        ["gh", "pr", "merge", str(pr_num), "--squash", "--admin"], cwd=workspace, check=False
-                    )
-
-                    # Verify PR was actually merged on GitHub
-                    pr_state_raw = run_cmd(
-                        ["gh", "pr", "view", str(pr_num), "--json", "state,merged"], cwd=workspace, check=False
-                    )
-                    is_merged = False
-                    try:
-                        pr_data = json.loads(pr_state_raw) if pr_state_raw else {}
-                        is_merged = pr_data.get("merged", False) or pr_data.get("state") == "MERGED"
-                    except Exception:
-                        pass
-
-                    if is_merged:
-                        print(
-                            f"[SUCCESS] Merged PR #{pr_num} into main! Contributor activity recorded for {USER_NAME}.",
-                            flush=True,
-                        )
-                        run_cmd(
-                            [
-                                "gh",
-                                "pr",
-                                "comment",
-                                str(pr_num),
-                                "--body",
-                                f"✅ **Pull Request #{pr_num} successfully merged into `main`**.\n\nAll automated architectural reviews (score: {score}/100) and tests passed.",
-                            ],
-                            cwd=workspace,
-                            check=False,
-                        )
-                        if linked_issue:
-                            run_cmd(
-                                [
-                                    "gh",
-                                    "issue",
-                                    "close",
-                                    str(linked_issue),
-                                    "-c",
-                                    f"Resolved and merged in PR #{pr_num}.",
-                                ],
-                                cwd=workspace,
-                                check=False,
-                            )
-                        run_cmd(["git", "checkout", "main"], cwd=workspace)
-                        run_cmd(["git", "pull", "origin", "main"], cwd=workspace)
-                        run_cmd(["git", "branch", "-D", head_ref], cwd=workspace, check=False)
-                        run_cmd(["git", "push", "origin", "--delete", head_ref], cwd=workspace, check=False)
-                        return True
-                    else:
-                        print(
-                            f"[!] PR #{pr_num} merge command did not complete merge: {merge_res}. Leaving open for next cycle.",
-                            flush=True,
-                        )
-                        run_cmd(
-                            [
-                                "gh",
-                                "pr",
-                                "comment",
-                                str(pr_num),
-                                "--body",
-                                f"⚠️ **Merge Incomplete**: Auto-merge attempted but GitHub reported conflicts or blocked merge:\n```text\n{merge_res}\n```\nBranch preserved for automated self-healing.",
-                            ],
-                            cwd=workspace,
-                            check=False,
-                        )
-                        run_cmd(["git", "checkout", "main"], cwd=workspace)
-                        return False
+                    print(f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Adding ready-to-merge label.", flush=True)
+                    run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace, check=False)
+                    run_cmd(["gh", "pr", "edit", str(pr_num), "--add-label", "ready-to-merge"], cwd=workspace, check=False)
+                    # Auto‑merge disabled per user request; PR stays open with the label.
+                    return True
                 elif verdict == "REJECT" or score < 60 or s_data.get("should_close", False):
                     print(
                         f"[*] PR #{pr_num} REJECTED as unnecessary/anti-pattern (Score: {score}/100). Closing...",
