@@ -5,5 +5,5 @@ from gossipmesh.core.exceptions import GossipMeshException
 
 app = FastAPI(title="GossipMesh Webhook API", version="0.1.0")
 app.include_router(webhooks_router)
-app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler) # type: ignore
-app.add_exception_handler(Exception, global_exception_handler) # type: ignore
+app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler)  # type: ignore
+app.add_exception_handler(Exception, global_exception_handler)  # type: ignore

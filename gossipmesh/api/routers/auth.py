@@ -14,7 +14,13 @@ from pydantic import ValidationError
 
 from gossipmesh.api import deps
 from gossipmesh.core.config import settings
-from gossipmesh.core.security import verify_password, create_access_token, create_refresh_token, encrypt_string, decrypt_string
+from gossipmesh.core.security import (
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    encrypt_string,
+    decrypt_string,
+)
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 from gossipmesh.models.user import User
 from gossipmesh.models.session import UserSession, RefreshToken
@@ -30,10 +36,12 @@ from gossipmesh.models.user import UserOIDCCredential
 
 router = APIRouter()
 
+
 class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
+
 
 @router.post("/login/access-token", response_model=Token)
 def login_access_token(
@@ -49,11 +57,7 @@ def login_access_token(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
-    session = UserSession(
-        user_id=user.id,
-        ip_address=ip_address,
-        user_agent=user_agent
-    )
+    session = UserSession(user_id=user.id, ip_address=ip_address, user_agent=user_agent)
     db.add(session)
     db.commit()
     db.refresh(session)
@@ -68,9 +72,7 @@ def login_access_token(
 
     # Store refresh token in db
     db_refresh_token = RefreshToken(
-        session_id=session.id,
-        jti=jti,
-        expires_at=datetime.now(timezone.utc) + refresh_token_expires
+        session_id=session.id, jti=jti, expires_at=datetime.now(timezone.utc) + refresh_token_expires
     )
     db.add(db_refresh_token)
     db.commit()
@@ -81,6 +83,7 @@ def login_access_token(
         "token_type": "bearer",
     }
 
+
 class SessionResponse(BaseModel):
     id: int
     ip_address: str | None
@@ -89,19 +92,16 @@ class SessionResponse(BaseModel):
     last_active_at: datetime
     is_active: bool
 
+
 @router.get("/sessions", response_model=list[SessionResponse])
-def get_sessions(
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-) -> Any:
+def get_sessions(current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)) -> Any:
     sessions = db.query(UserSession).filter(UserSession.user_id == current_user.id).all()
     return sessions
 
+
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=fastapi.Response)
 def revoke_session(
-    session_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
+    session_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> None:
     session = db.query(UserSession).filter(UserSession.id == session_id, UserSession.user_id == current_user.id).first()
     if not session:
@@ -113,13 +113,13 @@ def revoke_session(
     db.commit()
     return None
 
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
+
 @router.post("/refresh", response_model=Token)
-def refresh_token(
-    request: RefreshTokenRequest, db: Session = Depends(deps.get_db)
-) -> Any:
+def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_db)) -> Any:
     try:
         payload = jwt.decode(
             request.refresh_token,
@@ -127,7 +127,7 @@ def refresh_token(
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
             issuer=settings.JWT_ISSUER,
-            leeway=timedelta(seconds=10)
+            leeway=timedelta(seconds=10),
         )
         token_type = payload.get("type")
         if token_type != "refresh":
@@ -173,13 +173,13 @@ def refresh_token(
 
     new_jti = str(uuid.uuid4())
     access_token = create_access_token(user_id, session_id=session.id, expires_delta=access_token_expires)
-    refresh_token = create_refresh_token(user_id, session_id=session.id, jti=new_jti, expires_delta=refresh_token_expires)
+    refresh_token = create_refresh_token(
+        user_id, session_id=session.id, jti=new_jti, expires_delta=refresh_token_expires
+    )
 
     # Store new refresh token
     new_db_refresh_token = RefreshToken(
-        session_id=session.id,
-        jti=new_jti,
-        expires_at=datetime.now(timezone.utc) + refresh_token_expires
+        session_id=session.id, jti=new_jti, expires_at=datetime.now(timezone.utc) + refresh_token_expires
     )
     db.add(new_db_refresh_token)
     db.commit()
@@ -208,12 +208,7 @@ def github_login(request: Request) -> Any:
 
 
 @router.get("/github/callback")
-def github_callback(
-    request: Request,
-    code: str,
-    state: str,
-    db: Session = Depends(deps.get_db)
-) -> Any:
+def github_callback(request: Request, code: str, state: str, db: Session = Depends(deps.get_db)) -> Any:
     # Validate state
     redis_key = f"github_oauth_state:{state}"
     if not redis_client.get(redis_key):
@@ -246,7 +241,7 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         user_response.raise_for_status()
         github_user_data = user_response.json()
@@ -258,11 +253,13 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         emails_response.raise_for_status()
         emails_data = emails_response.json()
-        primary_email = next((email["email"] for email in emails_data if email["primary"] and email.get("verified")), None)
+        primary_email = next(
+            (email["email"] for email in emails_data if email["primary"] and email.get("verified")), None
+        )
 
         if not primary_email:
             raise AuthenticationError(message="No verified primary email found on GitHub account")
@@ -284,7 +281,7 @@ def github_callback(
                 user_id=user.id,
                 github_id=github_id,
                 encrypted_access_token=encrypt_string(access_token),
-                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None
+                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
             )
             db.add(credential)
         else:
@@ -302,7 +299,7 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         orgs_response.raise_for_status()
         github_orgs = orgs_response.json()
@@ -316,7 +313,7 @@ def github_callback(
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-            }
+            },
         )
         installations_count = 0
         if installations_response.status_code == 200:
@@ -331,17 +328,14 @@ def github_callback(
                 db.commit()
                 db.refresh(org)
 
-            user_org = db.query(UserOrganization).filter(
-                UserOrganization.user_id == user.id,
-                UserOrganization.organization_id == org.id
-            ).first()
+            user_org = (
+                db.query(UserOrganization)
+                .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id == org.id)
+                .first()
+            )
 
             if not user_org:
-                user_org = UserOrganization(
-                    user_id=user.id,
-                    organization_id=org.id,
-                    role="member"
-                )
+                user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="member")
                 db.add(user_org)
 
         db.commit()
@@ -350,28 +344,21 @@ def github_callback(
         audit_event = AuditEvent(
             action="github_login",
             actor_id=user.id,
-            details={
-                "github_id": github_id,
-                "organizations": org_names,
-                "installations_count": installations_count
-            }
+            details={"github_id": github_id, "organizations": org_names, "installations_count": installations_count},
         )
         db.add(audit_event)
         db.commit()
 
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         return {
-            "access_token": create_access_token(
-                user.id, expires_delta=access_token_expires
-            ),
+            "access_token": create_access_token(user.id, expires_delta=access_token_expires),
             "token_type": "bearer",
         }
 
 
 @router.post("/github/refresh-token")
 def github_refresh_token(
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
+    current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
     if not credential or not credential.encrypted_refresh_token:
@@ -409,7 +396,7 @@ def github_refresh_token(
             actor_id=current_user.id,
             details={
                 "github_id": credential.github_id,
-            }
+            },
         )
         db.add(audit_event)
         db.commit()
@@ -424,8 +411,10 @@ def oidc_login(request: Request) -> Any:
 
     state = str(uuid.uuid4())
     nonce = str(uuid.uuid4())
-    code_verifier = base64.urlsafe_b64encode(os.urandom(32)).decode('utf-8').rstrip('=')
-    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode('utf-8')).digest()).decode('utf-8').rstrip('=')
+    code_verifier = base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8").rstrip("=")
+    code_challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode("utf-8")).digest()).decode("utf-8").rstrip("=")
+    )
 
     redis_client.setex(f"oidc_state:{state}", 300, f"{nonce}:{code_verifier}")
 
@@ -446,7 +435,7 @@ def oidc_login(request: Request) -> Any:
         "state": state,
         "nonce": nonce,
         "code_challenge": code_challenge,
-        "code_challenge_method": "S256"
+        "code_challenge_method": "S256",
     }
 
     url = f"{auth_endpoint}?{urllib.parse.urlencode(params)}"
@@ -454,13 +443,13 @@ def oidc_login(request: Request) -> Any:
 
 
 @router.get("/oidc/callback")
-def oidc_callback(
-    request: Request,
-    state: str,
-    code: str,
-    db: Session = Depends(deps.get_db)
-) -> Any:
-    if not settings.OIDC_DISCOVERY_URL or not settings.OIDC_CLIENT_ID or not settings.OIDC_CLIENT_SECRET or not settings.OIDC_REDIRECT_URI:
+def oidc_callback(request: Request, state: str, code: str, db: Session = Depends(deps.get_db)) -> Any:
+    if (
+        not settings.OIDC_DISCOVERY_URL
+        or not settings.OIDC_CLIENT_ID
+        or not settings.OIDC_CLIENT_SECRET
+        or not settings.OIDC_REDIRECT_URI
+    ):
         raise HTTPException(status_code=500, detail="OIDC is not configured")
 
     redis_key = f"oidc_state:{state}"
@@ -469,7 +458,9 @@ def oidc_callback(
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
-    nonce, code_verifier = state_data.decode("utf-8").split(":") if isinstance(state_data, bytes) else state_data.split(":")
+    nonce, code_verifier = (
+        state_data.decode("utf-8").split(":") if isinstance(state_data, bytes) else state_data.split(":")
+    )
 
     with httpx.Client() as client:
         try:
@@ -490,9 +481,9 @@ def oidc_callback(
                 "redirect_uri": settings.OIDC_REDIRECT_URI,
                 "client_id": settings.OIDC_CLIENT_ID,
                 "client_secret": settings.OIDC_CLIENT_SECRET,
-                "code_verifier": code_verifier
+                "code_verifier": code_verifier,
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         token_data = token_response.json()
         if "error" in token_data:
@@ -513,7 +504,7 @@ def oidc_callback(
                 signing_key.key,
                 algorithms=["RS256"],
                 audience=settings.OIDC_CLIENT_ID,
-                issuer=discovery_data.get("issuer")
+                issuer=discovery_data.get("issuer"),
             )
         except Exception as e:
             raise AuthenticationError(message=f"Failed to validate ID token: {e}")
@@ -523,7 +514,7 @@ def oidc_callback(
 
         email = claims.get("email")
         if not email:
-             raise AuthenticationError(message="OIDC claims did not contain an email")
+            raise AuthenticationError(message="OIDC claims did not contain an email")
 
         sub = claims.get("sub")
         issuer = claims.get("iss")
@@ -537,7 +528,11 @@ def oidc_callback(
             db.refresh(user)
 
         # Map OIDC Credentials
-        credential = db.query(UserOIDCCredential).filter(UserOIDCCredential.user_id == user.id, UserOIDCCredential.issuer == issuer).first()
+        credential = (
+            db.query(UserOIDCCredential)
+            .filter(UserOIDCCredential.user_id == user.id, UserOIDCCredential.issuer == issuer)
+            .first()
+        )
         if not credential:
             credential = UserOIDCCredential(
                 user_id=user.id,
@@ -545,7 +540,7 @@ def oidc_callback(
                 issuer=issuer,
                 encrypted_access_token=encrypt_string(access_token),
                 encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
-                encrypted_id_token=encrypt_string(id_token)
+                encrypted_id_token=encrypt_string(id_token),
             )
             db.add(credential)
         else:
@@ -562,37 +557,26 @@ def oidc_callback(
             for role_name in roles:
                 org = db.query(Organization).filter(Organization.name == role_name).first()
                 if org:
-                    user_org = db.query(UserOrganization).filter(
-                        UserOrganization.user_id == user.id,
-                        UserOrganization.organization_id == org.id
-                    ).first()
+                    user_org = (
+                        db.query(UserOrganization)
+                        .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id == org.id)
+                        .first()
+                    )
                     if not user_org:
-                        user_org = UserOrganization(
-                            user_id=user.id,
-                            organization_id=org.id,
-                            role="member"
-                        )
+                        user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="member")
                         db.add(user_org)
 
         db.commit()
 
         # Audit event
         audit_event = AuditEvent(
-            action="oidc_login",
-            actor_id=user.id,
-            details={
-                "sub": sub,
-                "issuer": issuer,
-                "roles_mapped": roles
-            }
+            action="oidc_login", actor_id=user.id, details={"sub": sub, "issuer": issuer, "roles_mapped": roles}
         )
         db.add(audit_event)
         db.commit()
 
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         return {
-            "access_token": create_access_token(
-                user.id, expires_delta=access_token_expires
-            ),
+            "access_token": create_access_token(user.id, expires_delta=access_token_expires),
             "token_type": "bearer",
         }
