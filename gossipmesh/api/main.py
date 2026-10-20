@@ -33,7 +33,6 @@ from gossipmesh.core.logging import setup_logging
 from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
 
 setup_logging()
-
 logger = logging.getLogger(__name__)
 
 
@@ -176,7 +175,6 @@ app.include_router(artifacts.router, prefix=f"{settings.API_V1_STR}/artifacts", 
 app.include_router(enterprise.router, prefix=f"{settings.API_V1_STR}/enterprise", tags=["enterprise"])
 app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector_search", tags=["vector_search"])
 app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
-
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
 app.include_router(runs.router, prefix=f"{settings.API_V1_STR}", tags=["runs"])
