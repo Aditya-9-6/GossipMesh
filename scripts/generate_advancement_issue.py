@@ -31,55 +31,41 @@ CATALOG = [
         "area": "area/p2p",
         "difficulty": "enhancement",
         "spec": "Replace static peer configuration with a distributed hash table (DHT) based on Kademlia. Implement XOR metric routing and bucket updates for active peers.",
-        "target_files": ["gossipmesh/p2p/dht.py", "gossipmesh/p2p/node.py"],
+        "target_files": ["gossipmesh/p2p/dht.py", "gossipmesh/p2p/node.py"]
     },
     {
         "title": "feat(consensus): Add Byzantine Fault Tolerant (BFT) Voting Quorum",
         "area": "area/consensus",
         "difficulty": "priority/high",
         "spec": "Implement a 2/3 majority BFT voting mechanism for architectural proposals. Ensure that malicious or lagging nodes cannot disrupt the consensus state.",
-        "target_files": ["gossipmesh/consensus/bft.py", "tests/test_bft.py"],
+        "target_files": ["gossipmesh/consensus/bft.py", "tests/test_bft.py"]
     },
     {
         "title": "feat(agents): Integrate Local LLM Fallback via Llama.cpp",
         "area": "area/agents",
         "difficulty": "good first issue",
         "spec": "Add a fallback completion provider that uses local Llama.cpp bindings when the Gemini API is rate-limited or unavailable, preserving autonomy.",
-        "target_files": ["gossipmesh/agents/llm.py"],
+        "target_files": ["gossipmesh/agents/llm.py"]
     },
     {
         "title": "feat(core): Zero-Copy Vector Clock Synchronization",
         "area": "area/core",
         "difficulty": "enhancement",
         "spec": "Optimize the vector clock anti-entropy sync using efficient delta encodings and avoiding deep copies of the state ledger during peer exchanges.",
-        "target_files": ["gossipmesh/core/clocks.py", "tests/test_clocks.py"],
-    },
+        "target_files": ["gossipmesh/core/clocks.py", "tests/test_clocks.py"]
+    }
 ]
-
 
 def get_existing_issues():
     """Fetch existing issue titles and creation timestamps."""
     try:
-        cmd = [
-            "gh",
-            "issue",
-            "list",
-            "--repo",
-            "Aditya-9-6/GossipMesh",
-            "--state",
-            "all",
-            "--limit",
-            "100",
-            "--json",
-            "title,createdAt,author",
-        ]
+        cmd = ["gh", "issue", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "all", "--limit", "100", "--json", "title,createdAt,author"]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         issues = json.loads(result.stdout)
         return issues
     except Exception as e:
         print(f"[WARN] Failed to fetch issues via gh CLI: {e}")
         return []
-
 
 def check_freeze_timer(existing_issues, cooldown_minutes=0, force=False):
     """
@@ -107,7 +93,6 @@ def check_freeze_timer(existing_issues, cooldown_minutes=0, force=False):
 
     return True, 999.0
 
-
 def load_backlog(workspace: Path) -> list:
     """Loads archived backlog queue from file."""
     backlog_file = workspace / ".github" / "advancement_backlog.json"
@@ -118,13 +103,11 @@ def load_backlog(workspace: Path) -> list:
             return []
     return []
 
-
 def save_backlog(workspace: Path, backlog: list):
     """Saves backlog queue to file."""
     backlog_file = workspace / ".github" / "advancement_backlog.json"
     backlog_file.parent.mkdir(parents=True, exist_ok=True)
     backlog_file.write_text(json.dumps(backlog, indent=2), encoding="utf-8")
-
 
 def generate_ai_advancement(existing_titles):
     """Use Gemini API to dynamically generate a novel, high-impact architectural advancement task."""
@@ -156,7 +139,7 @@ Output ONLY valid JSON matching this schema:
 """
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
+        "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"}
     }
 
     for model in FALLBACK_MODELS:
@@ -167,7 +150,7 @@ Output ONLY valid JSON matching this schema:
                     url,
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
-                    method="POST",
+                    method="POST"
                 )
                 with urllib.request.urlopen(req, timeout=25) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
@@ -176,10 +159,7 @@ Output ONLY valid JSON matching this schema:
             except urllib.error.HTTPError as e:
                 if e.code == 429:
                     freeze_sec = 5 * attempt
-                    print(
-                        f"[FREEZE TIMER] Rate limit encountered on {model}. Backing off for {freeze_sec}s...",
-                        flush=True,
-                    )
+                    print(f"[FREEZE TIMER] Rate limit encountered on {model}. Backing off for {freeze_sec}s...", flush=True)
                     time.sleep(freeze_sec)
                     continue
                 break
@@ -187,7 +167,6 @@ Output ONLY valid JSON matching this schema:
                 print(f"[WARN] Error with {model}: {e}")
                 break
     return None
-
 
 def create_issue(item):
     """Create a structured GitHub issue with strict anti-spaghetti warnings."""
@@ -197,9 +176,7 @@ def create_issue(item):
     spec = item["spec"]
     target_files = item.get("target_files", [])
 
-    target_files_md = (
-        "\n".join(f"- `{f}`" for f in target_files) if target_files else "- Relevant files in `gossipmesh/`"
-    )
+    target_files_md = "\n".join(f"- `{f}`" for f in target_files) if target_files else "- Relevant files in `gossipmesh/`"
 
     body = f"""## 🚀 Architecture Advancement Specification
 
@@ -232,30 +209,21 @@ def create_issue(item):
 > - **Comprehensive Tests**: Provide comprehensive Python unit tests covering happy paths, edge cases, and error branches.
 
 ### 🛠️ Getting Started
-1. Fork the repository and create a branch: `git checkout -b feature/{area.replace("area/", "")}-advancement`
+1. Fork the repository and create a branch: `git checkout -b feature/{area.replace('area/', '')}-advancement`
 2. Run local tests: `python -m unittest discover`
 3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
 
     labels_list = [area, difficulty, "hacktoberfest", "advancement"]
     for lbl in labels_list:
-        subprocess.run(
-            ["gh", "label", "create", lbl, "--repo", "Aditya-9-6/GossipMesh", "--force"], capture_output=True
-        )
+        subprocess.run(["gh", "label", "create", lbl, "--repo", "Aditya-9-6/GossipMesh", "--force"], capture_output=True)
 
     labels = f"{area},{difficulty},hacktoberfest,advancement"
     cmd = [
-        "gh",
-        "issue",
-        "create",
-        "--repo",
-        "Aditya-9-6/GossipMesh",
-        "--title",
-        title,
-        "--body",
-        body,
-        "--label",
-        labels,
+        "gh", "issue", "create", "--repo", "Aditya-9-6/GossipMesh",
+        "--title", title,
+        "--body", body,
+        "--label", labels
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -265,7 +233,6 @@ def create_issue(item):
         print(f"[ERROR] Failed to create issue '{title}': {e.stderr}")
         return False
 
-
 def main():
     workspace = Path(".").resolve()
     manual_title = os.environ.get("INPUT_TITLE", "").strip()
@@ -274,22 +241,16 @@ def main():
     manual_spec = os.environ.get("INPUT_SPEC", "").strip()
     count = int(os.environ.get("INPUT_COUNT", "1") or "1")
     cooldown_min = int(os.environ.get("MIN_COOLDOWN_MINUTES", "0"))
-    force = (
-        os.environ.get("FORCE_SUBMIT", "false").lower() in ("true", "1")
-        or ("--force" in sys.argv)
-        or ("-f" in sys.argv)
-    )
+    force = os.environ.get("FORCE_SUBMIT", "false").lower() in ("true", "1") or ("--force" in sys.argv) or ("-f" in sys.argv)
 
     # If manual submission specified
     if manual_title and manual_area != "auto":
-        create_issue(
-            {
-                "title": manual_title,
-                "area": manual_area,
-                "difficulty": manual_diff,
-                "spec": manual_spec or f"Implement architectural advancement for {manual_title}.",
-            }
-        )
+        create_issue({
+            "title": manual_title,
+            "area": manual_area,
+            "difficulty": manual_diff,
+            "spec": manual_spec or f"Implement architectural advancement for {manual_title}."
+        })
         return
 
     existing_issues = get_existing_issues()
@@ -299,12 +260,8 @@ def main():
     # 1. Check Freeze Timer Cooldown
     can_submit, elapsed = check_freeze_timer(existing_issues, cooldown_minutes=cooldown_min, force=force)
     if not can_submit:
-        print(
-            f"[FREEZE TIMER ACTIVE] Last issue was created {elapsed:.1f} minutes ago (< {cooldown_min} min cooldown)."
-        )
-        print(
-            "[*] Generating next high-impact advancement and archiving to backlog queue to prevent rate-limit breaks..."
-        )
+        print(f"[FREEZE TIMER ACTIVE] Last issue was created {elapsed:.1f} minutes ago (< {cooldown_min} min cooldown).")
+        print("[*] Generating next high-impact advancement and archiving to backlog queue to prevent rate-limit breaks...")
 
         # Find next candidate to archive
         candidate = None
@@ -320,9 +277,7 @@ def main():
             if not any(b["title"] == candidate["title"] for b in backlog):
                 backlog.append(candidate)
                 save_backlog(workspace, backlog)
-                print(
-                    f"[ARCHIVED TO BACKLOG] Stored: '{candidate['title']}'. Will be submitted once freeze timer expires."
-                )
+                print(f"[ARCHIVED TO BACKLOG] Stored: '{candidate['title']}'. Will be submitted once freeze timer expires.")
         return
 
     # 2. Cooldown is clear: Drain backlog first if available
@@ -355,9 +310,7 @@ def main():
 
     # 4. If catalog exhausted and more requested, dynamically generate via Gemini AI
     if created_count < count:
-        print(
-            f"[*] Catalog exhausted or more issues requested ({created_count}/{count}). Querying Gemini AI for novel advancement..."
-        )
+        print(f"[*] Catalog exhausted or more issues requested ({created_count}/{count}). Querying Gemini AI for novel advancement...")
         while created_count < count:
             ai_item = generate_ai_advancement(existing_titles)
             if not ai_item or ai_item.get("title") in existing_titles:
@@ -374,7 +327,6 @@ def main():
         print("[OK] No new issues needed or all catalog items already exist.")
     else:
         print(f"[DONE] Successfully generated {created_count} advancement issue(s) under safe rate-limiting.")
-
 
 if __name__ == "__main__":
     main()

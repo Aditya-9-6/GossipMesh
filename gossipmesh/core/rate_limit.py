@@ -3,10 +3,8 @@ from typing import Tuple
 from gossipmesh.db.redis import redis_client
 from gossipmesh.core.exceptions import RateLimitError
 
-
 class RateLimiter:
     """Redis-backed rate limiter."""
-
     def __init__(self, limit: int, window: int):
         self.limit = limit
         self.window = window
@@ -60,6 +58,11 @@ class RateLimiter:
         is_allowed, remaining, reset_time = self.check_limit(identifier, limit_type)
         if not is_allowed:
             raise RateLimitError(
-                message="Rate limit exceeded", details={"limit": self.limit, "remaining": 0, "reset": reset_time}
+                message="Rate limit exceeded",
+                details={
+                    "limit": self.limit,
+                    "remaining": 0,
+                    "reset": reset_time
+                }
             )
         return remaining, reset_time

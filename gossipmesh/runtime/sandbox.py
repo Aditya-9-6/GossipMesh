@@ -5,13 +5,11 @@ import subprocess
 import shlex
 from typing import Optional, Tuple, Union, List
 
-
 class SandboxEnvironment:
     """
     Provides a temporary, isolated directory for executing jobs safely.
     In a full production environment, this would wrap Docker or Firecracker microVMs.
     """
-
     def __init__(self):
         self.workspace_dir: Optional[str] = None
 
@@ -32,7 +30,11 @@ class SandboxEnvironment:
             cmd = shlex.split(cmd)
 
         process = subprocess.Popen(
-            cmd, cwd=self.workspace_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            cmd,
+            cwd=self.workspace_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
         )
         try:
             stdout, stderr = process.communicate(timeout=timeout)

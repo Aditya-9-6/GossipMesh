@@ -5,7 +5,6 @@ from datetime import datetime
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.models.base import Base
 
-
 class SoftDeleteMixin:
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -22,29 +21,28 @@ class SoftDeleteMixin:
             self.retention_days = retention_days
 
         # Determine organization_id
-        if hasattr(self, "organization_id"):
+        if hasattr(self, 'organization_id'):
             org_id = self.organization_id
-        elif self.__class__.__name__ == "Organization":
-            org_id = getattr(self, "id", None)
+        elif self.__class__.__name__ == 'Organization':
+            org_id = getattr(self, 'id', None)
         else:
             org_id = None
 
         # Determine ID details for composite keys
         details = {"model": self.__class__.__name__, "retention_days": retention_days}
-        if hasattr(self, "id"):
+        if hasattr(self, 'id'):
             details["id"] = self.id
-        elif hasattr(self, "user_id") and hasattr(self, "organization_id"):
-            details["user_id"] = self.user_id
-            details["organization_id"] = self.organization_id
+        elif hasattr(self, 'user_id') and hasattr(self, 'organization_id'):
+             details["user_id"] = self.user_id
+             details["organization_id"] = self.organization_id
 
         audit_event = AuditEvent(
             action=f"{self.__class__.__name__.lower()}_deleted",
             actor_id=actor_id,
             organization_id=org_id,
-            details=details,
+            details=details
         )
         session.add(audit_event)
-
 
 @event.listens_for(Session, "do_orm_execute")
 def _add_filtering_criteria(execute_state):

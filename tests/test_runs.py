@@ -16,7 +16,6 @@ Base.metadata.create_all(bind=engine)
 # Create a test client for the FastAPI app
 client = TestClient(app)
 
-
 # Test case for tracking a run
 def test_track_run():
     # Create a sample run data
@@ -35,7 +34,7 @@ def test_track_run():
         "files_changed": ["file1.py", "file2.py"],
         "model": "gemini-2.5-flash",
         "token_usage": 1000,
-        "estimated_cost": 0.01,
+        "estimated_cost": 0.01
     }
 
     # Send a POST request to track the run
@@ -45,4 +44,6 @@ def test_track_run():
     assert response.status_code == 200
 
     # Assert that the response message is correct
-    assert response.json() == {"message": "Run tracked successfully"}
+    assert response.json() == {
+        "message": "Run tracked successfully"
+    }

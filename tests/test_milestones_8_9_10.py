@@ -1,20 +1,15 @@
 import unittest
 from gossipmesh.enterprise.controls import (
-    SSOManager,
-    SCIMProvisioner,
-    DataRetentionPolicy,
-    DataExporter,
-    ComplianceAuditor,
+    SSOManager, SCIMProvisioner,
+    DataRetentionPolicy, DataExporter, ComplianceAuditor
 )
 from gossipmesh.billing.commercialization import (
-    StripeBillingEngine,
-    SubscriptionPlanManager,
-    SeatManager,
-    MeteredUsageTracker,
-    EnterpriseContractManager,
+    StripeBillingEngine, SubscriptionPlanManager, SeatManager,
+    MeteredUsageTracker, EnterpriseContractManager
 )
-from gossipmesh.scale.reliability import RateLimiter, QueuePartitionManager, MultiRegionDRManager, SLOMonitor
-
+from gossipmesh.scale.reliability import (
+    RateLimiter, QueuePartitionManager, MultiRegionDRManager, SLOMonitor
+)
 
 class TestEnterpriseControls(unittest.TestCase):
     def test_sso_manager(self):
@@ -26,9 +21,9 @@ class TestEnterpriseControls(unittest.TestCase):
     def test_scim_provisioner(self):
         provisioner = SCIMProvisioner()
         self.assertTrue(provisioner.provision_user("user123", {"name": "Test"}))
-        self.assertFalse(provisioner.provision_user("user123", {"name": "Test"}))  # already exists
+        self.assertFalse(provisioner.provision_user("user123", {"name": "Test"})) # already exists
         self.assertTrue(provisioner.deprovision_user("user123"))
-        self.assertFalse(provisioner.deprovision_user("user123"))  # already deleted
+        self.assertFalse(provisioner.deprovision_user("user123")) # already deleted
 
     def test_data_retention_policy(self):
         policy = DataRetentionPolicy()
@@ -65,9 +60,9 @@ class TestBillingCommercialization(unittest.TestCase):
     def test_seat_manager(self):
         manager = SeatManager()
         self.assertTrue(manager.allocate_seat("org1", "user1"))
-        self.assertFalse(manager.allocate_seat("org1", "user1"))  # already allocated
+        self.assertFalse(manager.allocate_seat("org1", "user1")) # already allocated
         self.assertTrue(manager.remove_seat("org1", "user1"))
-        self.assertFalse(manager.remove_seat("org1", "user1"))  # already removed
+        self.assertFalse(manager.remove_seat("org1", "user1")) # already removed
 
     def test_metered_usage_tracker(self):
         tracker = MeteredUsageTracker()
@@ -110,8 +105,7 @@ class TestScaleReliability(unittest.TestCase):
         self.assertTrue(monitor.record_metric("api_service", True))
         self.assertTrue(monitor.record_metric("api_service", False))
         budget = monitor.check_error_budget("api_service")
-        self.assertTrue(budget < 0)  # 66.6% < 99.0%
+        self.assertTrue(budget < 0) # 66.6% < 99.0%
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
