@@ -24,6 +24,7 @@ def verify_license(license_key: str, public_key_input: Optional[Any] = None) -> 
 
         # Check expiration
         expires_at_str = data.get("expires_at")
+        expires_at = None
         if expires_at_str:
             expires_at = datetime.datetime.fromisoformat(expires_at_str)
             if datetime.datetime.utcnow() > expires_at:
