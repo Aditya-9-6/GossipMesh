@@ -165,7 +165,4 @@ class GitHubPRService:
         return response.json()
 
     async def get_pr_review_comments(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
-        return await self._request(
-            "GET",
-            f"/repos/{owner}/{repo}/pulls/{pull_number}/comments"
-        )
+        return await self._request("GET", f"/repos/{owner}/{repo}/pulls/{pull_number}/comments")

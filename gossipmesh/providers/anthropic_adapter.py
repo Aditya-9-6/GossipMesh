@@ -10,6 +10,7 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 
 class AnthropicProvider(BaseProvider):
     _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
+
     def __init__(self, api_key: str):
         super().__init__(api_key)
         self.client = AsyncAnthropic(api_key=self.api_key, timeout=60.0)

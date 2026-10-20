@@ -54,7 +54,9 @@ class GitHubIntegration:
 
         # Fetch existing comments to support cross-run retry safety
         try:
-            existing_comments = await self.github_pr_service.get_pr_review_comments(self.owner, self.repo, self.pr_number)
+            existing_comments = await self.github_pr_service.get_pr_review_comments(
+                self.owner, self.repo, self.pr_number
+            )
             for comment in existing_comments:
                 body = comment.get("body", "")
                 for fp in re.findall(r"<!-- fingerprint: (.*?) -->", body):
@@ -119,13 +121,7 @@ class GitHubIntegration:
             # Use commit_sha from the first finding in the group
             commit_sha = findings_group[0].commit_sha
 
-            payload = {
-                "body": body,
-                "commit_id": commit_sha,
-                "path": file_path,
-                "side": side,
-                "line": line
-            }
+            payload = {"body": body, "commit_id": commit_sha, "path": file_path, "side": side, "line": line}
             if end_line and end_line != line:
                 payload["start_line"] = line
                 payload["line"] = end_line

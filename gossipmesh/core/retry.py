@@ -7,9 +7,12 @@ import inspect
 
 logger = logging.getLogger(__name__)
 
+
 class CircuitBreakerOpenError(Exception):
     """Raised when the circuit breaker is open."""
+
     pass
+
 
 class CircuitBreaker:
     def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 60.0):
@@ -43,15 +46,17 @@ class CircuitBreaker:
             return False
         return True
 
+
 def with_retry_and_circuit_breaker(
     exceptions: Tuple[Type[Exception], ...],
     retries: int = 3,
     delay: float = 1.0,
     backoff: float = 2.0,
-    circuit_breaker: Optional[CircuitBreaker] = None
+    circuit_breaker: Optional[CircuitBreaker] = None,
 ):
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         if inspect.isasyncgenfunction(func):
+
             @wraps(func)
             async def async_gen_wrapper(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
                 if circuit_breaker and not circuit_breaker.check_state():
@@ -71,12 +76,16 @@ def with_retry_and_circuit_breaker(
                                 circuit_breaker.record_failure()
                             raise e
 
-                        logger.warning(f"Attempt {attempt + 1}/{retries} failed for {func.__name__}: {str(e)}. Retrying in {current_delay}s...")
+                        logger.warning(
+                            f"Attempt {attempt + 1}/{retries} failed for {func.__name__}: {str(e)}. Retrying in {current_delay}s..."
+                        )
                         await asyncio.sleep(current_delay)
                         current_delay *= backoff
                 raise Exception("Unexpected error in retry logic")
+
             return async_gen_wrapper
         else:
+
             @wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
                 if circuit_breaker and not circuit_breaker.check_state():
@@ -95,10 +104,14 @@ def with_retry_and_circuit_breaker(
                                 circuit_breaker.record_failure()
                             raise e
 
-                        logger.warning(f"Attempt {attempt + 1}/{retries} failed for {func.__name__}: {str(e)}. Retrying in {current_delay}s...")
+                        logger.warning(
+                            f"Attempt {attempt + 1}/{retries} failed for {func.__name__}: {str(e)}. Retrying in {current_delay}s..."
+                        )
                         await asyncio.sleep(current_delay)
                         current_delay *= backoff
 
                 raise Exception("Unexpected error in retry logic")
+
             return wrapper
+
     return decorator

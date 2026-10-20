@@ -27,6 +27,7 @@ class Run(BaseModel):
     token_usage: int
     estimated_cost: float
 
+
 @router.post("/")
 def track_run(run: Run, db: Session = Depends(get_db)):
     # Implement logic to track the run details in the database

@@ -1,5 +1,6 @@
 from typing import AsyncGenerator
 import time
+
 try:
     import google.generativeai as genai
     from google.api_core.exceptions import GoogleAPIError
@@ -15,6 +16,7 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 
 class GeminiProvider(BaseProvider):
     _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
+
     def __init__(self, api_key: str):
         super().__init__(api_key)
         if genai is not None:

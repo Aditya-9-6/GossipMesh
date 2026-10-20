@@ -2,6 +2,7 @@ from typing import AsyncGenerator
 import time
 import json
 import asyncio
+
 boto3 = __import__("boto3")
 from botocore.config import Config
 from botocore.exceptions import ClientError, BotoCoreError
@@ -14,18 +15,19 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 
 class BedrockProvider(BaseProvider):
     _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
+
     def __init__(self, aws_access_key_id: str, aws_secret_access_key: str, region_name: str = "us-east-1"):
         # We store the access key id as the main "api_key" for BaseProvider compatibility
         super().__init__(aws_access_key_id)
         self.aws_secret_access_key = aws_secret_access_key
         self.region_name = region_name
-        _config = Config(retries={'max_attempts': 0}, connect_timeout=10.0, read_timeout=60.0)
+        _config = Config(retries={"max_attempts": 0}, connect_timeout=10.0, read_timeout=60.0)
         self.client = boto3.client(
             service_name="bedrock-runtime",
             aws_access_key_id=self.api_key,
             aws_secret_access_key=self.aws_secret_access_key,
             region_name=self.region_name,
-            config=_config
+            config=_config,
         )
 
     @property
@@ -49,13 +51,7 @@ class BedrockProvider(BaseProvider):
         }
 
         try:
-            response = await asyncio.to_thread(
-                self._sync_generate,
-                request.model,
-                messages,
-                system_prompts,
-                config
-            )
+            response = await asyncio.to_thread(self._sync_generate, request.model, messages, system_prompts, config)
         except (ClientError, BotoCoreError) as e:
             raise ProviderError("Provider API error") from None
 
@@ -122,13 +118,13 @@ class BedrockProvider(BaseProvider):
             raise ProviderError("Provider API error") from None
 
     def _sync_check_health(self):
-        _config = Config(retries={'max_attempts': 0}, connect_timeout=10.0, read_timeout=60.0)
+        _config = Config(retries={"max_attempts": 0}, connect_timeout=10.0, read_timeout=60.0)
         control_client = boto3.client(
             service_name="bedrock",
             aws_access_key_id=self.api_key,
             aws_secret_access_key=self.aws_secret_access_key,
             region_name=self.region_name,
-            config=_config
+            config=_config,
         )
         control_client.list_foundation_models(byOutputModality="TEXT")
         return True

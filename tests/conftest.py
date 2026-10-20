@@ -14,6 +14,7 @@ os.environ["POSTGRES_DB"] = "testdb"
 
 from gossipmesh.api.main import app
 
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_env():
     """Ensure environment variables are set for all tests."""
