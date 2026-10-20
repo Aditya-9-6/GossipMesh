@@ -7,9 +7,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from gossipmesh.models.base import Base
 
+
 class TestTransactions(unittest.TestCase):
     def setUp(self):
-        engine = create_engine('sqlite:///:memory:')
+        engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)
         Session = sessionmaker(bind=engine)
         self.session = Session()
@@ -22,6 +23,7 @@ class TestTransactions(unittest.TestCase):
 
     def test_create_workflow_with_job_rollback(self):
         pass
+
 
 if __name__ == "__main__":
     unittest.main()
