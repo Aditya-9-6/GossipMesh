@@ -12,7 +12,7 @@ class Workflow(SoftDeleteMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
-    __mapper_args__ = {"version_id_col": version_id}
+    __mapper_args__ = {"version_id_col": "version_id"}
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), nullable=False)
     status: Mapped[str] = mapped_column(
@@ -34,7 +34,7 @@ class Job(SoftDeleteMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
-    __mapper_args__ = {"version_id_col": version_id}
+    __mapper_args__ = {"version_id_col": "version_id"}
     workflow_id: Mapped[int] = mapped_column(ForeignKey("workflows.id"), nullable=False)
     agent_name: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")

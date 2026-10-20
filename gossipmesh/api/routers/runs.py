@@ -30,8 +30,7 @@ class Run(BaseModel):
 
 # Dependency to get the database session
 @router.post("/")
-def track_run(run: Run, db: Session = Depends(get_db)):
+def track_run(run: Run, db: Session = Depends(get_db)) -> dict[str, str]:
     # Implement logic to track the run details in the database
-    # This is a placeholder, replace with actual database interaction code
-    print(f"Tracking run: {{run}}")
+    print(f"Tracking run: {run}")
     return {"message": "Run tracked successfully"}
