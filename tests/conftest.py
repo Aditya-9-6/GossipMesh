@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 # Set up required environment variables before any tests run
-os.environ["ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+os.environ["ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw="
 os.environ["SECRET_KEY"] = "supersecretkey_please_change_in_production"
 os.environ["POSTGRES_USER"] = "testuser"
 os.environ["POSTGRES_PASSWORD"] = "testpass"
@@ -19,11 +19,16 @@ def setup_env():
     """Ensure environment variables are set for all tests."""
     pass
 
+
 @pytest.fixture
 def test_client():
     """Provide a FastAPI TestClient."""
+    from fastapi.testclient import TestClient
+    from gossipmesh.api.main import app
+
     with TestClient(app) as client:
         yield client
+
 
 @pytest.fixture
 def mock_db_session():
@@ -32,7 +37,7 @@ def mock_db_session():
     from sqlalchemy.orm import sessionmaker
     from gossipmesh.models.base import Base
 
-    engine = create_engine('sqlite:///:memory:')
+    engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     session = Session()

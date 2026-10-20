@@ -4,12 +4,15 @@ import tempfile
 import subprocess
 import shlex
 from typing import Optional, Tuple, Union, List
+from gossipmesh.core.exceptions import SandboxError
+
 
 class SandboxEnvironment:
     """
     Provides a temporary, isolated directory for executing jobs safely.
     In a full production environment, this would wrap Docker or Firecracker microVMs.
     """
+
     def __init__(self):
         self.workspace_dir: Optional[str] = None
 
@@ -29,12 +32,13 @@ class SandboxEnvironment:
         if isinstance(cmd, str):
             cmd = shlex.split(cmd)
 
+        if os.name == "nt" and cmd and cmd[0].lower() == "echo":
+            import sys
+
+            cmd = [sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))"] + cmd[1:]
+
         process = subprocess.Popen(
-            cmd,
-            cwd=self.workspace_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            cmd, cwd=self.workspace_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
         try:
             stdout, stderr = process.communicate(timeout=timeout)
@@ -42,7 +46,7 @@ class SandboxEnvironment:
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-            return -1, stdout, "Command timed out\n" + stderr
+            raise SandboxError(message="Command timed out", details={"stderr": stderr})
 
     def write_file(self, filepath: str, content: str):
         if not self.workspace_dir:

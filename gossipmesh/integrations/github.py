@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubIntegration:
-
     def __init__(self, owner: str, repo: str, pr_number: int, github_pr_service: GitHubPRService):
         self.owner = owner
         self.repo = repo
@@ -159,10 +158,7 @@ class GitHubIntegration:
 
             try:
                 await self.github_pr_service.post_pr_review(
-                    self.owner,
-                    self.repo,
-                    self.pr_number,
-                    {"body": fallback_body, "event": "COMMENT"}
+                    self.owner, self.repo, self.pr_number, {"body": fallback_body, "event": "COMMENT"}
                 )
             except Exception as e:
                 logger.error(f"Failed to post fallback review summary: {e}")

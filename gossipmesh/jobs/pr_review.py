@@ -6,6 +6,9 @@ from gossipmesh.integrations.github import GitHubIntegration
 
 logger = logging.getLogger(__name__)
 
+from sqlalchemy.orm import Session
+from gossipmesh.runtime.workflow import WorkflowManager
+
 
 class PRReviewJob:
     """
@@ -29,13 +32,11 @@ class PRReviewJob:
 
         # Instantiate GitHubPRService (mock token for job)
         from gossipmesh.integrations.github_pr import GitHubPRService
+
         github_pr_service = GitHubPRService(token="dummy_token")
 
         integration = GitHubIntegration(
-            owner=owner,
-            repo=repo,
-            pr_number=pr_number,
-            github_pr_service=github_pr_service
+            owner=owner, repo=repo, pr_number=pr_number, github_pr_service=github_pr_service
         )
 
         # Simulate PR review steps

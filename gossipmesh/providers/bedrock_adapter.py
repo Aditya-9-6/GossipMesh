@@ -2,7 +2,7 @@ from typing import AsyncGenerator
 import time
 import json
 import asyncio
-import boto3
+boto3 = __import__("boto3")
 from botocore.config import Config
 from botocore.exceptions import ClientError, BotoCoreError
 from gossipmesh.core.exceptions import ProviderError
@@ -10,6 +10,7 @@ from gossipmesh.core.retry import with_retry_and_circuit_breaker, CircuitBreaker
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
+
 
 class BedrockProvider(BaseProvider):
     _cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
@@ -32,22 +33,19 @@ class BedrockProvider(BaseProvider):
         return "bedrock"
 
     def _sync_generate(self, model: str, messages: list, system: list, config: dict):
-        return self.client.converse(
-            modelId=model,
-            messages=messages,
-            system=system,
-            inferenceConfig=config
-        )
+        return self.client.converse(modelId=model, messages=messages, system=system, inferenceConfig=config)
 
     @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         system_prompts = [{"text": msg.content} for msg in request.messages if msg.role == "system"]
-        messages = [{"role": msg.role, "content": [{"text": msg.content}]} for msg in request.messages if msg.role != "system"]
+        messages = [
+            {"role": msg.role, "content": [{"text": msg.content}]} for msg in request.messages if msg.role != "system"
+        ]
 
         config = {
             "maxTokens": request.max_tokens,
             "temperature": request.temperature,
-            "stopSequences": request.stop_sequences or []
+            "stopSequences": request.stop_sequences or [],
         }
 
         try:
@@ -66,54 +64,46 @@ class BedrockProvider(BaseProvider):
             prompt_tokens=usage_data.get("inputTokens", 0),
             completion_tokens=usage_data.get("outputTokens", 0),
             total_tokens=usage_data.get("totalTokens", 0),
-            cost_estimate_usd=0.0
+            cost_estimate_usd=0.0,
         )
 
         content = response["output"]["message"]["content"][0]["text"]
 
-        return GenerationResponse(
-            content=content,
-            model=request.model,
-            usage=usage,
-            raw_response=response
-        )
+        return GenerationResponse(content=content, model=request.model, usage=usage, raw_response=response)
 
     def _sync_generate_stream(self, model: str, messages: list, system: list, config: dict):
-        response = self.client.converse_stream(
-            modelId=model,
-            messages=messages,
-            system=system,
-            inferenceConfig=config
-        )
+        response = self.client.converse_stream(modelId=model, messages=messages, system=system, inferenceConfig=config)
         stream = response.get("stream")
         if stream:
-             for event in stream:
-                 if "contentBlockDelta" in event:
-                     delta = event["contentBlockDelta"]["delta"]
-                     if "text" in delta:
-                         yield delta["text"]
+            for event in stream:
+                if "contentBlockDelta" in event:
+                    delta = event["contentBlockDelta"]["delta"]
+                    if "text" in delta:
+                        yield delta["text"]
 
     @with_retry_and_circuit_breaker(exceptions=(ProviderError,), circuit_breaker=_cb)
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
         system_prompts = [{"text": msg.content} for msg in request.messages if msg.role == "system"]
-        messages = [{"role": msg.role, "content": [{"text": msg.content}]} for msg in request.messages if msg.role != "system"]
+        messages = [
+            {"role": msg.role, "content": [{"text": msg.content}]} for msg in request.messages if msg.role != "system"
+        ]
 
         config = {
             "maxTokens": request.max_tokens,
             "temperature": request.temperature,
-            "stopSequences": request.stop_sequences or []
+            "stopSequences": request.stop_sequences or [],
         }
 
         loop = asyncio.get_running_loop()
 
         def consume_generator(gen, q):
-             try:
-                 for item in gen:
-                     asyncio.run_coroutine_threadsafe(q.put(item), loop)
-             except Exception as e:
-                 asyncio.run_coroutine_threadsafe(q.put(e), loop)
-             finally:
-                 asyncio.run_coroutine_threadsafe(q.put(None), loop)
+            try:
+                for item in gen:
+                    asyncio.run_coroutine_threadsafe(q.put(item), loop)
+            except Exception as e:
+                asyncio.run_coroutine_threadsafe(q.put(e), loop)
+            finally:
+                asyncio.run_coroutine_threadsafe(q.put(None), loop)
 
         q: asyncio.Queue = asyncio.Queue()
 
@@ -131,7 +121,6 @@ class BedrockProvider(BaseProvider):
         except (ClientError, BotoCoreError) as e:
             raise ProviderError("Provider API error") from None
 
-
     def _sync_check_health(self):
         _config = Config(retries={'max_attempts': 0}, connect_timeout=10.0, read_timeout=60.0)
         control_client = boto3.client(
@@ -141,7 +130,7 @@ class BedrockProvider(BaseProvider):
             region_name=self.region_name,
             config=_config
         )
-        control_client.list_foundation_models(byOutputModality='TEXT')
+        control_client.list_foundation_models(byOutputModality="TEXT")
         return True
 
     async def check_health(self) -> ProviderHealth:
