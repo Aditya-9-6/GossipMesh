@@ -19,9 +19,24 @@ ENTERPRISE_PLAN_PATH = REPO_ROOT / "docs" / "ENTERPRISE_SAAS_IMPLEMENTATION_PLAN
 
 
 def run_cmd(cmd):
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    """Execute a shell command and safely return its stdout.
+    Returns an empty string on failure and suppresses Unicode decode errors.
+    """
+    result = subprocess.run(
+        cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+        env=os.environ,
+        encoding="utf-8",
+        errors="ignore",
+    )
     if result.returncode != 0:
-        print(f"Command failed: {cmd}\n{result.stderr}", file=sys.stderr)
+        print(
+            f"Command failed (exit {result.returncode}): {cmd}\n{result.stderr}",
+            file=sys.stderr,
+        )
+        return result.stdout or ""
     return result.stdout.strip()
 
 
@@ -164,9 +179,12 @@ def main():
     run_cmd(f'gh pr comment {pr_number} --body "{comment}"')
 
     # Add labels
-    run_cmd(f"gh label create reviewed --force 2>/dev/null || true")
-    run_cmd(f"gh label create score-{score} --force 2>/dev/null || true")
+    run_cmd(f"gh label create reviewed --force")
+    run_cmd(f"gh label create score-{score} --force")
     run_cmd(f"gh pr edit {pr_number} --add-label reviewed --add-label score-{score}")
+    if score > 90:
+        run_cmd(f"gh label create ready-to-merge --force")
+        run_cmd(f"gh pr edit {pr_number} --add-label ready-to-merge")
     print(f"Reviewed PR #{pr_number} against Master Implementation Plan. Score: {score}")
 
 
