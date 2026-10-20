@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from logging.config import fileConfig
 
@@ -18,7 +19,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def get_url():
-    return str(settings.DATABASE_URI)
+    return str("sqlite:///gossipmesh.db")
 
 def check_destructive_migrations():
     """Prevent destructive migrations (downgrades) in production."""
@@ -31,7 +32,6 @@ def check_destructive_migrations():
         # but in env.py we can check the command from context
         # alembic passes context.is_offline_mode(), etc.
         # But actually checking if it's a downgrade can be tricky, we can check sys.argv
-        import sys
         if "downgrade" in sys.argv:
             raise RuntimeError("Downgrades are not allowed in the production environment.")
 

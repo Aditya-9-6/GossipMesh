@@ -8,6 +8,15 @@
 └─░───┘
 ```
 
+> **Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh**  
+> *A prototype AI engineering automation platform for autonomous coding agents.*
+
+---
+
+## 🌟 Overview
+
+**GossipMesh** is currently a strong prototype for autonomous code-review agents, transitioning into a secure, multi-tenant AI agent SaaS platform. It aims to enable autonomous software engineering agents to cross-pollinate architectural wisdom, prevent repeated mistakes, enforce Byzantine quorum consensus, and maintain cross-repository wire compatibility.
+
 <p align="left">
   <p align="left">
 	  <a href="https://github.com/zricethezav/gitleaks/actions/workflows/test.yml">
@@ -24,6 +33,86 @@
 	  </a>
   </p>
 </p>
+
+## 🚀 Implemented Features
+
+The following features have been implemented and integrated into the repository:
+- **AST Parsing:** Extracts structural changes from Python and Go diffs to reduce LLM context bloat.
+- **Gemini Embeddings & RAG:** Basic Retrieval-Augmented Generation using Gemini and local JSON vector search.
+- **Semantic Caching:** Reduces redundant LLM API calls using vector embeddings via a local VectorDB.
+- **AI PR Reviewer:** An autonomous loop that evaluates PRs and merges them if the score is $\ge 90/100$, or closes them if rejected.
+- **AI CI Fixer & Issue Solver:** Scripts for AI issue implementation and CI repair.
+
+## 🏗️ Prototype Features
+
+These features currently exist as in-memory stubs, local scripts, or mock implementations, lacking a full database or API layer:
+- **Local file-backed gossip node and ledger:** Peer nodes exchange cryptographically verified messages with vector clocks and TTL counters using local JSON files.
+- **Memetic Knowledge Distillation (`gossipmesh.memetic`):** Persistent architectural knowledge and scoring using dynamic fitness scores.
+- **Heterogeneous Multi-Model Byzantine Consensus (`gossipmesh.consensus`):** Multi-model vote aggregation (currently mocked for Gemini models).
+- **Red Team vs. Blue Team Adversarial Auditing (`gossipmesh.red_team`):** Regex-based adversarial audit rules probing for vulnerabilities prior to PR creation.
+- **Cross-Repo Wire Contract Synchronizer (`gossipmesh.bridge`):** Go/Rust wire-contract code generation.
+- **Zero-Allocation Performance Regression Oracle (`gossipmesh.oracle`):** In-memory benchmark regression checks.
+- **Contract Net Protocol Task Auction (`gossipmesh.auction`):** Keyword-based agent specialty selection for RFQs.
+
+## 🔮 Planned Features
+
+The platform is transitioning toward a full SaaS offering with the following planned features:
+- **Multi-tenant Secure Platform:** Transitioning from local scripts to a provider-neutral agent platform.
+- **Full Backend Stack:** Integration with FastAPI, PostgreSQL, SQLAlchemy 2.0, Alembic, Redis, and Celery for background workers.
+- **Secure Agent Runtime:** A `SandboxEnvironment` for execution isolation, complete with `WorkflowManager`, `BudgetManager`, and robust database models.
+- **Enterprise Controls & Billing:** Milestones for RBAC, provider credential encryption (Fernet), SaaS RAG, and scalable deployment.
+
+### 5. Cross-Repo Wire Contract Synchronizer (`gossipmesh.bridge`)
+- Translates shared data structures between **Go** ([`DevProxy`](https://github.com/GossipMesh/DevProxy)) and **Rust** ([`Spryzen`](https://github.com/GossipMesh/spryzen)).
+- Generates matching Go structs and Rust Serde types automatically to prevent protocol divergence.
+
+---
+
+## ⚠️ Security Warnings
+
+- **Do not use in production environments.** GossipMesh is a prototype.
+- **Credential Security:** AI must never receive unrestricted production credentials. Do not provide sensitive values like database credentials or production API keys.
+- **Execution Risks:** The framework currently executes AI-generated code. All patches must go through a validation pipeline. Do not push/merge without explicit policy authorization in non-development setups.
+
+---
+
+## 💻 Local Development Instructions
+
+The project requires Python version >= 3.10. Dependencies are managed via `pyproject.toml`.
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/Aditya-9-6/GossipMesh.git
+cd GossipMesh
+
+# Create a virtual environment and activate it
+python -m venv venv
+source venv/bin/activate
+
+# Install the package with API dependencies
+pip install -e .[api]
+```
+
+### CLI Usage
+
+```bash
+# Broadcast an architectural learning across all agent daemons
+python -m gossipmesh.cli broadcast --topic anti_patterns --message "Use atomic buckets, avoid mutex on hot path" --repo DevProxy
+```
+
+### Testing
+
+```bash
+# Setup development environment variables to bypass strict signature verification if needed
+export ENVIRONMENT="development"
+
+# Run tests
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+---
 
 ### Join our Discord! [![Discord](https://img.shields.io/discord/1102689410522284044.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/8Hzbrnkr7E)
 
@@ -80,7 +169,7 @@ make build
 
 Check out the official [Gitleaks GitHub Action](https://github.com/gitleaks/gitleaks-action)
 
-```
+```yaml
 name: gitleaks
 on: [pull_request, push, workflow_dispatch]
 jobs:
@@ -102,7 +191,7 @@ jobs:
 1. Install pre-commit from https://pre-commit.com/#install
 2. Create a `.pre-commit-config.yaml` file at the root of your repository with the following content:
 
-   ```
+   ```yaml
    repos:
      - repo: https://github.com/gitleaks/gitleaks
        rev: v8.16.1
@@ -257,7 +346,6 @@ diff --git a/checks_test.go b/checks_test.go
 +++ b/checks_test.go
 @@ -28,0 +37,1 @@
 +               "aws_secret= \"AKIAIMNOJVGFDXXXE4OA\"":          true,
-
 ```
 
 ## Pre-Commit hook
@@ -391,10 +479,9 @@ Refer to the default [gitleaks config](https://github.com/zricethezav/gitleaks/b
 If you are knowingly committing a test secret that gitleaks will catch you can add a `gitleaks:allow` comment to that line which will instruct gitleaks
 to ignore that secret. Ex:
 
-```
+```python
 class CustomClass:
-    discord_client_secret = '8dyfuiRyq=vVc3RRr_edRk-fK__JItpZ'  #gitleaks:allow
-
+    discord_client_secret = "8dyfuiRyq=vVc3RRr_edRk-fK__JItpZ"  # gitleaks:allow
 ```
 
 #### .gitleaksignore
@@ -418,3 +505,110 @@ You can always set the exit code when leaks are encountered with the --exit-code
 1 - leaks or error encountered
 126 - unknown flag
 ```
+
+---
+
+# 🛡️ GossipMesh Enterprise: Air-Gapped AI Reviewer & Architecture Engine
+
+GossipMesh Enterprise is an air-gapped, on-premises AI code, security, and infrastructure reviewer container designed specifically for **defense contractors, financial institutions (HFT/fintech), deep tech, and regulated industries**.
+
+Unlike standard syntax-only reviewers (e.g. CodeRabbit), GossipMesh evaluates:
+- **Infrastructure-as-Code**: Terraform, CloudFormation, Kubernetes, and Dockerfile security.
+- **CI/CD Supply Chain Hardening**: GitHub Actions commit pinning and pipeline security.
+- **Deep Architectural & Cross-File Logic**: Using specialized, local open-weight coding foundation models.
+- **True Air-Gapped Operation**: Completely offline RSA-4096 cryptographic signature verification. Zero telemetry or outbound requests required.
+
+---
+
+## 💎 Model Bundles & Parameter-Tiered Pricing
+
+Customers select the open-weight foundation model size that matches their compute environment and security requirements:
+
+| Bundle | Foundation Model | Parameter Size | Primary Task | 6-Month Plan | 1-Year Enterprise Plan |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **B01** | Qwen2.5-Coder | **1.5B** | Fast syntax & linting | \$5,500 | **\$10,000 / yr** |
+| **B02** | Gemma 2 / Qwen2.5-Coder | **2B - 3B** | Medium static analysis & rules | \$8,250 | **\$15,000 / yr** |
+| **B03** | Qwen2.5-Coder | **7B** | Full-code review & unit test checks | \$13,750 | **\$25,000 / yr** |
+| **B04** | Qwen2.5-Coder | **14B** | **Architecture & Infrastructure Review (Flagship)** | \$27,500 | **\$50,000 / yr** |
+| **B05** | Qwen2.5-Coder / Gemma 2 | **27B - 32B** | **Deep Auto-Remediation & Defense HFT** | \$41,250 | **\$75,000 / yr** |
+
+### Deployment Modes:
+1. **Single-Model Deployment**: One model handles all review stages (e.g., Flagship B04 for everything).
+2. **Task-Specific Multi-Model Deployment**: Saves compute by automatically routing tasks to specialized models:
+   - `syntax` ➔ B01 (1.5B)
+   - `security` ➔ B04 (14B)
+   - `architecture` ➔ B04 (14B)
+   - `auto_remediation` ➔ B05 (32B)
+   *(Multi-model packages receive an automatic 15% bundled enterprise discount).*
+
+---
+
+## 🔐 Air-Gapped Cryptographic Licensing (RSA-4096)
+
+Licenses are issued as signed JWT tokens (`license.jwt` or `license.token`) using RSA-4096 (`RS256`). The Docker image contains the public verification key (`enterprise/public_key.pem`) and validates the token locally without making any external network requests.
+
+### Issuing an Enterprise License (B2B Admin CLI)
+High-ticket enterprise licenses are generated post-contract execution via:
+```bash
+python scripts/issue_license.py \
+  --customer-id "lockheed-defense" \
+  --bundle b04 \
+  --plan 1_year \
+  --private-key /secure/path/enterprise_private_key.pem \
+  --output license.jwt
+```
+
+---
+
+## 🚀 Running the Air-Gapped Docker Container
+
+### Option 1: Local Docker Run
+```bash
+# Pull or load the air-gapped container image
+docker pull ghcr.io/aditya-9-6/gossipmesh-reviewer:b04
+
+# Run review on any repository mounted at /workspace
+docker run --rm \
+  -v $(pwd):/workspace \
+  -v $(pwd)/license.jwt:/workspace/license.jwt:ro \
+  ghcr.io/aditya-9-6/gossipmesh-reviewer:b04 \
+  --repo-path /workspace \
+  --output-format text
+```
+
+### Option 2: JSON Output for CI/CD Gates
+```bash
+docker run --rm \
+  -v $(pwd):/workspace \
+  -e LICENSE_TOKEN="<SIGNED_JWT_STRING>" \
+  ghcr.io/aditya-9-6/gossipmesh-reviewer:b04 \
+  --repo-path /workspace \
+  --output-format json \
+  --fail-on-critical
+```
+
+---
+
+## ☁️ Optional SaaS Telemetry & Managed Cloud Mode
+
+For non-air-gapped customers who prefer centralized usage reporting:
+- Set `SAAS_ENDPOINT=https://api.yourdomain.com/v1/telemetry`
+- Set `SAAS_TELEMETRY_SECRET=<HMAC_SECRET>`
+
+Telemetry events are authenticated with HMAC-SHA256 (`X-GossipMesh-Signature`). If the endpoint is unreachable or firewalled, the container logs a notice and continues normally without interrupting the review.
+
+---
+
+## 🚦 Production Deployment Status
+
+**Not ready for production.** GossipMesh is currently in a prototype phase and lacks the full realization and dependencies for its planned SaaS stack. It is intended strictly for local development and conceptual validation.
+
+For more details on our path to production and architectural decisions, please refer to the following documentation:
+- [Production Readiness](docs/PRODUCTION_READINESS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+
+---
+
+## 📜 License
+
+Apache-2.0 License. Built by [Maintainers](https://github.com/Maintainers).

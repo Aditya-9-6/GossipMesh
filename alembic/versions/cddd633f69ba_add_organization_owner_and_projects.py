@@ -1,7 +1,7 @@
 """Add organization owner and projects
 
 Revision ID: cddd633f69ba
-Revises: 524303fcc606
+Revises: 674ba9fa3e87
 Create Date: 2026-10-13 16:28:10.849395
 
 """

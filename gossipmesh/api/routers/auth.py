@@ -18,7 +18,6 @@ from gossipmesh.core.security import verify_password, create_access_token, creat
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 from gossipmesh.models.user import User
 from gossipmesh.models.session import UserSession, RefreshToken
-from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 from gossipmesh.models.user import UserGitHubCredential
 from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
