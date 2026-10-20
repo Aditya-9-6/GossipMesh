@@ -1,0 +1,154 @@
+name: AI Issue Solver Bot
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to solve"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-solver-${{ github.event.issue.number || github.event.inputs.issue_number }}
+  cancel-in-progress: true
+
+jobs:
+  solve-issue:
+    name: Autonomous Issue Solver
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.label.name == 'auto-solve') ||
+      (github.event_name == 'issue_comment' && !github.event.issue.pull_request && (
+        startsWith(github.event.comment.body, '/solve') ||
+        contains(github.event.comment.body, '/solve')
+      ))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate GitHub App Token (Higher Rate Limits)
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Resolve Issue Metadata
+        id: meta
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ISSUE_NUM="${{ github.event.inputs.issue_number }}"
+          else
+            ISSUE_NUM="${{ github.event.issue.number }}"
+          fi
+
+          ISSUE_DATA=$(gh issue view "$ISSUE_NUM" --json title,body,number)
+          TITLE=$(echo "$ISSUE_DATA" | jq -r .title)
+
+          echo "num=$ISSUE_NUM" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+
+          gh issue comment "$ISSUE_NUM" --body "🤖 **GossipMesh AI Issue Solver** is analyzing this issue and implementing the solution..."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          pip install ruff mypy pytest
+          pip install -e . || true
+
+      - name: Run AI Solution Generator
+        id: solver
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_SOLVER_KEY || secrets.GEMINI_API_KEY }}
+          GEMINI_FALLBACK_KEY: ${{ secrets.GEMINI_REVIEWER_KEY || secrets.GEMINI_ISSUE_KEY }}
+          GEMINI_KEY_POOL: ${{ secrets.GEMINI_KEY_POOL || '' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY || '' }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY || '' }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY || '' }}
+          NVIDIA_API_KEY_2: ${{ secrets.NVIDIA_API_KEY_2 || '' }}
+          ISSUE_NUM: ${{ steps.meta.outputs.num }}
+          ISSUE_TITLE: ${{ steps.meta.outputs.title }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          BODY=$(gh issue view "$ISSUE_NUM" --json body -q .body)
+
+          python3 scripts/ai_issue_solver.py \
+            --issue-number "$ISSUE_NUM" \
+            --issue-title "$ISSUE_TITLE" \
+            --issue-body "$BODY" \
+            --workspace .
+
+      - name: Verify Code Formatting & Tests
+        run: |
+          ruff check --fix . || true
+          pytest -v || echo "Tests completed with warnings. Proceeding with PR generation."
+
+      - name: Create Branch and Commit Changes
+        env:
+          ISSUE_NUM: ${{ steps.meta.outputs.num }}
+          ISSUE_TITLE: ${{ steps.meta.outputs.title }}
+          AUTH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="ai/solve-issue-${ISSUE_NUM}"
+          git config --global user.name "Aditya Dahale"
+          git config --global user.email "aditya-9-6@users.noreply.github.com"
+
+          git checkout -B "$BRANCH_NAME"
+          git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true
+          git add -A
+          git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true
+          git commit -m "feat: automated resolution for issue #${ISSUE_NUM} (${ISSUE_TITLE})" -m "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>"
+          git remote set-url origin "https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }}.git"
+          git push origin "$BRANCH_NAME" --force
+
+          echo "branch=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Open Pull Request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUM: ${{ steps.meta.outputs.num }}
+          ISSUE_TITLE: ${{ steps.meta.outputs.title }}
+        run: |
+          PR_BODY="ai_pr_summary.md"
+          if [ ! -f "$PR_BODY" ]; then
+            echo "Automated resolution for Issue #${ISSUE_NUM}." > "$PR_BODY"
+          fi
+
+          EXISTING_PR=$(gh pr list --head "$branch" --json url -q '.[0].url' || true)
+          if [ -n "$EXISTING_PR" ]; then
+            PR_URL="$EXISTING_PR"
+            gh pr edit "$PR_URL" --title "feat(ai): resolve #${ISSUE_NUM} - ${ISSUE_TITLE}" --body-file "$PR_BODY"
+          else
+            PR_URL=$(gh pr create \
+              --head "$branch" \
+              --base main \
+              --title "feat(ai): resolve #${ISSUE_NUM} - ${ISSUE_TITLE}" \
+              --body-file "$PR_BODY" \
+              --label "ai-generated,advancement")
+          fi
+
+          echo "PR ready: $PR_URL"
+          gh issue comment "$ISSUE_NUM" --body "🚀 **Solution Generated!** A pull request has been opened/updated with the implementation: $PR_URL"

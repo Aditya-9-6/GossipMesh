@@ -6,15 +6,14 @@ from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
 from gossipmesh.models.audit import AuditEvent
+from gossipmesh.models.sso import OrganizationSAMLConfig
 from gossipmesh.models.provider import ProviderCredential
-from gossipmesh.models.repository import Repository, IndexState
+from gossipmesh.models.repository import Repository, IndexState, GithubAppInstallation
 from gossipmesh.models.runtime import Workflow, Job, Budget, Artifact
 from gossipmesh.models.service_account import ServiceAccount, APIKey
 from gossipmesh.repository.vector_store import DocumentChunk
-from gossipmesh.models.finding import Finding
-from gossipmesh.models.review import ReviewResult
-from gossipmesh.models.usage import UsageRecord
-from gossipmesh.models.gossip import GossipMessageModel, GossipHeartbeat
+from gossipmesh.models.session import UserSession, RefreshToken
+from gossipmesh.models.approval import ApprovalGate
 
 __all__ = [
     "Base",
@@ -28,6 +27,7 @@ __all__ = [
     "ProviderCredential",
     "Repository",
     "IndexState",
+    "GithubAppInstallation",
     "Workflow",
     "Job",
     "Budget",
@@ -35,9 +35,8 @@ __all__ = [
     "ServiceAccount",
     "APIKey",
     "DocumentChunk",
-    "Finding",
-    "ReviewResult",
-    "UsageRecord",
-    "GossipMessageModel",
-    "GossipHeartbeat",
+    "UserSession",
+    "RefreshToken",
+    "OrganizationSAMLConfig",
+    "ApprovalGate",
 ]

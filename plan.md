@@ -1,5 +1,11 @@
-1. **Initial Migration Validation**: Check if there's a script or function to validate Alembic migrations. If not, create a validation script/function. Alembic validation can mean verifying that the database matches the models, or that the current head revision can be reached.
-2. **Upgrade and Downgrade Tests**: Implement tests that verify Alembic migrations can upgrade to `head` and downgrade to `base` without errors using an in-memory SQLite database (as recommended for offline testing).
-3. **Migration Documentation**: Add a `docs/migrations.md` file (or append to a relevant file) to detail the Alembic workflow and conventions.
-4. **Startup Migration Policy**: Although no auto-migration exists in `main.py` currently, I'll add explicit startup logic using a Fastapi lifespan that prevents accidental destructive migrations (checking if it's production and failing if migrations are attempted, or requiring an explicit flag).
-5. **Prevention of Accidental Destructive Migrations**: Update `alembic/env.py` to prevent running down migrations in production.
+1. **Understand Task 62 - Retry policies:**
+   - Categorize transient and permanent failures. Use exponential backoff and dead letters without retrying invalid input or authorization failures forever.
+   - We need to modify `process_webhook_event` in `gossipmesh/worker/tasks/webhook_dispatch.py`.
+2. **Update Exception Handling in Webhook Dispatch:**
+   - Import specific exception types from `gossipmesh.core.exceptions`, such as `AuthenticationError`, `AuthorizationError`, `ValidationError`.
+   - In `process_webhook_event`, catch these permanent error types and immediately set the status to `dead_letter` without retrying.
+   - For other transient errors, keep the existing logic (exponential backoff, retry up to `MAX_RETRIES`).
+3. **Write/Update Tests:**
+   - Create tests for `process_webhook_event` simulating permanent failures (like `ValidationError` or `AuthorizationError`) and verifying it moves straight to `dead_letter` and doesn't retry.
+   - Create tests for transient failures to verify retries with backoff.
+4. **Pre-commit step:** Ensure proper testing, verification, review, and reflection are done.

@@ -15,6 +15,7 @@ from gossipmesh.bridge import CrossRepoBridge
 from gossipmesh.oracle import PerformanceOracle
 from gossipmesh.auction import TaskAuctioneer
 
+
 class TestGossipMesh(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -31,9 +32,7 @@ class TestGossipMesh(unittest.TestCase):
         node_b.subscribe(GossipTopic.ANTI_PATTERNS, lambda msg: received_by_b.append(msg))
 
         msg = node_a.publish(
-            GossipTopic.ANTI_PATTERNS,
-            {"rule": "Use atomic buckets, avoid mutex on hot path"},
-            repo="DevProxy"
+            GossipTopic.ANTI_PATTERNS, {"rule": "Use atomic buckets, avoid mutex on hot path"}, repo="DevProxy"
         )
         self.assertIsNotNone(msg.message_id)
 
@@ -103,7 +102,7 @@ class TestGossipMesh(unittest.TestCase):
         weighted_engine = ByzantineConsensusEngine(
             quorum_threshold=0.66,
             min_score_threshold=80,
-            model_weights={"flash-3.8": 0.5, "pro-3.1": 2.0, "lite-3.1": 0.5}
+            model_weights={"flash-3.8": 0.5, "pro-3.1": 2.0, "lite-3.1": 0.5},
         )
         weighted_result = weighted_engine.evaluate(divided_votes)
         self.assertFalse(weighted_result.is_approved)
@@ -115,9 +114,7 @@ class TestGossipMesh(unittest.TestCase):
 
     def test_byzantine_consensus_zero_weight(self):
         engine = ByzantineConsensusEngine(
-            quorum_threshold=0.66,
-            min_score_threshold=80,
-            model_weights={"flash-3.8": 0.0, "pro-3.1": 0.0}
+            quorum_threshold=0.66, min_score_threshold=80, model_weights={"flash-3.8": 0.0, "pro-3.1": 0.0}
         )
 
         votes = [
@@ -132,18 +129,36 @@ class TestGossipMesh(unittest.TestCase):
         self.assertFalse(result.is_approved)
 
     def test_node_sync_malformed_json_error_path(self):
-        # Database backed implementation handles structure gracefully through sqlalchemy
         import json
+
         node = GossipNode("node_sync_error", mesh_dir=self.test_dir)
 
-        # Mocking or testing sync logic against DB would be integration test
+        # Write malformed JSON to the log file
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write("{invalid_json: 'missing_quotes'}\n")
+
+        # Write valid JSON to the log file
+        valid_msg = {
+            "message_id": "valid_123",
+            "topic": GossipTopic.HEARTBEATS.value,
+            "origin_node": "other_node",
+            "payload": {},
+        }
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(valid_msg) + "\n")
+
+        # Write another malformed JSON to the log file
+        with open(node.log_file, "a", encoding="utf-8") as f:
+            f.write("completely unparseable string\n")
+
+        # Should not crash and should return the 1 valid message
         messages = node.sync()
-        self.assertIsInstance(messages, list)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].message_id, "valid_123")
 
     def test_node_cleanup_ledger(self):
         import time
-        from gossipmesh.db.session import SessionLocal
-        from gossipmesh.models.gossip import GossipMessageModel
+        import json
 
         node = GossipNode("node_cleaner", mesh_dir=self.test_dir)
 
@@ -151,20 +166,29 @@ class TestGossipMesh(unittest.TestCase):
         msg1 = node.publish(GossipTopic.HEARTBEATS, {"status": "alive"})
         msg2 = node.publish(GossipTopic.HEARTBEATS, {"status": "alive"})
 
-        db = SessionLocal()
-        db_msg1 = db.query(GossipMessageModel).filter(GossipMessageModel.id == msg1.message_id).first()
-        db_msg1.timestamp = time.time() - (db_msg1.ttl * 3600 + 100) # strictly expired
-        db.commit()
-        db.close()
+        # Artificially expire msg1 in the ledger
+        lines = []
+        with open(node.log_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        with open(node.log_file, "w", encoding="utf-8") as f:
+            for line in lines:
+                data = json.loads(line)
+                if data["message_id"] == msg1.message_id:
+                    data["timestamp"] = time.time() - (data.get("ttl", 10) * 3600 + 100)  # strictly expired
+                f.write(json.dumps(data) + "\n")
 
         # Call cleanup
         node.cleanup_ledger()
 
         # Verify
-        db = SessionLocal()
-        remaining = [m.id for m in db.query(GossipMessageModel).all()]
-        db.close()
+        remaining = []
+        with open(node.log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                data = json.loads(line.strip())
+                remaining.append(data["message_id"])
 
+        self.assertEqual(len(remaining), 1)
         self.assertIn(msg2.message_id, remaining)
         self.assertNotIn(msg1.message_id, remaining)
 
@@ -189,7 +213,7 @@ class TestGossipMesh(unittest.TestCase):
             name="TrafficMetric",
             version=1,
             fields={"latency_ms": "int64", "client_ip": "string", "is_tls": "bool"},
-            source_repo="DevProxy"
+            source_repo="DevProxy",
         )
         go_code = bridge.get_go_definitions()
         rust_code = bridge.get_rust_definitions()
@@ -216,7 +240,7 @@ class TestGossipMesh(unittest.TestCase):
         auctioneer = TaskAuctioneer()
         bids = auctioneer.generate_bids(
             task_title="feat(crypto): Add WireGuard MTU discovery with Kyber PQC handshake",
-            task_body="Implements post-quantum encryption for tunnels."
+            task_body="Implements post-quantum encryption for tunnels.",
         )
         winner = auctioneer.elect_winner(bids)
         self.assertIsNotNone(winner)
@@ -228,15 +252,15 @@ class TestGossipMesh(unittest.TestCase):
         from unittest.mock import patch
 
         node = GossipNode("test_node", mesh_dir=self.test_dir)
+        # Create an empty file so the initial exists() check passes
+        node.log_file.touch()
 
-        with patch("gossipmesh.node.SessionLocal") as MockSession:
-            mock_db = MockSession.return_value
-            mock_db.query.side_effect = Exception("DB Connection denied")
-
+        with patch("builtins.open", side_effect=IOError("Permission denied")):
             f = io.StringIO()
             with contextlib.redirect_stdout(f):
                 node.cleanup_ledger()
-            self.assertIn("[test_node] Ledger cleanup error: DB Connection denied", f.getvalue())
+            self.assertIn("[test_node] Ledger cleanup error: Permission denied", f.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
