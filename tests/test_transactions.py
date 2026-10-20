@@ -7,10 +7,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from gossipmesh.models.base import Base
 
-
 class TestTransactions(unittest.TestCase):
     def setUp(self):
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine('sqlite:///:memory:')
         Base.metadata.create_all(engine)
         Session = sessionmaker(bind=engine)
         self.session = Session()
@@ -38,7 +37,7 @@ class TestTransactions(unittest.TestCase):
         # Verify rollback
         self.session.expire_all()
         wf = self.session.query(Workflow).filter(Workflow.id == workflow.id).first()
-        self.assertEqual(wf.status, "blocked")  # Not changed to running
+        self.assertEqual(wf.status, "blocked") # Not changed to running
 
         # Verify no audit event is saved
         audit = self.session.query(AuditEvent).filter(AuditEvent.action == "workflow_approved").first()
@@ -52,11 +51,8 @@ class TestTransactions(unittest.TestCase):
         manager = WorkflowManager(self.session)
 
         # We can just patch db.add or flush
-        with (
-            patch.object(self.session, "flush", side_effect=Exception("DB flush failed")),
-            self.assertRaises(Exception),
-        ):
-            manager.create_workflow_with_job(organization_id=1, repository_id=1, agent_name="agent-1", actor_id=99)
+        with patch.object(self.session, 'flush', side_effect=Exception("DB flush failed")), self.assertRaises(Exception):
+                manager.create_workflow_with_job(organization_id=1, repository_id=1, agent_name="agent-1", actor_id=99)
 
         # Verify rollback
         self.session.expire_all()
@@ -68,7 +64,6 @@ class TestTransactions(unittest.TestCase):
 
         audits = self.session.query(AuditEvent).all()
         self.assertEqual(len(audits), 0)
-
 
 if __name__ == "__main__":
     unittest.main()

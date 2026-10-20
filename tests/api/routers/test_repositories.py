@@ -8,7 +8,6 @@ from gossipmesh.core.config import settings
 
 client = TestClient(app)
 
-
 class TestRepositoriesAPI(unittest.TestCase):
     def setUp(self):
         # Create a mock organization with organization_id = 1
@@ -32,28 +31,44 @@ class TestRepositoriesAPI(unittest.TestCase):
 
     @patch("fastapi.BackgroundTasks.add_task")
     def test_sync_repository_success(self, mock_add_task):
-        payload = {"full_name": "test/repo", "installation_id": 123, "organization_id": 1}
+        payload = {
+            "full_name": "test/repo",
+            "installation_id": 123,
+            "organization_id": 1
+        }
         response = client.post(f"{settings.API_V1_STR}/repositories/sync", json=payload)
 
         self.assertEqual(response.status_code, 202)
-        self.assertEqual(response.json(), {"status": "accepted", "message": "Repository sync queued"})
+        self.assertEqual(
+            response.json(),
+            {"status": "accepted", "message": "Repository sync queued"}
+        )
         # Ensure that the background task was queued exactly once
         mock_add_task.assert_called_once()
 
     @patch("fastapi.BackgroundTasks.add_task")
     def test_sync_repository_unauthorized(self, mock_add_task):
         self.mock_db.query.return_value.filter.return_value.first.return_value = None
-        payload = {"full_name": "test/repo", "installation_id": 123, "organization_id": 999}
+        payload = {
+            "full_name": "test/repo",
+            "installation_id": 123,
+            "organization_id": 999
+        }
         response = client.post(f"{settings.API_V1_STR}/repositories/sync", json=payload)
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(
+
             response.json(),
-            {"error": {"code": "AUTHORIZATION_ERROR", "message": "Not authorized for this organization"}},
+            {
+                "error": {
+                    "code": "AUTHORIZATION_ERROR",
+                    "message": "Not authorized for this organization"
+                }
+            }
         )
         # Ensure that the background task was NOT queued
         mock_add_task.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

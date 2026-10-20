@@ -23,7 +23,6 @@ if hasattr(sys.stderr, "reconfigure"):
 
 PLAN_FILE = Path("docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md")
 
-
 class PlanTask:
     def __init__(self, num: int, name: str, phase: str, header: str, spec: str):
         self.num = num
@@ -42,7 +41,6 @@ class PlanTask:
             "status": self.status,
             "evidence": self.evidence,
         }
-
 
 def parse_implementation_plan(workspace: Path) -> List[PlanTask]:
     """Extracts all tasks defined in docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md."""
@@ -69,10 +67,15 @@ def parse_implementation_plan(workspace: Path) -> List[PlanTask]:
             if m:
                 t_num = int(m.group(1))
                 t_name = m.group(2).strip()
-                tasks.append(PlanTask(num=t_num, name=t_name, phase=p_name, header=t_header, spec=t_spec))
+                tasks.append(PlanTask(
+                    num=t_num,
+                    name=t_name,
+                    phase=p_name,
+                    header=t_header,
+                    spec=t_spec
+                ))
 
     return tasks
-
 
 def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
     """
@@ -82,19 +85,7 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
     merged_prs = {}
     open_prs = {}
     try:
-        cmd = [
-            "gh",
-            "pr",
-            "list",
-            "--repo",
-            "Aditya-9-6/GossipMesh",
-            "--state",
-            "all",
-            "--limit",
-            "200",
-            "--json",
-            "number,title,state,headRefName",
-        ]
+        cmd = ["gh", "pr", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "all", "--limit", "200", "--json", "number,title,state,headRefName"]
         res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace)
         if res.returncode == 0 and res.stdout.strip():
             all_prs = json.loads(res.stdout)
@@ -113,19 +104,7 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
     # 2. Fetch open issues
     open_issues = {}
     try:
-        cmd = [
-            "gh",
-            "issue",
-            "list",
-            "--repo",
-            "Aditya-9-6/GossipMesh",
-            "--state",
-            "open",
-            "--limit",
-            "100",
-            "--json",
-            "number,title",
-        ]
+        cmd = ["gh", "issue", "list", "--repo", "Aditya-9-6/GossipMesh", "--state", "open", "--limit", "100", "--json", "number,title"]
         res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace)
         if res.returncode == 0 and res.stdout.strip():
             issues = json.loads(res.stdout)
@@ -136,96 +115,43 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
 
     # Specific file-based and semantic verifications
     CODEBASE_CHECKS = {
-        1: lambda: (
-            (workspace / "docs" / "PRODUCTION_READINESS.md").is_file()
-            and "Audit" in (workspace / "docs" / "PRODUCTION_READINESS.md").read_text(encoding="utf-8", errors="ignore")
-        ),
-        2: lambda: (
-            (workspace / "README.md").is_file()
-            and "prototype" in (workspace / "README.md").read_text(encoding="utf-8", errors="ignore").lower()
-        ),
+        1: lambda: (workspace / "docs" / "PRODUCTION_READINESS.md").is_file() and "Audit" in (workspace / "docs" / "PRODUCTION_READINESS.md").read_text(encoding="utf-8", errors="ignore"),
+        2: lambda: (workspace / "README.md").is_file() and "prototype" in (workspace / "README.md").read_text(encoding="utf-8", errors="ignore").lower(),
         3: lambda: (workspace / "CONTRIBUTING.md").is_file() and (workspace / "SECURITY.md").is_file(),
-        4: lambda: (
-            "pytest" in (workspace / "pyproject.toml").read_text(encoding="utf-8", errors="ignore")
-            if (workspace / "pyproject.toml").is_file()
-            else False
-        ),
-        5: lambda: (
-            "[tool.ruff]" in (workspace / "pyproject.toml").read_text(encoding="utf-8", errors="ignore")
-            if (workspace / "pyproject.toml").is_file()
-            else False
-        ),
+        4: lambda: "pytest" in (workspace / "pyproject.toml").read_text(encoding="utf-8", errors="ignore") if (workspace / "pyproject.toml").is_file() else False,
+        5: lambda: "[tool.ruff]" in (workspace / "pyproject.toml").read_text(encoding="utf-8", errors="ignore") if (workspace / "pyproject.toml").is_file() else False,
         6: lambda: (workspace / ".github" / "workflows" / "ci.yml").is_file(),
         7: lambda: any("terminology" in title.lower() for title, _ in merged_prs.values()),
-        8: lambda: (
-            "GOSSIPMESH_AUTOMATION_ENABLED"
-            in (workspace / "scripts" / "autonomous_loop.py").read_text(encoding="utf-8", errors="ignore")
-            if (workspace / "scripts" / "autonomous_loop.py").is_file()
-            else False
-        ),
+        8: lambda: "GOSSIPMESH_AUTOMATION_ENABLED" in (workspace / "scripts" / "autonomous_loop.py").read_text(encoding="utf-8", errors="ignore") if (workspace / "scripts" / "autonomous_loop.py").is_file() else False,
         19: lambda: (workspace / "docs" / "ARCHITECTURE.md").is_file(),
         20: lambda: (workspace / "gossipmesh" / "enterprise").is_dir() and (workspace / "gossipmesh" / "core").is_dir(),
         23: lambda: (workspace / "gossipmesh" / "core" / "exceptions.py").is_file(),
         25: lambda: (workspace / "gossipmesh" / "middleware" / "correlation.py").is_file(),
-        26: lambda: (
-            (workspace / "alembic").is_dir() and len(list((workspace / "alembic" / "versions").glob("*.py"))) > 0
-        ),
+        26: lambda: (workspace / "alembic").is_dir() and len(list((workspace / "alembic" / "versions").glob("*.py"))) > 0,
         28: lambda: any("transaction boundaries" in title.lower() for title, _ in merged_prs.values()),
         29: lambda: any("optimistic concurrency" in title.lower() for title, _ in merged_prs.values()),
-        30: lambda: any(
-            "soft delete" in title.lower() or "safe deletion" in title.lower() for title, _ in merged_prs.values()
-        ),
+        30: lambda: any("soft delete" in title.lower() or "safe deletion" in title.lower() for title, _ in merged_prs.values()),
         33: lambda: (workspace / "gossipmesh" / "models" / "organization.py").is_file(),
-        34: lambda: (
-            (workspace / "gossipmesh" / "auth" / "authorization.py").is_file()
-            or any("centralized authorization" in title.lower() for title, _ in merged_prs.values())
-        ),
+        34: lambda: (workspace / "gossipmesh" / "auth" / "authorization.py").is_file() or any("centralized authorization" in title.lower() for title, _ in merged_prs.values()),
         36: lambda: (workspace / "gossipmesh" / "api" / "routers" / "organizations.py").is_file(),
-        38: lambda: (
-            (workspace / "gossipmesh" / "models" / "service_account.py").is_file()
-            or any("service account" in title.lower() for title, _ in merged_prs.values())
-        ),
+        38: lambda: (workspace / "gossipmesh" / "models" / "service_account.py").is_file() or any("service account" in title.lower() for title, _ in merged_prs.values()),
         39: lambda: (workspace / "gossipmesh" / "core" / "rate_limit.py").is_file(),
-        40: lambda: any(
-            "cross-tenant" in title.lower() or "isolation" in title.lower() for title, _ in merged_prs.values()
-        ),
-        41: lambda: any(
-            "password" in title.lower() and "security" in title.lower() for title, _ in merged_prs.values()
-        ),
+        40: lambda: any("cross-tenant" in title.lower() or "isolation" in title.lower() for title, _ in merged_prs.values()),
+        41: lambda: any("password" in title.lower() and "security" in title.lower() for title, _ in merged_prs.values()),
         42: lambda: any("jwt" in title.lower() and "session" in title.lower() for title, _ in merged_prs.values()),
         43: lambda: any("github oauth" in title.lower() for title, _ in merged_prs.values()),
         44: lambda: any("oidc" in title.lower() for title, _ in merged_prs.values()),
-        45: lambda: (
-            (workspace / "gossipmesh" / "models" / "saml.py").is_file()
-            or any("saml" in title.lower() for title, _ in merged_prs.values())
-        ),
-        46: lambda: (
-            (workspace / "gossipmesh" / "api" / "routers" / "scim.py").is_file()
-            or any("scim" in title.lower() for title, _ in merged_prs.values())
-        ),
-        47: lambda: (
-            (workspace / "gossipmesh" / "auth" / "mfa.py").is_file()
-            or any("mfa" in title.lower() for title, _ in merged_prs.values())
-        ),
-        49: lambda: any(
-            "webhook" in title.lower() and "idempotency" in title.lower() for title, _ in merged_prs.values()
-        ),
-        50: lambda: (
-            (workspace / "gossipmesh" / "integrations" / "github_app.py").is_file()
-            or any("github app" in title.lower() for title, _ in merged_prs.values())
-        ),
+        45: lambda: (workspace / "gossipmesh" / "models" / "saml.py").is_file() or any("saml" in title.lower() for title, _ in merged_prs.values()),
+        46: lambda: (workspace / "gossipmesh" / "api" / "routers" / "scim.py").is_file() or any("scim" in title.lower() for title, _ in merged_prs.values()),
+        47: lambda: (workspace / "gossipmesh" / "auth" / "mfa.py").is_file() or any("mfa" in title.lower() for title, _ in merged_prs.values()),
+        49: lambda: any("webhook" in title.lower() and "idempotency" in title.lower() for title, _ in merged_prs.values()),
+        50: lambda: (workspace / "gossipmesh" / "integrations" / "github_app.py").is_file() or any("github app" in title.lower() for title, _ in merged_prs.values()),
         51: lambda: (workspace / "gossipmesh" / "api" / "routers" / "repositories.py").is_file(),
         52: lambda: (workspace / "gossipmesh" / "integrations" / "github_pr.py").is_file(),
         53: lambda: any("inline review" in title.lower() for title, _ in merged_prs.values()),
         54: lambda: any("webhook replay" in title.lower() for title, _ in merged_prs.values()),
-        56: lambda: (
-            (workspace / "gossipmesh" / "integrations" / "github_client.py").is_file()
-            or any("github integration failure" in title.lower() for title, _ in merged_prs.values())
-        ),
-        57: lambda: (
-            (workspace / "gossipmesh" / "worker" / "celery_app.py").is_file()
-            or (workspace / "gossipmesh" / "models" / "jobs.py").is_file()
-        ),
+        56: lambda: (workspace / "gossipmesh" / "integrations" / "github_client.py").is_file() or any("github integration failure" in title.lower() for title, _ in merged_prs.values()),
+        57: lambda: (workspace / "gossipmesh" / "worker" / "celery_app.py").is_file() or (workspace / "gossipmesh" / "models" / "jobs.py").is_file(),
     }
 
     for task in tasks:
@@ -262,11 +188,7 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
 
         # Check open PRs
         for pr_num, (pr_title, pr_head) in open_prs.items():
-            if (
-                f"task {task.num}" in pr_title.lower()
-                or f"task-{task.num}" in pr_head.lower()
-                or task.name.lower() in pr_title.lower()
-            ):
+            if f"task {task.num}" in pr_title.lower() or f"task-{task.num}" in pr_head.lower() or task.name.lower() in pr_title.lower():
                 task.status = "IN_PROGRESS"
                 task.evidence = f"Open PR #{pr_num}: {pr_title}"
                 break
@@ -280,14 +202,12 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
                 task.evidence = f"Open Issue #{iss_num}: {iss_title}"
                 break
 
-
 def get_next_pending_task(tasks: List[PlanTask]) -> Optional[PlanTask]:
     """Returns the first task in sequential order that is strictly PENDING."""
     for task in tasks:
         if task.status == "PENDING":
             return task
     return None
-
 
 def format_issue_content(task: PlanTask) -> Tuple[str, str]:
     """Formats issue title and Markdown body strictly conforming to the Jules plan standards."""
@@ -324,22 +244,15 @@ def format_issue_content(task: PlanTask) -> Tuple[str, str]:
 """
     return title, body
 
-
 def create_github_issue(task: PlanTask, workspace: Path) -> Optional[int]:
     """Submits the task as a new GitHub issue and attaches auto-solve labels."""
     title, body = format_issue_content(task)
     cmd = [
-        "gh",
-        "issue",
-        "create",
-        "--repo",
-        "Aditya-9-6/GossipMesh",
-        "--title",
-        title,
-        "--body",
-        body,
-        "--label",
-        "advancement,auto-solve,enterprise-plan",
+        "gh", "issue", "create",
+        "--repo", "Aditya-9-6/GossipMesh",
+        "--title", title,
+        "--body", body,
+        "--label", "advancement,auto-solve,enterprise-plan"
     ]
     res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace)
     if res.returncode == 0:
@@ -353,22 +266,14 @@ def create_github_issue(task: PlanTask, workspace: Path) -> Optional[int]:
         print(f"[!] Failed to create issue for Task {task.num}: {res.stderr}", file=sys.stderr)
     return None
 
-
 def main():
     parser = argparse.ArgumentParser(description="GossipMesh Enterprise SaaS Plan Advancement Engine")
     parser.add_argument("--workspace", default=".", help="Workspace path")
     parser.add_argument("--status", action="store_true", help="Print status summary of all tasks")
     parser.add_argument("--next", action="store_true", help="Display next pending task without creating issue")
     parser.add_argument("--create-next", action="store_true", help="Create GitHub issue for the next pending task")
-    parser.add_argument(
-        "--solve-next", action="store_true", help="Create issue and trigger cloud AI solver immediately"
-    )
-    parser.add_argument(
-        "--batch",
-        type=int,
-        default=0,
-        help="Batch create issues and dispatch AI solver for N pending tasks concurrently",
-    )
+    parser.add_argument("--solve-next", action="store_true", help="Create issue and trigger cloud AI solver immediately")
+    parser.add_argument("--batch", type=int, default=0, help="Batch create issues and dispatch AI solver for N pending tasks concurrently")
     args = parser.parse_args()
 
     workspace = Path(args.workspace).resolve()
@@ -396,7 +301,7 @@ def main():
         return
 
     if args.batch > 0:
-        batch_tasks = pending[: args.batch]
+        batch_tasks = pending[:args.batch]
         if not batch_tasks:
             print("[INFO] No pending tasks available to batch-advance!")
             return
@@ -408,19 +313,11 @@ def main():
             iss_num = create_github_issue(t, workspace)
             if iss_num:
                 print(f"[*] Triggering AI Issue Solver Bot for Issue #{iss_num}...")
-                subprocess.run(
-                    [
-                        "gh",
-                        "workflow",
-                        "run",
-                        "ai-issue-solver.yml",
-                        "--repo",
-                        "Aditya-9-6/GossipMesh",
-                        "-f",
-                        f"issue_number={iss_num}",
-                    ],
-                    cwd=workspace,
-                )
+                subprocess.run([
+                    "gh", "workflow", "run", "ai-issue-solver.yml",
+                    "--repo", "Aditya-9-6/GossipMesh",
+                    "-f", f"issue_number={iss_num}"
+                ], cwd=workspace)
                 dispatched.append((t.num, t.name, iss_num))
                 print(f"[OK] Dispatched solver for Issue #{iss_num} (Task {t.num})\n")
             time.sleep(2)
@@ -446,21 +343,12 @@ def main():
         iss_num = create_github_issue(next_task, workspace)
         if iss_num and args.solve_next:
             print(f"[*] Triggering AI Issue Solver Bot for Issue #{iss_num}...")
-            subprocess.run(
-                [
-                    "gh",
-                    "workflow",
-                    "run",
-                    "ai-issue-solver.yml",
-                    "--repo",
-                    "Aditya-9-6/GossipMesh",
-                    "-f",
-                    f"issue_number={iss_num}",
-                ],
-                cwd=workspace,
-            )
+            subprocess.run([
+                "gh", "workflow", "run", "ai-issue-solver.yml",
+                "--repo", "Aditya-9-6/GossipMesh",
+                "-f", f"issue_number={iss_num}"
+            ], cwd=workspace)
             print(f"[OK] AI Issue Solver dispatched in cloud for Issue #{iss_num}!")
-
 
 if __name__ == "__main__":
     main()

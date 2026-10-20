@@ -10,7 +10,6 @@ from gossipmesh.core.config import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 def validate_migrations():
     alembic_cfg = Config("alembic.ini")
     script = ScriptDirectory.from_config(alembic_cfg)
@@ -34,7 +33,6 @@ def validate_migrations():
 
     logger.info(f"Database is up-to-date. Current revision: {current_rev}")
     return True
-
 
 if __name__ == "__main__":
     validate_migrations()

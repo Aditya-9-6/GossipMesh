@@ -98,7 +98,9 @@ def map_user_to_scim(user: User, user_org: UserOrganization) -> SCIMUserResponse
     )
 
 
-@router.get("/{org_id}/Users", response_model=SCIMListResponse, response_model_exclude_none=True)
+@router.get(
+    "/{org_id}/Users", response_model=SCIMListResponse, response_model_exclude_none=True
+)
 def list_users(
     org_id: int,
     startIndex: int = 1,
@@ -110,9 +112,15 @@ def list_users(
     # Basic authorization check - API key must belong to a service account in the org
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     query = (
         db.query(User, UserOrganization)
@@ -128,7 +136,9 @@ def list_users(
             query = query.filter(User.email == value)
         elif 'emails[type eq "work" and value eq' in filter:  # okta test format
             # Basic fallback for complex email queries
-            value = filter.split("value eq")[1].split("]")[0].strip().strip('"').strip("'")
+            value = (
+                filter.split("value eq")[1].split("]")[0].strip().strip('"').strip("'")
+            )
             query = query.filter(User.email == value)
 
     total_results = query.count()
@@ -163,9 +173,15 @@ def create_user(
 ):
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     # The userName is typically the email in Okta/Entra setups for SaaS
     email = user_in.userName
@@ -192,7 +208,9 @@ def create_user(
 
     if user_org:
         # Returning 409 Conflict per SCIM spec when resource exists
-        raise HTTPException(status_code=409, detail=f"User {email} already exists in organization")
+        raise HTTPException(
+            status_code=409, detail=f"User {email} already exists in organization"
+        )
 
     # Add user to org
     user_org = UserOrganization(
@@ -203,7 +221,9 @@ def create_user(
     )
     db.add(user_org)
 
-    _log_scim_audit(db, "scim.user.created", org_id, {"user_id": user.id, "email": email})
+    _log_scim_audit(
+        db, "scim.user.created", org_id, {"user_id": user.id, "email": email}
+    )
     db.commit()
     db.refresh(user)
     db.refresh(user_org)
@@ -224,9 +244,15 @@ def get_user(
 ):
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     try:
         user_id = int(id)
@@ -266,9 +292,15 @@ def update_user(
 ):
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     try:
         user_id = int(id)
@@ -297,7 +329,9 @@ def update_user(
 
     user_org.is_suspended = not user_in.active
 
-    _log_scim_audit(db, "scim.user.updated", org_id, {"user_id": user.id, "active": user_in.active})
+    _log_scim_audit(
+        db, "scim.user.updated", org_id, {"user_id": user.id, "active": user_in.active}
+    )
     db.commit()
     db.refresh(user)
     db.refresh(user_org)
@@ -319,9 +353,15 @@ def patch_user(
 ):
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     try:
         user_id = int(id)
@@ -347,7 +387,9 @@ def patch_user(
     # Rudimentary PATCH support (mainly for active status which Entra/Okta uses for deprovisioning)
     for op in patch_in.Operations:
         if op.op.lower() == "replace":
-            if op.path == "active" or (isinstance(op.value, dict) and "active" in op.value):
+            if op.path == "active" or (
+                isinstance(op.value, dict) and "active" in op.value
+            ):
                 # Handle `{"op": "replace", "value": {"active": False}}` or `{"op": "replace", "path": "active", "value": False}`
                 active_val = op.value
                 if isinstance(op.value, dict) and "active" in op.value:
@@ -373,9 +415,15 @@ def delete_user(
 ):
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     try:
         user_id = int(id)
@@ -422,9 +470,15 @@ def list_groups(
 ):
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     # In our model, "Groups" are actually "Roles" within the org (admin, member)
     roles = ["admin", "member"]
@@ -460,11 +514,19 @@ def get_group(
 ):
     from gossipmesh.models.service_account import ServiceAccount
 
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == api_key.service_account_id).first()
+    account = (
+        db.query(ServiceAccount)
+        .filter(ServiceAccount.id == api_key.service_account_id)
+        .first()
+    )
     if not account or account.organization_id != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization")
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this organization"
+        )
 
     if id not in ["admin", "member"]:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    return SCIMGroupResponse(id=id, displayName=id.capitalize(), meta=SCIMMeta(resourceType="Group"))
+    return SCIMGroupResponse(
+        id=id, displayName=id.capitalize(), meta=SCIMMeta(resourceType="Group")
+    )
