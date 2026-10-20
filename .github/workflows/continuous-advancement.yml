@@ -3,8 +3,6 @@ name: Continuous Autonomous Advancement Engine
 on:
   schedule:
     - cron: '*/5 * * * *' # Executes 24/7 every 5 minutes in GitHub Actions Cloud
-  push:
-    branches: [main]     # Instantly trigger next cycle whenever a PR is merged into main
   issues:
     types: [opened]       # Instant event-driven trigger whenever an issue is created
   workflow_dispatch:
@@ -68,6 +66,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          PYTHONPATH: ${{ github.workspace }}
           GEMINI_KEY_POOL: ${{ secrets.GEMINI_KEY_POOL || '' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
           GEMINI_ISSUE_KEY: ${{ secrets.GEMINI_ISSUE_KEY || '' }}
