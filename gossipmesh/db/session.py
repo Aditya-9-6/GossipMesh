@@ -9,6 +9,7 @@ if os.environ.get("ENVIRONMENT") == "test":
         connect_args={"check_same_thread": False},
     )
     from gossipmesh.models.base import Base
+
     # Import all models to ensure they are registered with Base.metadata
     from gossipmesh.models.user import User, UserGitHubCredential
     from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation

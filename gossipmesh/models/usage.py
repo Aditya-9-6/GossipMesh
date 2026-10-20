@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 from datetime import datetime
 from gossipmesh.models.base import Base
 
+
 class UsageRecord(Base):
     __tablename__ = "usage_records"
 
