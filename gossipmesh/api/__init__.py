@@ -8,7 +8,7 @@ from gossipmesh.core.config import settings
 app = FastAPI(
     title="GossipMesh Webhook API",
     version=settings.VERSION,
-    description="Webhook API for GossipMesh processing GitHub and related events."
+    description="Webhook API for GossipMesh processing GitHub and related events.",
 )
 app.include_router(webhooks_router)
 app.include_router(approvals_router)
