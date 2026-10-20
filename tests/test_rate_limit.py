@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from gossipmesh.core.rate_limit import RateLimiter
 from gossipmesh.core.exceptions import RateLimitError
 
+
 class TestRateLimiter(unittest.TestCase):
     @patch("gossipmesh.core.rate_limit.redis_client")
     def test_rate_limiter_allowed(self, mock_redis):
