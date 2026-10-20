@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Dict, List
+from typing import Dict, List, Set, Any
 from gossipmesh.models.pr_review import SecurityFinding, TestResult
 from gossipmesh.integrations.github_pr import GitHubPRService
 
@@ -14,8 +14,8 @@ class GitHubIntegration:
         self.pr_number = pr_number
         self.github_pr_service = github_pr_service
 
-    def _parse_unified_diff(self, diff: str) -> Dict[str, Dict[str, set[int]]]:
-        valid_lines = {"RIGHT": {}, "LEFT": {}}
+    def _parse_unified_diff(self, diff: str) -> Dict[str, Dict[str, Set[int]]]:
+        valid_lines: Dict[str, Dict[str, Set[int]]] = {"RIGHT": {}, "LEFT": {}}
         current_file = None
         current_right_line = 0
         current_left_line = 0
@@ -71,7 +71,7 @@ class GitHubIntegration:
         except Exception as e:
             logger.warning(f"Failed to fetch existing PR comments for deduplication: {e}")
 
-        grouped_findings = {}
+        grouped_findings: Dict[tuple, List[SecurityFinding]] = {}
         fallback_findings = []
 
         for finding in findings:

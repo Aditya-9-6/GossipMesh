@@ -90,7 +90,8 @@ class GitHubPRService:
         """Get basic pull request metadata."""
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
         response = await self._request("GET", url)
-        return response.json()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
 
     async def get_pr_diff(self, owner: str, repo: str, pull_number: int) -> str:
         """Get pull request unified diff."""
@@ -152,7 +153,8 @@ class GitHubPRService:
         """
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/comments"
         response = await self._request("POST", url, json=comment_payload)
-        return response.json()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
 
     async def post_pr_review(
         self, owner: str, repo: str, pull_number: int, review_payload: Dict[str, Any]
@@ -162,7 +164,9 @@ class GitHubPRService:
         """
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
         response = await self._request("POST", url, json=review_payload)
-        return response.json()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
 
     async def get_pr_review_comments(self, owner: str, repo: str, pull_number: int) -> List[Dict[str, Any]]:
-        return await self._request("GET", f"/repos/{owner}/{repo}/pulls/{pull_number}/comments")
+        url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/comments"
+        return await self._get_paginated(url)
