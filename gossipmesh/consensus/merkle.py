@@ -72,7 +72,7 @@ class MerkleTree:
         fingerprints: Dict[str, str] = {}
         if not self.root:
             return fingerprints
-        queue = [(self.root, "root")]
+        queue: List[Tuple[MerkleNode, str]] = [(self.root, "root")]
         while queue:
             node, path = queue.pop(0)
             if node.key:

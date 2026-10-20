@@ -127,7 +127,7 @@ openapi_tags = [
 ]
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
+    title="GossipMesh SaaS",
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",

@@ -1,11 +1,11 @@
-import time
+from typing import Optional
 
 
 class RTOEstimator:
     def __init__(self, initial_rto: float = 1.0):
         self.rto = initial_rto
-        self.srtt: float | None = None
-        self.rttvar: float | None = None
+        self.srtt: Optional[float] = None
+        self.rttvar: Optional[float] = None
 
     def update(self, rtt: float):
         if self.srtt is None:
@@ -18,7 +18,7 @@ class RTOEstimator:
             self.rttvar = (1 - beta) * current_rttvar + beta * abs(self.srtt - rtt)
             self.srtt = (1 - alpha) * self.srtt + alpha * rtt
 
-        self.rto = self.srtt + max(0.01, 4.0 * (self.rttvar or 0.0))
+        self.rto = (self.srtt if self.srtt is not None else 0.0) + max(0.01, 4.0 * (self.rttvar or 0.0))
 
     def get_rto(self) -> float:
         return self.rto
