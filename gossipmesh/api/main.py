@@ -1,9 +1,16 @@
-from contextlib import asynccontextmanager
-import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from gossipmesh.core.config import settings
+from gossipmesh.api.routers import auth, users, organizations, providers, repositories, runtime
+from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
+from gossipmesh.core.logging import setup_logging
+
+setup_logging()
+from contextlib import asynccontextmanager
+import logging
+from fastapi import FastAPI
 from gossipmesh.core.config import settings
 from gossipmesh.api.routers import (
     auth,
@@ -19,18 +26,12 @@ from gossipmesh.api.routers import (
     sso,
     scim,
     runs,
-    approvals,
 )
-from gossipmesh.middleware.correlation import CorrelationIdMiddleware, get_correlation_id
-from gossipmesh.core.logging import setup_logging
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine
-from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
-from gossipmesh.core.exceptions import GossipMeshException
 
-setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -65,11 +66,10 @@ async def lifespan(app: FastAPI):
     # Cleanup on shutdown can go here if needed
 
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan,
-)
+from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
+from gossipmesh.core.exceptions import GossipMeshException
+
+app = FastAPI(title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json", lifespan=lifespan)
 
 app.add_middleware(CorrelationIdMiddleware)
 
@@ -112,10 +112,10 @@ app.include_router(artifacts.router, prefix=f"{settings.API_V1_STR}/artifacts", 
 app.include_router(enterprise.router, prefix=f"{settings.API_V1_STR}/enterprise", tags=["enterprise"])
 app.include_router(vector_search.router, prefix=f"{settings.API_V1_STR}/vector_search", tags=["vector_search"])
 app.include_router(service_accounts.router, prefix=f"{settings.API_V1_STR}/service-accounts", tags=["service-accounts"])
+
 app.include_router(sso.router, prefix=f"{settings.API_V1_STR}/sso", tags=["sso"])
 app.include_router(scim.router, prefix=f"{settings.API_V1_STR}/scim/v2", tags=["scim"])
 app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
-app.include_router(approvals.router)
 
 app.add_exception_handler(GossipMeshException, gossipmesh_exception_handler)  # type: ignore
 app.add_exception_handler(Exception, global_exception_handler)  # type: ignore

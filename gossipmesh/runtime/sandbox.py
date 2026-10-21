@@ -4,7 +4,6 @@ import tempfile
 import subprocess
 import shlex
 from typing import Optional, Tuple, Union, List
-from gossipmesh.core.exceptions import SandboxError
 
 
 class SandboxEnvironment:
@@ -32,11 +31,6 @@ class SandboxEnvironment:
         if isinstance(cmd, str):
             cmd = shlex.split(cmd)
 
-        if os.name == "nt" and cmd and cmd[0].lower() == "echo":
-            import sys
-
-            cmd = [sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))"] + cmd[1:]
-
         process = subprocess.Popen(
             cmd, cwd=self.workspace_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
@@ -46,7 +40,7 @@ class SandboxEnvironment:
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-            raise SandboxError(message="Command timed out", details={"stderr": stderr})
+            return -1, stdout, "Command timed out\n" + stderr
 
     def write_file(self, filepath: str, content: str):
         if not self.workspace_dir:

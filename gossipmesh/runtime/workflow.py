@@ -144,52 +144,6 @@ class WorkflowManager:
 
         self.db.flush()
 
-    def check_cancellation(self, workflow_id: int) -> bool:
-        """
-        Checks if the workflow is cancelled or has exceeded its deadline.
-        Returns True if cancelled or timed out, False otherwise.
-        """
-        try:
-            workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
-            if not workflow:
-                return False
-
-            if workflow.status == "cancelled":
-                return True
-
-            if workflow.deadline:
-                from datetime import datetime, timezone
-
-                # SQLite returns naive datetimes even for Timestamp(timezone=True)
-                db_deadline = workflow.deadline
-                if db_deadline.tzinfo is None:
-                    db_deadline = db_deadline.replace(tzinfo=timezone.utc)
-                if datetime.now(timezone.utc) > db_deadline:
-                    workflow.status = "failed"
-                    jobs = self.db.query(Job).filter(Job.workflow_id == workflow_id).all()
-                    for job in jobs:
-                        if job.status not in ("completed", "failed"):
-                            job.status = "cancelled"
-                            if not job.state:
-                                job.state = {}
-                            job.state["error"] = "deadline_exceeded"
-                    self.db.flush()
-
-                    audit = AuditEvent(
-                        action="workflow_timeout",
-                        actor_id=None,
-                        organization_id=workflow.organization_id,
-                        details={"workflow_id": workflow.id},
-                    )
-                    self.db.add(audit)
-                    self.db.commit()
-                    return True
-
-            return False
-        except Exception:
-            self.db.rollback()
-            raise
-
     def cancel_workflow(self, workflow_id: int, actor_id: int | None = None):
         try:
             workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()

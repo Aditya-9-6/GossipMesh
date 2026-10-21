@@ -28,6 +28,7 @@ class Run(BaseModel):
     estimated_cost: float
 
 
+# Dependency to get the database session
 @router.post("/")
 def track_run(run: Run, db: Session = Depends(get_db)):
     # Implement logic to track the run details in the database

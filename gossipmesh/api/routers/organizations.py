@@ -1,13 +1,14 @@
-from typing import Any, List, Literal
+from typing import Any, List
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
-from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation, OrganizationRole
+from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
 from gossipmesh.models.repository import Repository
 from gossipmesh.models.audit import AuditEvent
+from typing import Literal
 from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
@@ -20,6 +21,9 @@ class OrganizationResponse(BaseModel):
 
 class OrganizationCreate(BaseModel):
     name: str
+
+
+from gossipmesh.models.organization import OrganizationRole
 
 
 class InvitationCreate(BaseModel):

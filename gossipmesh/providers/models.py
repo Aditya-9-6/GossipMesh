@@ -13,7 +13,6 @@ class GenerationRequest(BaseModel):
     temperature: float = 0.7
     max_tokens: int = 1024
     stop_sequences: Optional[List[str]] = None
-    timeout: Optional[float] = None
 
 
 class Usage(BaseModel):

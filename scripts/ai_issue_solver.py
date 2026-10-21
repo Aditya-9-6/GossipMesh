@@ -16,12 +16,10 @@ import time
 import hashlib
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-flash-lite-latest"
+DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-3.8-flash",
-    "gemini-flash-latest",
-    "gemini-pro-latest",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
 
 SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, AI agent platform architecture, secure sandbox runtimes, and fastAPI backends.
@@ -34,8 +32,6 @@ CORE ARCHITECTURE GUIDELINES:
 4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in test_*.py) with the standard `testing` package.
 5. Code style: clean comments, adherence to standard black formatting.
 6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., gossipmesh/<feature>.py) instead of rewriting existing complex files.
-7. PYTHON TYPING & IMPORT HYGIENE: Always explicitly import all used type annotations (e.g., `from typing import Any, Dict, List, Optional, Tuple, Set, Union, Callable`). NEVER reference `Any`, `Dict`, `List`, `Optional`, or other types without importing them. Undefined names will cause instant CI build failure.
-8. SYNTAX & COMPILATION INTEGRITY: Ensure every file is 100% syntactically valid Python. Test cases must inherit from `unittest.TestCase` or be compatible with standard pytest and unittest runners. Never introduce syntax errors, broken docstrings, or unmatched quotes.
 
 You will be given a GitHub issue with its title, description, and repository context.
 Analyze the requirements and generate the exact file changes needed to implement the feature or fix the bug.
@@ -169,52 +165,28 @@ def summarize_go_file(filepath: str, workspace_root: Path, raw_content: str) -> 
 
 
 def get_relevant_files(workspace_root: Path, query_text: str) -> str:
-    """Uses fast local keyword indexing to find relevant files for context instantly."""
+    """Uses VectorDB RAG to find semantically relevant files for context."""
     context_files = []
-    import re
 
-    try:
-        # Extract meaningful keywords from query_text (exclude common filler words)
-        words = re.findall(r"\b[a-zA-Z_]{4,}\b", query_text.lower())
-        stop_words = {
-            "feat",
-            "task",
-            "plan",
-            "issue",
-            "implement",
-            "create",
-            "with",
-            "from",
-            "that",
-            "this",
-            "file",
-            "mode",
-            "test",
-        }
-        keywords = [w for w in words if w not in stop_words]
+    # Initialize and index workspace if not already done
+    db = VectorDB()
+    if not db.embeddings:
+        print("[*] VectorDB is empty. Indexing workspace...")
+        db.index_workspace(workspace_root)
 
-        scored_files = []
-        target_dir = workspace_root / "gossipmesh"
-        if target_dir.exists():
-            for p in target_dir.rglob("*.py"):
-                if p.name.startswith("test_") or "__pycache__" in str(p):
-                    continue
-                try:
-                    txt = p.read_text(encoding="utf-8", errors="replace")
-                    score = sum(1 for kw in keywords if kw in txt.lower() or kw in p.name.lower())
-                    if score > 0:
-                        scored_files.append((score, p))
-                except Exception:
-                    pass
+    print("[*] Querying VectorDB for relevant context files...")
+    results = db.search(query_text, top_k=3)
 
-        scored_files.sort(key=lambda x: x[0], reverse=True)
-        for _, p in scored_files[:4]:
-            rel = str(p.relative_to(workspace_root)).replace("\\", "/")
-            summarized = summarize_python_file(p.read_text(encoding="utf-8", errors="replace"))
-            print(f"    [+] Keyword context hit: {rel}")
-            context_files.append(f"=== Existing File: {rel} ===\n{summarized}")
-    except Exception as e:
-        print(f"[Warning] Context search error: {e}")
+    for path, content, score in results:
+        print(f"    [+] RAG hit: {path} (Similarity: {score:.2f})")
+        if path.endswith(".py"):
+            summarized = summarize_python_file(content)
+        elif path.endswith(".go"):
+            summarized = summarize_go_file(path, workspace_root, content)
+        else:
+            summarized = content
+
+        context_files.append(f"=== Existing File: {path} ===\n{summarized}")
 
     return "\n\n".join(context_files)
 

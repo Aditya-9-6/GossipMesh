@@ -1,7 +1,7 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime
+from sqlalchemy import text, String, Integer, ForeignKey, DateTime, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from sqlalchemy import JSON
+from sqlalchemy import text, JSON
 from gossipmesh.models.base import Base
 
 
@@ -28,7 +28,7 @@ class Repository(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
-    __mapper_args__ = {"version_id_col": version_id}
+    __mapper_args__ = {"version_id_col": "version_id"}
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)

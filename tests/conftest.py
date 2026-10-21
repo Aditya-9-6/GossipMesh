@@ -1,6 +1,7 @@
 import os
 import pytest
 from unittest.mock import MagicMock
+from fastapi.testclient import TestClient
 
 # Set up required environment variables before any tests run
 os.environ["ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
@@ -10,6 +11,8 @@ os.environ["POSTGRES_PASSWORD"] = "testpass"
 os.environ["POSTGRES_HOST"] = "localhost"
 os.environ["POSTGRES_PORT"] = "5432"
 os.environ["POSTGRES_DB"] = "testdb"
+
+from gossipmesh.api.main import app
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -21,9 +24,6 @@ def setup_env():
 @pytest.fixture
 def test_client():
     """Provide a FastAPI TestClient."""
-    from fastapi.testclient import TestClient
-    from gossipmesh.api.main import app
-
     with TestClient(app) as client:
         yield client
 

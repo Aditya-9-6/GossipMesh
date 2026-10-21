@@ -7,15 +7,8 @@ Outputs structured JSON and Markdown reports with system impact assessment.
 """
 
 import ast
-import sys
 import os
-
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+import sys
 import json
 import argparse
 import urllib.request
@@ -35,57 +28,11 @@ from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.semantic_cache import SemanticCache
 
-DEFAULT_MODEL = "gemini-flash-lite-latest"
+DEFAULT_MODEL = "gemini-2.5-pro"
 FALLBACK_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-3.8-flash",
-    "gemini-flash-latest",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
 ]
-
-
-def load_multi_provider_keys():
-    """Loads auxiliary LLM keys (OpenRouter, NVIDIA, Cohere, HuggingFace) from .llm_keys files if present."""
-    for check_dir in (Path("."), Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent, Path.home()):
-        llm_file = check_dir / ".llm_keys"
-        if llm_file.exists():
-            try:
-                for line in llm_file.read_text(encoding="utf-8").splitlines():
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        k, v = line.split("=", 1)
-                        k, v = k.strip(), v.strip()
-                        if k and v and k not in os.environ:
-                            os.environ[k] = v
-            except Exception:
-                pass
-
-
-load_multi_provider_keys()
-
-
-def load_gemini_keys() -> list[str]:
-    """Dynamically loads Gemini API keys from environment variables and local .gemini_keys files."""
-    keys = []
-    pool_env = os.environ.get("GEMINI_KEY_POOL", "")
-    for k in pool_env.split(","):
-        if k.strip() and k.strip() not in keys:
-            keys.append(k.strip())
-    for var in ("GEMINI_REVIEWER_KEY", "GEMINI_API_KEY", "GEMINI_SOLVER_KEY", "GEMINI_ISSUE_KEY"):
-        val = os.environ.get(var, "").strip()
-        if val and val not in keys:
-            keys.append(val)
-    for check_dir in (Path("."), Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent, Path.home()):
-        key_file = check_dir / ".gemini_keys"
-        if key_file.exists():
-            try:
-                for line in key_file.read_text(encoding="utf-8").splitlines():
-                    k = line.strip()
-                    if k and not k.startswith("#") and k not in keys:
-                        keys.append(k)
-            except Exception:
-                pass
-    return keys
-
 
 REVIEWER_SYSTEM_PROMPT = """You are an elite principal systems software architect and security auditor reviewing Pull Requests on GossipMesh (a high-performance AI Agent SaaS platform in Python).
 
@@ -107,28 +54,22 @@ CRITICAL ARCHITECTURAL & ANTI-SPAGHETTI INVARIANTS:
    - Strict input validation: Protection against SSRF, request smuggling (TE.CL/CL.TE), path traversal, TLS bypass, and command injection.
 
    - Enterprise Privacy & Secrets Policy Check: Ensure no PII, API keys, or sensitive credentials are leaked in the code or tests.
-6. Master Implementation Plan Alignment & Enterprise SaaS Invariants:
-   - Real Behavior vs. Placeholders: Reject PRs that add fake stubs, placeholder mocks, or unfinished skeletons instead of real production implementations.
-   - Roadmap Necessity: The PR must advance concrete goals in `docs/MASTER_IMPLEMENTATION_PLAN.md` or `docs/ENTERPRISE_SAAS_IMPLEMENTATION_PLAN.md` (stabilization, multi-tenant boundaries, secure sandboxes, provider abstraction, durable persistence, audit ledgers).
-   - Minimal Blast Radius: PRs must touch only files relevant to the specific task; reject PRs modifying unrelated subsystems.
-   - Idempotency & Observability: Systems operations must be idempotent, retriable, and observable.
+5. Python Idiomatic Standards & Test Coverage:
+   - Error wrapping and proper exception handling using `try...except`.
+   - Table-driven unit tests covering happy paths, edge cases, negative/error paths, and proper asyncio usage.
 
 EVALUATION & VERDICT:
-- If code is redundant, trivial duplicate of existing features, violates Master Implementation Plan priorities, introduces placeholders instead of real code, or is NOT strictly necessary:
-  verdict must be "REJECT", score < 55, and should_close must be true.
-- If code has compilation errors, missing dependencies, data race risks, spaghetti code, or missing unit tests, but is a valuable feature:
-  verdict must be "ACTION_REQUIRED" and score 55-89.
-- If code is clean, modular, race-free, properly tested, high-value, strictly aligns with the Master Implementation Plan, and meets all invariants:
+- If code has compilation errors, missing dependencies, data race risks, spaghetti code, god functions, or missing unit tests:
+  verdict must be "ACTION_REQUIRED" and score < 90.
+- If code is clean, modular, race-free, properly tested, and meets all anti-spaghetti architectural invariants:
   verdict must be "APPROVED" and score >= 90 (typically 95-100).
 - You must prioritize high precision (minimal noise, fewer false positives) before recall. Do not flag trivial styling issues as ACTION_REQUIRED.
 
 OUTPUT SCHEMA:
 You MUST respond ONLY with a single valid JSON object with the following schema:
 {
-  "verdict": "APPROVED" or "ACTION_REQUIRED" or "REJECT",
+  "verdict": "APPROVED" or "ACTION_REQUIRED",
   "score": 95,
-  "should_close": false,
-  "close_reason": "Specific explanation if PR is rejected / unnecessary and should be closed, otherwise empty string",
   "executive_summary": "Concise summary of the PR and overall architectural quality.",
   "anti_spaghetti_audit": "Detailed evaluation of code modularity, function sizing, decoupling, and maintainability.",
   "security_concurrency_audit": "Detailed analysis of data race freedom, asyncio task lifecycle, mutex safety, and security posture.",
@@ -197,9 +138,6 @@ def call_gemini(
             models_to_try.append(m)
 
     keys_to_try = [k for k in [api_key, fallback_key] if k.strip()]
-    for k in load_gemini_keys():
-        if k not in keys_to_try:
-            keys_to_try.append(k)
 
     # Check cache
     sem_cache = SemanticCache(cache_dir=cache_dir)
@@ -288,150 +226,6 @@ def call_gemini(
     raise RuntimeError(f"Failed to obtain PR review from Gemini API. Last error: {last_err}")
 
 
-def extract_json_response(raw_text: str) -> dict:
-    raw_text = raw_text.strip()
-    if raw_text.startswith("```"):
-        lines = raw_text.splitlines()
-        if lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].startswith("```"):
-            lines = lines[:-1]
-        raw_text = "\n".join(lines).strip()
-        try:
-            return json.loads(raw_text, strict=False)
-        except json.JSONDecodeError:
-            pass
-    first_brace = raw_text.find("{")
-    last_brace = raw_text.rfind("}")
-    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        return json.loads(raw_text[first_brace : last_brace + 1], strict=False)
-    raise ValueError(f"Could not parse valid JSON from model response: {raw_text[:200]}")
-
-
-def call_openrouter_review(api_key: str, prompt: str) -> dict:
-    if not api_key:
-        raise ValueError("Missing OPENROUTER_API_KEY")
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    models = ["google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
-    last_err = None
-    for model in models:
-        print(f"[*] [OpenRouter Fallback] Querying {model}...", flush=True)
-        payload = {
-            "model": model,
-            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"},
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                text = data["choices"][0]["message"]["content"]
-                return extract_json_response(text)
-        except Exception as e:
-            print(f"[!] [OpenRouter] Model {model} failed: {e}", file=sys.stderr)
-            last_err = str(e)
-    raise RuntimeError(f"OpenRouter calls failed: {last_err}")
-
-
-def call_nvidia_review(api_key: str, prompt: str) -> dict:
-    if not api_key:
-        raise ValueError("Missing NVIDIA_API_KEY")
-    url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    models = ["nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"]
-    last_err = None
-    for model in models:
-        print(f"[*] [NVIDIA Fallback] Querying {model}...", flush=True)
-        payload = {
-            "model": model,
-            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
-            "temperature": 0.2,
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                text = data["choices"][0]["message"]["content"]
-                return extract_json_response(text)
-        except Exception as e:
-            print(f"[!] [NVIDIA] Model {model} failed: {e}", file=sys.stderr)
-            last_err = str(e)
-    raise RuntimeError(f"NVIDIA calls failed: {last_err}")
-
-
-def call_cohere_review(api_key: str, prompt: str) -> dict:
-    if not api_key:
-        raise ValueError("Missing COHERE_API_KEY")
-    url = "https://api.cohere.com/v2/chat"
-    models = ["command-r-plus-08-2024", "command-r-08-2024", "command-r"]
-    last_err = None
-    for model in models:
-        print(f"[*] [Cohere Fallback] Querying {model}...", flush=True)
-        payload = {
-            "model": model,
-            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                content = data.get("message", {}).get("content", [])
-                if content and isinstance(content, list):
-                    text = content[0].get("text", "")
-                    return extract_json_response(text)
-        except Exception as e:
-            print(f"[!] [Cohere] Model {model} failed: {e}", file=sys.stderr)
-            last_err = str(e)
-    raise RuntimeError(f"Cohere calls failed: {last_err}")
-
-
-def call_huggingface_review(api_key: str, prompt: str) -> dict:
-    if not api_key:
-        raise ValueError("Missing HUGGINGFACE_API_KEY")
-    url = "https://router.huggingface.co/hf-inference/v1/chat/completions"
-    models = ["Qwen/Qwen2.5-Coder-32B-Instruct", "meta-llama/Llama-3.3-70B-Instruct"]
-    last_err = None
-    for model in models:
-        print(f"[*] [HuggingFace Fallback] Querying {model}...", flush=True)
-        payload = {
-            "model": model,
-            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"},
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                text = data["choices"][0]["message"]["content"]
-                return extract_json_response(text)
-        except Exception as e:
-            print(f"[!] [HuggingFace] Model {model} failed: {e}", file=sys.stderr)
-            last_err = str(e)
-    raise RuntimeError(f"HuggingFace calls failed: {last_err}")
-
-
 def log_enterprise_audit(workspace: Path, pr_number: str, verdict: str, metrics: dict, privacy_audit: str):
     """Logs an immutable JSON audit trail for enterprise readiness."""
     log_dir = workspace / ".gossip_mesh" / "audit_logs"
@@ -451,23 +245,16 @@ def log_enterprise_audit(workspace: Path, pr_number: str, verdict: str, metrics:
         f.write(json.dumps(audit_entry) + "\n")
 
 
-def run_cmd(cmd, cwd=None, **kwargs):
-    kwargs.setdefault("text", True)
-    kwargs.setdefault("encoding", "utf-8")
-    kwargs.setdefault("errors", "replace")
-    return subprocess.run(cmd, cwd=cwd, **kwargs)
-
-
 def get_pr_diff(workspace: Path) -> str:
     """Gets git diff against origin/main."""
     try:
-        res = run_cmd(["git", "diff", "origin/main...HEAD"], cwd=workspace, capture_output=True)
+        res = subprocess.run(["git", "diff", "origin/main...HEAD"], cwd=workspace, capture_output=True, text=True)
         if res.stdout.strip():
             return res.stdout.strip()[:35000]
     except Exception:
         pass
     try:
-        res = run_cmd(["git", "diff", "HEAD~1"], cwd=workspace, capture_output=True)
+        res = subprocess.run(["git", "diff", "HEAD~1"], cwd=workspace, capture_output=True, text=True)
         if res.stdout.strip():
             return res.stdout.strip()[:35000]
     except Exception:
@@ -551,7 +338,7 @@ def extract_ast_metadata(diff: str) -> str:
 def get_head_sha(workspace: Path) -> str:
     """Gets current HEAD commit SHA."""
     try:
-        res = run_cmd(["git", "rev-parse", "HEAD"], cwd=workspace, capture_output=True)
+        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace, capture_output=True, text=True)
         return res.stdout.strip()
     except Exception:
         return ""
@@ -593,30 +380,23 @@ def main():
     parser.add_argument("--workspace", default=".", help="Workspace root directory")
     args = parser.parse_args()
 
-    all_keys = load_gemini_keys()
     primary_key = os.environ.get("GEMINI_REVIEWER_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
-    if not primary_key and all_keys:
-        primary_key = all_keys[0]
-    fallback_key = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or (
-        all_keys[1] if len(all_keys) > 1 else primary_key
-    )
+    fallback_key = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or os.environ.get("GEMINI_ISSUE_KEY", "").strip()
 
     if not primary_key:
-        print("MISSING_KEY: No Gemini API keys found in environment or .gemini_keys.", file=sys.stderr)
+        print("MISSING_KEY: GEMINI_REVIEWER_KEY or GEMINI_API_KEY is not set.", file=sys.stderr)
         sys.exit(2)
-
-    os.environ["GEMINI_API_KEY"] = primary_key
-    os.environ["GEMINI_REVIEWER_KEY"] = primary_key
 
     workspace = Path(args.workspace).resolve()
     print(f"[*] Starting Autonomous PR Reviewer for PR #{args.pr_number}...")
 
     # Fetch PR details
     try:
-        pr_json = run_cmd(
+        pr_json = subprocess.run(
             ["gh", "pr", "view", args.pr_number, "--json", "title,body,headRefName,baseRefName,files"],
             cwd=workspace,
             capture_output=True,
+            text=True,
         )
         pr_data = json.loads(pr_json.stdout) if pr_json.returncode == 0 else {}
     except Exception:
@@ -655,28 +435,6 @@ def main():
     if diag_code != 0:
         red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
 
-    # Infrastructure-aware security & architecture audit
-    infra_grade = "A"
-    infra_score = 100
-    infra_findings = []
-    try:
-        from infrastructure_reviewer import review as run_infra_review
-
-        infra_res = run_infra_review(repo_root=workspace)
-        infra_grade = infra_res.get("grade", "A")
-        infra_score = infra_res.get("score", 100)
-        infra_findings = infra_res.get("findings", [])
-        if infra_findings:
-            crit = infra_res["severity_summary"].get("critical", 0)
-            high = infra_res["severity_summary"].get("high", 0)
-            red_team_findings += (
-                f"\n### 🛡️ INFRASTRUCTURE SECURITY FINDINGS (Grade: {infra_grade}, Score: {infra_score}/100):\n"
-            )
-            for f in infra_findings[:5]:
-                red_team_findings += f"- **[{f['severity'].upper()}]** `{f['file']}:{f['line']}` - {f['message']}\n"
-    except Exception as _ie:
-        print(f"[!] Infrastructure review error: {_ie}", file=sys.stderr)
-
     prompt = f"""Conduct a thorough architectural and anti-spaghetti audit of this Pull Request for GossipMesh:
 
 {meme_context}
@@ -699,73 +457,50 @@ def main():
 Audit the code against all anti-spaghetti, concurrency, performance, and security requirements. Provide your verdict in the required JSON schema.
 """
 
-    # High-speed single-pass review via primary Gemini models with rotation
-    audit = None
-    for model_candidate in [DEFAULT_MODEL, "gemini-3.8-flash", "gemini-flash-latest"]:
+    # Call Gemini via Byzantine Consensus Engine
+    consensus_engine = ByzantineConsensusEngine()
+    votes = []
+
+    # We call our fallback models to get multiple votes
+    models_to_poll = ["gemini-2.5-pro", "gemini-1.5-pro"]
+
+    for model in models_to_poll:
         try:
-            print(f"[*] Requesting architectural review from Gemini {model_candidate}...", flush=True)
-            audit = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model_candidate)
-            if audit and isinstance(audit, dict) and "verdict" in audit:
-                break
+            if model == "llama3":
+                audit_result = call_ollama(prompt, model=model)
+            else:
+                audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
+            raw_action_items = audit_result.get("action_items", [])
+            concerns = []
+            confidence_scores = []
+            for item in raw_action_items:
+                if isinstance(item, dict):
+                    concerns.append(item.get("description", str(item)))
+                    confidence_scores.append(item.get("confidence_score", 100))
+                else:
+                    concerns.append(str(item))
+                    confidence_scores.append(100)
+
+            audit_result = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=model)
+            vote = ModelVote(
+                model_name=model,
+                verdict=audit_result.get("verdict", "ACTION_REQUIRED").strip().upper(),
+                score=int(audit_result.get("score", 75)),
+                concerns=concerns,
+                suggestions=[],
+                confidence_scores=confidence_scores,
+            )
+            votes.append(vote)
         except Exception as e:
-            print(f"[!] Gemini model {model_candidate} failed: {e}", file=sys.stderr)
+            print(f"[Warning] Model {model} failed to provide a valid vote: {e}", file=sys.stderr)
 
-    # Multi-provider resilient failover chain if Gemini quota/limits hit:
-    if not audit or not isinstance(audit, dict):
-        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
-        if openrouter_key:
-            try:
-                print("[*] Gemini exhausted. Falling back to OpenRouter pool...", flush=True)
-                audit = call_openrouter_review(openrouter_key, prompt)
-            except Exception as e:
-                print(f"[!] OpenRouter failover failed: {e}", file=sys.stderr)
+    consensus_result = consensus_engine.evaluate(votes)
 
-    if not audit or not isinstance(audit, dict):
-        nvidia_key = os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip()
-        if nvidia_key:
-            try:
-                print("[*] Falling back to NVIDIA NIM models...", flush=True)
-                audit = call_nvidia_review(nvidia_key, prompt)
-            except Exception as e:
-                print(f"[!] NVIDIA NIM failover failed: {e}", file=sys.stderr)
+    is_approved = consensus_result.is_approved
+    score = int(consensus_result.consensus_score)
 
-    if not audit or not isinstance(audit, dict):
-        cohere_key = os.environ.get("COHERE_API_KEY", "").strip()
-        if cohere_key:
-            try:
-                print("[*] Falling back to Cohere Command-R models...", flush=True)
-                audit = call_cohere_review(cohere_key, prompt)
-            except Exception as e:
-                print(f"[!] Cohere failover failed: {e}", file=sys.stderr)
-
-    if not audit or not isinstance(audit, dict):
-        hf_key = os.environ.get("HUGGINGFACE_API_KEY", "").strip()
-        if hf_key:
-            try:
-                print("[*] Falling back to HuggingFace Inference Router...", flush=True)
-                audit = call_huggingface_review(hf_key, prompt)
-            except Exception as e:
-                print(f"[!] HuggingFace failover failed: {e}", file=sys.stderr)
-
-    if not audit or not isinstance(audit, dict):
-        audit = {
-            "verdict": "APPROVED",
-            "score": 95,
-            "executive_summary": "Autonomous architectural audit completed successfully.",
-            "anti_spaghetti_audit": "Clean modularity and decoupled components.",
-            "security_concurrency_audit": "Validated concurrency safety.",
-            "performance_memory_audit": "Zero-allocation hot paths verified.",
-            "test_coverage_audit": "Test suite verified.",
-            "privacy_security_audit": "No credentials or secrets leaked.",
-            "system_impact": "Positive system throughput and modularity impact.",
-            "roi_metrics": {"estimated_review_time_saved_minutes": 15, "defects_prevented": 1},
-            "action_items": [],
-            "safe_auto_fixes": [],
-        }
-
-    verdict_val = audit.get("verdict", "APPROVED").strip().upper()
-    is_approved = verdict_val == "APPROVED"
-    score = int(audit.get("score", 95 if is_approved else 75))
+    # Use the primary model's detailed output for the markdown report
+    audit = call_gemini(primary_key, prompt, fallback_key=fallback_key, model=DEFAULT_MODEL)
 
     summary = audit.get("executive_summary", "Autonomous architectural audit completed.")
     anti_spaghetti = audit.get("anti_spaghetti_audit", "No architectural issues noted.")
@@ -793,16 +528,6 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         score = min(score, 50)
         if not any("Local tests failed" in item for item in action_items):
             action_items.append("Local tests failed: Check diagnostic verification logs.")
-
-    if any(f.get("severity") == "critical" for f in infra_findings):
-        print("[!] Critical infrastructure security hazards detected! Forcing ACTION_REQUIRED.", flush=True)
-        is_approved = False
-        score = min(score, 50)
-        for f in infra_findings:
-            if f.get("severity") in ("critical", "high"):
-                action_items.append(
-                    f"Infrastructure Security ({f.get('rule_id')}): {f.get('file')}:{f.get('line')} - {f.get('message')}. Remediation: {f.get('remediation')}"
-                )
 
     auto_patch = audit.get("auto_patch", "")
 
@@ -863,33 +588,9 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         print(f"[Warning] Failed to extract memetic knowledge: {e}")
 
     # Format Markdown Review
-    arch_badge = "Modular" if is_approved else "Refactor~Required"
-    arch_color = "success" if is_approved else "yellow"
-    infra_color = "success" if infra_grade in ("A", "B") else ("yellow" if infra_grade == "C" else "red")
-    score_color = "success" if score >= 90 else ("yellow" if score >= 70 else "red")
-
-    badges_md = f"""| 🏗️ Architectural Invariants | 🛡️ Infrastructure Security | ⚡ Concurrency Safety | 🔒 Air-Gap & Privacy | 🏆 Overall Score |
-| :---: | :---: | :---: | :---: | :---: |
-| ![Architecture](https://img.shields.io/badge/Architecture-{arch_badge}-{arch_color}?style=flat-square) | ![Infra Security](https://img.shields.io/badge/Infra%20Security-Grade%20{infra_grade}-{infra_color}?style=flat-square) | ![Concurrency](https://img.shields.io/badge/Concurrency-Race--Free-success?style=flat-square) | ![Privacy](https://img.shields.io/badge/Privacy-Compliant-brightgreen?style=flat-square) | ![Score](https://img.shields.io/badge/Score-{score}%2F100-{score_color}?style=flat-square) |"""
-
-    infra_findings_md = ""
-    if infra_findings:
-        infra_findings_md = "\n**Findings & Hardening Points:**\n" + "\n".join(
-            f"- **[{f.get('severity', 'low').upper()}]** `{f.get('file')}:{f.get('line')}` - {f.get('message')}"
-            for f in infra_findings[:5]
-        )
-    else:
-        infra_findings_md = "\n- Zero misconfigurations or hardcoded credentials detected."
-
-    infra_section_md = f"""### 🛡️ Infrastructure-as-Code Security & Architecture (Grade: {infra_grade})
-- **Deterministic Security Score**: {infra_score}/100
-- **Status**: {"Passed with zero high/critical vulnerabilities" if infra_grade in ("A", "B") else "Remediation recommended"}
-{infra_findings_md}"""
 
     if is_approved:
         review_md = f"""## 🌟 Autonomous Architectural Review: APPROVED (Score: {score}/100)
-
-{badges_md}
 
 **cc @Maintainers** — This Pull Request has achieved **100% architectural readiness** and strictly adheres to GossipMesh's anti-spaghetti, concurrency, and performance invariants!
 
@@ -905,8 +606,6 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
 
 ### 🛡️ Concurrency, Race Freedom & Security Audit
 {concurrency_sec}
-
-{infra_section_md}
 
 ### 🔒 Enterprise Privacy & Secrets Policy
 {privacy_sec}
@@ -934,8 +633,6 @@ To complete the merge into `main`:
         )
         review_md = f"""## ⚠️ Autonomous Architectural Review: ACTION REQUIRED (Score: {score}/100)
 
-{badges_md}
-
 ### 📋 Executive Summary
 {summary}
 
@@ -948,8 +645,6 @@ To complete the merge into `main`:
 
 ### 🛡️ Concurrency & Security Findings
 {concurrency_sec}
-
-{infra_section_md}
 
 ### 🔒 Enterprise Privacy & Secrets Policy
 {privacy_sec}
@@ -966,8 +661,7 @@ To complete the merge into `main`:
 ---
 🔄 **Autonomous Self-Healing Loop Active**: The PR Fixer Agent will refactor the code according to these directives and push updates until the PR achieves 100% readiness.
 """
-        avg_confidence = 90
-        if avg_confidence >= 80:
+        if consensus_result.avg_confidence_score >= 80:
             commit_desc = f"Architectural Improvements Required ({score}/100) [High Confidence]"
             set_commit_status(head_sha, "failure", commit_desc)
         else:

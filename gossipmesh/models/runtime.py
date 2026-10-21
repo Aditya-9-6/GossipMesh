@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Float, JSON
+from sqlalchemy import text, String, Integer, ForeignKey, DateTime, Float, JSON, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -12,14 +12,12 @@ class Workflow(SoftDeleteMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
-    __mapper_args__ = {"version_id_col": version_id}
+    __mapper_args__ = {"version_id_col": "version_id"}
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         String, default="pending"
     )  # pending, running, completed, failed, cancelled, blocked
-    timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -36,13 +34,11 @@ class Job(SoftDeleteMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
-    __mapper_args__ = {"version_id_col": version_id}
+    __mapper_args__ = {"version_id_col": "version_id"}
     workflow_id: Mapped[int] = mapped_column(ForeignKey("workflows.id"), nullable=False)
     agent_name: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")
     state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     workflow = relationship("Workflow", back_populates="jobs")

@@ -71,29 +71,10 @@ class VectorDB:
         return dot_product / (norm_a * norm_b)
 
     def index_workspace(self, workspace_path: Path):
-        """Indexes all .py files in gossipmesh directory, strictly skipping .venv and tests."""
-        print("[*] Indexing gossipmesh into VectorDB...")
-        target_dir = workspace_path / "gossipmesh"
-        if not target_dir.exists():
-            target_dir = workspace_path
-
-        for root, dirs, files in os.walk(target_dir):
-            dirs[:] = [
-                d
-                for d in dirs
-                if d
-                not in [
-                    ".git",
-                    "vendor",
-                    ".gossip_mesh",
-                    "__pycache__",
-                    "node_modules",
-                    ".venv",
-                    ".pytest_cache",
-                    ".ruff_cache",
-                    "tests",
-                ]
-            ]
+        """Indexes all .py files in the workspace, skipping tests if necessary."""
+        print("[*] Indexing workspace into VectorDB...")
+        for root, dirs, files in os.walk(workspace_path):
+            dirs[:] = [d for d in dirs if d not in [".git", "vendor", ".gossip_mesh", "__pycache__", "node_modules"]]
             for file in files:
                 if file.endswith(".py") and not file.startswith("test_"):
                     full_path = Path(root) / file
@@ -101,6 +82,7 @@ class VectorDB:
 
                     try:
                         content = full_path.read_text(encoding="utf-8")
+                        # Simple chunking if file is too large (Gemini has high limits, but good to be safe)
                         chunk = content[:15000]
                         embedding = self.get_embedding(chunk)
 
