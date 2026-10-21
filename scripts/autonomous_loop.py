@@ -33,6 +33,7 @@ USER_EMAIL = "aditya-9-6@users.noreply.github.com"
 
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []
+FAILED_SOLVE_ATTEMPTS = {}
 
 
 def load_multi_provider_keys():
