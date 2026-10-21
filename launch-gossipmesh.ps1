@@ -53,6 +53,8 @@ $env:PYTHONUTF8 = "1"
 $pyBin = if (Test-Path "G:\My Drive\GossipMesh\.venv\Scripts\python.exe") { "G:\My Drive\GossipMesh\.venv\Scripts\python.exe" } else { "python" }
 
 # Continuous Loop with automatic recovery
+# Ensure repository root is on PYTHONPATH for module imports
+$env:PYTHONPATH = (Resolve-Path .).Path
 while ($true) {
     try {
         Write-Host "`n[*] Starting GossipMesh autonomous loop cycle..." -ForegroundColor Magenta

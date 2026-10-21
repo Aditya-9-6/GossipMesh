@@ -53,3 +53,7 @@ venv/
 .gossip_mesh/
 .coverage
 *.db-*
+
+.env
+.env.*
+

@@ -1,0 +1,48 @@
+name: GossipMesh Agent Runner
+on:
+  schedule:
+    - cron: "*/1 * * * *"  # run autoscaler every minute
+  workflow_dispatch:
+
+jobs:
+  run-agent:
+    runs-on: windows-latest
+    timeout-minutes: 1440
+    env:
+      REDIS_URL: redis://localhost:6379/0
+      PROVIDER_KEYS_JSON: >-
+        [{"key_id":"key_01","provider":"Groq","tier":"fast","rpm":28,"tpm":30},
+         {"key_id":"key_02","provider":"OpenAI","tier":"fast","rpm":95,"tpm":100},
+         {"key_id":"key_03","provider":"Anthropic","tier":"reasoning","rpm":0,"tpm":50}]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Start Autoscaler (background)
+        run: |
+          python -c "import asyncio, gossipmesh_agent.autoscaler as a; asyncio.run(a.autoscale_worker_pool())" &
+        shell: bash
+
+      - name: Keep runner alive
+        run: |
+          echo "Agent running – processing jobs until cancelled."
+          timeout /t 86400
+        shell: cmd
