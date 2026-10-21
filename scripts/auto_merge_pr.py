@@ -128,17 +128,32 @@ def auto_merge_pr(pr_number: str, workspace: Path, notify_on_failure: bool = Fal
     can_merge = is_mergeable and len(failing) == 0 and len(pending) == 0 and len(passing) > 0
 
     if can_merge:
-        print(f"\n[🎉 READY TO MERGE] PR #{pr_number} meets all conditions! Adding ready-to-merge label...", flush=True)
+        print(f"\n[🎉 READY TO MERGE] PR #{pr_number} meets all conditions! Merging to '{base_ref}'...", flush=True)
         run_cmd(["gh", "label", "create", "ready-to-merge", "--color", "0E8A16", "-f"], cwd=workspace)
         run_cmd(["gh", "pr", "edit", pr_number, "--add-label", "ready-to-merge"], cwd=workspace)
-        success_comment = f"""🎉 **Pull Request #{pr_number} is Ready to Merge!**
+        code, stdout, stderr = run_cmd(
+            ["gh", "pr", "merge", pr_number, "--squash", "--delete-branch", "--subject", f"{title} (#{pr_number})"],
+            cwd=workspace,
+        )
+        if code != 0:
+            print(f"[*] Squash merge failed ({stderr}). Retrying with default merge...", flush=True)
+            code, stdout, stderr = run_cmd(
+                ["gh", "pr", "merge", pr_number, "--merge", "--delete-branch"],
+                cwd=workspace,
+            )
+        if code == 0:
+            print(f"[✅ MERGED] PR #{pr_number} successfully merged into '{base_ref}'!", flush=True)
+            success_comment = f"""🎉 **Pull Request #{pr_number} Successfully Merged!**
 
 - **Mergeability**: Clean (0 conflicts)
 - **CI Validation**: {len(passing)} check(s) passed (100% GREEN)
-- **Label**: `ready-to-merge` applied (Auto-merge disabled per repository policy).
+- **Target Branch**: `{base_ref}`
 """
-        run_cmd(["gh", "pr", "comment", pr_number, "--body", success_comment], cwd=workspace)
-        return True
+            run_cmd(["gh", "pr", "comment", pr_number, "--body", success_comment], cwd=workspace)
+            return True
+        else:
+            print(f"[!] PR #{pr_number} merge command failed: {stderr}", flush=True)
+            return False
 
     # PR cannot be merged at this time
     print(f"[!] PR #{pr_number} is not ready yet.", flush=True)

@@ -1,4 +1,6 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from pydantic import PostgresDsn, RedisDsn
 
 
@@ -25,7 +27,10 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: str = "6379"
 
-    GITHUB_CLIENT_ID: str | None = None
+    DEFAULT_INITIAL_CREDITS: int = int(os.getenv("DEFAULT_INITIAL_CREDITS", "1000"))
+    ERROR_RATE_THRESHOLD: float = float(os.getenv("ERROR_RATE_THRESHOLD", "0.25"))
+    # Load provider API keys list (optional, can be empty)
+    PROVIDER_API_KEYS: list[str] = os.getenv("PROVIDER_API_KEYS", "").split(",") if os.getenv("PROVIDER_API_KEYS") else []
     GITHUB_CLIENT_SECRET: str | None = None
 
     OIDC_CLIENT_ID: str | None = None

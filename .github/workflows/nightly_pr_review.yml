@@ -1,0 +1,29 @@
+name: Nightly PR Review
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC daily (around 07:30 local time)
+
+jobs:
+  nightly-review:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install requirements (if any)
+        run: |
+          if (Test-Path -Path 'requirements.txt') { pip install -r requirements.txt }
+      - name: Run PR reviewer for all open PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          Set-Location -LiteralPath "${{ github.workspace }}"
+          $ErrorActionPreference = 'Stop'
+          # Ensure script can run despite execution policy
+          powershell -ExecutionPolicy Bypass -File "process_all_prs.ps1"

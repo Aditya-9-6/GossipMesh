@@ -1,34 +1,30 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
+    container_name: gossipmesh_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis_data:/data
 
-  app:
-    build: .
+  agent_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: gossipmesh_agent_worker
     restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
-      - GH_TOKEN=${GH_TOKEN}
-      - GEMINI_REVIEWER_KEY=${GEMINI_REVIEWER_KEY}
     depends_on:
       - redis
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-  worker:
-    build: .
-    restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
-      - GH_TOKEN=${GH_TOKEN}
-      - GEMINI_REVIEWER_KEY=${GEMINI_REVIEWER_KEY}
-    depends_on:
-      - redis
-    entrypoint: ["/bin/bash", "run_worker.sh"]
+    profiles:
+      - full
+
+volumes:
+  redis_data:

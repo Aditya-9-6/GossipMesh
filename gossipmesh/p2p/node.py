@@ -115,7 +115,7 @@ class GossipNode:
     ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
         current_scatter = self.scatter_governor.update()
-        
+
         topic_str = topic.value if isinstance(topic, GossipTopic) else topic
         msg = GossipMessage(
             topic=topic_str,
@@ -123,8 +123,8 @@ class GossipNode:
             payload={**payload, "_adaptive_scatter": current_scatter},
             repo=repo,
             ttl=ttl,
-        }
-        
+        )
+
         if self.pow_difficulty > 0:
             nonce, _ = mine_pow(msg.message_id, self.pow_difficulty, self.pow_nonce)
             msg.payload["pow_nonce"] = nonce
