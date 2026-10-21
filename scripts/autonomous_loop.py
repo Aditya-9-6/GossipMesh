@@ -112,6 +112,7 @@ class KeyPool:
 
 # Deprecated global pool; using services.key_pool_router.router for key rotation
 from services.key_pool_router import router  # noqa: E402
+
 # Compatibility alias for legacy code expecting GLOBAL_POOL
 GLOBAL_POOL = router
 
