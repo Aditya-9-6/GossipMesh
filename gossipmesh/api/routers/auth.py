@@ -197,8 +197,9 @@ def github_login(request: Request) -> Any:
     # store state in redis for 5 minutes
     redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", "")
     params = {
-        "client_id": settings.GITHUB_CLIENT_ID,
+        "client_id": client_id,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -215,14 +216,17 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", "")
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
+
     # Exchange code for token
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
             },
@@ -366,13 +370,16 @@ def github_refresh_token(
 
     refresh_token = decrypt_string(credential.encrypted_refresh_token)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", "")
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
+
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
             },
