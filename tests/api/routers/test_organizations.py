@@ -5,9 +5,12 @@ from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
 import pytest
 
+
 @pytest.fixture
 def mock_db_session():
     return MagicMock()
+
+
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -16,6 +19,7 @@ from gossipmesh.models.project import Project
 from gossipmesh.models.repository import Repository
 from gossipmesh.models.audit import AuditEvent
 
+
 @pytest.fixture
 def mock_current_user():
     user = User(id=1, email="test@example.com", hashed_password="hashed")
@@ -23,12 +27,14 @@ def mock_current_user():
     yield user
     app.dependency_overrides.clear()
 
+
 @pytest.fixture
 def mock_db():
     mock = MagicMock()
     app.dependency_overrides[deps.get_db] = lambda: mock
     yield mock
     app.dependency_overrides.pop(deps.get_db, None)
+
 
 def test_create_organization(test_client, mock_db, mock_current_user):
     mock_db.query.return_value.filter.return_value.first.return_value = None
@@ -38,13 +44,15 @@ def test_create_organization(test_client, mock_db, mock_current_user):
             obj.id = 1
         if isinstance(obj, UserOrganization):
             pass
+
     mock_db.add.side_effect = side_effect
 
     response = test_client.post("/api/v1/organizations/", json={"name": "New Org"})
 
     assert response.status_code == 200
     assert response.json() == {"id": 1, "name": "New Org"}
-    assert mock_db.add.call_count == 3 # Org, UserOrg, AuditEvent
+    assert mock_db.add.call_count == 3  # Org, UserOrg, AuditEvent
+
 
 def test_create_organization_exists(test_client, mock_db, mock_current_user):
     mock_db.query.return_value.filter.return_value.first.return_value = Organization(id=1, name="Existing")
@@ -52,24 +60,35 @@ def test_create_organization_exists(test_client, mock_db, mock_current_user):
     response = test_client.post("/api/v1/organizations/", json={"name": "Existing"})
     assert response.status_code == 400
 
-def test_create_invitation(test_client, mock_db, mock_current_user):
-    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(role="admin", is_suspended=False)
 
-    response = test_client.post("/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "member"})
+def test_create_invitation(test_client, mock_db, mock_current_user):
+    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(
+        role="admin", is_suspended=False
+    )
+
+    response = test_client.post(
+        "/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "member"}
+    )
 
     assert response.status_code == 200
     assert "token" in response.json()
 
-def test_create_invitation_unauthorized(test_client, mock_db, mock_current_user):
-    mock_db.query.return_value.filter.return_value.first.return_value = None # Not an admin
 
-    response = test_client.post("/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "member"})
+def test_create_invitation_unauthorized(test_client, mock_db, mock_current_user):
+    mock_db.query.return_value.filter.return_value.first.return_value = None  # Not an admin
+
+    response = test_client.post(
+        "/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "member"}
+    )
 
     assert response.status_code == 403
 
+
 def test_accept_invitation(test_client, mock_db, mock_current_user):
     # Mock finding the invitation
-    mock_invitation = OrganizationInvitation(id=1, email="invite@example.com", token="valid_token", organization_id=1, role="member")
+    mock_invitation = OrganizationInvitation(
+        id=1, email="invite@example.com", token="valid_token", organization_id=1, role="member"
+    )
 
     # First query is for invitation, second is for existing member
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_invitation, None]
@@ -77,8 +96,9 @@ def test_accept_invitation(test_client, mock_db, mock_current_user):
     response = test_client.post("/api/v1/organizations/invitations/valid_token/accept")
 
     assert response.status_code == 200
-    assert mock_db.add.call_count == 2 # UserOrg, AuditEvent
-    assert mock_db.delete.call_count == 1 # Invitation
+    assert mock_db.add.call_count == 2  # UserOrg, AuditEvent
+    assert mock_db.delete.call_count == 1  # Invitation
+
 
 def test_assign_role(test_client, mock_db, mock_current_user):
     # First query checks admin, second finds the user to update
@@ -91,12 +111,16 @@ def test_assign_role(test_client, mock_db, mock_current_user):
     assert response.status_code == 200
     assert mock_user_org.role == "admin"
 
+
 def test_create_project(test_client, mock_db, mock_current_user):
-    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(role="admin", is_suspended=False)
+    mock_db.query.return_value.filter.return_value.first.return_value = UserOrganization(
+        role="admin", is_suspended=False
+    )
 
     def side_effect(obj):
         if isinstance(obj, Project):
             obj.id = 1
+
     mock_db.add.side_effect = side_effect
 
     response = test_client.post("/api/v1/organizations/1/projects", json={"name": "New Project", "description": "Desc"})
@@ -104,19 +128,28 @@ def test_create_project(test_client, mock_db, mock_current_user):
     assert response.status_code == 200
     assert response.json() == {"id": 1, "name": "New Project", "description": "Desc"}
 
+
 def test_connect_repository(test_client, mock_db, mock_current_user):
     # First query admin check, second repo check
-    mock_db.query.return_value.filter.return_value.first.side_effect = [UserOrganization(role="admin", is_suspended=False), None]
+    mock_db.query.return_value.filter.return_value.first.side_effect = [
+        UserOrganization(role="admin", is_suspended=False),
+        None,
+    ]
 
     def side_effect(obj):
         if isinstance(obj, Repository):
             obj.id = 1
+
     mock_db.add.side_effect = side_effect
 
-    response = test_client.post("/api/v1/organizations/1/repositories", json={"github_id": 123, "name": "repo", "full_name": "org/repo", "default_branch": "main"})
+    response = test_client.post(
+        "/api/v1/organizations/1/repositories",
+        json={"github_id": 123, "name": "repo", "full_name": "org/repo", "default_branch": "main"},
+    )
 
     assert response.status_code == 200
     assert response.json()["id"] == 1
+
 
 def test_remove_member(test_client, mock_db, mock_current_user):
     # First admin check, second find member
@@ -128,6 +161,7 @@ def test_remove_member(test_client, mock_db, mock_current_user):
 
     assert response.status_code == 200
     assert mock_db.delete.call_count == 1
+
 
 def test_suspend_member(test_client, mock_db, mock_current_user):
     # First admin check, second find member

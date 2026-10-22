@@ -7,13 +7,14 @@ from gossipmesh.providers.gemini_adapter import GeminiProvider
 from gossipmesh.providers.ollama_adapter import OllamaProvider
 from gossipmesh.providers.models import ProviderHealth
 
+
 class ProviderManager:
     def __init__(self):
         self._providers: Dict[str, Type[BaseProvider]] = {
             "openai": OpenAIProvider,
             "anthropic": AnthropicProvider,
             "gemini": GeminiProvider,
-            "ollama": OllamaProvider
+            "ollama": OllamaProvider,
         }
         self._instances: Dict[str, BaseProvider] = {}
 
@@ -24,7 +25,7 @@ class ProviderManager:
         provider_class = self._providers[name]
 
         if name == "ollama":
-            instance = provider_class() # type: ignore
+            instance = provider_class()  # type: ignore
         else:
             if not api_key:
                 raise ValueError(f"API key required for {name}")

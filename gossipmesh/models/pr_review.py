@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass
 class SecurityFinding:
     id: str
@@ -13,6 +14,7 @@ class SecurityFinding:
     evidence: Optional[str] = None
     confidence_score: Optional[int] = None
     is_ai_generated: bool = False
+
 
 @dataclass
 class TestResult:

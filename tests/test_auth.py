@@ -11,6 +11,7 @@ from gossipmesh.core.config import settings
 
 client = TestClient(app)
 
+
 class TestAuth(unittest.TestCase):
     def setUp(self):
         self.mock_db = MagicMock(spec=Session)
@@ -21,21 +22,16 @@ class TestAuth(unittest.TestCase):
     def tearDown(self):
         app.dependency_overrides.clear()
 
-    @patch('gossipmesh.api.routers.auth.verify_password')
+    @patch("gossipmesh.api.routers.auth.verify_password")
     def test_login_success(self, mock_verify):
         mock_verify.return_value = True
         # Setup mock user
-        mock_user = User(
-            id=1,
-            email="test@example.com",
-            hashed_password="mocked_hash",
-            is_active=True
-        )
+        mock_user = User(id=1, email="test@example.com", hashed_password="mocked_hash", is_active=True)
         self.mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
         response = client.post(
             f"{settings.API_V1_STR}/auth/login/access-token",
-            data={"username": "test@example.com", "password": "password123"}
+            data={"username": "test@example.com", "password": "password123"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -44,21 +40,16 @@ class TestAuth(unittest.TestCase):
         self.assertEqual(data["token_type"], "bearer")
         mock_verify.assert_called_once_with("password123", "mocked_hash")
 
-    @patch('gossipmesh.api.routers.auth.verify_password')
+    @patch("gossipmesh.api.routers.auth.verify_password")
     def test_login_incorrect_password(self, mock_verify):
         mock_verify.return_value = False
         # Setup mock user
-        mock_user = User(
-            id=1,
-            email="test@example.com",
-            hashed_password="mocked_hash",
-            is_active=True
-        )
+        mock_user = User(id=1, email="test@example.com", hashed_password="mocked_hash", is_active=True)
         self.mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
         response = client.post(
             f"{settings.API_V1_STR}/auth/login/access-token",
-            data={"username": "test@example.com", "password": "wrongpassword"}
+            data={"username": "test@example.com", "password": "wrongpassword"},
         )
 
         self.assertEqual(response.status_code, 401)
@@ -70,46 +61,37 @@ class TestAuth(unittest.TestCase):
 
         response = client.post(
             f"{settings.API_V1_STR}/auth/login/access-token",
-            data={"username": "nonexistent@example.com", "password": "password123"}
+            data={"username": "nonexistent@example.com", "password": "password123"},
         )
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["error"]["message"], "Incorrect email or password")
 
-    @patch('gossipmesh.api.routers.auth.verify_password')
+    @patch("gossipmesh.api.routers.auth.verify_password")
     def test_login_inactive_user(self, mock_verify):
         mock_verify.return_value = True
         # Setup mock inactive user
-        mock_user = User(
-            id=1,
-            email="test@example.com",
-            hashed_password="mocked_hash",
-            is_active=False
-        )
+        mock_user = User(id=1, email="test@example.com", hashed_password="mocked_hash", is_active=False)
         self.mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
         response = client.post(
             f"{settings.API_V1_STR}/auth/login/access-token",
-            data={"username": "test@example.com", "password": "password123"}
+            data={"username": "test@example.com", "password": "password123"},
         )
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["error"]["message"], "Inactive user")
         mock_verify.assert_called_once_with("password123", "mocked_hash")
 
-
-
-    @patch('gossipmesh.api.routers.auth.httpx.Client.get')
-    @patch('gossipmesh.api.routers.auth.redis_client')
+    @patch("gossipmesh.api.routers.auth.httpx.Client.get")
+    @patch("gossipmesh.api.routers.auth.redis_client")
     def test_oidc_login(self, mock_redis, mock_get):
         settings.OIDC_DISCOVERY_URL = "https://provider.com/.well-known/openid-configuration"
         settings.OIDC_CLIENT_ID = "test-client"
         settings.OIDC_REDIRECT_URI = "https://app.com/callback"
 
         mock_discovery_response = MagicMock()
-        mock_discovery_response.json.return_value = {
-            "authorization_endpoint": "https://provider.com/auth"
-        }
+        mock_discovery_response.json.return_value = {"authorization_endpoint": "https://provider.com/auth"}
         mock_get.return_value = mock_discovery_response
 
         response = client.get(f"{settings.API_V1_STR}/auth/oidc/login", follow_redirects=False)
@@ -120,11 +102,11 @@ class TestAuth(unittest.TestCase):
 
         mock_redis.setex.assert_called_once()
 
-    @patch('gossipmesh.api.routers.auth.jwt.decode')
-    @patch('gossipmesh.api.routers.auth.jwt.PyJWKClient')
-    @patch('gossipmesh.api.routers.auth.httpx.Client.post')
-    @patch('gossipmesh.api.routers.auth.httpx.Client.get')
-    @patch('gossipmesh.api.routers.auth.redis_client')
+    @patch("gossipmesh.api.routers.auth.jwt.decode")
+    @patch("gossipmesh.api.routers.auth.jwt.PyJWKClient")
+    @patch("gossipmesh.api.routers.auth.httpx.Client.post")
+    @patch("gossipmesh.api.routers.auth.httpx.Client.get")
+    @patch("gossipmesh.api.routers.auth.redis_client")
     def test_oidc_callback(self, mock_redis, mock_get, mock_post, mock_jwks, mock_jwt_decode):
         settings.OIDC_DISCOVERY_URL = "https://provider.com/.well-known/openid-configuration"
         settings.OIDC_CLIENT_ID = "test-client"
@@ -137,7 +119,7 @@ class TestAuth(unittest.TestCase):
         mock_discovery_response.json.return_value = {
             "token_endpoint": "https://provider.com/token",
             "jwks_uri": "https://provider.com/jwks",
-            "issuer": "https://provider.com"
+            "issuer": "https://provider.com",
         }
         mock_get.return_value = mock_discovery_response
 
@@ -145,7 +127,7 @@ class TestAuth(unittest.TestCase):
         mock_token_response.json.return_value = {
             "access_token": "mock-access",
             "id_token": "mock-id",
-            "refresh_token": "mock-refresh"
+            "refresh_token": "mock-refresh",
         }
         mock_post.return_value = mock_token_response
 
@@ -156,7 +138,7 @@ class TestAuth(unittest.TestCase):
             "email": "testoidc@example.com",
             "sub": "user123",
             "iss": "https://provider.com",
-            "groups": ["engineering", "admin"]
+            "groups": ["engineering", "admin"],
         }
 
         # Mock DB logic
@@ -164,44 +146,36 @@ class TestAuth(unittest.TestCase):
         from gossipmesh.models.organization import Organization
         from gossipmesh.models.audit import AuditEvent
 
-
         self.mock_db.query.return_value.filter.return_value.first.side_effect = [
-            None, # First query: User
-            None, # Second query: UserOIDCCredential
-            Organization(id=1, name="engineering"), # Third query: Organization engineering
-            None, # Fourth query: UserOrganization engineering
-            None, # Fifth query: Organization admin
+            None,  # First query: User
+            None,  # Second query: UserOIDCCredential
+            Organization(id=1, name="engineering"),  # Third query: Organization engineering
+            None,  # Fourth query: UserOrganization engineering
+            None,  # Fifth query: Organization admin
         ]
 
         # intercept add to give objects an ID
         def mock_add(obj):
-             if isinstance(obj, User):
-                 obj.id = 1
+            if isinstance(obj, User):
+                obj.id = 1
 
         self.mock_db.add.side_effect = mock_add
 
-        response = client.get(
-            f"{settings.API_V1_STR}/auth/oidc/callback?state=test-state&code=test-code"
-        )
+        response = client.get(f"{settings.API_V1_STR}/auth/oidc/callback?state=test-state&code=test-code")
         self.assertEqual(response.status_code, 200)
         self.assertIn("access_token", response.json())
         self.assertEqual(response.json()["token_type"], "bearer")
         self.mock_db.add.assert_called()
 
-    @patch('gossipmesh.api.routers.auth.verify_password')
+    @patch("gossipmesh.api.routers.auth.verify_password")
     def test_login_creates_session_and_refresh_token(self, mock_verify):
         mock_verify.return_value = True
-        mock_user = User(
-            id=1,
-            email="test@example.com",
-            hashed_password="mocked_hash",
-            is_active=True
-        )
+        mock_user = User(id=1, email="test@example.com", hashed_password="mocked_hash", is_active=True)
         self.mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
         response = client.post(
             f"{settings.API_V1_STR}/auth/login/access-token",
-            data={"username": "test@example.com", "password": "password123"}
+            data={"username": "test@example.com", "password": "password123"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -222,7 +196,13 @@ class TestAuth(unittest.TestCase):
         jti = str(uuid.uuid4())
 
         mock_session = UserSession(id=session_id, user_id=user_id, is_active=True, refresh_tokens=[])
-        mock_refresh_token = RefreshToken(id=1, session_id=session_id, jti=jti, is_revoked=False, expires_at=datetime.now(timezone.utc) + timedelta(days=1))
+        mock_refresh_token = RefreshToken(
+            id=1,
+            session_id=session_id,
+            jti=jti,
+            is_revoked=False,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+        )
         mock_session.refresh_tokens.append(mock_refresh_token)
 
         # Configure mock DB behavior to return our specific models when queried
@@ -242,10 +222,7 @@ class TestAuth(unittest.TestCase):
         token_str = create_refresh_token(subject=user_id, session_id=session_id, jti=jti)
 
         # Test successful rotation
-        response = client.post(
-            f"{settings.API_V1_STR}/auth/refresh",
-            json={"refresh_token": token_str}
-        )
+        response = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": token_str})
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -255,10 +232,7 @@ class TestAuth(unittest.TestCase):
         # Test reuse detection (token is now revoked)
         mock_refresh_token.is_revoked = True
 
-        response_reuse = client.post(
-            f"{settings.API_V1_STR}/auth/refresh",
-            json={"refresh_token": token_str}
-        )
+        response_reuse = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": token_str})
 
         self.assertEqual(response_reuse.status_code, 401)
         self.assertEqual(response_reuse.json()["error"]["message"], "Token has been revoked, session terminated")
@@ -281,7 +255,7 @@ class TestAuth(unittest.TestCase):
             user_agent="TestAgent",
             created_at=datetime.now(timezone.utc),
             last_active_at=datetime.now(timezone.utc),
-            refresh_tokens=[RefreshToken(id=1, is_revoked=False)]
+            refresh_tokens=[RefreshToken(id=1, is_revoked=False)],
         )
 
         # Mock DB behavior
@@ -311,5 +285,5 @@ class TestAuth(unittest.TestCase):
         self.assertTrue(mock_session.refresh_tokens[0].is_revoked)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
