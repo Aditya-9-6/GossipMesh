@@ -51,8 +51,8 @@ class ConcurrentSkipListRoutingTable:
             node = SkipListNode(key, score, latency, lvl)
             for i in range(lvl):
                 up = update[i]
-                node.forward[i] = up.forward[i] if up else None
-                if up:
+                if up is not None:
+                    node.forward[i] = up.forward[i]
                     up.forward[i] = node
             self.size += 1
             if self.size > self.capacity:
@@ -80,9 +80,11 @@ class ConcurrentSkipListRoutingTable:
             update[i] = curr
 
         for i in range(len(worst_node.forward)):
-            up = update[i] if i < len(update) else None
-            if up and up.forward[i] == worst_node:
-                up.forward[i] = worst_node.forward[i]
+            if i < len(update) and update[i] and update[i].forward[i] == worst_node:
+                worst_node_forward = worst_node.forward[i]
+                up = update[i]
+                if up is not None:
+                    up.forward[i] = worst_node_forward
 
         while self.level > 1 and self.head.forward[self.level - 1] is None:
             self.level -= 1
@@ -112,7 +114,7 @@ class ConcurrentSkipListRoutingTable:
                 return False
             for i in range(self.level):
                 up = update[i]
-                if not up or up.forward[i] != curr:
+                if up is None or up.forward[i] != curr:
                     break
                 up.forward[i] = curr.forward[i]
             while self.level > 1 and self.head.forward[self.level - 1] is None:

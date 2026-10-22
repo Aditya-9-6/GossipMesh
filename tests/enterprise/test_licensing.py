@@ -54,7 +54,7 @@ def valid_license_token(private_key):
         customer_id="acme-defense-corp",
         bundle_ids=["b04"],
         plan="1_year",
-        private_key_path=key_path,
+        private_key_path=str(key_path),
     )
 
 
@@ -83,7 +83,7 @@ def test_expired_license_error(private_key):
         "iss": "GossipMesh Enterprise",
         "sub": "expired-corp",
         "iat": now - 7200,
-        "exp": now - 3600,  # Expired 1 hour ago
+        "exp": now - 3600,
         "bundle_ids": ["b04"],
         "tier": "Enterprise Air-Gapped",
     }

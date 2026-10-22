@@ -1,3 +1,13 @@
+# webhook_server.py – Simple Flask server for GitHub App events
+"""Entry point that receives GitHub webhook payloads, validates the HMAC
+signature, transforms the event into a minimal job description and pushes it
+onto the Redis queue consumed by ``gossipmesh_agent.queue_worker``.
+
+The server is deliberately lightweight – it runs on Render (or any other
+container host) and does not need any privileged Docker access. All heavy
+lifting is delegated to the worker processes.
+"""
+
 import json
 import os
 import sys
@@ -10,24 +20,23 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from gossipmesh_agent import utils, ingestion
-from gossipmesh_agent.queue_worker import (
-    REDIS_URL,
-    redis_client,
-    JOB_QUEUE,
-)
-
-HEARTBEAT_PREFIX = "gossipmesh:heartbeat:"
-CANCEL_PREFIX = "gossipmesh:cancel:"
+from gossipmesh_agent.queue_worker import redis_client, JOB_QUEUE
 
 app = Flask(__name__)
 
 utils.load_dotenv()
 
-GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET", "")
+HEARTBEAT_PREFIX = "gossipmesh:job:heartbeat:"
+CANCEL_PREFIX = "gossipmesh:job:cancel:"
+GITHUB_SECRET = os.getenv("GITHUB_SECRET", "")
 
 
 @app.route("/cancel/<job_id>", methods=["POST"])
 def cancel_job(job_id: str):
+    """Endpoint to cancel a running job.
+    Sets the Redis cancel flag for the given job id.
+    Returns 200 if flag set, 404 if job not found in Redis.
+    """
     key = f"{HEARTBEAT_PREFIX}{job_id}"
     if not redis_client.exists(key):
         return {"status": "not_found", "job_id": job_id}, 404
@@ -36,6 +45,9 @@ def cancel_job(job_id: str):
 
 
 def verify_signature(headers: dict, payload: bytes) -> bool:
+    """Validate the ``X-Hub-Signature-256`` header using the shared secret.
+    Returns ``True`` if the signature matches or the secret is missing (fallback for
+    local debugging)."""
     if not GITHUB_SECRET:
         return True
     signature = headers.get("X-Hub-Signature-256")
