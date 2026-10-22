@@ -22,4 +22,5 @@ COPY . .
 EXPOSE 8000
 
 # Run FastAPI app using python module syntax
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+ENTRYPOINT ["python", "-m", "enterprise.packaging"]
