@@ -9,19 +9,16 @@ from gossipmesh.models.audit import AuditEvent
 engine = create_engine("sqlite:///:memory:")
 Base.metadata.create_all(engine)
 
-
 @pytest.fixture
 def session():
     with Session(engine) as session:
         yield session
-
 
 def test_soft_delete_mixin_columns():
     org = Organization(name="Test Org")
     assert hasattr(org, "deleted_at")
     assert hasattr(org, "deleted_by")
     assert hasattr(org, "retention_days")
-
 
 def test_active_query_helper_and_default_exclusion(session):
     org1 = Organization(name="Active Org")
@@ -40,7 +37,6 @@ def test_active_query_helper_and_default_exclusion(session):
     # Test inclusion with execution option
     all_orgs = session.scalars(select(Organization).execution_options(include_deleted=True)).all()
     assert len(all_orgs) == 2
-
 
 def test_soft_delete_method(session):
     org = Organization(name="Test Org 2")

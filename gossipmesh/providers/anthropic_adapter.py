@@ -5,7 +5,6 @@ from anthropic import AsyncAnthropic
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
 
-
 class AnthropicProvider(BaseProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
@@ -25,10 +24,10 @@ class AnthropicProvider(BaseProvider):
         response = await self.client.messages.create(
             model=request.model,
             system=system_prompt,
-            messages=messages,  # type: ignore
+            messages=messages, # type: ignore
             max_tokens=request.max_tokens,
             temperature=request.temperature,
-            stop_sequences=request.stop_sequences or [],
+            stop_sequences=request.stop_sequences or []
         )
 
         time.time()
@@ -37,28 +36,31 @@ class AnthropicProvider(BaseProvider):
             prompt_tokens=response.usage.input_tokens,
             completion_tokens=response.usage.output_tokens,
             total_tokens=response.usage.input_tokens + response.usage.output_tokens,
-            cost_estimate_usd=0.0,
+            cost_estimate_usd=0.0
         )
 
         content = ""
         if response.content:
-            content = response.content[0].text  # type: ignore
+             content = response.content[0].text # type: ignore
 
         return GenerationResponse(
-            content=content, model=request.model, usage=usage, raw_response={"id": response.id, "type": response.type}
+            content=content,
+            model=request.model,
+            usage=usage,
+            raw_response={"id": response.id, "type": response.type}
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]: # type: ignore
         system_prompt = next((msg.content for msg in request.messages if msg.role == "system"), "")
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages if msg.role != "system"]
 
         async with self.client.messages.stream(
             model=request.model,
             system=system_prompt,
-            messages=messages,  # type: ignore
+            messages=messages, # type: ignore
             max_tokens=request.max_tokens,
             temperature=request.temperature,
-            stop_sequences=request.stop_sequences or [],
+            stop_sequences=request.stop_sequences or []
         ) as stream:
             async for text in stream.text_stream:
                 yield text
@@ -68,7 +70,9 @@ class AnthropicProvider(BaseProvider):
         try:
             # simple ping query
             await self.client.messages.create(
-                model="claude-3-haiku-20240307", max_tokens=1, messages=[{"role": "user", "content": "hello"}]
+                model="claude-3-haiku-20240307",
+                max_tokens=1,
+                messages=[{"role": "user", "content": "hello"}]
             )
             latency = (time.time() - start_time) * 1000
             return ProviderHealth(is_healthy=True, latency_ms=latency)

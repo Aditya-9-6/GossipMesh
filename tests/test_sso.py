@@ -10,7 +10,6 @@ from gossipmesh.core.config import settings
 
 client = TestClient(app)
 
-
 class TestSSO(unittest.TestCase):
     def setUp(self):
         # We'll use the real in-memory sqlite mock_db_session provided by conftest
@@ -20,7 +19,6 @@ class TestSSO(unittest.TestCase):
 
     def tearDown(self):
         app.dependency_overrides.clear()
-
 
 def test_sso_config_and_login(test_client: TestClient):
     # Tests without db thread issues
@@ -53,7 +51,11 @@ def test_sso_config_and_login(test_client: TestClient):
     cert = "-----BEGIN CERTIFICATE-----\nMIIC...mock...\n-----END CERTIFICATE-----"
     response = test_client.post(
         f"{settings.API_V1_STR}/sso/{org.id}/config",
-        json={"idp_entity_id": "https://idp.example.com", "sso_url": "https://idp.example.com/sso", "x509_cert": cert},
+        json={
+            "idp_entity_id": "https://idp.example.com",
+            "sso_url": "https://idp.example.com/sso",
+            "x509_cert": cert
+        }
     )
     assert response.status_code == 200
     assert response.json() == {"message": "SAML configuration saved successfully"}
@@ -70,7 +72,8 @@ def test_sso_config_and_login(test_client: TestClient):
 
     # Test SAML ACS endpoint boundary
     response = test_client.post(
-        f"{settings.API_V1_STR}/sso/{org.id}/acs", data={"SAMLResponse": "PHNhbWxwOlJlc3BvbnNlLi4u"}
+        f"{settings.API_V1_STR}/sso/{org.id}/acs",
+        data={"SAMLResponse": "PHNhbWxwOlJlc3BvbnNlLi4u"}
     )
     # Our adapter explicitly raises NotImplementedError to keep the boundary secure
     assert response.status_code == 501
@@ -82,7 +85,6 @@ def test_sso_config_and_login(test_client: TestClient):
     assert "TODO: Full SAML SLO implementation" in response.json()["detail"]
 
     app.dependency_overrides.clear()
-
 
 def test_sso_config_unauthorized(test_client: TestClient):
     from sqlalchemy import create_engine
@@ -114,7 +116,11 @@ def test_sso_config_unauthorized(test_client: TestClient):
     cert = "-----BEGIN CERTIFICATE-----\nMIIC...mock...\n-----END CERTIFICATE-----"
     response = test_client.post(
         f"{settings.API_V1_STR}/sso/{org.id}/config",
-        json={"idp_entity_id": "https://idp.example.com", "sso_url": "https://idp.example.com/sso", "x509_cert": cert},
+        json={
+            "idp_entity_id": "https://idp.example.com",
+            "sso_url": "https://idp.example.com/sso",
+            "x509_cert": cert
+        }
     )
     assert response.status_code == 403
 

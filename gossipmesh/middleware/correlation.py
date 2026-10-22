@@ -1,8 +1,9 @@
 import uuid
 import contextvars
 
-correlation_id: contextvars.ContextVar[str] = contextvars.ContextVar("correlation_id", default="")
-
+correlation_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "correlation_id", default=""
+)
 
 class CorrelationIdMiddleware:
     def __init__(self, app):
@@ -33,7 +34,6 @@ class CorrelationIdMiddleware:
         token = correlation_id.set(req_id)
 
         try:
-
             async def send_wrapper(message):
                 if message["type"] == "http.response.start":
                     headers = message.get("headers", [])
@@ -44,7 +44,6 @@ class CorrelationIdMiddleware:
             await self.app(scope, receive, send_wrapper)
         finally:
             correlation_id.reset(token)
-
 
 def get_correlation_id() -> str:
     return correlation_id.get()

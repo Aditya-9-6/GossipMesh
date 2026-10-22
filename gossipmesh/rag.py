@@ -12,7 +12,6 @@ from typing import List, Dict, Any, Tuple
 import math
 import operator
 
-
 class VectorDB:
     def __init__(self, db_path: str = ".gossip_mesh/vectordb.json"):
         self.db_path = Path(db_path)
@@ -42,10 +41,18 @@ class VectorDB:
             raise RuntimeError("GEMINI_API_KEY environment variable is missing.")
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
-        payload = {"model": "models/text-embedding-004", "content": {"parts": [{"text": text}]}}
+        payload = {
+            "model": "models/text-embedding-004",
+            "content": {
+                "parts": [{"text": text}]
+            }
+        }
 
         req = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST"
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
         )
 
         try:
@@ -57,10 +64,8 @@ class VectorDB:
             return []
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
-        if not vec1 or not vec2:
-            return 0.0
-        if len(vec1) != len(vec2):
-            return 0.0
+        if not vec1 or not vec2: return 0.0
+        if len(vec1) != len(vec2): return 0.0
 
         dot_product = sum(map(operator.mul, vec1, vec2))
         norm_a = math.hypot(*vec1)
@@ -87,7 +92,10 @@ class VectorDB:
                         embedding = self.get_embedding(chunk)
 
                         if embedding:
-                            self.embeddings[rel_path] = {"content": chunk, "embedding": embedding}
+                            self.embeddings[rel_path] = {
+                                "content": chunk,
+                                "embedding": embedding
+                            }
                             print(f"  [+] Indexed: {rel_path}")
                     except Exception as e:
                         print(f"  [!] Failed to index {rel_path}: {e}")

@@ -1,7 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import PostgresDsn, RedisDsn
 
-
 class Settings(BaseSettings):
     PROJECT_NAME: str = "GossipMesh SaaS"
     VERSION: str = "0.2.0"
@@ -43,5 +42,5 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
 
-
-settings = Settings()  # type: ignore
+settings = Settings() # type: ignore
+DEFAULT_INITIAL_CREDITS = 1000
