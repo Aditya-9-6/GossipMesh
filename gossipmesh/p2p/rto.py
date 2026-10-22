@@ -1,3 +1,4 @@
+import json
 import time
 
 
@@ -14,10 +15,10 @@ class RTOEstimator:
         else:
             alpha = 0.125
             beta = 0.25
-            self.rttvar = (1 - beta) * self.rttvar + beta * abs(self.srtt - rtt)
+            self.rttvar = (1 - beta) * (self.rttvar or 0.0) + beta * abs(self.srtt - rtt)
             self.srtt = (1 - alpha) * self.srtt + alpha * rtt
 
-        self.rto = self.srtt + max(0.01, 4.0 * (self.rttvar or 0.0))
+        self.rto = (self.srtt or 1.0) + max(0.01, 4.0 * (self.rttvar or 0.0))
 
     def get_rto(self) -> float:
         return self.rto

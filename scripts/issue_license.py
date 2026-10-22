@@ -75,7 +75,14 @@ def load_private_key(key_input: Optional[str] = None):
             "or set LICENSE_PRIVATE_KEY_PATH."
         )
 
-    return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
+    # Clean and load PEM bytes safely
+    try:
+        return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
+    except ValueError:
+        pem_str = pem_bytes.decode("utf-8", errors="ignore").strip()
+        if "\\n" in pem_str:
+            pem_str = pem_str.replace("\\n", "\n")
+        return serialization.load_pem_private_key(pem_str.encode("utf-8"), password=None, backend=default_backend())
 
 
 def parse_task_map(map_str: Optional[str]) -> Optional[Dict[str, str]]:

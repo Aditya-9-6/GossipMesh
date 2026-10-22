@@ -1,3 +1,5 @@
+import json
+
 """
 Weighted Multi-Level Priority Queue with Anti-Starvation Aging.
 
@@ -30,7 +32,7 @@ class PriorityQueueConfig:
     max_capacity: int = 10000
     aging_interval_sec: float = 0.25
     enable_aging: bool = True
-    level_weights: Dict[int, int] = None
+    level_weights: Optional[Dict[int, int]] = None
 
     def __post_init__(self):
         if self.level_weights is None:
@@ -219,7 +221,7 @@ class WeightedPriorityQueue:
             if not bucket:
                 continue
 
-            retained = collections.deque()
+            retained: collections.deque = collections.deque()
             target_level = level - 1
 
             while bucket:
