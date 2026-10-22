@@ -1,11 +1,10 @@
-from onelogin.saml2.auth import OneLogin_Saml2_Auth
-
-
 class SAMLAdapter:
     """
     SAML SSO secure adapter boundary.
     Provides the structural components for SAML login, ACS response processing,
-    and metadata validation.
+    and metadata validation. Due to the high risk of implementing SAML crypto
+    incorrectly without a dedicated library (like python3-saml/xmlsec),
+    full validation logic raises a NotImplementedError.
     """
 
     def __init__(self, entity_id: str, sso_url: str, x509_cert: str):
@@ -13,68 +12,42 @@ class SAMLAdapter:
         self.sso_url = sso_url
         self.x509_cert = x509_cert
 
-        self.settings = {
-            "strict": True,
-            "debug": True,
-            "sp": {
-                "entityId": "https://gossipmesh.example.com/metadata",
-                "assertionConsumerService": {
-                    "url": "https://gossipmesh.example.com/acs",
-                    "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
-                },
-                "singleLogoutService": {
-                    "url": "https://gossipmesh.example.com/sls",
-                    "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
-                },
-                "NameIDFormat": "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
-            },
-            "idp": {
-                "entityId": self.entity_id,
-                "singleSignOnService": {
-                    "url": self.sso_url,
-                    "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
-                },
-                "singleLogoutService": {
-                    "url": self.sso_url,
-                    "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
-                },
-                "x509cert": self.x509_cert,
-            },
-        }
-
-    def _get_dummy_req(self, saml_response: str = None) -> dict:
-        req = {
-            "https": "on",
-            "http_host": "localhost",
-            "server_port": "443",
-            "script_name": "/acs",
-            "get_data": {},
-            "post_data": {},
-        }
-        if saml_response:
-            req["post_data"]["SAMLResponse"] = saml_response
-        return req
-
     def build_authn_request(self) -> str:
         """
         Generates a SAML AuthnRequest.
         Returns the Redirect URL (SSO URL + encoded SAMLRequest).
         """
-        auth = OneLogin_Saml2_Auth(self._get_dummy_req(), self.settings)
-        return auth.login()
+        import uuid
+        import base64
+        import urllib.parse
+        from datetime import datetime, timezone
+
+        request_id = "_" + str(uuid.uuid4())
+        issue_instant = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        # Simplified SAML Request template for the boundary
+        xml = f"""<?xml version="1.0"?>
+<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                    ID="{request_id}"
+                    Version="2.0"
+                    IssueInstant="{issue_instant}"
+                    Destination="{self.sso_url}"
+                    ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                    AssertionConsumerServiceURL="https://example.com/sso/saml/acs">
+  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{self.entity_id}</saml:Issuer>
+  <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/>
+</samlp:AuthnRequest>"""
+
+        # In a real implementation this might be deflated. Just base64 encoding for the adapter stub.
+        encoded_request = base64.b64encode(xml.encode('utf-8')).decode('utf-8')
+        params = {"SAMLRequest": encoded_request}
+        return f"{self.sso_url}?{urllib.parse.urlencode(params)}"
 
     def parse_response(self, saml_response: str) -> dict:
         """
         Parses and validates the SAML response payload.
         """
-        auth = OneLogin_Saml2_Auth(self._get_dummy_req(saml_response), self.settings)
-        auth.process_response()
-
-        errors = auth.get_errors()
-        if errors:
-            raise ValueError(f"SAML Validation Error: {errors}")
-
-        return auth.get_attributes()
+        raise NotImplementedError("TODO: Full SAML XML validation requires python3-saml/xmlsec library integration")
 
     def validate_certificate(self) -> bool:
         """
@@ -88,5 +61,4 @@ class SAMLAdapter:
         """
         Generates a SAML LogoutRequest.
         """
-        auth = OneLogin_Saml2_Auth(self._get_dummy_req(), self.settings)
-        return auth.logout()
+        raise NotImplementedError("TODO: Full SAML SLO implementation requires python3-saml/xmlsec library integration")

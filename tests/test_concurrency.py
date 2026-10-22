@@ -8,7 +8,6 @@ from gossipmesh.models.runtime import Workflow, Job
 from gossipmesh.models.repository import Repository
 from gossipmesh.models.organization import Organization
 
-
 class TestConcurrency(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
@@ -91,6 +90,5 @@ class TestConcurrency(unittest.TestCase):
         with self.assertRaises(StaleDataError):
             db2.commit()
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

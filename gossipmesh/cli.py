@@ -11,7 +11,6 @@ from .node import GossipNode, GossipTopic
 from .memetic import MemeticKnowledgeBase
 from .red_team import RedTeamAuditor
 
-
 def cmd_status(args):
     node = GossipNode("cli_inspector", mesh_dir=args.mesh_dir)
     print("=" * 65)
@@ -40,18 +39,15 @@ def cmd_status(args):
         print(f"  [{m.fitness_score:4.1f}*] {m.title:<35} ({m.repo})")
         print(f"         Rule: {m.rule}")
 
-
 def cmd_broadcast(args):
     node = GossipNode(args.node_id or "cli_broadcaster", mesh_dir=args.mesh_dir)
     payload = {"message": args.message, "origin": "cli"}
     msg = node.publish(args.topic, payload, repo=args.repo)
     print(f"[OK] Broadcasted gossip message '{msg.message_id}' on topic '{args.topic}' across mesh.")
 
-
 def cmd_memes(args):
     kb = MemeticKnowledgeBase()
     print(kb.format_prompt_context(repo=args.repo))
-
 
 def cmd_audit(args):
     auditor = RedTeamAuditor()
@@ -70,7 +66,6 @@ def cmd_audit(args):
             print(f"[{p.severity}] {p.category}: {p.description}")
             print(f"  Attack Vector: {p.attack_vector}")
             print(f"  Suggested Test:\n{p.exploit_test_stub}\n")
-
 
 def main():
     parser = argparse.ArgumentParser(description="GossipMesh Multi-Agent Peer CLI")
@@ -105,7 +100,6 @@ def main():
         cmd_memes(args)
     elif args.command == "audit":
         cmd_audit(args)
-
 
 if __name__ == "__main__":
     main()

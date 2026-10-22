@@ -4,7 +4,6 @@ import tempfile
 import shutil
 from gossipmesh.runtime.sandbox import SandboxEnvironment
 
-
 class TestSandboxEnvironment(unittest.TestCase):
     def setUp(self):
         self.sandbox = SandboxEnvironment()
@@ -50,7 +49,6 @@ class TestSandboxEnvironment(unittest.TestCase):
         self.assertEqual(code, 0)
         # Should literally output 'hello ; echo injected'
         self.assertEqual(stdout.strip(), "hello ; echo injected")
-
 
 if __name__ == "__main__":
     unittest.main()

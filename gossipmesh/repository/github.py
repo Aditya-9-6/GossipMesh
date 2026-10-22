@@ -4,14 +4,17 @@ from github import Github, Auth
 from github.Installation import Installation
 from gossipmesh.core.config import settings
 
-
 class GitHubIntegration:
     def __init__(self, app_id: str, private_key: str):
         self.app_id = app_id
         self.private_key = private_key
 
     def _generate_jwt(self) -> str:
-        payload = {"iat": int(time.time()) - 60, "exp": int(time.time()) + (10 * 60), "iss": self.app_id}
+        payload = {
+            "iat": int(time.time()) - 60,
+            "exp": int(time.time()) + (10 * 60),
+            "iss": self.app_id
+        }
         encoded = jwt.encode(payload, self.private_key, algorithm="RS256")
         return encoded if isinstance(encoded, str) else encoded.decode("utf-8")
 
@@ -41,5 +44,5 @@ class GitHubIntegration:
             "github_id": repo.id,
             "name": repo.name,
             "default_branch": repo.default_branch,
-            "clone_url": repo.clone_url,
+            "clone_url": repo.clone_url
         }
