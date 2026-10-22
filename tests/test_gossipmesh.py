@@ -23,6 +23,35 @@ class TestGossipMesh(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
+    def test_node_publish_local_state(self):
+        import json
+        from unittest.mock import patch, mock_open
+
+        node = GossipNode("test_publish_node", mesh_dir=self.test_dir)
+        payload = {"key": "value", "test": True}
+
+        mock_file = mock_open()
+        with patch("builtins.open", mock_file):
+            msg = node.publish(GossipTopic.HEARTBEATS, payload)
+
+        # Verify message returned
+        self.assertIsNotNone(msg.message_id)
+        self.assertEqual(msg.topic, GossipTopic.HEARTBEATS.value)
+        self.assertEqual(msg.payload, payload)
+
+        # Verify local state updated
+        self.assertIn(msg.message_id, node.seen_messages)
+        self.assertEqual(len(node._message_cache), 1)
+        self.assertEqual(node._message_cache[-1].message_id, msg.message_id)
+
+        # Verify log file written
+        mock_file.assert_called_with(node.log_file, "a", encoding="utf-8")
+        written_data_str = "".join(call[0][0] for call in mock_file().write.call_args_list)
+        written_data = json.loads(written_data_str.strip())
+
+        self.assertEqual(written_data["message_id"], msg.message_id)
+        self.assertEqual(written_data["payload"], payload)
+
     def test_p2p_gossip_dissemination(self):
         node_a = GossipNode("node_alpha", mesh_dir=self.test_dir)
         node_b = GossipNode("node_beta", mesh_dir=self.test_dir)
