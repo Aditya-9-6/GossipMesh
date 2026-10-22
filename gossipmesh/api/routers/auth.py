@@ -61,7 +61,7 @@ def login_access_token(
     if is_locked:
         raise HTTPException(
             status_code=429,
-            detail=f"Account temporarily locked due to excessive failed login attempts. Please try again in {remaining} seconds."
+            detail=f"Account temporarily locked due to excessive failed login attempts. Please try again in {remaining} seconds.",
         )
 
     user = db.query(User).filter(User.email == form_data.username).first()
@@ -69,11 +69,12 @@ def login_access_token(
         is_now_locked, remaining, delay = login_throttler.record_failure(form_data.username)
         if delay > 0:
             import time
+
             time.sleep(delay)
         if is_now_locked:
             raise HTTPException(
                 status_code=429,
-                detail=f"Account temporarily locked due to excessive failed login attempts. Please try again in {remaining} seconds."
+                detail=f"Account temporarily locked due to excessive failed login attempts. Please try again in {remaining} seconds.",
             )
         raise AuthenticationError(message="Incorrect email or password")
     elif not user.is_active:
@@ -642,7 +643,9 @@ def change_password(
     current_user.hashed_password = get_password_hash(body.new_password)
     invalidate_user_sessions(db, current_user.id)
 
-    event = AuditEvent(action="password.changed", actor_id=current_user.id, organization_id=None, details={"user_id": current_user.id})
+    event = AuditEvent(
+        action="password.changed", actor_id=current_user.id, organization_id=None, details={"user_id": current_user.id}
+    )
     db.add(event)
     db.commit()
     return {"message": "Password changed successfully. All previous sessions have been invalidated."}
@@ -659,7 +662,9 @@ def request_password_reset(
         return {"message": "If an active account with that email exists, a reset token has been generated."}
 
     token = create_password_reset_token(db, user)
-    event = AuditEvent(action="password.reset_requested", actor_id=user.id, organization_id=None, details={"email": user.email})
+    event = AuditEvent(
+        action="password.reset_requested", actor_id=user.id, organization_id=None, details={"email": user.email}
+    )
     db.add(event)
     db.commit()
     return {"message": "Password reset token generated.", "reset_token": token}
@@ -685,7 +690,9 @@ def confirm_password_reset(
     user.hashed_password = get_password_hash(body.new_password)
     invalidate_user_sessions(db, user.id)
 
-    event = AuditEvent(action="password.reset_completed", actor_id=user.id, organization_id=None, details={"user_id": user.id})
+    event = AuditEvent(
+        action="password.reset_completed", actor_id=user.id, organization_id=None, details={"user_id": user.id}
+    )
     db.add(event)
     db.commit()
     return {"message": "Password has been reset successfully. All previous sessions have been invalidated."}
