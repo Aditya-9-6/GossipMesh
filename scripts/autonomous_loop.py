@@ -19,7 +19,15 @@ import json
 import time
 import subprocess
 import argparse
+import traceback
 from pathlib import Path
+
+# Ensure repository root is at the head of sys.path
+_repo_root = str(Path(__file__).resolve().parent.parent)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+if "." not in sys.path:
+    sys.path.insert(1, ".")
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
@@ -33,7 +41,6 @@ USER_EMAIL = "aditya-9-6@users.noreply.github.com"
 
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []
-FAILED_SOLVE_ATTEMPTS = {}
 
 
 def load_multi_provider_keys():
@@ -56,64 +63,38 @@ def load_multi_provider_keys():
 load_multi_provider_keys()
 
 
-class KeyPool:
-    """Manages round-robin rotation and dynamic failover across Gemini API keys."""
+from gossipmesh.core.config import (
+    DEFAULT_INITIAL_CREDITS,
+    ERROR_RATE_THRESHOLD,
+    KEY_COOLDOWN_SECONDS,
+    MAX_KEY_RETRIES,
+)
+from gossipmesh.services.key_pool_router import (
+    KeyPoolRouter,
+    KeyMetrics,
+    router as default_router,
+    track_error_rate,
+)
+from gossipmesh.services.execution_loop import (
+    CreditLedger,
+    ExecutionLoop,
+    InsufficientCreditsError,
+)
+from gossipmesh.core.safety import (
+    safety,
+    check_automation_kill_switch,
+    check_pr_creation_allowed,
+    check_push_allowed,
+    check_auto_merge_allowed,
+    check_file_mutation_limit,
+)
+from gossipmesh.runtime.patch_validator import PatchValidator, PatchValidationError
+from gossipmesh.runtime.limits import volume_limiter
 
-    def __init__(self, initial_keys: list[str] = None):
-        self.keys = []
-        pool_env = os.environ.get("GEMINI_KEY_POOL", "")
-        extra_keys = [k.strip() for k in pool_env.split(",") if k.strip()]
-
-        for var in ("GEMINI_API_KEY", "GEMINI_ISSUE_KEY", "GEMINI_REVIEWER_KEY", "GEMINI_SOLVER_KEY"):
-            val = os.environ.get(var, "").strip()
-            if val and val not in extra_keys:
-                extra_keys.append(val)
-
-        # Check local gitignored .gemini_keys file across workspace root, script dir, and user home
-        for check_dir in (
-            Path("."),
-            Path(__file__).resolve().parent,
-            Path(__file__).resolve().parent.parent,
-            Path.home(),
-        ):
-            key_file = check_dir / ".gemini_keys"
-            if key_file.exists():
-                try:
-                    for line in key_file.read_text(encoding="utf-8").splitlines():
-                        k = line.strip()
-                        if k and not k.startswith("#") and k not in extra_keys:
-                            extra_keys.append(k)
-                except Exception:
-                    pass
-
-        all_keys = extra_keys + (initial_keys or [])
-        for k in all_keys:
-            if k and k not in self.keys:
-                self.keys.append(k)
-        self.idx = 0
-
-    def add_keys(self, new_keys: list[str]):
-        for k in new_keys:
-            clean = k.strip()
-            if clean and clean not in self.keys:
-                self.keys.append(clean)
-                print(f"[KeyPool] Added new API key to active rotation pool (Total: {len(self.keys)})", flush=True)
-
-    def next_key(self) -> str:
-        if not self.keys:
-            return ""
-        key = self.keys[self.idx % len(self.keys)]
-        self.idx += 1
-        return key
-
-    def __len__(self):
-        return len(self.keys)
-
-
-# Deprecated global pool; using services.key_pool_router.router for key rotation
-from services.key_pool_router import router  # noqa: E402
-# Compatibility alias for legacy code expecting GLOBAL_POOL
-GLOBAL_POOL = router
+KeyPool = KeyPoolRouter
+GLOBAL_POOL = default_router
+GLOBAL_LEDGER = CreditLedger(initial_credits=DEFAULT_INITIAL_CREDITS)
+GLOBAL_EXECUTION_LOOP = ExecutionLoop(workspace=".", ledger=GLOBAL_LEDGER, router=GLOBAL_POOL)
 
 
 def run_cmd(cmd, cwd=None, check=False, timeout=60):
@@ -194,21 +175,33 @@ def verify_and_auto_fix_preflight(workspace: Path) -> tuple[bool, str]:
     # Pass 2: Syntax compilation check
     comp_res = subprocess.run(
         [py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"],
-        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
     )
     if comp_res.returncode != 0:
         errors.append(f"Syntax/Compilation Failure:\n{comp_res.stderr.strip() or comp_res.stdout.strip()}")
 
     # Pass 3: Strict Ruff Lint Check
     ruff_check_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
-    ruff_res = subprocess.run(ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    ruff_res = subprocess.run(
+        ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
+    )
     if ruff_res.returncode != 0:
         errors.append(f"Ruff Lint Failure:\n{ruff_res.stdout.strip() or ruff_res.stderr.strip()}")
 
     # Pass 4: Pytest Unit Tests
     test_res = subprocess.run(
         [py_bin, "-m", "pytest", "tests/", "-q", "--durations=5"],
-        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
     )
     if test_res.returncode != 0:
         combined_tests = (test_res.stdout + "\n" + test_res.stderr).strip()
@@ -339,14 +332,15 @@ def generate_new_issue(workspace: Path):
         print(f"[!] Generator error: {res.stderr}", file=sys.stderr, flush=True)
 
 
-def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: str):
-    """Solves an issue, creates PR, reviews, and merges."""
-    solver_key = GLOBAL_POOL.next_key()
-    print(f"\n=======================================================", flush=True)
-    print(f"[*] Solving Issue #{issue_num}: {issue_title}", flush=True)
-    print(f"[*] Active Solver API Key: ...{solver_key[-6:] if len(solver_key) > 6 else 'key'}", flush=True)
-    print(f"=======================================================", flush=True)
-
+def invoke_ai_solver(
+    workspace: Path,
+    issue_num: int,
+    issue_title: str,
+    issue_body: str,
+    api_key: str = "",
+) -> subprocess.CompletedProcess:
+    """Invokes scripts/ai_issue_solver.py with error detection and key rotation."""
+    solver_key = api_key or os.environ.get("GEMINI_API_KEY", "") or GLOBAL_POOL.next_key()
     env = os.environ.copy()
     env["GEMINI_API_KEY"] = solver_key
     env["GH_REPO"] = REPO
@@ -366,6 +360,100 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     res = subprocess.run(
         solver_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace"
     )
+    if res.returncode != 0:
+        err_msg = (res.stderr + "\n" + res.stdout).lower()
+        if any(term in err_msg for term in ("429", "503", "quota", "rate limit", "resourceexhausted")):
+            raise RuntimeError(f"HTTP 429/503 Quota exhausted in ai_issue_solver: {res.stderr or res.stdout}")
+    return res
+
+
+def create_pull_request(
+    workspace: Path,
+    branch_name: str,
+    issue_num: int,
+    issue_title: str,
+    body_content: str,
+) -> tuple[int | None, str]:
+    """Creates or discovers a Pull Request for branch_name. Returns (pr_num, pr_url)."""
+    allowed, reason = check_pr_creation_allowed()
+    if not allowed:
+        print(f"[Safety Gate] {reason}", flush=True)
+        return None, ""
+
+    existing = run_cmd(
+        ["gh", "pr", "list", "--repo", REPO, "--head", branch_name, "--json", "number,url"], cwd=workspace
+    )
+    prs = json.loads(existing) if existing else []
+    if prs:
+        pr_num = prs[0]["number"]
+        pr_url = prs[0]["url"]
+        print(f"[OK] Found existing PR #{pr_num}: {pr_url}", flush=True)
+        return pr_num, pr_url
+
+    pr_out = run_cmd(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            REPO,
+            "--head",
+            branch_name,
+            "--base",
+            "main",
+            "--title",
+            f"feat(ai): resolve #{issue_num} - {issue_title}",
+            "--body",
+            body_content,
+            "--label",
+            "advancement,ai-generated",
+        ],
+        cwd=workspace,
+    )
+    pr_url = pr_out.strip()
+    pr_num = None
+    if pr_url:
+        try:
+            pr_num = int(pr_url.split("/")[-1])
+        except Exception:
+            pass
+    print(f"[OK] Created PR #{pr_num}: {pr_url}", flush=True)
+    return pr_num, pr_url
+
+
+def solve_issue(
+    workspace: Path,
+    issue_num: int,
+    issue_title: str,
+    issue_body: str,
+    execution_loop: ExecutionLoop | None = None,
+) -> bool:
+    """Solves an issue, creates PR, reviews, and merges."""
+    loop = execution_loop or GLOBAL_EXECUTION_LOOP
+    active_keys = loop.router.keys if loop.router and loop.router.keys else []
+    display_key = active_keys[loop.router.idx % len(active_keys)] if active_keys else "key"
+    print(f"\n=======================================================", flush=True)
+    print(f"[*] Solving Issue #{issue_num}: {issue_title}", flush=True)
+    print(f"[*] Active Solver API Key: ...{display_key[-6:] if len(display_key) > 6 else 'key'}", flush=True)
+    print(f"=======================================================", flush=True)
+
+    env = os.environ.copy()
+    env["GH_REPO"] = REPO
+
+    try:
+        res = loop.run_task(
+            invoke_ai_solver,
+            workspace,
+            issue_num,
+            issue_title,
+            issue_body,
+            action=0,
+        )
+    except Exception as e:
+        print(f"[!] Solver execution failed: {e}", file=sys.stderr, flush=True)
+        traceback.print_exc(file=sys.stderr)
+        return False
+
     try:
         print(res.stdout, flush=True)
     except Exception:
@@ -391,6 +479,9 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
                 "--workspace",
                 str(workspace),
             ]
+            env = os.environ.copy()
+            env["GEMINI_API_KEY"] = loop.router.next_key() if loop.router else GLOBAL_POOL.next_key()
+            env["GH_REPO"] = REPO
             subprocess.run(
                 ci_fixer_cmd, cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace"
             )
@@ -410,6 +501,7 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
         )
         run_cmd("git reset --hard HEAD", cwd=workspace, check=False)
         run_cmd("git clean -fd", cwd=workspace, check=False)
+        loop.handle_verification_failure(org="default", action="combo_fix")
         return False
 
     branch_name = f"ai/solve-issue-{issue_num}"
@@ -417,6 +509,16 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     run_cmd(["git", "checkout", "-B", branch_name], cwd=workspace)
     run_cmd(["git", "config", "user.name", USER_NAME], cwd=workspace)
     run_cmd(["git", "config", "user.email", USER_EMAIL], cwd=workspace)
+
+    # Safety Check: Limit modified file count (Task 8 & 18)
+    status_out = run_cmd(["git", "status", "--porcelain"], cwd=workspace)
+    mod_files = [line.strip() for line in status_out.splitlines() if line.strip()]
+    count_ok, count_reason = check_file_mutation_limit(len(mod_files))
+    if not count_ok:
+        print(f"[Safety Gate] {count_reason} Aborting PR creation.", file=sys.stderr, flush=True)
+        run_cmd("git reset --hard HEAD", cwd=workspace, check=False)
+        run_cmd("git clean -fd", cwd=workspace, check=False)
+        return False
 
     run_cmd(
         "git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true", cwd=workspace, check=False
@@ -427,8 +529,12 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     commit_msg = f"feat: automated resolution for issue #{issue_num} ({issue_title})"
     run_cmd(["git", "commit", "--author", f"{USER_NAME} <{USER_EMAIL}>", "-m", commit_msg], cwd=workspace, check=False)
 
-    print(f"[*] Pushing branch {branch_name} to origin...", flush=True)
-    run_cmd(["git", "push", "origin", branch_name, "--force"], cwd=workspace)
+    push_ok, push_reason = check_push_allowed(force=True)
+    if not push_ok:
+        print(f"[Safety Gate] {push_reason} (Skipping remote git push).", flush=True)
+    else:
+        print(f"[*] Pushing branch {branch_name} to origin...", flush=True)
+        run_cmd(["git", "push", "origin", branch_name, "--force"], cwd=workspace)
 
     print("[*] Creating / updating Pull Request...", flush=True)
     summary_file = workspace / "ai_pr_summary.md"
@@ -443,63 +549,35 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
     pr_url = ""
     pr_num = None
     try:
-        existing = run_cmd(
-            ["gh", "pr", "list", "--repo", REPO, "--head", branch_name, "--json", "number,url"], cwd=workspace
-        )
-        prs = json.loads(existing) if existing else []
-        if prs:
-            pr_num = prs[0]["number"]
-            pr_url = prs[0]["url"]
-            print(f"[OK] Found existing PR #{pr_num}: {pr_url}", flush=True)
-        else:
-            pr_out = run_cmd(
-                [
-                    "gh",
-                    "pr",
-                    "create",
-                    "--repo",
-                    REPO,
-                    "--head",
-                    branch_name,
-                    "--base",
-                    "main",
-                    "--title",
-                    f"feat(ai): resolve #{issue_num} - {issue_title}",
-                    "--body",
-                    body_content,
-                    "--label",
-                    "advancement,ai-generated",
-                ],
-                cwd=workspace,
-            )
-            pr_url = pr_out.strip()
-            pr_num = int(pr_url.split("/")[-1])
-            print(f"[OK] Created PR #{pr_num}: {pr_url}", flush=True)
+        pr_num, pr_url = create_pull_request(workspace, branch_name, issue_num, issue_title, body_content)
+        if not pr_num:
+            return False
 
-            # Auto-approve CI workflow runs so all tests execute immediately without waiting for approval
-            try:
-                time.sleep(3)
-                pending_out = run_cmd(
-                    ["gh", "api", f"repos/{REPO}/actions/runs?status=action_required", "--jq", ".workflow_runs[].id"],
-                    cwd=workspace,
-                    check=False,
-                )
-                for run_id in pending_out.splitlines():
-                    run_id = run_id.strip()
-                    if run_id:
-                        run_cmd(
-                            ["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/approve", "-X", "POST"],
-                            cwd=workspace,
-                            check=False,
-                        )
-                        print(
-                            f"[OK] Automatically approved CI workflow run {run_id} to execute tests immediately.",
-                            flush=True,
-                        )
-            except Exception:
-                pass
+        # Auto-approve CI workflow runs so all tests execute immediately without waiting for approval
+        try:
+            time.sleep(3)
+            pending_out = run_cmd(
+                ["gh", "api", f"repos/{REPO}/actions/runs?status=action_required", "--jq", ".workflow_runs[].id"],
+                cwd=workspace,
+                check=False,
+            )
+            for run_id in pending_out.splitlines():
+                run_id = run_id.strip()
+                if run_id:
+                    run_cmd(
+                        ["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/approve", "-X", "POST"],
+                        cwd=workspace,
+                        check=False,
+                    )
+                    print(
+                        f"[OK] Automatically approved CI workflow run {run_id} to execute tests immediately.",
+                        flush=True,
+                    )
+        except Exception:
+            pass
     except Exception as e:
         print(f"[!] Failed to manage PR: {e}", file=sys.stderr, flush=True)
+        traceback.print_exc(file=sys.stderr)
         return False
 
     reviewer_key = GLOBAL_POOL.next_key()
@@ -580,11 +658,16 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
 
         # Re-run reviewer to verify the fixes
         print(f"[*] Re-running Autonomous Architectural Reviewer on PR #{pr_num} after fixes...", flush=True)
-        rev_res = subprocess.run([
-            sys.executable, "scripts/ai_pr_reviewer.py",
-            "--pr-number", str(pr_num),
-            "--workspace", str(workspace)
-        ], cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
+        rev_res = subprocess.run(
+            [sys.executable, "scripts/ai_pr_reviewer.py", "--pr-number", str(pr_num), "--workspace", str(workspace)],
+            cwd=workspace,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
+        )
         print(rev_res.stdout, flush=True)
 
         if review_status_file.exists():
@@ -596,6 +679,12 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
                 pass
 
     if verdict == "APPROVED" and score >= 90:
+        merge_ok, merge_reason = check_auto_merge_allowed()
+        if not merge_ok:
+            print(f"[Safety Gate] {merge_reason} (PR #{pr_num} left open for human review).", flush=True)
+            run_cmd(["git", "checkout", "main"], cwd=workspace, check=False)
+            return True
+
         print(
             f"[🚀] PR #{pr_num} APPROVED (Score: {score}/100)! Attempting to merge PR #{pr_num} into main...",
             flush=True,
@@ -993,11 +1082,23 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 rev_env["GEMINI_REVIEWER_KEY"] = GLOBAL_POOL.next_key()
                 rev_env["GH_REPO"] = REPO
 
-                rev_res = subprocess.run([
-                    sys.executable, "scripts/ai_pr_reviewer.py",
-                    "--pr-number", str(pr_num),
-                    "--workspace", str(workspace)
-                ], cwd=workspace, env=rev_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
+                rev_res = subprocess.run(
+                    [
+                        sys.executable,
+                        "scripts/ai_pr_reviewer.py",
+                        "--pr-number",
+                        str(pr_num),
+                        "--workspace",
+                        str(workspace),
+                    ],
+                    cwd=workspace,
+                    env=rev_env,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=300,
+                )
                 print(rev_res.stdout, flush=True)
 
                 review_status_file = workspace / "ai_review_status.json"
@@ -1140,9 +1241,74 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
     return False
 
 
-def run_loop_iteration(workspace: Path, worker_id: int = 1, num_workers: int = 5):
+def run_issue_job(
+    workspace: Path,
+    issue: dict,
+    execution_loop: ExecutionLoop | None = None,
+    org: str = "default",
+) -> bool:
+    """Executes the full issue-to-PR workflow for a given issue using ExecutionLoop.
+    Charges 3 credits for combo_fix upfront.
+    Returns True if issue was successfully solved and PR opened/merged.
+    """
+    loop = execution_loop or GLOBAL_EXECUTION_LOOP
+    issue_num = issue["number"]
+    issue_title = issue["title"]
+    issue_body = issue.get("body", "")
+
+    print(f"\n[*] ExecutionLoop initiating combo_fix (3 credits) for Issue #{issue_num}...", flush=True)
+
+    # Check daily volume and cost limits (Task 15)
+    can_proceed, limit_reason = volume_limiter.check_limits(org_id=org, is_pr=True)
+    if not can_proceed:
+        print(f"[Volume Limit Gate] {limit_reason}", file=sys.stderr, flush=True)
+        return False
+
+    if not loop.ledger.charge(org, "combo_fix"):
+        print(
+            f"[ExecutionLoop] Insufficient credits for org '{org}' (balance: {loop.ledger.get(org)}, required: 3).",
+            file=sys.stderr,
+            flush=True,
+        )
+        return False
+
+    try:
+        success = solve_issue(
+            workspace=workspace,
+            issue_num=issue_num,
+            issue_title=issue_title,
+            issue_body=issue_body,
+            execution_loop=loop,
+        )
+        if success:
+            volume_limiter.record_usage(org_id=org, prs=1)
+        return bool(success)
+    except Exception as e:
+        print(
+            f"[ExecutionLoop Watchdog] Issue #{issue_num} failed with unhandled error: {e}", file=sys.stderr, flush=True
+        )
+        traceback.print_exc(file=sys.stderr)
+        # System-error auto-refund full 3 credits
+        loop.ledger.refund(org, 3)
+        return False
+
+
+def run_loop_iteration(
+    workspace: Path,
+    worker_id: int = 1,
+    num_workers: int = 5,
+    execution_loop: ExecutionLoop | None = None,
+):
     """Executes a single cycle of the autonomous loop."""
-    # 0. Active Triage & Cleanup Gatekeeper: Automatically close unneeded, obsolete, or duplicate PRs & issues
+    loop = execution_loop or GLOBAL_EXECUTION_LOOP
+
+    # 0. Master Kill-Switch Gate (Task 8 & 18: GOSSIPMESH_AUTOMATION_ENABLED)
+    allowed, kill_reason = check_automation_kill_switch()
+    if not allowed:
+        print(f"[Safety Gate] {kill_reason}", flush=True)
+        return
+
+    # 1. Active Triage & Cleanup Gatekeeper: Automatically close unneeded, obsolete, or duplicate PRs & issues
     if worker_id == 1:
         try:
             from scripts.triage_cleanup import audit_and_close_unneeded_prs, audit_and_close_unneeded_issues
@@ -1165,6 +1331,7 @@ def run_loop_iteration(workspace: Path, worker_id: int = 1, num_workers: int = 5
             "[*] All currently open advancement issues already have active PRs or remote branches. Generating next task from Master Implementation Plan...",
             flush=True,
         )
+        loop.ledger.charge("default", "issue_scan")
         generate_new_issue(workspace)
         time.sleep(5)
         issues = get_open_advancement_issues(workspace)
@@ -1176,7 +1343,7 @@ def run_loop_iteration(workspace: Path, worker_id: int = 1, num_workers: int = 5
     # Deterministic work partitioning across parallel workers
     idx = (worker_id - 1) % len(issues)
     target = issues[idx]
-    solve_issue(workspace, target["number"], target["title"], target.get("body", ""))
+    run_issue_job(workspace, target, execution_loop=loop)
 
 
 def main():
@@ -1201,6 +1368,8 @@ def main():
     args = parser.parse_args()
 
     workspace = Path(args.workspace).resolve()
+    GLOBAL_EXECUTION_LOOP.workspace = workspace
+    execution_loop = GLOBAL_EXECUTION_LOOP
 
     if args.add_keys:
         GLOBAL_POOL.add_keys(args.add_keys)
@@ -1213,7 +1382,9 @@ def main():
     start_time = time.time()
 
     if args.once:
-        run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers)
+        run_loop_iteration(
+            workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
+        )
     elif args.iterations > 0:
         print(
             f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, max: {args.max_minutes}m, interval: {args.interval}s, worker: {args.worker_id}/{args.num_workers})...",
@@ -1227,7 +1398,9 @@ def main():
             )
             print(f"=======================================================", flush=True)
             try:
-                run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers)
+                run_loop_iteration(
+                    workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
+                )
             except Exception as e:
                 print(f"[Error in cycle {i + 1}]: {e}", file=sys.stderr, flush=True)
 
@@ -1244,7 +1417,9 @@ def main():
         )
         while True:
             try:
-                run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers)
+                run_loop_iteration(
+                    workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
+                )
             except Exception as e:
                 print(f"[Error in loop]: {e}", file=sys.stderr, flush=True)
 
