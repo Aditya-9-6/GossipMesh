@@ -816,8 +816,10 @@ def main():
     try:
         import sys as _sys
         from pathlib import Path as _Path
+
         _sys.path.insert(0, str(_Path(__file__).resolve().parent))
         from ai_ci_fixer import run_diagnostics
+
         diag_code, diag_log = run_diagnostics(workspace)
         if diag_code != 0 and diag_log.strip():
             red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
@@ -887,7 +889,11 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         ("DeepSeek", os.environ.get("DEEPSEEK_API_KEY", "").strip(), call_deepseek_review),
         ("Mistral", os.environ.get("MISTRAL_API_KEY", "").strip(), call_mistral_review),
         ("Anthropic", os.environ.get("ANTHROPIC_API_KEY", "").strip(), call_anthropic_review),
-        ("NVIDIA", os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip(), call_nvidia_review),
+        (
+            "NVIDIA",
+            os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip(),
+            call_nvidia_review,
+        ),
         ("Cohere", os.environ.get("COHERE_API_KEY", "").strip(), call_cohere_review),
         ("HuggingFace", os.environ.get("HUGGINGFACE_API_KEY", "").strip(), call_huggingface_review),
     ]

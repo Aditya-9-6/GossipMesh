@@ -15,9 +15,7 @@ from gossipmesh.core.exceptions import AuthorizationError
 from gossipmesh.models.user import User
 
 # ContextVar for thread/async-safe tenant context propagation
-current_tenant_id: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar(
-    "current_tenant_id", default=None
-)
+current_tenant_id: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar("current_tenant_id", default=None)
 
 
 class TenantContext:
@@ -89,9 +87,7 @@ class TenantQueryGuard:
             or hasattr(model, "project_id")
         )
         if not has_scoping:
-            raise ValueError(
-                f"Model {model_name} has no defined organization scoping path."
-            )
+            raise ValueError(f"Model {model_name} has no defined organization scoping path.")
 
         query = db.query(model)
 
@@ -106,6 +102,7 @@ class TenantQueryGuard:
         # 3. Model is linked through Repository (e.g. DocumentChunk)
         if hasattr(model, "repository_id"):
             from gossipmesh.models.repository import Repository
+
             return query.join(Repository, model.repository_id == Repository.id).filter(
                 Repository.organization_id == active_org
             )
@@ -113,20 +110,16 @@ class TenantQueryGuard:
         # 4. Model is linked through Workflow (e.g. Job)
         if hasattr(model, "workflow_id"):
             from gossipmesh.models.runtime import Workflow
-            return query.join(Workflow, model.workflow_id == Workflow.id).filter(
-                Workflow.organization_id == active_org
-            )
+
+            return query.join(Workflow, model.workflow_id == Workflow.id).filter(Workflow.organization_id == active_org)
 
         # 5. Model is linked through Project
         if hasattr(model, "project_id"):
             from gossipmesh.models.project import Project
-            return query.join(Project, model.project_id == Project.id).filter(
-                Project.organization_id == active_org
-            )
 
-        raise ValueError(
-            f"Model {model_name} has no defined organization scoping path."
-        )
+            return query.join(Project, model.project_id == Project.id).filter(Project.organization_id == active_org)
+
+        raise ValueError(f"Model {model_name} has no defined organization scoping path.")
 
     @staticmethod
     def scope_cache_key(key: str, organization_id: int) -> str:
@@ -143,9 +136,6 @@ class TenantQueryGuard:
     @staticmethod
     def scope_artifact_path(organization_id: int, filename: str) -> str:
         """Sanitizes and partitions artifact paths by organization."""
-        parts = [
-            p for p in filename.replace("\\", "/").split("/")
-            if p and p != ".." and p != "."
-        ]
+        parts = [p for p in filename.replace("\\", "/").split("/") if p and p != ".." and p != "."]
         clean_name = "/".join(parts)
         return f"artifacts/{organization_id}/{clean_name}"
