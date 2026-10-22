@@ -1,34 +1,26 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 from gossipmesh.core.config import settings
+
 import os
 
-if os.environ.get("ENVIRONMENT") == "test":
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-    )
-    from gossipmesh.models.base import Base
+DATABASE_URL = settings.DATABASE_URI
+if isinstance(DATABASE_URL, object) and hasattr(DATABASE_URL, "__str__"):
+    DATABASE_URL = str(DATABASE_URL)
 
-    # Import all models to ensure they are registered with Base.metadata
-    from gossipmesh.models.user import User, UserGitHubCredential
-    from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
-    from gossipmesh.models.project import Project
-    from gossipmesh.models.audit import AuditEvent
-    from gossipmesh.models.provider import ProviderCredential
-    from gossipmesh.models.repository import Repository, IndexState
-    from gossipmesh.models.runtime import Workflow, Job, Budget, Artifact
-    from gossipmesh.models.service_account import ServiceAccount, APIKey
-    from gossipmesh.models.finding import Finding
-    from gossipmesh.models.review import ReviewResult
-    from gossipmesh.models.usage import UsageRecord
-    from gossipmesh.models.gossip import GossipMessageModel, GossipHeartbeat
+# Fallback to psycopg2 or sqlite if psycopg is missing and not explicitly supported
+if "postgresql+psycopg://" in DATABASE_URL:
+    try:
+        import psycopg
+    except ImportError:
+        DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg://", "postgresql+psycopg2://")
 
-    Base.metadata.create_all(bind=engine)
-else:
-    engine = create_engine(
-        str(settings.DATABASE_URI),
-        pool_pre_ping=True,
-    )
-
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
