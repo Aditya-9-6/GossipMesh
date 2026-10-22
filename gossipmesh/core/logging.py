@@ -38,9 +38,7 @@ SECRET_PATTERNS = [
 ]
 
 # Source code block detector pattern
-CODE_BLOCK_PATTERN = re.compile(
-    r"(```[\s\S]*?```|(?:def\s+[a-zA-Z_]\w*\s*\(|class\s+[a-zA-Z_]\w*[:\(])[\s\S]{40,})"
-)
+CODE_BLOCK_PATTERN = re.compile(r"(```[\s\S]*?```|(?:def\s+[a-zA-Z_]\w*\s*\(|class\s+[a-zA-Z_]\w*[:\(])[\s\S]{40,})")
 
 
 def redact_sensitive_data(text: str) -> str:
@@ -72,6 +70,7 @@ class StructuredJSONFormatter(logging.Formatter):
         if not req_id:
             try:
                 from gossipmesh.middleware.correlation import get_correlation_id
+
                 req_id = get_correlation_id()
             except Exception:
                 req_id = None
