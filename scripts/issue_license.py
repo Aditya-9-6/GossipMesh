@@ -65,10 +65,13 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = Path(env_path).read_bytes()
 
     if not pem_bytes:
-        # Look in workspace root/enterprise/test_private_key.pem
         fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
         if fallback.is_file():
             pem_bytes = fallback.read_bytes()
+        else:
+            fallback_local = Path("enterprise/test_private_key.pem")
+            if fallback_local.is_file():
+                pem_bytes = fallback_local.read_bytes()
 
     if not pem_bytes:
         raise ValueError(

@@ -30,6 +30,8 @@ def test_packaging_cli_missing_license():
         sys.executable,
         "-m",
         "enterprise.packaging",
+        "--public-key-path",
+        "enterprise/test_public_key.pem",
         "--license-path",
         "nonexistent.jwt",
     ]
@@ -44,6 +46,8 @@ def test_packaging_cli_json_output(test_license_file, tmp_path):
         sys.executable,
         "-m",
         "enterprise.packaging",
+        "--public-key-path",
+        "enterprise/test_public_key.pem",
         "--license-path",
         str(test_license_file),
         "--repo-path",

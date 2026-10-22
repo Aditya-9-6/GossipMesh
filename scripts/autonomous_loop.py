@@ -112,7 +112,6 @@ class KeyPool:
 
 # Deprecated global pool; using services.key_pool_router.router for key rotation
 from services.key_pool_router import router  # noqa: E402
-
 # Compatibility alias for legacy code expecting GLOBAL_POOL
 GLOBAL_POOL = router
 
@@ -195,33 +194,21 @@ def verify_and_auto_fix_preflight(workspace: Path) -> tuple[bool, str]:
     # Pass 2: Syntax compilation check
     comp_res = subprocess.run(
         [py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=120,
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
     )
     if comp_res.returncode != 0:
         errors.append(f"Syntax/Compilation Failure:\n{comp_res.stderr.strip() or comp_res.stdout.strip()}")
 
     # Pass 3: Strict Ruff Lint Check
     ruff_check_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
-    ruff_res = subprocess.run(
-        ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
-    )
+    ruff_res = subprocess.run(ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     if ruff_res.returncode != 0:
         errors.append(f"Ruff Lint Failure:\n{ruff_res.stdout.strip() or ruff_res.stderr.strip()}")
 
     # Pass 4: Pytest Unit Tests
     test_res = subprocess.run(
         [py_bin, "-m", "pytest", "tests/", "-q", "--durations=5"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=1200,
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200
     )
     if test_res.returncode != 0:
         combined_tests = (test_res.stdout + "\n" + test_res.stderr).strip()
@@ -593,16 +580,11 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
 
         # Re-run reviewer to verify the fixes
         print(f"[*] Re-running Autonomous Architectural Reviewer on PR #{pr_num} after fixes...", flush=True)
-        rev_res = subprocess.run(
-            [sys.executable, "scripts/ai_pr_reviewer.py", "--pr-number", str(pr_num), "--workspace", str(workspace)],
-            cwd=workspace,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=1200,
-        )
+        rev_res = subprocess.run([
+            sys.executable, "scripts/ai_pr_reviewer.py",
+            "--pr-number", str(pr_num),
+            "--workspace", str(workspace)
+        ], cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
         print(rev_res.stdout, flush=True)
 
         if review_status_file.exists():
@@ -1011,23 +993,11 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 rev_env["GEMINI_REVIEWER_KEY"] = GLOBAL_POOL.next_key()
                 rev_env["GH_REPO"] = REPO
 
-                rev_res = subprocess.run(
-                    [
-                        sys.executable,
-                        "scripts/ai_pr_reviewer.py",
-                        "--pr-number",
-                        str(pr_num),
-                        "--workspace",
-                        str(workspace),
-                    ],
-                    cwd=workspace,
-                    env=rev_env,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    timeout=1200,
-                )
+                rev_res = subprocess.run([
+                    sys.executable, "scripts/ai_pr_reviewer.py",
+                    "--pr-number", str(pr_num),
+                    "--workspace", str(workspace)
+                ], cwd=workspace, env=rev_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
                 print(rev_res.stdout, flush=True)
 
                 review_status_file = workspace / "ai_review_status.json"

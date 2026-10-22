@@ -198,7 +198,7 @@ def github_login(request: Request) -> Any:
     redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
 
     params = {
-        "client_id": settings.GITHUB_CLIENT_SECRET,
+        "client_id": settings.GITHUB_CLIENT_ID,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -221,7 +221,7 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_SECRET,
+                "client_id": settings.GITHUB_CLIENT_ID,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
@@ -371,7 +371,7 @@ def github_refresh_token(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_SECRET,
+                "client_id": settings.GITHUB_CLIENT_ID,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
@@ -554,18 +554,15 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
         # Handle Organization Mapping via Groups/Roles if present
         roles = claims.get("groups", claims.get("roles", []))
         if isinstance(roles, list) and roles:
-            orgs = db.query(Organization).filter(Organization.name.in_(roles)).all()
-            if orgs:
-                org_ids = [org.id for org in orgs]
-                existing_user_orgs = (
-                    db.query(UserOrganization)
-                    .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id.in_(org_ids))
-                    .all()
-                )
-                existing_org_ids = {uo.organization_id for uo in existing_user_orgs}
-
-                for org in orgs:
-                    if org.id not in existing_org_ids:
+            for role_name in roles:
+                org = db.query(Organization).filter(Organization.name == role_name).first()
+                if org:
+                    user_org = (
+                        db.query(UserOrganization)
+                        .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id == org.id)
+                        .first()
+                    )
+                    if not user_org:
                         user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="member")
                         db.add(user_org)
 
