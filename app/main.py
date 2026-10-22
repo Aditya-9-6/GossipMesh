@@ -7,8 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 
-# redeploy trigger
-from worker.processor import process_pr_event
+from worker.processor import process_pr_event, run_autonomous_cycle
 
 app = FastAPI()
 thread_pool = ThreadPoolExecutor(max_workers=5)
@@ -40,7 +39,7 @@ class GitHubEvent(BaseModel):
 @app.get("/")
 @app.get("/healthz")
 async def health():
-    return {"status": "ok", "service": "GossipMesh Autonomous Reviewer"}
+    return {"status": "ok", "service": "GossipMesh Autonomous Engine"}
 
 
 def verify_signature(request: Request, payload: bytes):
@@ -78,6 +77,15 @@ async def webhook(request: Request):
     return {"status": "queued_async"}
 
 
+@app.get("/advance")
+@app.post("/advance")
+async def trigger_advance():
+    """Manual or external trigger to execute a full autonomous development cycle."""
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(thread_pool, run_autonomous_cycle)
+    return {"status": "queued_advancement_cycle", "service": "GossipMesh Autonomous Engine"}
+
+
 # Diagnostics endpoint to expose worker count
 @app.get("/debug/worker_status")
 def worker_status():
@@ -85,8 +93,7 @@ def worker_status():
     return {"active_workers": thread_pool._max_workers}
 
 
-# Ready endpoint for Kubernetes liveness/readiness probes
+# Ready endpoint for Kubernetes / Render liveness & readiness probes
 @app.get("/ready")
 async def ready():
-    # Simple readiness check – could be expanded to DB connections, etc.
-    return {"status": "ready", "service": "GossipMesh Autonomous Reviewer"}
+    return {"status": "ready", "service": "GossipMesh Autonomous Engine"}
