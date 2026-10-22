@@ -37,6 +37,7 @@ from typing import Any, Callable, Dict, Tuple
 # Credit ledger (very simple in‑memory implementation for demo purposes)
 # ---------------------------------------------------------------------------
 
+
 class CreditLedger:
     """Tracks credits per organization (identified by ``org_id``).
 
@@ -66,12 +67,14 @@ class CreditLedger:
     def balance(self, org_id: str) -> int:
         return self._balances.get(org_id, 0)
 
+
 # Singleton ledger used throughout the runtime.
 credit_ledger = CreditLedger()
 
 # ---------------------------------------------------------------------------
 # Helper – sandbox CI execution
 # ---------------------------------------------------------------------------
+
 
 def _run_ci_in_sandbox(workspace: Path, patch_path: Path) -> Tuple[int, str]:
     """Apply ``patch_path`` to a fresh copy of ``workspace`` and run CI.
@@ -82,7 +85,7 @@ def _run_ci_in_sandbox(workspace: Path, patch_path: Path) -> Tuple[int, str]:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
         # Copy everything except ``.git`` (which may be large). ``shutil`` is fine.
-        shutil.copytree(workspace, tmp_path / "repo", dirs_exist_ok=True, ignore=shutil.ignore_patterns('.git'))
+        shutil.copytree(workspace, tmp_path / "repo", dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git"))
         repo_path = tmp_path / "repo"
         # Apply the patch (assume a unified diff). ``git apply`` works for both files.
         apply_cmd = ["git", "apply", str(patch_path)]
@@ -105,9 +108,11 @@ def _run_ci_in_sandbox(workspace: Path, patch_path: Path) -> Tuple[int, str]:
         except subprocess.TimeoutExpired:
             return 1, "CI command timed out"
 
+
 # ---------------------------------------------------------------------------
 # Execution Loop
 # ---------------------------------------------------------------------------
+
 
 class ExecutionLoop:
     def __init__(self, workspace: Path, org_id: str = "default"):
@@ -160,6 +165,7 @@ class ExecutionLoop:
     # ---------------------------------------------------------------------
     def _run_llm(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         from services.key_pool_router import router
+
         wrapped = router.track_error_rate(fn)
         return wrapped(*args, **kwargs)
 
@@ -180,6 +186,7 @@ class ExecutionLoop:
             if rc == 0:
                 # Success – open PR via existing core function (import lazily).
                 from scripts.autonomous_loop import open_pr_from_patch
+
                 pr_url = open_pr_from_patch(patch_path)
                 return True, pr_url
             else:
@@ -190,7 +197,7 @@ class ExecutionLoop:
         credit_ledger.refund(self.org_id, 1)
         comment = f"""Patch failed CI after 3 attempts. Draft patch attached.
 ```
-{patch_path.read_text(encoding='utf-8')}
+{patch_path.read_text(encoding="utf-8")}
 ```"""
         return False, comment
 
@@ -238,11 +245,11 @@ class ExecutionLoop:
         finally:
             pass
 
+
 # Convenience function used by ``autonomous_loop.py``.
 def run_issue_job(workspace: Path, org_id: str = "default") -> None:
-    """Wrapper that uses the core ``generate_patch_for_issue`` function.
-    """
+    """Wrapper that uses the core ``generate_patch_for_issue`` function."""
     from scripts.autonomous_loop import generate_patch_for_issue  # noqa: E402
+
     loop = ExecutionLoop(workspace, org_id)
     loop.run_task("combo", generate_patch_for_issue)
-
