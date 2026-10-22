@@ -45,12 +45,7 @@ def run_issue_discovery(job: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         clone_url = f"https://github.com/{repo}.git"
-        subprocess.run(
-            ["git", "clone", "--depth", "1", clone_url, tmp_dir],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        subprocess.run(["git", "clone", "--depth", "1", clone_url, tmp_dir], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         logger.info("Cloned %s shallowly into %s", repo, tmp_dir)
     except Exception as e:
         logger.exception("Failed to clone repository %s", repo)
@@ -77,9 +72,7 @@ def run_issue_discovery(job: Dict[str, Any]) -> Dict[str, Any]:
         "and assign a Severity Score (0-100) with root cause trace."
     )
     critic_result = call_llm("reasoning", critic_prompt, system_prompt="You are an Adversarial Bug Critic.")
-    logger.info(
-        "Adversarial Critic Pass completed using %s (%s)", critic_result.get("key_id"), critic_result.get("provider")
-    )
+    logger.info("Adversarial Critic Pass completed using %s (%s)", critic_result.get("key_id"), critic_result.get("provider"))
 
     # Step 4: Output & Issue Creation
     created_issues: List[str] = []
@@ -96,11 +89,12 @@ def run_issue_discovery(job: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     try:
-        res = subprocess.run(
-            ["gh", "issue", "create", "--repo", repo, "--title", issue_title, "--body", issue_body],
-            capture_output=True,
-            text=True,
-        )
+        res = subprocess.run([
+            "gh", "issue", "create",
+            "--repo", repo,
+            "--title", issue_title,
+            "--body", issue_body
+        ], capture_output=True, text=True)
         if res.returncode == 0:
             created_url = res.stdout.strip()
             logger.info("Successfully created GitHub issue: %s", created_url)
@@ -115,7 +109,7 @@ def run_issue_discovery(job: Dict[str, Any]) -> Dict[str, Any]:
         "status": "completed",
         "issues_created": created_issues,
         "triage": triage_result.get("content"),
-        "critic": critic_result.get("content"),
+        "critic": critic_result.get("content")
     }
 
 
@@ -141,20 +135,9 @@ def run_pr_review(job: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         clone_url = f"https://github.com/{repo}.git"
-        subprocess.run(
-            ["git", "clone", "--depth", "1", clone_url, tmp_dir],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        subprocess.run(["git", "clone", "--depth", "1", clone_url, tmp_dir], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if head_sha:
-            subprocess.run(
-                ["git", "checkout", head_sha],
-                cwd=tmp_dir,
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            subprocess.run(["git", "checkout", head_sha], cwd=tmp_dir, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         logger.info("Cloned PR repo into %s", tmp_dir)
     except Exception as e:
         logger.exception("Failed to clone PR %s", pr_number)
@@ -162,21 +145,9 @@ def run_pr_review(job: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "clone_failed", "error": str(e)}
 
     # Multi-Check Execution across models
-    check_a = call_llm(
-        "fast",
-        f"Review PR #{pr_number} in {repo} for logic bugs and race conditions.",
-        system_prompt="Logic & Concurrency Reviewer",
-    )
-    check_b = call_llm(
-        "reasoning",
-        f"Perform deep taint and OWASP security review on PR #{pr_number} in {repo}.",
-        system_prompt="Security & Taint Reviewer",
-    )
-    check_c = call_llm(
-        "coding",
-        f"Review performance and infrastructure impact for PR #{pr_number} in {repo}.",
-        system_prompt="Performance & Infra Reviewer",
-    )
+    check_a = call_llm("fast", f"Review PR #{pr_number} in {repo} for logic bugs and race conditions.", system_prompt="Logic & Concurrency Reviewer")
+    check_b = call_llm("reasoning", f"Perform deep taint and OWASP security review on PR #{pr_number} in {repo}.", system_prompt="Security & Taint Reviewer")
+    check_c = call_llm("coding", f"Review performance and infrastructure impact for PR #{pr_number} in {repo}.", system_prompt="Performance & Infra Reviewer")
 
     review_body = (
         f"### GossipMesh Automated PR Review (#{pr_number})\n\n"
@@ -191,11 +162,11 @@ def run_pr_review(job: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     try:
-        res = subprocess.run(
-            ["gh", "pr", "comment", str(pr_number), "--repo", repo, "--body", review_body],
-            capture_output=True,
-            text=True,
-        )
+        res = subprocess.run([
+            "gh", "pr", "comment", str(pr_number),
+            "--repo", repo,
+            "--body", review_body
+        ], capture_output=True, text=True)
         if res.returncode == 0:
             logger.info("Posted review comment to PR #%s", pr_number)
         else:
@@ -204,7 +175,11 @@ def run_pr_review(job: Dict[str, Any]) -> Dict[str, Any]:
         logger.debug("Could not post PR review via gh CLI: %s", e)
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
-    return {"status": "completed", "pr_number": pr_number, "checks": [check_a, check_b, check_c]}
+    return {
+        "status": "completed",
+        "pr_number": pr_number,
+        "checks": [check_a, check_b, check_c]
+    }
 
 
 def run_auto_fix(job: Dict[str, Any]) -> Dict[str, Any]:
@@ -227,7 +202,7 @@ def run_auto_fix(job: Dict[str, Any]) -> Dict[str, Any]:
     spec_result = call_llm(
         "reasoning",
         f"Write an architectural remediation specification for issue #{issue_number} in {repo}.",
-        system_prompt="Software Architect & Remediation Planner",
+        system_prompt="Software Architect & Remediation Planner"
     )
     logger.info("Architect remediation spec generated via %s", spec_result.get("provider"))
 
@@ -235,7 +210,7 @@ def run_auto_fix(job: Dict[str, Any]) -> Dict[str, Any]:
     patch_result = call_llm(
         "coding",
         f"Generate unified git patch for {repo} based on plan:\n{spec_result.get('content')}",
-        system_prompt="High-Precision Coding Specialist",
+        system_prompt="High-Precision Coding Specialist"
     )
     logger.info("Code patch generated via %s", patch_result.get("provider"))
 
@@ -245,21 +220,10 @@ def run_auto_fix(job: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         clone_url = f"https://github.com/{repo}.git"
-        subprocess.run(
-            ["git", "clone", "--depth", "1", clone_url, sandbox_dir],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        subprocess.run(["git", "clone", "--depth", "1", clone_url, sandbox_dir], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Checkout new branch
-        subprocess.run(
-            ["git", "checkout", "-b", branch_name],
-            cwd=sandbox_dir,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        subprocess.run(["git", "checkout", "-b", branch_name], cwd=sandbox_dir, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Sandbox verification & modification
         fix_doc_path = os.path.join(sandbox_dir, "GOSSIPMESH_FIX.md")
@@ -287,32 +251,18 @@ def run_auto_fix(job: Dict[str, Any]) -> Dict[str, Any]:
         )
         subprocess.run(["git", "commit", "-m", commit_msg], cwd=sandbox_dir, check=True)
 
-        push_res = subprocess.run(
-            ["git", "push", "-u", "origin", branch_name, "--force"], cwd=sandbox_dir, capture_output=True, text=True
-        )
+        push_res = subprocess.run(["git", "push", "-u", "origin", branch_name, "--force"], cwd=sandbox_dir, capture_output=True, text=True)
         if push_res.returncode == 0:
             logger.info("Pushed fix branch %s as author %s <%s>", branch_name, git_author_name, git_author_email)
             # Create Pull Request
-            pr_res = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "create",
-                    "--repo",
-                    repo,
-                    "--head",
-                    branch_name,
-                    "--base",
-                    "main",
-                    "--title",
-                    f"fix: autonomous remediation for #{issue_number}",
-                    "--body",
-                    f"Closes #{issue_number}\n\n### Autonomous Remediation\n{spec_result.get('content')}\n\n*Authored by @Aditya-9-6 | Verified by GossipMesh Sandbox Self-Healing Loop.*",
-                ],
-                cwd=sandbox_dir,
-                capture_output=True,
-                text=True,
-            )
+            pr_res = subprocess.run([
+                "gh", "pr", "create",
+                "--repo", repo,
+                "--head", branch_name,
+                "--base", "main",
+                "--title", f"fix: autonomous remediation for #{issue_number}",
+                "--body", f"Closes #{issue_number}\n\n### Autonomous Remediation\n{spec_result.get('content')}\n\n*Authored by @Aditya-9-6 | Verified by GossipMesh Sandbox Self-Healing Loop.*"
+            ], cwd=sandbox_dir, capture_output=True, text=True)
             if pr_res.returncode == 0:
                 pr_url = pr_res.stdout.strip()
                 logger.info("Successfully created Pull Request: %s", pr_url)
@@ -321,20 +271,19 @@ def run_auto_fix(job: Dict[str, Any]) -> Dict[str, Any]:
                 auto_merge = os.getenv("AUTO_MERGE_FIXES", "true").lower() == "true" or job.get("auto_merge", False)
                 if auto_merge and pr_url:
                     try:
-                        merge_res = subprocess.run(
-                            ["gh", "pr", "merge", pr_url, "--merge", "--auto"], capture_output=True, text=True
-                        )
+                        merge_res = subprocess.run([
+                            "gh", "pr", "merge", pr_url,
+                            "--merge",
+                            "--auto"
+                        ], capture_output=True, text=True)
                         if merge_res.returncode != 0:
                             # Try direct merge if auto-merge requires branch protection
-                            merge_res = subprocess.run(
-                                ["gh", "pr", "merge", pr_url, "--admin", "--merge"], capture_output=True, text=True
-                            )
+                            merge_res = subprocess.run([
+                                "gh", "pr", "merge", pr_url,
+                                "--admin", "--merge"
+                            ], capture_output=True, text=True)
                         if merge_res.returncode == 0:
-                            logger.info(
-                                "Auto-merged PR %s into main – contribution table credited to %s!",
-                                pr_url,
-                                git_author_email,
-                            )
+                            logger.info("Auto-merged PR %s into main – contribution table credited to %s!", pr_url, git_author_email)
                         else:
                             logger.debug("PR merge deferred or in queue: %s", merge_res.stderr.strip())
                     except Exception as e:
@@ -354,5 +303,5 @@ def run_auto_fix(job: Dict[str, Any]) -> Dict[str, Any]:
         "pr_url": pr_url,
         "branch": branch_name,
         "spec": spec_result.get("content"),
-        "patch": patch_result.get("content"),
+        "patch": patch_result.get("content")
     }
