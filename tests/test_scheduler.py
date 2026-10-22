@@ -30,7 +30,9 @@ def db_session():
     session = Session()
     try:
         org = Organization(id=1, name="Sched Org")
-        repo = Repository(id=1, organization_id=1, github_id=888, name="sched-repo", full_name="org/sched-repo", default_branch="main")
+        repo = Repository(
+            id=1, organization_id=1, github_id=888, name="sched-repo", full_name="org/sched-repo", default_branch="main"
+        )
         session.add_all([org, repo])
         session.commit()
         yield session
@@ -137,9 +139,7 @@ def test_graceful_shutdown(db_session):
 
     # New review enqueue should be rejected
     with pytest.raises(RuntimeError) as exc:
-        WorkflowScheduler.enqueue_review(
-            db=db_session, repository_id=1, organization_id=1, pr_number=300
-        )
+        WorkflowScheduler.enqueue_review(db=db_session, repository_id=1, organization_id=1, pr_number=300)
     assert "Scheduler is shutting down" in str(exc.value)
 
     # Dispatch returns None
