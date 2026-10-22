@@ -39,7 +39,7 @@ class SAMLAdapter:
 </samlp:AuthnRequest>"""
 
         # In a real implementation this might be deflated. Just base64 encoding for the adapter stub.
-        encoded_request = base64.b64encode(xml.encode("utf-8")).decode("utf-8")
+        encoded_request = base64.b64encode(xml.encode('utf-8')).decode('utf-8')
         params = {"SAMLRequest": encoded_request}
         return f"{self.sso_url}?{urllib.parse.urlencode(params)}"
 

@@ -5,7 +5,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 async def gossipmesh_exception_handler(request: Request, exc: GossipMeshException) -> JSONResponse:
     # Log the full exception with details, but be careful not to log sensitive details directly
     # from the request unless sanitized. For now, log the exception info.
@@ -21,7 +20,6 @@ async def gossipmesh_exception_handler(request: Request, exc: GossipMeshExceptio
             }
         },
     )
-
 
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # Log the full exception stack trace for debugging

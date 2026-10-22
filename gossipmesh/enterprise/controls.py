@@ -40,7 +40,6 @@ class SCIMProvisioner:
             return True
         return False
 
-
 class DataRetentionPolicy:
     """Enforces data retention policies."""
 

@@ -15,7 +15,6 @@ from gossipmesh.bridge import CrossRepoBridge
 from gossipmesh.oracle import PerformanceOracle
 from gossipmesh.auction import TaskAuctioneer
 
-
 class TestGossipMesh(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -32,7 +31,9 @@ class TestGossipMesh(unittest.TestCase):
         node_b.subscribe(GossipTopic.ANTI_PATTERNS, lambda msg: received_by_b.append(msg))
 
         msg = node_a.publish(
-            GossipTopic.ANTI_PATTERNS, {"rule": "Use atomic buckets, avoid mutex on hot path"}, repo="DevProxy"
+            GossipTopic.ANTI_PATTERNS,
+            {"rule": "Use atomic buckets, avoid mutex on hot path"},
+            repo="DevProxy"
         )
         self.assertIsNotNone(msg.message_id)
 
@@ -102,7 +103,7 @@ class TestGossipMesh(unittest.TestCase):
         weighted_engine = ByzantineConsensusEngine(
             quorum_threshold=0.66,
             min_score_threshold=80,
-            model_weights={"flash-3.8": 0.5, "pro-3.1": 2.0, "lite-3.1": 0.5},
+            model_weights={"flash-3.8": 0.5, "pro-3.1": 2.0, "lite-3.1": 0.5}
         )
         weighted_result = weighted_engine.evaluate(divided_votes)
         self.assertFalse(weighted_result.is_approved)
@@ -114,7 +115,9 @@ class TestGossipMesh(unittest.TestCase):
 
     def test_byzantine_consensus_zero_weight(self):
         engine = ByzantineConsensusEngine(
-            quorum_threshold=0.66, min_score_threshold=80, model_weights={"flash-3.8": 0.0, "pro-3.1": 0.0}
+            quorum_threshold=0.66,
+            min_score_threshold=80,
+            model_weights={"flash-3.8": 0.0, "pro-3.1": 0.0}
         )
 
         votes = [
@@ -130,7 +133,6 @@ class TestGossipMesh(unittest.TestCase):
 
     def test_node_sync_malformed_json_error_path(self):
         import json
-
         node = GossipNode("node_sync_error", mesh_dir=self.test_dir)
 
         # Write malformed JSON to the log file
@@ -138,12 +140,7 @@ class TestGossipMesh(unittest.TestCase):
             f.write("{invalid_json: 'missing_quotes'}\n")
 
         # Write valid JSON to the log file
-        valid_msg = {
-            "message_id": "valid_123",
-            "topic": GossipTopic.HEARTBEATS.value,
-            "origin_node": "other_node",
-            "payload": {},
-        }
+        valid_msg = {"message_id": "valid_123", "topic": GossipTopic.HEARTBEATS.value, "origin_node": "other_node", "payload": {}}
         with open(node.log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(valid_msg) + "\n")
 
@@ -156,10 +153,10 @@ class TestGossipMesh(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0].message_id, "valid_123")
 
+
     def test_node_cleanup_ledger(self):
         import time
         import json
-
         node = GossipNode("node_cleaner", mesh_dir=self.test_dir)
 
         # Publish two messages, one recent, one artificially expired
@@ -175,7 +172,7 @@ class TestGossipMesh(unittest.TestCase):
             for line in lines:
                 data = json.loads(line)
                 if data["message_id"] == msg1.message_id:
-                    data["timestamp"] = time.time() - (data.get("ttl", 10) * 3600 + 100)  # strictly expired
+                    data["timestamp"] = time.time() - (data.get("ttl", 10) * 3600 + 100) # strictly expired
                 f.write(json.dumps(data) + "\n")
 
         # Call cleanup
@@ -213,7 +210,7 @@ class TestGossipMesh(unittest.TestCase):
             name="TrafficMetric",
             version=1,
             fields={"latency_ms": "int64", "client_ip": "string", "is_tls": "bool"},
-            source_repo="DevProxy",
+            source_repo="DevProxy"
         )
         go_code = bridge.get_go_definitions()
         rust_code = bridge.get_rust_definitions()
@@ -240,7 +237,7 @@ class TestGossipMesh(unittest.TestCase):
         auctioneer = TaskAuctioneer()
         bids = auctioneer.generate_bids(
             task_title="feat(crypto): Add WireGuard MTU discovery with Kyber PQC handshake",
-            task_body="Implements post-quantum encryption for tunnels.",
+            task_body="Implements post-quantum encryption for tunnels."
         )
         winner = auctioneer.elect_winner(bids)
         self.assertIsNotNone(winner)
@@ -260,7 +257,6 @@ class TestGossipMesh(unittest.TestCase):
             with contextlib.redirect_stdout(f):
                 node.cleanup_ledger()
             self.assertIn("[test_node] Ledger cleanup error: Permission denied", f.getvalue())
-
 
 if __name__ == "__main__":
     unittest.main()

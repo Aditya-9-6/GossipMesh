@@ -6,39 +6,30 @@ from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
-from gossipmesh.models.repository import Repository, RepositoryPolicy
+from gossipmesh.models.repository import Repository
 from gossipmesh.models.audit import AuditEvent
 from typing import Literal
 from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 
-
 class OrganizationResponse(BaseModel):
     id: int
     name: str
 
-
 class OrganizationCreate(BaseModel):
     name: str
 
-
-from gossipmesh.models.organization import OrganizationRole
-
-
 class InvitationCreate(BaseModel):
     email: EmailStr
-    role: OrganizationRole = OrganizationRole.developer
-
+    role: Literal["admin", "member"] = "member"
 
 class RoleUpdate(BaseModel):
-    role: OrganizationRole
-
+    role: Literal["admin", "member"]
 
 class ProjectCreate(BaseModel):
     name: str
     description: str | None = None
-
 
 class RepositoryConnect(BaseModel):
     github_id: int
@@ -46,50 +37,31 @@ class RepositoryConnect(BaseModel):
     full_name: str
     default_branch: str = "main"
 
-
 def require_org_admin(org_id: int, db: Session, current_user: User):
-    if getattr(current_user, "is_superuser", False):
-        return None
-    user_org = (
-        db.query(UserOrganization)
-        .filter(
-            UserOrganization.organization_id == org_id,
-            UserOrganization.user_id == current_user.id,
-            UserOrganization.role.in_([OrganizationRole.organization_admin, OrganizationRole.owner]),
-            UserOrganization.is_suspended == False,
-        )
-        .first()
-    )
+    user_org = db.query(UserOrganization).filter(
+        UserOrganization.organization_id == org_id,
+        UserOrganization.user_id == current_user.id,
+        UserOrganization.role == "admin",
+        UserOrganization.is_suspended == False
+    ).first()
     if not user_org:
         raise HTTPException(status_code=403, detail="Not authorized to perform this action.")
     return user_org
 
-
-def require_org_member(org_id: int, db: Session, current_user: User):
-    if getattr(current_user, "is_superuser", False):
-        return None
-    user_org = (
-        db.query(UserOrganization)
-        .filter(
-            UserOrganization.organization_id == org_id,
-            UserOrganization.user_id == current_user.id,
-            UserOrganization.is_suspended == False,
-        )
-        .first()
-    )
-    if not user_org:
-        raise HTTPException(status_code=403, detail="Not authorized for this organization.")
-    return user_org
-
-
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
-    event = AuditEvent(action=action, actor_id=actor_id, organization_id=org_id, details=details)
+    event = AuditEvent(
+        action=action,
+        actor_id=actor_id,
+        organization_id=org_id,
+        details=details
+    )
     db.add(event)
-
 
 @router.post("/", response_model=OrganizationResponse)
 def create_organization(
-    org_in: OrganizationCreate, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
+    org_in: OrganizationCreate,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     # Check if org exists
     existing_org = db.query(Organization).filter(Organization.name == org_in.name).first()
@@ -101,7 +73,7 @@ def create_organization(
     db.commit()
     db.refresh(org)
 
-    user_org = UserOrganization(user_id=current_user.id, organization_id=org.id, role=OrganizationRole.owner)
+    user_org = UserOrganization(user_id=current_user.id, organization_id=org.id, role="admin")
     db.add(user_org)
 
     log_audit_event(db, "organization.created", current_user.id, org.id, {"name": org.name})
@@ -109,58 +81,58 @@ def create_organization(
     db.refresh(org)
     return org
 
-
 @router.get("/me", response_model=List[OrganizationResponse])
 def read_organizations_me(
-    current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
-    user_orgs = (
-        db.query(UserOrganization)
-        .options(joinedload(UserOrganization.organization))
-        .filter(UserOrganization.user_id == current_user.id)
-        .all()
-    )
-    return [org.organization for org in user_orgs if org.organization is not None]
-
+    return db.query(Organization).join(
+        UserOrganization, Organization.id == UserOrganization.organization_id
+    ).filter(
+        UserOrganization.user_id == current_user.id
+    ).all()
+    user_orgs = db.query(UserOrganization).options(
+        joinedload(UserOrganization.organization)
+    ).filter(UserOrganization.user_id == current_user.id).all()
+    return [org.organization for org in user_orgs]
 
 @router.post("/{org_id}/invitations")
 def create_invitation(
     org_id: int,
     invitation_in: InvitationCreate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
 
     token = secrets.token_urlsafe(32)
     invitation = OrganizationInvitation(
-        email=invitation_in.email, token=token, organization_id=org_id, role=invitation_in.role
+        email=invitation_in.email,
+        token=token,
+        organization_id=org_id,
+        role=invitation_in.role
     )
     db.add(invitation)
 
-    log_audit_event(
-        db, "invitation.created", current_user.id, org_id, {"email": invitation_in.email, "role": invitation_in.role}
-    )
+    log_audit_event(db, "invitation.created", current_user.id, org_id, {"email": invitation_in.email, "role": invitation_in.role})
     db.commit()
     return {"message": "Invitation created successfully", "token": token}
 
-
 @router.post("/invitations/{token}/accept")
 def accept_invitation(
-    token: str, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
+    token: str,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     invitation = db.query(OrganizationInvitation).filter(OrganizationInvitation.token == token).first()
     if not invitation:
         raise HTTPException(status_code=404, detail="Invitation not found or invalid.")
 
     # Check if user already in org
-    existing_member = (
-        db.query(UserOrganization)
-        .filter(
-            UserOrganization.organization_id == invitation.organization_id, UserOrganization.user_id == current_user.id
-        )
-        .first()
-    )
+    existing_member = db.query(UserOrganization).filter(
+        UserOrganization.organization_id == invitation.organization_id,
+        UserOrganization.user_id == current_user.id
+    ).first()
 
     if existing_member:
         db.delete(invitation)
@@ -168,7 +140,9 @@ def accept_invitation(
         return {"message": "User already a member of this organization."}
 
     user_org = UserOrganization(
-        user_id=current_user.id, organization_id=invitation.organization_id, role=invitation.role
+        user_id=current_user.id,
+        organization_id=invitation.organization_id,
+        role=invitation.role
     )
     db.add(user_org)
     db.delete(invitation)
@@ -177,22 +151,20 @@ def accept_invitation(
     db.commit()
     return {"message": "Invitation accepted."}
 
-
 @router.patch("/{org_id}/members/{user_id}/role")
 def assign_role(
     org_id: int,
     user_id: int,
     role_in: RoleUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
 
-    user_org = (
-        db.query(UserOrganization)
-        .filter(UserOrganization.organization_id == org_id, UserOrganization.user_id == user_id)
-        .first()
-    )
+    user_org = db.query(UserOrganization).filter(
+        UserOrganization.organization_id == org_id,
+        UserOrganization.user_id == user_id
+    ).first()
 
     if not user_org:
         raise HTTPException(status_code=404, detail="User not found in organization.")
@@ -202,17 +174,20 @@ def assign_role(
     db.commit()
     return {"message": "Role updated."}
 
-
 @router.post("/{org_id}/projects")
 def create_project(
     org_id: int,
     project_in: ProjectCreate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
 
-    project = Project(organization_id=org_id, name=project_in.name, description=project_in.description)
+    project = Project(
+        organization_id=org_id,
+        name=project_in.name,
+        description=project_in.description
+    )
     db.add(project)
 
     log_audit_event(db, "project.created", current_user.id, org_id, {"project_name": project_in.name})
@@ -220,25 +195,12 @@ def create_project(
     db.refresh(project)
     return {"id": project.id, "name": project.name, "description": project.description}
 
-
-@router.get("/{org_id}/projects")
-def list_projects(
-    org_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-) -> Any:
-    """Lists all projects belonging to the specified organization."""
-    require_org_member(org_id, db, current_user)
-    projects = db.query(Project).filter(Project.organization_id == org_id).all()
-    return [{"id": p.id, "name": p.name, "description": p.description} for p in projects]
-
-
 @router.post("/{org_id}/repositories")
 def connect_repository(
     org_id: int,
     repo_in: RepositoryConnect,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
 
@@ -252,64 +214,28 @@ def connect_repository(
         github_id=repo_in.github_id,
         name=repo_in.name,
         full_name=repo_in.full_name,
-        default_branch=repo_in.default_branch,
+        default_branch=repo_in.default_branch
     )
     db.add(repo)
-    db.flush()
-
-    # Automatically initialize default policy for the newly connected repository
-    policy = RepositoryPolicy(
-        repository_id=repo.id,
-        branch_protection_enabled=True,
-        auto_merge_enabled=False,
-        require_review_approval=True,
-        min_approvals=1,
-        allowed_target_branches=["main", "master"],
-        max_diff_lines=500,
-        scan_frequency_hours=24,
-        custom_rules={},
-    )
-    db.add(policy)
 
     log_audit_event(db, "repository.connected", current_user.id, org_id, {"repository_full_name": repo_in.full_name})
     db.commit()
     db.refresh(repo)
-    return {"id": repo.id, "name": repo.name, "full_name": repo.full_name, "default_branch": repo.default_branch}
-
-
-@router.get("/{org_id}/repositories")
-def list_repositories(
-    org_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-) -> Any:
-    """Lists all connected repositories belonging to the specified organization."""
-    require_org_member(org_id, db, current_user)
-    repos = db.query(Repository).filter(Repository.organization_id == org_id).all()
-    return [
-        {
-            "id": r.id,
-            "name": r.name,
-            "full_name": r.full_name,
-            "default_branch": r.default_branch,
-            "project_id": r.project_id,
-            "github_id": r.github_id,
-        }
-        for r in repos
-    ]
-
+    return {"id": repo.id, "name": repo.name, "full_name": repo.full_name}
 
 @router.delete("/{org_id}/members/{user_id}")
 def remove_member(
-    org_id: int, user_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
+    org_id: int,
+    user_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
 
-    user_org = (
-        db.query(UserOrganization)
-        .filter(UserOrganization.organization_id == org_id, UserOrganization.user_id == user_id)
-        .first()
-    )
+    user_org = db.query(UserOrganization).filter(
+        UserOrganization.organization_id == org_id,
+        UserOrganization.user_id == user_id
+    ).first()
 
     if not user_org:
         raise HTTPException(status_code=404, detail="User not found in organization.")
@@ -322,18 +248,19 @@ def remove_member(
     db.commit()
     return {"message": "Member removed."}
 
-
 @router.patch("/{org_id}/members/{user_id}/suspend")
 def suspend_member(
-    org_id: int, user_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
+    org_id: int,
+    user_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
 
-    user_org = (
-        db.query(UserOrganization)
-        .filter(UserOrganization.organization_id == org_id, UserOrganization.user_id == user_id)
-        .first()
-    )
+    user_org = db.query(UserOrganization).filter(
+        UserOrganization.organization_id == org_id,
+        UserOrganization.user_id == user_id
+    ).first()
 
     if not user_org:
         raise HTTPException(status_code=404, detail="User not found in organization.")
