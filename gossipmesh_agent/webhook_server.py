@@ -15,21 +15,20 @@ from pathlib import Path
 
 from flask import Flask, request, abort
 
-# Import internal utilities – the package lives in the repository root.
-# The repository root is added to ``sys.path`` by the Flask runner.
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from gossipmesh_agent import utils, ingestion
-from gossipmesh_agent.queue_worker import REDIS_URL, redis_client, JOB_QUEUE, HEARTBEAT_PREFIX, CANCEL_PREFIX
+from gossipmesh_agent.queue_worker import redis_client, JOB_QUEUE
 
 app = Flask(__name__)
 
-# Load optional .env for local development (Render supplies env vars via its UI)
 utils.load_dotenv()
 
-GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
+HEARTBEAT_PREFIX = "gossipmesh:job:heartbeat:"
+CANCEL_PREFIX = "gossipmesh:job:cancel:"
+GITHUB_SECRET = os.getenv("GITHUB_SECRET", "")
 
 
 @app.route("/cancel/<job_id>", methods=["POST"])
@@ -38,7 +37,6 @@ def cancel_job(job_id: str):
     Sets the Redis cancel flag for the given job id.
     Returns 200 if flag set, 404 if job not found in Redis.
     """
-    # Simple existence check – if a heartbeat exists we consider it active.
     key = f"{HEARTBEAT_PREFIX}{job_id}"
     if not redis_client.exists(key):
         return {"status": "not_found", "job_id": job_id}, 404
@@ -63,7 +61,6 @@ def verify_signature(headers: dict, payload: bytes) -> bool:
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    # Raw body for HMAC verification
     raw_body = request.get_data()
     if not verify_signature(request.headers, raw_body):
         utils.logger.warning("Invalid webhook signature")
@@ -75,16 +72,13 @@ def webhook():
 
     payload = request.get_json(silent=True) or {}
     job = ingestion.handle_github_event(event, payload)
-    # Attach a simple ID for tracing – we reuse the slug function.
     job_id = utils.slugify(json.dumps(job)[:80])
     job["id"] = job_id
-    # Push onto Redis list (LPUSH for ordering, BLPOP in worker reads from the tail)
     redis_client.rpush(JOB_QUEUE, json.dumps(job))
     utils.logger.info("Enqueued job %s of type %s", job_id, job.get("type"))
     return {"status": "queued", "job_id": job_id}, 202
 
 
 if __name__ == "__main__":
-    # Render expects the server to bind to $PORT, default to 8080 for local dev.
     port = int(os.getenv("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
