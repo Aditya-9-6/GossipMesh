@@ -75,7 +75,8 @@ def load_public_key(key_path: Optional[Path] = None):
     """Load and parse the RSA public key in PEM format."""
     target_path = key_path or _find_public_key_path()
     pem_data = target_path.read_bytes()
-    return serialization.load_pem_public_key(pem_data, backend=default_backend())
+    pub_key = serialization.load_pem_public_key(pem_data, backend=default_backend())
+    return pub_key
 
 
 def get_license_token(token: Optional[str] = None, token_path: Optional[Path] = None) -> str:
@@ -156,7 +157,6 @@ def verify_license(
 
     if required_bundle:
         req_b = required_bundle.lower().strip()
-        # Authorized if directly listed or if assigned in task map
         is_allowed = (req_b in allowed_bundles) or (req_b in task_map.values())
         if not is_allowed:
             raise BundleNotAuthorizedError(
@@ -189,7 +189,6 @@ def get_bundle_for_task(payload: Dict[str, Any], task: str, fallback_bundle: str
 
     allowed = payload.get("bundle_ids", [])
     if allowed:
-        # If fallback is in allowed list, use it
         if fallback_bundle.lower().strip() in [b.lower().strip() for b in allowed]:
             return fallback_bundle.lower().strip()
         return allowed[0].lower().strip()
