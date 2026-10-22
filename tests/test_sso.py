@@ -72,14 +72,14 @@ def test_sso_config_and_login(test_client: TestClient):
     response = test_client.post(
         f"{settings.API_V1_STR}/sso/{org.id}/acs", data={"SAMLResponse": "PHNhbWxwOlJlc3BvbnNlLi4u"}
     )
-    # Our adapter explicitly raises NotImplementedError to keep the boundary secure
-    assert response.status_code == 501
-    assert "TODO: Full SAML XML validation requires python3-saml" in response.json()["detail"]
+    # Since we use dummy response data, the validation will fail and return 400
+    assert response.status_code == 400
+    assert "Invalid SAML Response" in response.json()["detail"]
 
     # Test SAML Logout endpoint boundary
     response = test_client.get(f"{settings.API_V1_STR}/sso/{org.id}/logout", follow_redirects=False)
-    assert response.status_code == 501
-    assert "TODO: Full SAML SLO implementation" in response.json()["detail"]
+    assert response.status_code in [302, 303, 307]
+    assert "https://idp.example.com" in response.headers["location"]
 
     app.dependency_overrides.clear()
 
