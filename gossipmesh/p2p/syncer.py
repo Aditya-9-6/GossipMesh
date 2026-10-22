@@ -1,15 +1,16 @@
-"""P2P Mesh State Synchronization engine."""
-
-from typing import Dict, Any, Optional
-from gossipmesh.p2p.entropy import VectorClock
+from typing import Dict, List, Tuple, Optional
+from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class StateSyncer:
-    def __init__(self, node_id: str):
+class AntiEntropySyncer:
+    """Anti-entropy synchronization daemon coordinating peer sessions using entropy-driven selection."""
+
+    def __init__(self, node_id: str, window_size: int = 100):
         self.node_id = node_id
-        self.vector_clock = VectorClock(node_id)
+        self.entropy_evaluator = VectorClockEntropy(window_size=window_size)
 
-    def sync_state(self, peer_state: Dict[str, Any]) -> Dict[str, Any]:
-        peer_vc = peer_state.get("vector_clock", {})
-        self.vector_clock.merge(peer_vc)
-        return {"node_id": self.node_id, "vector_clock": self.vector_clock.to_dict(), "status": "synchronized"}
+    def select_sync_peers(
+        self, local_clock: Dict[str, int], active_peers: Dict[str, Dict[str, int]], limit: int = 3
+    ) -> List[Tuple[str, float]]:
+        """Selects the best peers to synchronize with based on vector clock entropy."""
+        return self.entropy_evaluator.select_best_peers(local_clock, active_peers, top_k=limit)
