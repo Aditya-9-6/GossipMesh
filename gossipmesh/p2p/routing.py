@@ -70,16 +70,27 @@ class ConcurrentSkipListRoutingTable:
         if not worst_node:
             return
 
+        # It's safer to just delete using the existing robust delete logic,
+        # but since we are already inside a lock, we must not call self.delete
+        # (which also acquires the lock) to avoid deadlock.
+        # However, the class uses threading.Lock(), not RLock, so calling delete() would deadlock.
+        # We will duplicate the logic of delete() here.
+        key = worst_node.key
         update = [None] * self.max_level
         curr = self.head
         for i in range(self.level - 1, -1, -1):
-            while curr.forward[i] and curr.forward[i] != worst_node:
+            while curr.forward[i] and curr.forward[i].key < key:
                 curr = curr.forward[i]
             update[i] = curr
 
-        for i in range(len(worst_node.forward)):
-            if i < len(update) and update[i] and update[i].forward[i] == worst_node:
-                update[i].forward[i] = worst_node.forward[i]
+        curr = curr.forward[0]
+        if not curr or curr.key != key:
+            return
+
+        for i in range(self.level):
+            if update[i].forward[i] != curr:
+                break
+            update[i].forward[i] = curr.forward[i]
 
         while self.level > 1 and self.head.forward[self.level - 1] is None:
             self.level -= 1

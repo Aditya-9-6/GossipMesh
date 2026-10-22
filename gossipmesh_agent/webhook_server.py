@@ -22,7 +22,7 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from gossipmesh_agent import utils, ingestion
-from gossipmesh_agent.queue_worker import REDIS_URL, redis_client, JOB_QUEUE
+from gossipmesh_agent.queue_worker import REDIS_URL, redis_client, JOB_QUEUE, HEARTBEAT_PREFIX, CANCEL_PREFIX
 
 app = Flask(__name__)
 
@@ -47,13 +47,13 @@ def verify_signature(headers: dict, payload: bytes) -> bool:
     """Validate the ``X-Hub-Signature-256`` header using the shared secret.
     Returns ``True`` if the signature matches or the secret is missing (fallback for
     local debugging)."""
-    if not GITHUB_SECRET:
+    if not os.getenv('GITHUB_WEBHOOK_SECRET'):
         return True
     signature = headers.get("X-Hub-Signature-256")
     if not signature:
         return False
     import hmac, hashlib
-    expected = "sha256=" + hmac.new(GITHUB_SECRET.encode(), payload, hashlib.sha256).hexdigest()
+    expected = "sha256=" + hmac.new(os.getenv('GITHUB_WEBHOOK_SECRET').encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 

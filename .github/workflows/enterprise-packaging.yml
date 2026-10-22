@@ -30,6 +30,10 @@ jobs:
     name: Enterprise Test Suite & Cryptographic Verification
     runs-on: ubuntu-latest
     steps:
+      - name: Set lower case owner name
+        run: |
+          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -56,6 +60,10 @@ jobs:
       matrix:
         bundle: [b01, b02, b03, b04, b05]
     steps:
+      - name: Set lower case owner name
+        run: |
+          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -69,12 +77,12 @@ jobs:
           file: ./Dockerfile
           build-args: |
             BUNDLE_ID=${{ matrix.bundle }}
-          tags: ghcr.io/${{ github.repository_owner }}/gossipmesh-reviewer:${{ matrix.bundle }}
+          tags: ghcr.io/${{ env.REPO_OWNER }}/gossipmesh-reviewer:${{ matrix.bundle }}
           load: true
 
       - name: Verify Container Execution
         run: |
-          docker run --rm ghcr.io/${{ github.repository_owner }}/gossipmesh-reviewer:${{ matrix.bundle }} --help
+          docker run --rm ghcr.io/${{ env.REPO_OWNER }}/gossipmesh-reviewer:${{ matrix.bundle }} --help
 
       - name: Log into GitHub Container Registry (GHCR)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -87,4 +95,4 @@ jobs:
       - name: Push Container to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/gossipmesh-reviewer:${{ matrix.bundle }}
+          docker push ghcr.io/${{ env.REPO_OWNER }}/gossipmesh-reviewer:${{ matrix.bundle }}
