@@ -39,6 +39,7 @@ class Repository(Base):
     organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
 
+
 class IndexState(Base):
     __tablename__ = "index_states"
 

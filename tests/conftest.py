@@ -14,8 +14,10 @@ sys.modules["fastavro"] = MagicMock()
 def mock_login(*args, **kwargs):
     return "https://idp.example.com/sso"
 
+
 def mock_logout(*args, **kwargs):
     return "https://idp.example.com/sls"
+
 
 mock_auth_instance = MagicMock()
 mock_auth_instance.login.side_effect = mock_login
@@ -33,6 +35,7 @@ os.environ["POSTGRES_PASSWORD"] = "testpass"
 os.environ["POSTGRES_HOST"] = "localhost"
 os.environ["POSTGRES_PORT"] = "5432"
 os.environ["POSTGRES_DB"] = "testdb"
+
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_env():
@@ -71,6 +74,7 @@ def setup_env():
     except ImportError:
         pass
 
+
 @pytest.fixture
 def test_client():
     """Provide a FastAPI TestClient."""
@@ -79,6 +83,7 @@ def test_client():
 
     with TestClient(app) as client:
         yield client
+
 
 @pytest.fixture
 def mock_db_session():
