@@ -30,10 +30,12 @@ from gossipmesh.core.config import settings
 from gossipmesh.core.logging import redact_sensitive_data
 
 # Global provider and tracer initialization
-_RESOURCE = Resource.create({
-    "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
-    "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
-})
+_RESOURCE = Resource.create(
+    {
+        "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
+        "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+    }
+)
 
 _PROVIDER: Optional[TracerProvider] = None
 _MEMORY_EXPORTER: Optional[InMemorySpanExporter] = None
@@ -55,7 +57,6 @@ def setup_tracer_provider(exporter: Optional[SpanExporter] = None) -> TracerProv
 
     trace.set_tracer_provider(_PROVIDER)
     return _PROVIDER
-
 
 
 def get_memory_exporter() -> InMemorySpanExporter:

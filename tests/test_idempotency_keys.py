@@ -77,16 +77,12 @@ def test_scope_mismatch_raises_conflict(db_session):
     payload = {"data": "test"}
 
     # Acquire under comments scope
-    IdempotencyEngine.acquire(
-        db=db_session, key=key, scope=IdempotencyScope.COMMENTS, payload=payload
-    )
+    IdempotencyEngine.acquire(db=db_session, key=key, scope=IdempotencyScope.COMMENTS, payload=payload)
     IdempotencyEngine.complete(db_session, key=key, response_body={"comment_id": 7})
 
     # Try to reuse under billing scope
     with pytest.raises(ConflictError) as exc:
-        IdempotencyEngine.acquire(
-            db=db_session, key=key, scope=IdempotencyScope.BILLING_USAGE, payload=payload
-        )
+        IdempotencyEngine.acquire(db=db_session, key=key, scope=IdempotencyScope.BILLING_USAGE, payload=payload)
     assert "different scope" in str(exc.value.message)
 
 
