@@ -2,6 +2,7 @@
 Unit Tests for Enterprise Packaging CLI Entry Point
 """
 
+import os
 import sys
 import subprocess
 import json
@@ -17,7 +18,7 @@ def test_license_file(tmp_path):
         customer_id="cli-test-corp",
         bundle_ids=["b04"],
         plan="1_year",
-        private_key_path=str(Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"),
+        private_key_path=os.environ["LICENSE_PRIVATE_KEY_PATH"],
     )
     lic_file = tmp_path / "license.jwt"
     lic_file.write_text(token, encoding="utf-8")
@@ -30,8 +31,6 @@ def test_packaging_cli_missing_license():
         sys.executable,
         "-m",
         "enterprise.packaging",
-        "--public-key-path",
-        str(Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem"),
         "--license-path",
         "nonexistent.jwt",
     ]
@@ -46,8 +45,6 @@ def test_packaging_cli_json_output(test_license_file, tmp_path):
         sys.executable,
         "-m",
         "enterprise.packaging",
-        "--public-key-path",
-        str(Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem"),
         "--license-path",
         str(test_license_file),
         "--repo-path",
