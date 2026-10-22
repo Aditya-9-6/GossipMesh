@@ -14,10 +14,13 @@ class RTOEstimator:
         else:
             alpha = 0.125
             beta = 0.25
-            self.rttvar = (1 - beta) * self.rttvar + beta * abs(self.srtt - rtt)
+            current_rttvar = self.rttvar if self.rttvar is not None else 0.0
+            self.rttvar = (1 - beta) * current_rttvar + beta * abs(self.srtt - rtt)
             self.srtt = (1 - alpha) * self.srtt + alpha * rtt
 
-        self.rto = self.srtt + max(0.01, 4.0 * (self.rttvar or 0.0))
+        rttvar_safe = self.rttvar if self.rttvar is not None else 0.0
+        srtt_safe = self.srtt if self.srtt is not None else self.rto
+        self.rto = srtt_safe + max(0.01, 4.0 * rttvar_safe)
 
     def get_rto(self) -> float:
         return self.rto

@@ -12,6 +12,8 @@ import json
 import os
 import sys
 from pathlib import Path
+import hmac
+import hashlib
 
 from flask import Flask, request, abort
 
@@ -28,6 +30,11 @@ app = Flask(__name__)
 
 # Load optional .env for local development (Render supplies env vars via its UI)
 utils.load_dotenv()
+
+HEARTBEAT_PREFIX = os.getenv("HEARTBEAT_PREFIX", "gossipmesh:heartbeat:")
+CANCEL_PREFIX = os.getenv("CANCEL_PREFIX", "gossipmesh:cancel:")
+GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET", "")
+
 
 @app.route("/cancel/<job_id>", methods=["POST"])
 def cancel_job(job_id: str):
@@ -52,7 +59,7 @@ def verify_signature(headers: dict, payload: bytes) -> bool:
     signature = headers.get("X-Hub-Signature-256")
     if not signature:
         return False
-    import hmac, hashlib
+
     expected = "sha256=" + hmac.new(GITHUB_SECRET.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 

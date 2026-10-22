@@ -65,9 +65,15 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = Path(env_path).read_bytes()
 
     if not pem_bytes:
-        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
-        if fallback.is_file():
-            pem_bytes = fallback.read_bytes()
+        for fallback in [
+            Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem",
+            Path("enterprise/test_private_key.pem"),
+            Path("../enterprise/test_private_key.pem"),
+            Path("../../enterprise/test_private_key.pem"),
+        ]:
+            if fallback.is_file():
+                pem_bytes = fallback.read_bytes()
+                break
 
     if not pem_bytes:
         raise ValueError(
