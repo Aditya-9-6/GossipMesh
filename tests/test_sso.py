@@ -1,4 +1,27 @@
 import unittest
+import sys
+from unittest.mock import MagicMock
+
+sys.modules["onelogin"] = MagicMock()
+sys.modules["onelogin.saml2"] = MagicMock()
+sys.modules["onelogin.saml2.auth"] = MagicMock()
+
+
+def mock_login(*args, **kwargs):
+    return "https://idp.example.com/sso"
+
+
+def mock_logout(*args, **kwargs):
+    return "https://idp.example.com/sls"
+
+
+mock_auth_instance = MagicMock()
+mock_auth_instance.login.side_effect = mock_login
+mock_auth_instance.logout.side_effect = mock_logout
+
+mock_auth_class = MagicMock(return_value=mock_auth_instance)
+sys.modules["onelogin.saml2.auth"].OneLogin_Saml2_Auth = mock_auth_class
+
 from fastapi.testclient import TestClient
 
 from gossipmesh.api.main import app

@@ -14,12 +14,9 @@ class RTOEstimator:
         else:
             alpha = 0.125
             beta = 0.25
-            assert self.rttvar is not None
-            assert self.srtt is not None
             self.rttvar = (1 - beta) * self.rttvar + beta * abs(self.srtt - rtt)
             self.srtt = (1 - alpha) * self.srtt + alpha * rtt
 
-        assert self.srtt is not None
         self.rto = self.srtt + max(0.01, 4.0 * (self.rttvar or 0.0))
 
     def get_rto(self) -> float:
