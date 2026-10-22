@@ -52,6 +52,8 @@ class SecurityFinding(BaseModel):
     side: str = "RIGHT"
     commit_sha: str = ""
     severity: str = "MEDIUM"
+    category: str = "SECURITY"
+    rule_id: Optional[str] = None
     message: str = ""
     evidence: Optional[str] = None
     evidence_structured: Optional[Evidence] = None
@@ -61,6 +63,7 @@ class SecurityFinding(BaseModel):
     fingerprint: str = ""
     remediation: Optional[Union[str, RemediationModel]] = ""
     source_scanner: str = ""
+    sources: List[str] = Field(default_factory=list)
     end_line: Optional[int] = None
     github_comment_id: Optional[str] = None
     usage: Optional[UsageSchema] = None
@@ -75,4 +78,5 @@ class ReviewResponse(BaseModel):
 
 
 class TestResult(BaseModel):
+    __test__ = False
     status: str

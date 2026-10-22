@@ -1,6 +1,7 @@
-from sqlalchemy import String, Boolean, Integer, ForeignKey, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from gossipmesh.models.base import Base
 
 
@@ -12,6 +13,8 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=True)  # made nullable because of github login
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    mfa_secret: Mapped[str | None] = mapped_column(String, nullable=True)
 
     organizations = relationship("UserOrganization", back_populates="user")
     github_credential = relationship("UserGitHubCredential", back_populates="user", uselist=False)
