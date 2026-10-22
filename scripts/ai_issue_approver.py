@@ -193,7 +193,6 @@ Instructions:
 """
     return prompt
 
-
 def handle_approved_issue(issue_number: str, workspace, score, rationale):
     print(f"[*] Approving Issue #{issue_number} and triggering PR Solution Agent...", flush=True)
     run_cmd(["gh", "issue", "edit", issue_number, "--add-label", "approved,auto-solve"], cwd=workspace)
@@ -217,10 +216,7 @@ def handle_approved_issue(issue_number: str, workspace, score, rationale):
     run_cmd(["gh", "workflow", "run", "ai-issue-solver.yml", "-f", f"issue_number={issue_number}"], cwd=workspace)
     return True
 
-
-def handle_needs_changes_issue(
-    issue_number: str, workspace, title, score, feedback, rationale, refined_title, refined_body
-):
+def handle_needs_changes_issue(issue_number: str, workspace, title, score, feedback, rationale, refined_title, refined_body):
     print(f"[*] Issue #{issue_number} requires refinement. Updating specification...", flush=True)
 
     # If the AI provided a refined body, update the issue directly!
@@ -259,7 +255,6 @@ def handle_needs_changes_issue(
     run_cmd(["gh", "issue", "comment", issue_number, "--body", comment], cwd=workspace)
     return True
 
-
 def handle_rejected_issue(issue_number: str, workspace, score, rationale):
     print(f"[*] Issue #{issue_number} rejected as unnecessary (Score: {score}/100). Closing...", flush=True)
     comment = f"""### 🛑 Architectural Gatekeeper: Issue Closed (Unnecessary / Not Planned)
@@ -276,7 +271,6 @@ def handle_rejected_issue(issue_number: str, workspace, score, rationale):
     run_cmd(["gh", "issue", "close", issue_number, "--reason", "not_planned"], cwd=workspace)
     run_cmd(["gh", "issue", "edit", issue_number, "--add-label", "rejected"], cwd=workspace)
     return True
-
 
 def evaluate_issue(issue_number: str, workspace: Path, force: bool = False):
     print(f"[*] AI Gatekeeper evaluating Issue #{issue_number} in {workspace}...", flush=True)
@@ -336,9 +330,7 @@ def evaluate_issue(issue_number: str, workspace: Path, force: bool = False):
 
     # Action 2: NEEDS CHANGES (Autonomous Collaborative Refinement)
     elif verdict == "NEEDS_CHANGES":
-        return handle_needs_changes_issue(
-            issue_number, workspace, title, score, feedback, rationale, refined_title, refined_body
-        )
+        return handle_needs_changes_issue(issue_number, workspace, title, score, feedback, rationale, refined_title, refined_body)
 
     # Action 3: REJECT / UNNECESSARY
     else:
