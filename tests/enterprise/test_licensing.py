@@ -22,7 +22,8 @@ from scripts.issue_license import issue_license, load_private_key
 @pytest.fixture
 def private_key():
     """Load test private key."""
-    return load_private_key("enterprise/test_private_key.pem")
+    key_path = Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"
+    return load_private_key(str(key_path))
 
 
 @pytest.fixture
@@ -32,13 +33,13 @@ def valid_license_token(private_key):
         customer_id="acme-defense-corp",
         bundle_ids=["b04"],
         plan="1_year",
-        private_key_path="enterprise/test_private_key.pem",
+        private_key_path=str(Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"),
     )
 
 
 def test_valid_offline_license_verification(valid_license_token):
     """Ensure a properly signed RSA-4096 license validates offline."""
-    payload = verify_license(token=valid_license_token, public_key_path=Path("enterprise/test_public_key.pem"), required_bundle="b04")
+    payload = verify_license(token=valid_license_token, public_key_path=Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem", required_bundle="b04")
     assert payload["sub"] == "acme-defense-corp"
     assert payload["tier"] == "Enterprise Air-Gapped"
     assert payload["plan"] == "1_year"
@@ -68,7 +69,7 @@ def test_expired_license_error(private_key):
     expired_token = jwt.encode(expired_payload, private_key, algorithm="RS256")
 
     with pytest.raises(LicenseExpiredError):
-        verify_license(token=expired_token, public_key_path=Path("enterprise/test_public_key.pem"))
+        verify_license(token=expired_token, public_key_path=Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem")
 
 
 def test_tampered_license_signature(valid_license_token):
@@ -77,14 +78,14 @@ def test_tampered_license_signature(valid_license_token):
     tampered_token = valid_license_token[:-6] + "XYZ123"
 
     with pytest.raises(LicenseInvalidError):
-        verify_license(token=tampered_token, public_key_path=Path("enterprise/test_public_key.pem"))
+        verify_license(token=tampered_token, public_key_path=Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem")
 
 
 def test_bundle_not_authorized_error(valid_license_token):
     """Ensure requesting a higher tier bundle not in license raises BundleNotAuthorizedError."""
     # License has b04, client requests b05
     with pytest.raises(BundleNotAuthorizedError, match="does not authorize bundle 'b05'"):
-        verify_license(token=valid_license_token, public_key_path=Path("enterprise/test_public_key.pem"), required_bundle="b05")
+        verify_license(token=valid_license_token, public_key_path=Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem", required_bundle="b05")
 
 
 def test_task_to_model_resolution():

@@ -17,7 +17,7 @@ def test_license_file(tmp_path):
         customer_id="cli-test-corp",
         bundle_ids=["b04"],
         plan="1_year",
-        private_key_path="enterprise/test_private_key.pem",
+        private_key_path=str(Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"),
     )
     lic_file = tmp_path / "license.jwt"
     lic_file.write_text(token, encoding="utf-8")
@@ -31,7 +31,7 @@ def test_packaging_cli_missing_license():
         "-m",
         "enterprise.packaging",
         "--public-key-path",
-        "enterprise/test_public_key.pem",
+        str(Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem"),
         "--license-path",
         "nonexistent.jwt",
     ]
@@ -47,7 +47,7 @@ def test_packaging_cli_json_output(test_license_file, tmp_path):
         "-m",
         "enterprise.packaging",
         "--public-key-path",
-        "enterprise/test_public_key.pem",
+        str(Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_public_key.pem"),
         "--license-path",
         str(test_license_file),
         "--repo-path",
