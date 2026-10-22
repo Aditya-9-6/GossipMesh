@@ -141,14 +141,21 @@ def verify_license(
             raw_token,
             public_key,
             algorithms=["RS256"],
-            options={"require": ["exp", "sub", "bundle_ids"]},
+            options={"verify_signature": True, "verify_exp": True},
         )
-    except jwt.ExpiredSignatureError as e:
+    except jwt.exceptions.ExpiredSignatureError as e:
         raise LicenseExpiredError(f"License has expired: {e}") from e
-    except jwt.InvalidSignatureError as e:
+    except jwt.exceptions.InvalidSignatureError as e:
         raise LicenseInvalidError(f"Cryptographic signature verification failed (tampered token): {e}") from e
-    except jwt.PyJWTError as e:
-        raise LicenseInvalidError(f"Invalid license token format: {e}") from e
+    except jwt.exceptions.PyJWTError as e:
+        if "expired" in str(e).lower():
+            raise LicenseExpiredError(f"License has expired: {e}") from e
+        raise LicenseInvalidError(f"Invalid license token format or signature: {e}") from e
+
+    # Verify required claims explicitly since PyJWT options requirement varies across versions
+    for claim in ["exp", "sub", "bundle_ids"]:
+        if claim not in payload:
+            raise LicenseInvalidError(f"Missing required claim: {claim}")
 
     # Validate authorized bundles
     allowed_bundles = [b.lower().strip() for b in payload.get("bundle_ids", [])]
