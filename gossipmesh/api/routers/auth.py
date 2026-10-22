@@ -197,8 +197,9 @@ def github_login(request: Request) -> Any:
     # store state in redis for 5 minutes
     redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", "")
     params = {
-        "client_id": settings.GITHUB_CLIENT_ID,
+        "client_id": client_id,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -215,14 +216,17 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", "")
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
+
     # Exchange code for token
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
             },
@@ -365,14 +369,16 @@ def github_refresh_token(
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
     refresh_token = decrypt_string(credential.encrypted_refresh_token)
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", "")
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
 
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
             },
@@ -406,7 +412,10 @@ def github_refresh_token(
 
 @router.get("/oidc/login")
 def oidc_login(request: Request) -> Any:
-    if not settings.OIDC_DISCOVERY_URL or not settings.OIDC_CLIENT_ID or not settings.OIDC_REDIRECT_URI:
+    oidc_discovery = getattr(settings, "OIDC_DISCOVERY_URL", None)
+    oidc_client_id = getattr(settings, "OIDC_CLIENT_ID", None)
+    oidc_redirect = getattr(settings, "OIDC_REDIRECT_URI", None)
+    if not oidc_discovery or not oidc_client_id or not oidc_redirect:
         raise HTTPException(status_code=500, detail="OIDC is not configured")
 
     state = str(uuid.uuid4())
@@ -420,7 +429,7 @@ def oidc_login(request: Request) -> Any:
 
     with httpx.Client() as client:
         try:
-            discovery_response = client.get(settings.OIDC_DISCOVERY_URL)
+            discovery_response = client.get(oidc_discovery)
             discovery_response.raise_for_status()
             discovery_data = discovery_response.json()
             auth_endpoint = discovery_data.get("authorization_endpoint")
@@ -428,9 +437,9 @@ def oidc_login(request: Request) -> Any:
             raise HTTPException(status_code=500, detail=f"Failed to fetch OIDC discovery document: {e}")
 
     params = {
-        "client_id": settings.OIDC_CLIENT_ID,
+        "client_id": oidc_client_id,
         "response_type": "code",
-        "redirect_uri": settings.OIDC_REDIRECT_URI,
+        "redirect_uri": oidc_redirect,
         "scope": "openid profile email",
         "state": state,
         "nonce": nonce,
@@ -444,12 +453,11 @@ def oidc_login(request: Request) -> Any:
 
 @router.get("/oidc/callback")
 def oidc_callback(request: Request, state: str, code: str, db: Session = Depends(deps.get_db)) -> Any:
-    if (
-        not settings.OIDC_DISCOVERY_URL
-        or not settings.OIDC_CLIENT_ID
-        or not settings.OIDC_CLIENT_SECRET
-        or not settings.OIDC_REDIRECT_URI
-    ):
+    oidc_discovery = getattr(settings, "OIDC_DISCOVERY_URL", None)
+    oidc_client_id = getattr(settings, "OIDC_CLIENT_ID", None)
+    oidc_client_secret = getattr(settings, "OIDC_CLIENT_SECRET", None)
+    oidc_redirect = getattr(settings, "OIDC_REDIRECT_URI", None)
+    if not oidc_discovery or not oidc_client_id or not oidc_client_secret or not oidc_redirect:
         raise HTTPException(status_code=500, detail="OIDC is not configured")
 
     redis_key = f"oidc_state:{state}"
@@ -464,7 +472,7 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
 
     with httpx.Client() as client:
         try:
-            discovery_response = client.get(settings.OIDC_DISCOVERY_URL)
+            discovery_response = client.get(oidc_discovery)
             discovery_response.raise_for_status()
             discovery_data = discovery_response.json()
             token_endpoint = discovery_data.get("token_endpoint")
@@ -478,9 +486,9 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
             data={
                 "grant_type": "authorization_code",
                 "code": code,
-                "redirect_uri": settings.OIDC_REDIRECT_URI,
-                "client_id": settings.OIDC_CLIENT_ID,
-                "client_secret": settings.OIDC_CLIENT_SECRET,
+                "redirect_uri": oidc_redirect,
+                "client_id": oidc_client_id,
+                "client_secret": oidc_client_secret,
                 "code_verifier": code_verifier,
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -503,7 +511,7 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
                 id_token,
                 signing_key.key,
                 algorithms=["RS256"],
-                audience=settings.OIDC_CLIENT_ID,
+                audience=oidc_client_id,
                 issuer=discovery_data.get("issuer"),
             )
         except Exception as e:

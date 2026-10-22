@@ -1,5 +1,5 @@
 from typing import Dict, List, Any
-from gossipmesh.p2p.entropy import VectorClockEntropy
+from gossipmesh.p2p.entropy import VectorClockEntropyTracker as VectorClockEntropy
 
 
 class PeerSyncer:
