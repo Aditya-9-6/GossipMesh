@@ -72,9 +72,8 @@ class WindowedHyperLogLog:
             self.timestamps[idx] = 0.0
 
     def decay(self, current_time: float) -> None:
-        with self._lock:
-            for i in range(self.num_registers):
-                self._decay_register(i, current_time)
+        for i in range(self.num_registers):
+            self._decay_register(i, current_time)
 
     def estimate(self, current_time: Optional[float] = None) -> float:
         t = current_time if current_time is not None else time.time()

@@ -1,0 +1,28 @@
+........................................................................ [ 22%]
+........................................................................ [ 45%]
+.......................................................s................ [ 67%]
+........................................................................ [ 90%]
+...............................                                          [100%]
+=============================== warnings summary ===============================
+../home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+gossipmesh/providers/gemini_adapter.py:5
+  /app/gossipmesh/providers/gemini_adapter.py:5: FutureWarning:
+
+  All support for the `google.generativeai` package has ended. It will no longer be receiving
+  updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+  See README for more details:
+
+  https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+    import google.generativeai as genai
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 5 durations ==============================
+6.65s call     tests/test_checkpointer.py::TestStateCheckpointer::test_snapshot_creation_performance
+1.10s call     tests/test_rate_limiter.py::test_rate_limiter_basic
+0.30s call     tests/p2p/test_cache.py::TestGossipMessageCache::test_ttl_expiration
+0.21s call     tests/enterprise/test_packaging_cli.py::test_packaging_cli_json_output
+0.20s call     tests/enterprise/test_packaging_cli.py::test_packaging_cli_missing_license

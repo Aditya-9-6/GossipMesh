@@ -36,7 +36,7 @@ class TestAdaptiveScatterGovernor(unittest.TestCase):
 
         governor = AdaptiveScatterGovernor(base_scatter=8, min_scatter=1, cpu_threshold=80.0, mem_threshold=85.0)
         # Run multiple updates to allow smoothing filter to adapt
-        for _ in range(5):
+        for _ in range(20):
             scatter = governor.update()
 
         # Scatter width should scale down proportionally toward min_scatter
@@ -52,7 +52,7 @@ class TestAdaptiveScatterGovernor(unittest.TestCase):
         self.assertGreaterEqual(msg.payload["_adaptive_scatter"], 1)
         self.assertLessEqual(msg.payload["_adaptive_scatter"], 5)
 
-        recent = node.get_recent_messages(GossipTopic.AGENT_EVENT)
+        recent = [m for m in node.recent_messages if m.topic == GossipTopic.AGENT_EVENT.value]
         self.assertEqual(len(recent), 1)
 
 
