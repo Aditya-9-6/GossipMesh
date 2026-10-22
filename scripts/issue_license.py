@@ -47,12 +47,19 @@ def load_private_key(key_input: Optional[str] = None):
     """
     pem_bytes = None
 
+    search_paths = []
     if key_input:
-        p = Path(key_input)
-        if p.is_file():
-            pem_bytes = p.read_bytes()
-        elif "BEGIN" in key_input:
-            pem_bytes = key_input.encode("utf-8")
+        search_paths.append(Path(key_input))
+
+    env_path = os.getenv("LICENSE_PRIVATE_KEY_PATH")
+    if env_path:
+        search_paths.append(Path(env_path))
+
+    search_paths.append(Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem")
+    search_paths.append(Path("enterprise/test_private_key.pem"))
+
+    if key_input and "BEGIN" in key_input:
+        pem_bytes = key_input.encode("utf-8")
 
     if not pem_bytes:
         env_raw = os.getenv("LICENSE_PRIVATE_KEY")
@@ -60,14 +67,10 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = env_raw.encode("utf-8")
 
     if not pem_bytes:
-        env_path = os.getenv("LICENSE_PRIVATE_KEY_PATH")
-        if env_path and Path(env_path).is_file():
-            pem_bytes = Path(env_path).read_bytes()
-
-    if not pem_bytes:
-        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
-        if fallback.is_file():
-            pem_bytes = fallback.read_bytes()
+        for p in search_paths:
+            if p.is_file():
+                pem_bytes = p.read_bytes()
+                break
 
     if not pem_bytes:
         raise ValueError(
