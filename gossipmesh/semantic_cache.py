@@ -1,9 +1,12 @@
 import json
+import logging
 import math
 import re
 from pathlib import Path
 from collections import Counter
 import hashlib
+
+logger = logging.getLogger(__name__)
 
 
 class SemanticCache:
@@ -18,15 +21,16 @@ class SemanticCache:
         if self.metadata_file.exists():
             try:
                 return json.loads(self.metadata_file.read_text(encoding="utf-8"))
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to load cache metadata: {e}")
                 return {}
         return {}
 
     def _save_metadata(self):
         try:
             self.metadata_file.write_text(json.dumps(self.metadata), encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to save cache metadata: {e}")
 
     def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         if not vec1 or not vec2:
@@ -52,8 +56,8 @@ class SemanticCache:
 
             db = VectorDB()
             query_embedding = db.get_embedding(key_text)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to get query embedding: {e}")
 
         if not query_embedding:
             # Fallback to exact match if embedding generation fails
@@ -82,12 +86,13 @@ class SemanticCache:
                         best_match = cache_key
 
         if best_match:
-            print(f"[*] Semantic cache hit! Similarity score: {best_score:.2f}")
+            logger.info(f"Semantic cache hit! Similarity score: {best_score:.2f}")
             cache_file = self.cache_dir / f"{best_match}.json"
             if cache_file.exists():
                 try:
                     return json.loads(cache_file.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Failed to read cache file: {e}")
                     return None
 
         return None
@@ -106,12 +111,12 @@ class SemanticCache:
 
             db = VectorDB()
             embedding = db.get_embedding(key_text)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to get embedding for put: {e}")
 
         try:
             cache_file.write_text(json.dumps(value), encoding="utf-8")
             self.metadata[cache_key] = {"key_text": key_text, "embedding": embedding}
             self._save_metadata()
         except Exception as e:
-            print(f"[Warning] Failed to write cache: {e}")
+            logger.warning(f"Failed to write cache: {e}")
