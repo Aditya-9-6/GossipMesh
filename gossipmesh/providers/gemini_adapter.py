@@ -1,10 +1,6 @@
 from typing import AsyncGenerator
 import time
-
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
+import google.generativeai as genai
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
@@ -13,8 +9,12 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
-        if genai is not None:
-            genai.configure(api_key=self.api_key)
+        # Avoid global state by passing the api_key implicitly via client instances or config overrides
+        # Due to google-generativeai SDK limitations, managing multi-tenant keys perfectly without genai.configure
+        # requires passing the client explicitly or instantiating a raw HTTPX client.
+        # For this milestone, we use the supported client initialization method.
+        # Note: The legacy SDK uses global config, the new `google.genai` SDK allows proper client injection.
+        genai.configure(api_key=self.api_key)
 
     @property
     def provider_name(self) -> str:
@@ -28,8 +28,8 @@ class GeminiProvider(BaseProvider):
         return converted
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        if genai is None:
-            raise RuntimeError("google-generativeai package is not installed")
+        time.time()
+
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -42,6 +42,8 @@ class GeminiProvider(BaseProvider):
             ),
             request_options={"timeout": request.timeout} if request.timeout else None,
         )
+
+        time.time()
 
         usage = Usage(
             prompt_tokens=self.count_tokens(" ".join([m.content for m in request.messages])),
@@ -58,9 +60,7 @@ class GeminiProvider(BaseProvider):
             raw_response={"prompt_feedback": str(response.prompt_feedback)},
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
-        if genai is None:
-            raise RuntimeError("google-generativeai package is not installed")
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -80,8 +80,6 @@ class GeminiProvider(BaseProvider):
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()
         try:
-            if genai is None:
-                return ProviderHealth(is_healthy=False, error="google-generativeai not installed")
             model = genai.GenerativeModel("gemini-1.5-flash")
             await model.generate_content_async("ping")
             latency = (time.time() - start_time) * 1000
@@ -90,8 +88,6 @@ class GeminiProvider(BaseProvider):
             return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
-        if genai is None:
-            return int(len(text.split()) * 1.3)
         model = genai.GenerativeModel("gemini-1.5-flash")
         try:
             return model.count_tokens(text).total_tokens

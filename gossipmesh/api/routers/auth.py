@@ -17,11 +17,19 @@ from gossipmesh.api import deps
 from gossipmesh.core.config import settings
 from gossipmesh.core.security import (
     verify_password,
+    get_password_hash,
     create_access_token,
     create_refresh_token,
     encrypt_string,
     decrypt_string,
 )
+from gossipmesh.auth.password import (
+    validate_password_strength,
+    invalidate_user_sessions,
+    create_password_reset_token,
+    verify_and_consume_reset_token,
+)
+from gossipmesh.auth.throttle import login_throttler
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 from gossipmesh.models.user import User
 from gossipmesh.models.session import UserSession, RefreshToken
@@ -29,7 +37,7 @@ from gossipmesh.models.user import UserGitHubCredential
 from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.db.redis import redis_client
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 import base64
 import hashlib
 import jwt
@@ -48,11 +56,31 @@ class Token(BaseModel):
 def login_access_token(
     request: Request, db: Session = Depends(deps.get_db), form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
+    # Check lockout before verifying credentials
+    is_locked, remaining = login_throttler.check_lockout(form_data.username)
+    if is_locked:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Account temporarily locked due to excessive failed login attempts. Please try again in {remaining} seconds."
+        )
+
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not user.hashed_password or not verify_password(form_data.password, user.hashed_password):
+        is_now_locked, remaining, delay = login_throttler.record_failure(form_data.username)
+        if delay > 0:
+            import time
+            time.sleep(delay)
+        if is_now_locked:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Account temporarily locked due to excessive failed login attempts. Please try again in {remaining} seconds."
+            )
         raise AuthenticationError(message="Incorrect email or password")
     elif not user.is_active:
         raise AuthorizationError(message="Inactive user")
+
+    # Successful login: reset throttling counters
+    login_throttler.record_success(form_data.username)
 
     # Create session
     ip_address = request.client.host if request.client else None
@@ -581,3 +609,83 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
             "access_token": create_access_token(user.id, expires_delta=access_token_expires),
             "token_type": "bearer",
         }
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/password/change")
+def change_password(
+    body: PasswordChangeRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """Changes user password, verifies current password, validates strength, and invalidates all active sessions."""
+    if not current_user.hashed_password or not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect current password.")
+
+    is_valid, err_msg = validate_password_strength(body.new_password, current_user.email)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=err_msg)
+
+    current_user.hashed_password = get_password_hash(body.new_password)
+    invalidate_user_sessions(db, current_user.id)
+
+    event = AuditEvent(action="password.changed", actor_id=current_user.id, organization_id=None, details={"user_id": current_user.id})
+    db.add(event)
+    db.commit()
+    return {"message": "Password changed successfully. All previous sessions have been invalidated."}
+
+
+@router.post("/password/reset-request")
+def request_password_reset(
+    body: PasswordResetRequest,
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """Requests a secure, single-use password reset token."""
+    user = db.query(User).filter(User.email == body.email, User.is_active == True).first()
+    if not user:
+        return {"message": "If an active account with that email exists, a reset token has been generated."}
+
+    token = create_password_reset_token(db, user)
+    event = AuditEvent(action="password.reset_requested", actor_id=user.id, organization_id=None, details={"email": user.email})
+    db.add(event)
+    db.commit()
+    return {"message": "Password reset token generated.", "reset_token": token}
+
+
+@router.post("/password/reset-confirm")
+def confirm_password_reset(
+    body: PasswordResetConfirm,
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """Confirms password reset using secure token and invalidates all active sessions."""
+    user = verify_and_consume_reset_token(db, body.token)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired password reset token.")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Inactive user account.")
+
+    is_valid, err_msg = validate_password_strength(body.new_password, user.email)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=err_msg)
+
+    user.hashed_password = get_password_hash(body.new_password)
+    invalidate_user_sessions(db, user.id)
+
+    event = AuditEvent(action="password.reset_completed", actor_id=user.id, organization_id=None, details={"user_id": user.id})
+    db.add(event)
+    db.commit()
+    return {"message": "Password has been reset successfully. All previous sessions have been invalidated."}
