@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from gossipmesh.core.config import settings
 import os
 
-if os.environ.get("ENVIRONMENT") == "test" or not str(settings.DATABASE_URI):
+if os.environ.get("ENVIRONMENT") == "test":
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -26,15 +26,9 @@ if os.environ.get("ENVIRONMENT") == "test" or not str(settings.DATABASE_URI):
 
     Base.metadata.create_all(bind=engine)
 else:
-    try:
-        engine = create_engine(
-            str(settings.DATABASE_URI),
-            pool_pre_ping=True,
-        )
-    except Exception:
-        engine = create_engine(
-            "sqlite:///:memory:",
-            connect_args={"check_same_thread": False},
-        )
+    engine = create_engine(
+        str(settings.DATABASE_URI),
+        pool_pre_ping=True,
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

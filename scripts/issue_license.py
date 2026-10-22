@@ -51,11 +51,6 @@ def load_private_key(key_input: Optional[str] = None):
         p = Path(key_input)
         if p.is_file():
             pem_bytes = p.read_bytes()
-        elif not p.is_file() and not ("BEGIN" in key_input):
-            # Try relative to workspace root
-            root_p = Path(__file__).resolve().parent.parent / key_input
-            if root_p.is_file():
-                pem_bytes = root_p.read_bytes()
         elif "BEGIN" in key_input:
             pem_bytes = key_input.encode("utf-8")
 
