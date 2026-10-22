@@ -169,14 +169,12 @@ class WeightedPriorityQueue:
 
     def _schedule_next_locked(self) -> Optional[PrioritizedMessage]:
         """Weighted selection logic to draw from buckets fairly."""
-        # 1. Critical control plane messages always take precedence if present
         ctrl_bucket = self._levels[MessagePriority.CONTROL.value]
         if ctrl_bucket:
             self._total_size -= 1
             self._total_dequeued += 1
             return ctrl_bucket.popleft()
 
-        # 2. Weighted round-robin across remaining levels (HIGH, NORMAL, LOW)
         for level in [
             MessagePriority.HIGH.value,
             MessagePriority.NORMAL.value,
@@ -194,7 +192,6 @@ class WeightedPriorityQueue:
                 self._total_dequeued += 1
                 return bucket.popleft()
 
-        # Fallback to any non-empty bucket
         for bucket in self._levels.values():
             if bucket:
                 self._total_size -= 1
@@ -204,12 +201,10 @@ class WeightedPriorityQueue:
         return None
 
     def _apply_aging_locked(self, timestamp: float) -> int:
-        """Promotes messages whose wait duration exceeds aging_interval_sec."""
         interval = self.config.aging_interval_sec
         promotions_count = 0
         newly_promoted: Dict[int, collections.deque] = {p.value: collections.deque() for p in MessagePriority}
 
-        # Iterate from LOW down to HIGH, promoting upwards
         for level in [
             MessagePriority.LOW.value,
             MessagePriority.NORMAL.value,
@@ -219,13 +214,12 @@ class WeightedPriorityQueue:
             if not bucket:
                 continue
 
-            retained = collections.deque()
+            retained: collections.deque = collections.deque()
             target_level = level - 1
 
             while bucket:
                 msg = bucket.popleft()
                 wait_time = timestamp - msg.created_at
-                # If waited longer than aging interval, promote to next higher level
                 if wait_time >= interval and target_level >= 0:
                     msg.effective_priority = target_level
                     msg.promotions += 1
@@ -237,7 +231,6 @@ class WeightedPriorityQueue:
 
             self._levels[level] = retained
 
-        # Merge newly promoted messages into target buckets
         for lvl, promoted_deque in newly_promoted.items():
             if promoted_deque:
                 self._levels[lvl].extend(promoted_deque)
