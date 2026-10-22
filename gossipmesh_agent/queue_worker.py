@@ -18,19 +18,15 @@ JOB_QUEUE = "gossipmesh:jobs"
 CANCEL_PREFIX = "gossipmesh:cancel:"
 HEARTBEAT_PREFIX = "gossipmesh:heartbeat:"
 
-
 def _is_cancelled(job_id: str) -> bool:
     return redis_client.get(f"{CANCEL_PREFIX}{job_id}") == b"true"
-
 
 def _mark_started(job_id: str) -> None:
     redis_client.setex(f"{HEARTBEAT_PREFIX}{job_id}", 300, "alive")
 
-
 def _clear_job_state(job_id: str) -> None:
     redis_client.delete(f"{CANCEL_PREFIX}{job_id}")
     redis_client.delete(f"{HEARTBEAT_PREFIX}{job_id}")
-
 
 def start_worker() -> None:
     """Continuously poll Redis for new jobs and process them.
@@ -66,19 +62,13 @@ def start_worker() -> None:
             logger.exception("Job %s crashed with error: %s", job_id, exc)
             # Automatic credit refund on unexpected crash
             repo = job.get("repo")
-            task_type = (
-                "issue_scan"
-                if job.get("type") == "issue_opened"
-                else ("pr_review" if job.get("type") == "pr_opened" else "auto_fix")
-            )
+            task_type = "issue_scan" if job.get("type") == "issue_opened" else ("pr_review" if job.get("type") == "pr_opened" else "auto_fix")
             if repo:
                 from .credit_manager import release_credits
-
                 release_credits(repo, task_type)
                 logger.info("Automatically refunded credits for crashed job %s on %s", job_id, repo)
         finally:
             _clear_job_state(job_id)
-
 
 if __name__ == "__main__":
     start_worker()

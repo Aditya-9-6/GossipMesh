@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 import jwt
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 
 # Add workspace to path to import enterprise modules
@@ -45,17 +44,11 @@ def load_private_key(key_input: Optional[str] = None):
     2. LICENSE_PRIVATE_KEY environment variable (PEM string)
     3. LICENSE_PRIVATE_KEY_PATH environment variable (file path)
     4. enterprise/test_private_key.pem (local fallback for development)
-    5. Generates a temporary test private key if none exists (for test environments)
     """
     pem_bytes = None
 
     if key_input:
         p = Path(key_input)
-        if not p.is_absolute():
-            # Resolve relative to repo root or cwd
-            repo_root_p = Path(__file__).resolve().parent.parent / key_input
-            if repo_root_p.is_file():
-                p = repo_root_p
         if p.is_file():
             pem_bytes = p.read_bytes()
         elif "BEGIN" in key_input:
@@ -77,9 +70,10 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = fallback.read_bytes()
 
     if not pem_bytes:
-        # Generate a fallback private key dynamically if missing for test runs
-        priv_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
-        return priv_key
+        raise ValueError(
+            "RSA private key not provided. Specify --private-key <path>, set LICENSE_PRIVATE_KEY, "
+            "or set LICENSE_PRIVATE_KEY_PATH."
+        )
 
     return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
 
