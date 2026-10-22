@@ -119,7 +119,10 @@ class PermissionAwareRetriever:
         # 5. Defense-in-depth post-verification: Ensure no cross-tenant leakage
         safe_results = []
         for r in vector_results:
-            if str(r.get("organization_id")) == str(repo.organization_id) and int(r.get("repository_id", repo_id)) == repo_id:
+            if (
+                str(r.get("organization_id")) == str(repo.organization_id)
+                and int(r.get("repository_id", repo_id)) == repo_id
+            ):
                 safe_results.append(r)
 
         # 6. Graph expansion if architecture graph is available
@@ -131,14 +134,16 @@ class PermissionAwareRetriever:
                     deps = self.graph.get_dependencies(fp)
                     for dep in deps:
                         if dep not in seen_files:
-                            safe_results.append({
-                                "metadata": {"filepath": dep, "type": "dependency_expansion"},
-                                "filepath": dep,
-                                "content": f"# Expanded dependency {dep}",
-                                "score": round(res.get("score", 0.0) * 0.8, 4),
-                                "organization_id": str(repo.organization_id),
-                                "repository_id": repo_id,
-                            })
+                            safe_results.append(
+                                {
+                                    "metadata": {"filepath": dep, "type": "dependency_expansion"},
+                                    "filepath": dep,
+                                    "content": f"# Expanded dependency {dep}",
+                                    "score": round(res.get("score", 0.0) * 0.8, 4),
+                                    "organization_id": str(repo.organization_id),
+                                    "repository_id": repo_id,
+                                }
+                            )
                             seen_files.add(dep)
 
         return safe_results[: top_k * 2]

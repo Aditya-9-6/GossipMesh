@@ -33,16 +33,15 @@ def setup_env():
         pem_priv = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
         pem_pub = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
+            encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
 
-        with open(priv_key_path, 'wb') as f:
+        with open(priv_key_path, "wb") as f:
             f.write(pem_priv)
-        with open(pub_key_path, 'wb') as f:
+        with open(pub_key_path, "wb") as f:
             f.write(pem_pub)
 
         os.environ["LICENSE_PRIVATE_KEY_PATH"] = priv_key_path

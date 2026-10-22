@@ -20,9 +20,13 @@ def upgrade() -> None:
     with op.batch_alter_table("artifacts", schema=None) as batch_op:
         batch_op.add_column(sa.Column("organization_id", sa.Integer(), nullable=False, server_default="1"))
         batch_op.add_column(sa.Column("size_bytes", sa.Integer(), nullable=False, server_default="0"))
-        batch_op.add_column(sa.Column("content_type", sa.String(), nullable=False, server_default="application/octet-stream"))
+        batch_op.add_column(
+            sa.Column("content_type", sa.String(), nullable=False, server_default="application/octet-stream")
+        )
         batch_op.add_column(sa.Column("sha256_hash", sa.String(length=64), nullable=True))
-        batch_op.add_column(sa.Column("quarantine_status", sa.String(length=32), nullable=False, server_default="QUARANTINED"))
+        batch_op.add_column(
+            sa.Column("quarantine_status", sa.String(length=32), nullable=False, server_default="QUARANTINED")
+        )
         batch_op.add_column(sa.Column("scan_results", sa.JSON(), nullable=True))
         batch_op.add_column(sa.Column("retention_days", sa.Integer(), nullable=False, server_default="30"))
         batch_op.add_column(sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True))

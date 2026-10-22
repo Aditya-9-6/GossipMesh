@@ -116,9 +116,7 @@ class CustomerSupportTooling:
         wf.status = "pending"
 
         # Re-queue failed jobs
-        session.query(Job).filter(Job.workflow_id == workflow_id, Job.status == "failed").update(
-            {"status": "pending"}
-        )
+        session.query(Job).filter(Job.workflow_id == workflow_id, Job.status == "failed").update({"status": "pending"})
 
         audit = AuditEvent(
             action="support.workflow_retried",
