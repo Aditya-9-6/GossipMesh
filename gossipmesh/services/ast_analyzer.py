@@ -3,7 +3,7 @@ import logging
 import re
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Sequence
 
 import git
 import tree_sitter_rust
@@ -20,7 +20,7 @@ class AstAnalyzer:
 
     def _parse_diff(self, diff_text: str) -> Dict[str, List[int]]:
         """Parses a diff and returns a dict mapping filename to list of added/modified line numbers."""
-        modified_files = {}
+        modified_files: Dict[str, List[int]] = {}
         current_file = None
         current_line = 0
 

@@ -49,6 +49,11 @@ def load_private_key(key_input: Optional[str] = None):
 
     if key_input:
         p = Path(key_input)
+        if not p.is_absolute():
+            repo_root = Path(__file__).resolve().parent.parent
+            candidate = repo_root / p
+            if candidate.is_file():
+                p = candidate
         if p.is_file():
             pem_bytes = p.read_bytes()
         elif "BEGIN" in key_input:

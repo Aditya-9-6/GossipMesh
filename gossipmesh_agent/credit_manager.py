@@ -10,9 +10,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL)
 
 UNLIMITED_ACCOUNTS = [
-    acc.strip().lower()
-    for acc in os.getenv("UNLIMITED_ACCOUNTS", "Aditya-9-6").split(",")
-    if acc.strip()
+    acc.strip().lower() for acc in os.getenv("UNLIMITED_ACCOUNTS", "Aditya-9-6").split(",") if acc.strip()
 ]
 
 
@@ -77,13 +75,7 @@ def lock_credits(repo: str, task_type: Literal["issue_scan", "pr_review", "auto_
     end
     """
     try:
-        result = redis_client.eval(
-            lua, 1,
-            f"credits:{repo}",
-            "balance",
-            str(cost),
-            "1" if unlimited else "0"
-        )
+        result = redis_client.eval(lua, 1, f"credits:{repo}", "balance", str(cost), "1" if unlimited else "0")
         if result == 1:
             tier_str = " (Unlimited VIP Tier)" if unlimited else ""
             logger.info("Locked %d credits for %s%s – task %s", cost, repo, tier_str, task_type)

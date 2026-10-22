@@ -11,7 +11,7 @@ import enum
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Deque
 
 
 class MessagePriority(enum.IntEnum):
@@ -219,7 +219,7 @@ class WeightedPriorityQueue:
             if not bucket:
                 continue
 
-            retained = collections.deque()
+            retained: Deque[PrioritizedMessage] = collections.deque()
             target_level = level - 1
 
             while bucket:
