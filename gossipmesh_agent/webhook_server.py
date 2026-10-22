@@ -8,7 +8,7 @@ container host) and does not need any privileged Docker access. All heavy
 lifting is delegated to the worker processes.
 """
 
-json_mod = __import__("json")
+import json
 import os
 import sys
 from pathlib import Path
@@ -28,11 +28,6 @@ app = Flask(__name__)
 
 # Load optional .env for local development (Render supplies env vars via its UI)
 utils.load_dotenv()
-
-HEARTBEAT_PREFIX = os.getenv("HEARTBEAT_PREFIX", "gossipmesh:heartbeat:")
-CANCEL_PREFIX = os.getenv("CANCEL_PREFIX", "gossipmesh:cancel:")
-GITHUB_SECRET = os.getenv("GITHUB_SECRET", "")
-
 
 @app.route("/cancel/<job_id>", methods=["POST"])
 def cancel_job(job_id: str):
@@ -58,7 +53,6 @@ def verify_signature(headers: dict, payload: bytes) -> bool:
     if not signature:
         return False
     import hmac, hashlib
-
     expected = "sha256=" + hmac.new(GITHUB_SECRET.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
@@ -78,10 +72,10 @@ def webhook():
     payload = request.get_json(silent=True) or {}
     job = ingestion.handle_github_event(event, payload)
     # Attach a simple ID for tracing – we reuse the slug function.
-    job_id = utils.slugify(json_mod.dumps(job)[:80])
+    job_id = utils.slugify(json.dumps(job)[:80])
     job["id"] = job_id
     # Push onto Redis list (LPUSH for ordering, BLPOP in worker reads from the tail)
-    redis_client.rpush(JOB_QUEUE, json_mod.dumps(job))
+    redis_client.rpush(JOB_QUEUE, json.dumps(job))
     utils.logger.info("Enqueued job %s of type %s", job_id, job.get("type"))
     return {"status": "queued", "job_id": job_id}, 202
 
