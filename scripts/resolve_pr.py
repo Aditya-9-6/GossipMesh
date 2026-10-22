@@ -67,13 +67,7 @@ def sanitize_branch(branch_name: str) -> str:
     return head_sha
 
 
-def resolve_pr(pr_number: int, head_ref: str):
-    print(f"\n==========================================")
-    print(f"[*] Resolving PR #{pr_number} (Branch: {head_ref})")
-    print(f"==========================================")
-
-    local_branch = f"resolve-pr-{pr_number}"
-
+def fetch_and_prepare_branch(head_ref: str, local_branch: str):
     # Clean previous local branch if exists
     run_cmd(["git", "branch", "-D", local_branch], check=False)
 
@@ -89,6 +83,8 @@ def resolve_pr(pr_number: int, head_ref: str):
     print(f"[*] Checking out {local_branch}...")
     run_cmd(["git", "checkout", local_branch])
 
+
+def merge_main_and_resolve_conflicts(pr_number: int) -> bool:
     # Merge origin/main
     print(f"[*] Merging origin/main...")
     merge_res = subprocess.run(
@@ -140,19 +136,40 @@ def resolve_pr(pr_number: int, head_ref: str):
                 "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>",
             ]
         )
+    return True
 
-    # Push to origin
+
+def push_branch(local_branch: str, head_ref: str):
     print(f"[*] Pushing resolved branch to origin {head_ref}...")
     push_res = run_cmd(["git", "push", "origin", f"{local_branch}:{head_ref}"])
     print(f"[OK] Pushed: {push_res.stdout.strip()}")
 
-    # Verify mergeable status
+
+def check_pr_mergeable_status(pr_number: int) -> bool:
     view_res = run_cmd(["gh", "pr", "view", str(pr_number), "--json", "mergeable,title"])
     pr_data = json.loads(view_res.stdout)
     print(f"[STATUS] PR #{pr_number} mergeable: {pr_data.get('mergeable')}")
+    return pr_data.get("mergeable") == "MERGEABLE"
+
+
+def resolve_pr(pr_number: int, head_ref: str):
+    print(f"\n==========================================")
+    print(f"[*] Resolving PR #{pr_number} (Branch: {head_ref})")
+    print(f"==========================================")
+
+    local_branch = f"resolve-pr-{pr_number}"
+
+    fetch_and_prepare_branch(head_ref, local_branch)
+
+    if not merge_main_and_resolve_conflicts(pr_number):
+        return False
+
+    push_branch(local_branch, head_ref)
+
+    is_mergeable = check_pr_mergeable_status(pr_number)
 
     run_cmd(["git", "checkout", "main"])
-    return pr_data.get("mergeable") == "MERGEABLE"
+    return is_mergeable
 
 
 if __name__ == "__main__":
