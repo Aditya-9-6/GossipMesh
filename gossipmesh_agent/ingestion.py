@@ -6,6 +6,7 @@ from .utils import logger
 def _verify_signature(headers: Dict[str, str], payload: bytes, secret: str) -> bool:
     """Verify GitHub webhook HMAC signature (X-Hub-Signature-256)."""
     import hmac, hashlib
+
     digest = "sha256=" + hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(digest, headers.get("X-Hub-Signature-256", ""))
 
