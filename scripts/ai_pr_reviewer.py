@@ -22,7 +22,6 @@ import urllib.request
 import urllib.error
 import subprocess
 import time
-import hashlib
 import datetime
 from pathlib import Path
 
