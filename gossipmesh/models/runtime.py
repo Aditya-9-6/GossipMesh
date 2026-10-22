@@ -13,13 +13,13 @@ class Workflow(SoftDeleteMixin, Base):
     version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
     __mapper_args__ = {"version_id_col": version_id}
-    organization_id: Mapped[int] = mapped_column(
-        ForeignKey("organizations.id"), nullable=False, index=True
-    )
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         String, default="pending"
     )  # pending, running, completed, failed, cancelled, blocked
+    timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -39,9 +39,18 @@ class Job(SoftDeleteMixin, Base):
     __mapper_args__ = {"version_id_col": version_id}
     workflow_id: Mapped[int] = mapped_column(ForeignKey("workflows.id"), nullable=False)
     agent_name: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, default="pending")
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, running, completed, failed, cancelled
     state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Worker ownership, fencing lease tokens, and crash recovery (Task 63)
+    worker_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    lease_token: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
 
     workflow = relationship("Workflow", back_populates="jobs")
 
@@ -50,9 +59,7 @@ class Budget(SoftDeleteMixin, Base):
     __tablename__ = "budgets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    organization_id: Mapped[int] = mapped_column(
-        ForeignKey("organizations.id"), unique=True, nullable=False
-    )
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), unique=True, nullable=False)
     monthly_limit_usd: Mapped[float] = mapped_column(Float, default=100.0)
     current_spend_usd: Mapped[float] = mapped_column(Float, default=0.0)
 
@@ -63,9 +70,25 @@ class Artifact(SoftDeleteMixin, Base):
     __tablename__ = "artifacts"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False, index=True, server_default="1"
+    )
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     storage_path: Mapped[str] = mapped_column(String, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    content_type: Mapped[str] = mapped_column(
+        String, default="application/octet-stream", nullable=False, server_default="application/octet-stream"
+    )
+    sha256_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    quarantine_status: Mapped[str] = mapped_column(
+        String(32), default="QUARANTINED", nullable=False, server_default="QUARANTINED", index=True
+    )
+    scan_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    retention_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False, server_default="30")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    download_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    organization = relationship("Organization")
     job = relationship("Job")
