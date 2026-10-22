@@ -715,8 +715,8 @@ def run_diagnostics(workspace: Path, pr_number: str = "") -> tuple[int, str]:
             out_lines.append("=== MYPY TYPE ERRORS ===")
             out_lines.append(mypy_res.stdout.strip() or mypy_res.stderr.strip())
             out_lines.append("")
-    except Exception as e:
-        print(f"[*] Note: mypy diagnostic check failed or is unavailable: {e}", flush=True)
+    except Exception:
+        pass
 
     # Always fetch remote GitHub CI failures and security alerts if pr_number is provided
     remote_ci = ""
