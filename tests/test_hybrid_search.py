@@ -128,8 +128,18 @@ def test_context_budget_limit(db_session):
     large_content_1 = "A" * 500
     large_content_2 = "B" * 500
 
-    store.upsert("chunk-large-1", vector=[0.1] * 1536, metadata={"organization_id": "1", "repo_id": 10, "filepath": "a.py"}, content=large_content_1)
-    store.upsert("chunk-large-2", vector=[0.1] * 1536, metadata={"organization_id": "1", "repo_id": 10, "filepath": "b.py"}, content=large_content_2)
+    store.upsert(
+        "chunk-large-1",
+        vector=[0.1] * 1536,
+        metadata={"organization_id": "1", "repo_id": 10, "filepath": "a.py"},
+        content=large_content_1,
+    )
+    store.upsert(
+        "chunk-large-2",
+        vector=[0.1] * 1536,
+        metadata={"organization_id": "1", "repo_id": 10, "filepath": "b.py"},
+        content=large_content_2,
+    )
 
     engine = HybridSearchEngine(store)
 
@@ -152,8 +162,18 @@ def test_deterministic_ordering_tie_breaking(db_session):
     store = PGVectorStore(db_session)
     user = db_session.query(User).filter(User.id == 1).first()
 
-    store.upsert("chunk-z", vector=[0.5] * 1536, metadata={"organization_id": "1", "repo_id": 10, "filepath": "z_file.py", "chunk_index": 0}, content="equal match")
-    store.upsert("chunk-a", vector=[0.5] * 1536, metadata={"organization_id": "1", "repo_id": 10, "filepath": "a_file.py", "chunk_index": 0}, content="equal match")
+    store.upsert(
+        "chunk-z",
+        vector=[0.5] * 1536,
+        metadata={"organization_id": "1", "repo_id": 10, "filepath": "z_file.py", "chunk_index": 0},
+        content="equal match",
+    )
+    store.upsert(
+        "chunk-a",
+        vector=[0.5] * 1536,
+        metadata={"organization_id": "1", "repo_id": 10, "filepath": "a_file.py", "chunk_index": 0},
+        content="equal match",
+    )
 
     engine = HybridSearchEngine(store)
     results = engine.search(query="equal match", repo_id=10, user=user, db=db_session)

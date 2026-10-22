@@ -29,7 +29,10 @@ REDACTION_PATTERNS = [
     (re.compile(r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,255}"), "[REDACTED_GITHUB_TOKEN]"),
     (re.compile(r"Bearer\s+[A-Za-z0-9_\-\.]{20,}", re.IGNORECASE), "Bearer [REDACTED_TOKEN]"),
     (re.compile(r"-----BEGIN (?:[A-Z0-9_\- ]+)?PRIVATE KEY-----"), "[REDACTED_PRIVATE_KEY]"),
-    (re.compile(r"""(?:api_key|secret|password|token)\s*=\s*['"][^\n'"]{8,128}['"]""", re.IGNORECASE), "[REDACTED_SECRET_ASSIGNMENT]"),
+    (
+        re.compile(r"""(?:api_key|secret|password|token)\s*=\s*['"][^\n'"]{8,128}['"]""", re.IGNORECASE),
+        "[REDACTED_SECRET_ASSIGNMENT]",
+    ),
     (re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"), "[REDACTED_EMAIL]"),
 ]
 
@@ -72,6 +75,7 @@ class InMemoryCacheStore:
 
     def scan_iter(self, match: str) -> List[str]:
         import fnmatch
+
         pattern = match.replace("*", "*")
         return [k for k in list(self.store.keys()) if fnmatch.fnmatch(k, pattern)]
 
@@ -111,6 +115,7 @@ class SecureRedisCache:
         if target_url and not os.getenv("TESTING"):
             try:
                 import redis
+
                 client = redis.Redis.from_url(target_url, decode_responses=True)
                 client.ping()
                 self.client = client
