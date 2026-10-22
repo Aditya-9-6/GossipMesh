@@ -36,34 +36,30 @@ class DisasterRecoveryService:
             raise ValidationError(f"Organization ID {organization_id} not found")
 
         # 1. Members
-        members = session.execute(
-            select(UserOrganization).where(UserOrganization.organization_id == organization_id)
-        ).scalars().all()
+        members = (
+            session.execute(select(UserOrganization).where(UserOrganization.organization_id == organization_id))
+            .scalars()
+            .all()
+        )
 
         # 2. Projects
-        projects = session.execute(
-            select(Project).where(Project.organization_id == organization_id)
-        ).scalars().all()
+        projects = session.execute(select(Project).where(Project.organization_id == organization_id)).scalars().all()
 
         # 3. Repositories
-        repos = session.execute(
-            select(Repository).where(Repository.organization_id == organization_id)
-        ).scalars().all()
+        repos = session.execute(select(Repository).where(Repository.organization_id == organization_id)).scalars().all()
 
         # 4. Workflows
-        workflows = session.execute(
-            select(Workflow).where(Workflow.organization_id == organization_id)
-        ).scalars().all()
+        workflows = session.execute(select(Workflow).where(Workflow.organization_id == organization_id)).scalars().all()
 
         # 5. Audit Events
-        audit_events = session.execute(
-            select(AuditEvent).where(AuditEvent.organization_id == organization_id)
-        ).scalars().all()
+        audit_events = (
+            session.execute(select(AuditEvent).where(AuditEvent.organization_id == organization_id)).scalars().all()
+        )
 
         # 6. Usage Records
-        usage_records = session.execute(
-            select(UsageRecord).where(UsageRecord.organization_id == organization_id)
-        ).scalars().all()
+        usage_records = (
+            session.execute(select(UsageRecord).where(UsageRecord.organization_id == organization_id)).scalars().all()
+        )
 
         return {
             "organization": {
@@ -76,9 +72,7 @@ class DisasterRecoveryService:
                 for m in members
             ],
             "projects": [{"id": p.id, "name": p.name} for p in projects],
-            "repositories": [
-                {"id": r.id, "name": r.name, "github_id": r.github_id} for r in repos
-            ],
+            "repositories": [{"id": r.id, "name": r.name, "github_id": r.github_id} for r in repos],
             "workflows_count": len(workflows),
             "audit_events_count": len(audit_events),
             "usage_records_count": len(usage_records),
@@ -170,4 +164,3 @@ class DisasterRecoveryService:
         """Verifies cryptographic hash of backup snapshots before restore."""
         actual_hash = hashlib.sha256(data_bytes).hexdigest()
         return actual_hash.lower() == expected_sha256.lower()
-
