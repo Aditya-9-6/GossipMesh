@@ -70,12 +70,6 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = fallback.read_bytes()
 
     if not pem_bytes:
-        # Absolute path fallback relative to workspace root
-        workspace_fallback = Path(__file__).resolve().parents[1] / "enterprise" / "test_private_key.pem"
-        if workspace_fallback.is_file():
-            pem_bytes = workspace_fallback.read_bytes()
-
-    if not pem_bytes:
         raise ValueError(
             "RSA private key not provided. Specify --private-key <path>, set LICENSE_PRIVATE_KEY, "
             "or set LICENSE_PRIVATE_KEY_PATH."
