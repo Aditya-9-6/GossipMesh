@@ -31,9 +31,9 @@ class TestMemeticKnowledgeBase(unittest.TestCase):
             rule="Always do X.",
             anti_pattern="Doing Y instead of X.",
             correct_pattern="Do X.",
-            repo="global"
+            repo="global",
         )
-        self.kb.reward("meme_1", 2.0) # Ensure fitness is high enough
+        self.kb.reward("meme_1", 2.0)  # Ensure fitness is high enough
 
         self.kb.record_or_update(
             meme_id="meme_2",
@@ -41,7 +41,7 @@ class TestMemeticKnowledgeBase(unittest.TestCase):
             rule="Never do Z.",
             anti_pattern="Doing Z.",
             correct_pattern="Avoid Z.",
-            repo="test_repo"
+            repo="test_repo",
         )
         self.kb.reward("meme_2", 3.0)
 
@@ -71,7 +71,7 @@ class TestMemeticKnowledgeBase(unittest.TestCase):
             rule="Rule A",
             anti_pattern="Anti A",
             correct_pattern="Correct A",
-            repo="repo_a"
+            repo="repo_a",
         )
         self.kb.reward("meme_repo_a", 5.0)
 
@@ -81,7 +81,7 @@ class TestMemeticKnowledgeBase(unittest.TestCase):
             rule="Rule B",
             anti_pattern="Anti B",
             correct_pattern="Correct B",
-            repo="repo_b"
+            repo="repo_b",
         )
         self.kb.reward("meme_repo_b", 5.0)
 
@@ -91,7 +91,7 @@ class TestMemeticKnowledgeBase(unittest.TestCase):
             rule="Rule Global",
             anti_pattern="Anti Global",
             correct_pattern="Correct Global",
-            repo="global"
+            repo="global",
         )
         self.kb.reward("meme_global", 5.0)
 

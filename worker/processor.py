@@ -79,10 +79,13 @@ def process_pr_event(payload: bytes):
             print(f"[INFO] Processing PR #{pr_number} (action={action})")
             status = run_ai_reviewer(pr_number)
             if status:
-                print(f"[RESULT] PR #{pr_number} review completed: {status.get('verdict')} (score {status.get('score')})")
+                print(
+                    f"[RESULT] PR #{pr_number} review completed: {status.get('verdict')} (score {status.get('score')})"
+                )
                 if status.get("verdict") == "APPROVED" and status.get("score", 0) >= 90:
                     try:
                         from scripts.auto_merge_pr import auto_merge_pr
+
                         auto_merge_pr(str(pr_number), REPO_ROOT)
                     except Exception as e:
                         print(f"[WARN] Auto-merge failed for PR #{pr_number}: {e}")

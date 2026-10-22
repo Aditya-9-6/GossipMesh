@@ -14,6 +14,7 @@ class RTOEstimator:
         else:
             alpha = 0.125
             beta = 0.25
+            assert self.rttvar is not None
             self.rttvar = (1 - beta) * self.rttvar + beta * abs(self.srtt - rtt)
             self.srtt = (1 - alpha) * self.srtt + alpha * rtt
 
