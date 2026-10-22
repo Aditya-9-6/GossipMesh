@@ -64,11 +64,17 @@ def _spawn_worker() -> None:
 
     if USE_DOCKER:
         cmd = [
-            "docker", "run", "-d", "--rm",
-            "--name", f"gossipmesh_worker_{worker_id}",
-            "--network", "host",
-            "-e", f"REDIS_URL={REDIS_URL}",
-            "gossipmesh_worker:latest"
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "--name",
+            f"gossipmesh_worker_{worker_id}",
+            "--network",
+            "host",
+            "-e",
+            f"REDIS_URL={REDIS_URL}",
+            "gossipmesh_worker:latest",
         ]
         try:
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -79,9 +85,7 @@ def _spawn_worker() -> None:
 
     # Subprocess fallback
     subprocess.Popen(
-        [sys.executable, "-m", "gossipmesh_agent.queue_worker"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        [sys.executable, "-m", "gossipmesh_agent.queue_worker"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
     logger.info("Spawned local queue worker process %s", worker_id)
 
