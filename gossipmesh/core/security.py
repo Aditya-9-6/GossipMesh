@@ -1,34 +1,23 @@
 from datetime import datetime, timedelta, timezone
-import uuid
-from typing import Any
-import bcrypt
+from passlib.context import CryptContext
 from cryptography.fernet import Fernet
 import jwt
+from typing import Any
 
 from gossipmesh.core.config import settings
 
-fernet = Fernet(
-    settings.ENCRYPTION_KEY.encode() if isinstance(settings.ENCRYPTION_KEY, str) else settings.ENCRYPTION_KEY
-)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+fernet = Fernet(settings.ENCRYPTION_KEY.encode() if isinstance(settings.ENCRYPTION_KEY, str) else settings.ENCRYPTION_KEY)
 
-
-def verify_password(plain_password: str, hashed_password: str | None) -> bool:
-    if not plain_password or not hashed_password:
-        return False
-    try:
-        return bcrypt.checkpw(plain_password[:72].encode("utf-8"), hashed_password.encode("utf-8"))
-    except Exception:
-        return False
-
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    # Truncate at 72 bytes per bcrypt standard
-    return bcrypt.hashpw(password[:72].encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return pwd_context.hash(password)
 
+import uuid
 
-def create_access_token(
-    subject: str | Any, session_id: int | None = None, expires_delta: timedelta | None = None
-) -> str:
+def create_access_token(subject: str | Any, session_id: int | None = None, expires_delta: timedelta | None = None) -> str:
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
@@ -43,7 +32,7 @@ def create_access_token(
         "aud": settings.JWT_AUDIENCE,
         "sub": str(subject),
         "jti": str(uuid.uuid4()),
-        "type": "access",
+        "type": "access"
     }
     if session_id:
         to_encode["sid"] = str(session_id)
@@ -51,10 +40,7 @@ def create_access_token(
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-
-def create_refresh_token(
-    subject: str | Any, session_id: int | None = None, jti: str | None = None, expires_delta: timedelta | None = None
-) -> str:
+def create_refresh_token(subject: str | Any, session_id: int | None = None, jti: str | None = None, expires_delta: timedelta | None = None) -> str:
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
@@ -69,18 +55,16 @@ def create_refresh_token(
         "aud": settings.JWT_AUDIENCE,
         "sub": str(subject),
         "jti": jti or str(uuid.uuid4()),
-        "type": "refresh",
+        "type": "refresh"
     }
     if session_id:
         to_encode["sid"] = str(session_id)
 
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded_jwt if isinstance(encoded_jwt, str) else encoded_jwt.decode("utf-8")
-
+    return encoded_jwt if isinstance(encoded_jwt, str) else encoded_jwt.decode('utf-8')
 
 def encrypt_string(plain_text: str) -> str:
     return fernet.encrypt(plain_text.encode()).decode()
-
 
 def decrypt_string(encrypted_text: str) -> str:
     return fernet.decrypt(encrypted_text.encode()).decode()

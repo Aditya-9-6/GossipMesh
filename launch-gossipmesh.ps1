@@ -46,19 +46,12 @@ if ($keys.Count -gt 0) {
 }
 
 $env:PYTHONUNBUFFERED = "1"
-$env:PYTHONIOENCODING = "utf-8"
-$env:PYTHONUTF8 = "1"
-
-# Locate Python executable
-$pyBin = if (Test-Path "G:\My Drive\GossipMesh\.venv\Scripts\python.exe") { "G:\My Drive\GossipMesh\.venv\Scripts\python.exe" } else { "python" }
 
 # Continuous Loop with automatic recovery
-# Ensure repository root is on PYTHONPATH for module imports
-$env:PYTHONPATH = (Resolve-Path .).Path
 while ($true) {
     try {
         Write-Host "`n[*] Starting GossipMesh autonomous loop cycle..." -ForegroundColor Magenta
-        & $pyBin scripts/autonomous_loop.py --workspace . --interval 15
+        python scripts/autonomous_loop.py --workspace . --interval 15
     } catch {
         Write-Host "[!] Loop exited with error: $_" -ForegroundColor Red
     }
