@@ -14,14 +14,14 @@ def get_org_id_from_request(request: Request) -> Optional[int]:
         try:
             return int(org_id)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="Invalid organization_id format")
 
     org_id = request.query_params.get("organization_id")
     if org_id:
         try:
             return int(org_id)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="Invalid organization_id format")
 
     return None
 
