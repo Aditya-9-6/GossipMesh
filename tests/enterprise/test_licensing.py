@@ -22,14 +22,14 @@ from scripts.issue_license import issue_license, load_private_key
 @pytest.fixture
 def private_key():
     """Load test private key."""
-    key_path = Path(__file__).resolve().parents[2] / "enterprise" / "test_private_key.pem"
+    key_path = Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"
     return load_private_key(str(key_path))
 
 
 @pytest.fixture
 def valid_license_token(private_key):
     """Generate a valid 1-year Enterprise B04 license token."""
-    key_path = Path(__file__).resolve().parents[2] / "enterprise" / "test_private_key.pem"
+    key_path = Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"
     return issue_license(
         customer_id="acme-defense-corp",
         bundle_ids=["b04"],
@@ -63,7 +63,7 @@ def test_expired_license_error(private_key):
         "iss": "GossipMesh Enterprise",
         "sub": "expired-corp",
         "iat": now - 7200,
-        "exp": now - 3600,  # Expired 1 hour ago
+        "exp": now - 3600,
         "bundle_ids": ["b04"],
         "tier": "Enterprise Air-Gapped",
     }
@@ -75,7 +75,6 @@ def test_expired_license_error(private_key):
 
 def test_tampered_license_signature(valid_license_token):
     """Ensure tampered tokens or payload mutations fail cryptographic signature verification."""
-    # Mutate the last few characters of the JWT signature
     tampered_token = valid_license_token[:-6] + "XYZ123"
 
     with pytest.raises(LicenseInvalidError):
@@ -84,7 +83,6 @@ def test_tampered_license_signature(valid_license_token):
 
 def test_bundle_not_authorized_error(valid_license_token):
     """Ensure requesting a higher tier bundle not in license raises BundleNotAuthorizedError."""
-    # License has b04, client requests b05
     with pytest.raises(BundleNotAuthorizedError, match="does not authorize bundle 'b05'"):
         verify_license(token=valid_license_token, required_bundle="b05")
 

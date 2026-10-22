@@ -60,7 +60,7 @@ class ConcurrentSkipListRoutingTable:
 
     def _evict_worst(self) -> None:
         curr: Optional[SkipListNode] = self.head
-        worst_node: Optional[SkipListNode] = None
+        worst_node = None
         worst_score = float("-inf")
         while curr and curr.forward[0]:
             nxt = curr.forward[0]
@@ -81,7 +81,10 @@ class ConcurrentSkipListRoutingTable:
 
         for i in range(len(worst_node.forward)):
             if i < len(update) and update[i] and update[i].forward[i] == worst_node:
-                update[i].forward[i] = worst_node.forward[i]
+                worst_node_forward = worst_node.forward[i]
+                up = update[i]
+                if up is not None:
+                    up.forward[i] = worst_node_forward
 
         while self.level > 1 and self.head.forward[self.level - 1] is None:
             self.level -= 1
@@ -111,7 +114,7 @@ class ConcurrentSkipListRoutingTable:
                 return False
             for i in range(self.level):
                 up = update[i]
-                if not up or up.forward[i] != curr:
+                if up is None or up.forward[i] != curr:
                     break
                 up.forward[i] = curr.forward[i]
             while self.level > 1 and self.head.forward[self.level - 1] is None:

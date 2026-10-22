@@ -534,15 +534,18 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
 
         roles = claims.get("groups", claims.get("roles", []))
         if isinstance(roles, list) and roles:
-            for role_name in roles:
-                org = db.query(Organization).filter(Organization.name == role_name).first()
-                if org:
-                    user_org = (
-                        db.query(UserOrganization)
-                        .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id == org.id)
-                        .first()
-                    )
-                    if not user_org:
+            orgs = db.query(Organization).filter(Organization.name.in_(roles)).all()
+            if orgs:
+                org_ids = [org.id for org in orgs]
+                existing_user_orgs = (
+                    db.query(UserOrganization)
+                    .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id.in_(org_ids))
+                    .all()
+                )
+                existing_org_ids = {uo.organization_id for uo in existing_user_orgs}
+
+                for org in orgs:
+                    if org.id not in existing_org_ids:
                         user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="member")
                         db.add(user_org)
 
