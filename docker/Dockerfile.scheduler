@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1
+# Production Scheduler Dockerfile (Task 113)
+
+FROM python:3.12-slim AS runner
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+RUN groupadd -g 10001 gossipmesh && \
+    useradd -u 10001 -g gossipmesh -m -s /bin/bash gossipmesh
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY --chown=gossipmesh:gossipmesh . /app
+
+USER gossipmesh:gossipmesh
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+CMD ["python", "scripts/plan_advancement_engine.py", "--status"]

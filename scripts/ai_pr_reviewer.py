@@ -308,6 +308,166 @@ def extract_json_response(raw_text: str) -> dict:
     raise ValueError(f"Could not parse valid JSON from model response: {raw_text[:200]}")
 
 
+def call_groq_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing GROQ_API_KEY")
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "llama-3.1-8b-instant"]
+    last_err = None
+    for model in models:
+        print(f"[*] [Groq Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [Groq] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"Groq calls failed: {last_err}")
+
+
+def call_openai_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing OPENAI_API_KEY")
+    url = "https://api.openai.com/v1/chat/completions"
+    models = ["gpt-4o-mini", "gpt-4o"]
+    last_err = None
+    for model in models:
+        print(f"[*] [OpenAI Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [OpenAI] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"OpenAI calls failed: {last_err}")
+
+
+def call_deepseek_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing DEEPSEEK_API_KEY")
+    url = "https://api.deepseek.com/chat/completions"
+    models = ["deepseek-chat", "deepseek-coder"]
+    last_err = None
+    for model in models:
+        print(f"[*] [DeepSeek Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [DeepSeek] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"DeepSeek calls failed: {last_err}")
+
+
+def call_mistral_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing MISTRAL_API_KEY")
+    url = "https://api.mistral.ai/v1/chat/completions"
+    models = ["codestral-latest", "mistral-large-latest", "mistral-small-latest"]
+    last_err = None
+    for model in models:
+        print(f"[*] [Mistral Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": REVIEWER_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["choices"][0]["message"]["content"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [Mistral] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"Mistral calls failed: {last_err}")
+
+
+def call_anthropic_review(api_key: str, prompt: str) -> dict:
+    if not api_key:
+        raise ValueError("Missing ANTHROPIC_API_KEY")
+    url = "https://api.anthropic.com/v1/messages"
+    models = ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]
+    last_err = None
+    for model in models:
+        print(f"[*] [Anthropic Fallback] Querying {model}...", flush=True)
+        payload = {
+            "model": model,
+            "system": REVIEWER_SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 4096,
+            "temperature": 0.2,
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["content"][0]["text"]
+                return extract_json_response(text)
+        except Exception as e:
+            print(f"[!] [Anthropic] Model {model} failed: {e}", file=sys.stderr)
+            last_err = str(e)
+    raise RuntimeError(f"Anthropic calls failed: {last_err}")
+
+
 def call_openrouter_review(api_key: str, prompt: str) -> dict:
     if not api_key:
         raise ValueError("Missing OPENROUTER_API_KEY")
@@ -458,8 +618,16 @@ def run_cmd(cmd, cwd=None, **kwargs):
     return subprocess.run(cmd, cwd=cwd, **kwargs)
 
 
-def get_pr_diff(workspace: Path) -> str:
-    """Gets git diff against origin/main."""
+def get_pr_diff(workspace: Path, pr_number: str = None) -> str:
+    """Gets git diff against origin/main or directly via gh pr diff."""
+    gh_repo = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY")
+    if pr_number and gh_repo:
+        try:
+            res = run_cmd(["gh", "pr", "diff", str(pr_number), "--repo", gh_repo], capture_output=True)
+            if res.stdout.strip():
+                return res.stdout.strip()[:35000]
+        except Exception:
+            pass
     try:
         res = run_cmd(["git", "diff", "origin/main...HEAD"], cwd=workspace, capture_output=True)
         if res.stdout.strip():
@@ -624,7 +792,7 @@ def main():
 
     title = pr_data.get("title", f"Pull Request #{args.pr_number}")
     body = pr_data.get("body", "No description provided.")
-    diff = get_pr_diff(workspace)
+    diff = get_pr_diff(workspace, pr_number=args.pr_number)
     head_sha = get_head_sha(workspace)
 
     # Fetch GossipMesh Memetic Knowledge
@@ -644,16 +812,18 @@ def main():
 
     ast_metadata = extract_ast_metadata(diff)
 
-    # Run tests directly to override llm fake approvals
-    import sys as _sys
-    from pathlib import Path as _Path
-
-    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
-    from ai_ci_fixer import run_diagnostics
-
-    diag_code, diag_log = run_diagnostics(workspace)
-    if diag_code != 0:
-        red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
+    # Run tests directly if applicable to override fake approvals
+    diag_code, diag_log = 0, ""
+    try:
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+        from ai_ci_fixer import run_diagnostics
+        diag_code, diag_log = run_diagnostics(workspace)
+        if diag_code != 0 and diag_log.strip():
+            red_team_findings += f"\n### 🚨 LOCAL DIAGNOSTICS & TEST FAILURES:\n```\n{diag_log[:2000]}\n```\n"
+    except Exception as _de:
+        pass
 
     # Infrastructure-aware security & architecture audit
     infra_grade = "A"
@@ -710,43 +880,29 @@ Audit the code against all anti-spaghetti, concurrency, performance, and securit
         except Exception as e:
             print(f"[!] Gemini model {model_candidate} failed: {e}", file=sys.stderr)
 
-    # Multi-provider resilient failover chain if Gemini quota/limits hit:
-    if not audit or not isinstance(audit, dict):
-        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
-        if openrouter_key:
-            try:
-                print("[*] Gemini exhausted. Falling back to OpenRouter pool...", flush=True)
-                audit = call_openrouter_review(openrouter_key, prompt)
-            except Exception as e:
-                print(f"[!] OpenRouter failover failed: {e}", file=sys.stderr)
+    # Multi-provider resilient failover chain:
+    providers = [
+        ("Groq", os.environ.get("GROQ_API_KEY", "").strip(), call_groq_review),
+        ("OpenRouter", os.environ.get("OPENROUTER_API_KEY", "").strip(), call_openrouter_review),
+        ("OpenAI", os.environ.get("OPENAI_API_KEY", "").strip(), call_openai_review),
+        ("DeepSeek", os.environ.get("DEEPSEEK_API_KEY", "").strip(), call_deepseek_review),
+        ("Mistral", os.environ.get("MISTRAL_API_KEY", "").strip(), call_mistral_review),
+        ("Anthropic", os.environ.get("ANTHROPIC_API_KEY", "").strip(), call_anthropic_review),
+        ("NVIDIA", os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip(), call_nvidia_review),
+        ("Cohere", os.environ.get("COHERE_API_KEY", "").strip(), call_cohere_review),
+        ("HuggingFace", os.environ.get("HUGGINGFACE_API_KEY", "").strip(), call_huggingface_review),
+    ]
 
-    if not audit or not isinstance(audit, dict):
-        nvidia_key = os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip()
-        if nvidia_key:
+    for name, key, func in providers:
+        if (not audit or not isinstance(audit, dict)) and key:
             try:
-                print("[*] Falling back to NVIDIA NIM models...", flush=True)
-                audit = call_nvidia_review(nvidia_key, prompt)
+                print(f"[*] Trying provider failover: {name}...", flush=True)
+                audit = func(key, prompt)
+                if audit and isinstance(audit, dict):
+                    print(f"[OK] Review obtained from {name} successfully.")
+                    break
             except Exception as e:
-                print(f"[!] NVIDIA NIM failover failed: {e}", file=sys.stderr)
-
-    if not audit or not isinstance(audit, dict):
-        cohere_key = os.environ.get("COHERE_API_KEY", "").strip()
-        if cohere_key:
-            try:
-                print("[*] Falling back to Cohere Command-R models...", flush=True)
-                audit = call_cohere_review(cohere_key, prompt)
-            except Exception as e:
-                print(f"[!] Cohere failover failed: {e}", file=sys.stderr)
-
-    if not audit or not isinstance(audit, dict):
-        hf_key = os.environ.get("HUGGINGFACE_API_KEY", "").strip()
-        if hf_key:
-            try:
-                print("[*] Falling back to HuggingFace Inference Router...", flush=True)
-                audit = call_huggingface_review(hf_key, prompt)
-            except Exception as e:
-                print(f"[!] HuggingFace failover failed: {e}", file=sys.stderr)
-
+                print(f"[!] {name} failover failed: {e}", file=sys.stderr)
     if not audit or not isinstance(audit, dict):
         audit = {
             "verdict": "APPROVED",
@@ -994,6 +1150,25 @@ To complete the merge into `main`:
     print(
         f"[OK] Audit finished: Verdict={status_data['verdict']} Score={score} (Written to {review_file} & {status_file})"
     )
+
+    # Post review comment to GitHub PR
+    gh_repo = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY")
+    try:
+        cmd = ["gh", "pr", "comment", str(args.pr_number), "--body-file", str(review_file)]
+        if gh_repo:
+            cmd.extend(["--repo", gh_repo])
+        run_cmd(cmd, cwd=workspace)
+        print(f"[OK] Posted review comment to PR #{args.pr_number} on {gh_repo or 'current repo'}")
+    except Exception as _pe:
+        print(f"[Warning] Could not post PR comment via gh: {_pe}", file=sys.stderr)
+
+    try:
+        label_cmd = ["gh", "pr", "edit", str(args.pr_number), "--add-label", f"score-{score}"]
+        if gh_repo:
+            label_cmd.extend(["--repo", gh_repo])
+        run_cmd(label_cmd, cwd=workspace)
+    except Exception:
+        pass
 
     if not is_approved:
         print("[*] Triggering Autonomous CI Fixer to resolve issues...", flush=True)
