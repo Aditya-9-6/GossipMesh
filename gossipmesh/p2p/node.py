@@ -52,7 +52,7 @@ class GossipMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'GossipMessage':
+    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
         return cls(
             topic=data.get("topic", GossipTopic.CUSTOM),
             origin_node=data.get("origin_node", "unknown"),
@@ -68,6 +68,7 @@ class GossipMessage:
 class GossipNode:
     """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence.
     Communicates via a shared ledger directory (file-backed mesh) or local bus."""
+
     def __init__(
         self,
         node_id: str,
