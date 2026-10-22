@@ -31,6 +31,7 @@ utils.load_dotenv()
 
 GITHUB_SECRET = os.getenv("GITHUB_SECRET")
 
+
 @app.route("/cancel/<job_id>", methods=["POST"])
 def cancel_job(job_id: str):
     """Endpoint to cancel a running job.
@@ -55,6 +56,7 @@ def verify_signature(headers: dict, payload: bytes) -> bool:
     if not signature:
         return False
     import hmac, hashlib
+
     expected = "sha256=" + hmac.new(GITHUB_SECRET.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
