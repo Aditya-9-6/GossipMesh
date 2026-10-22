@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic_settings import BaseSettings, ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     OIDC_CLIENT_SECRET: Optional[str] = None
     OIDC_REDIRECT_URI: Optional[str] = None
 
-    model_config = ConfigDict(
+    model_config = SettingsConfigDict(
         case_sensitive=True,
         env_file=".env",
     )
