@@ -7,6 +7,10 @@ import pytest
 from pathlib import Path
 import jwt
 
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
 from enterprise.licensing import (
     verify_license,
     get_bundle_for_task,
@@ -17,6 +21,21 @@ from enterprise.licensing import (
     BundleNotAuthorizedError,
 )
 from scripts.issue_license import issue_license, load_private_key
+
+
+@pytest.fixture(autouse=True)
+def ensure_test_private_key():
+    """Ensure enterprise/test_private_key.pem exists for test fixtures."""
+    key_path = Path("enterprise/test_private_key.pem")
+    if not key_path.is_file():
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096, backend=default_backend())
+        pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        key_path.write_bytes(pem)
 
 
 @pytest.fixture

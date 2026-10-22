@@ -1,6 +1,7 @@
 import unittest
 from gossipmesh.red_team import RedTeamAuditor
 
+
 class TestRedTeamAuditor(unittest.TestCase):
     def setUp(self):
         self.auditor = RedTeamAuditor()
@@ -52,23 +53,23 @@ class TestRedTeamAuditor(unittest.TestCase):
         self.assertEqual(probes[0].category, "Unchecked Slice Indexing")
 
     def test_audit_diff_path_traversal(self):
-        bad_code = "func bad() { os.Open(\"../../etc/passwd\") }"
+        bad_code = 'func bad() { os.Open("../../etc/passwd") }'
         probes = self.auditor.audit_diff(bad_code)
         self.assertEqual(len(probes), 1)
         self.assertEqual(probes[0].category, "Path Traversal / Unsanitized URL")
 
-        bad_code_2 = "func bad() { filepath.Join(base, \"../\", user) }"
+        bad_code_2 = 'func bad() { filepath.Join(base, "../", user) }'
         probes = self.auditor.audit_diff(bad_code_2)
         self.assertEqual(len(probes), 1)
         self.assertEqual(probes[0].category, "Path Traversal / Unsanitized URL")
 
-        bad_code_3 = "func bad() { path := \"../test\" }"
+        bad_code_3 = 'func bad() { path := "../test" }'
         probes = self.auditor.audit_diff(bad_code_3)
         self.assertEqual(len(probes), 1)
         self.assertEqual(probes[0].category, "Path Traversal / Unsanitized URL")
 
     def test_audit_diff_hardcoded_credentials(self):
-        bad_code = "password = \"secret\""
+        bad_code = 'password = "secret"'
         probes = self.auditor.audit_diff(bad_code)
         self.assertEqual(len(probes), 1)
         self.assertEqual(probes[0].category, "Hardcoded Credentials")
@@ -77,6 +78,7 @@ class TestRedTeamAuditor(unittest.TestCase):
         probes = self.auditor.audit_diff(bad_code_2)
         self.assertEqual(len(probes), 1)
         self.assertEqual(probes[0].category, "Hardcoded Credentials")
+
 
 if __name__ == "__main__":
     unittest.main()
