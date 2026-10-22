@@ -58,7 +58,7 @@ class GeminiProvider(BaseProvider):
             raw_response={"prompt_feedback": str(response.prompt_feedback)},
         )
 
-    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
+    async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:
         if genai is None:
             raise RuntimeError("google-generativeai package is not installed")
         model = genai.GenerativeModel(request.model)
