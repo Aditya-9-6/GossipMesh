@@ -10,7 +10,7 @@ with open("gossipmesh/p2p/routing.py", "r") as f:
 # Actually, the update array is built by searching for worst_node.
 # Let's fix the logic in _evict_worst to properly use delete(worst_node.key)
 data = data.replace(
-"""    def _evict_worst(self) -> None:
+    """    def _evict_worst(self) -> None:
         curr = self.head
         worst_node = None
         worst_score = float("-inf")
@@ -39,7 +39,7 @@ data = data.replace(
             self.level -= 1
 
         self.size -= 1""",
-"""    def _evict_worst(self) -> None:
+    """    def _evict_worst(self) -> None:
         curr = self.head
         worst_node = None
         worst_score = float("-inf")
@@ -78,7 +78,7 @@ data = data.replace(
         while self.level > 1 and self.head.forward[self.level - 1] is None:
             self.level -= 1
 
-        self.size -= 1"""
+        self.size -= 1""",
 )
 
 with open("gossipmesh/p2p/routing.py", "w") as f:

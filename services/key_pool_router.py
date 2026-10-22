@@ -24,6 +24,7 @@ from typing import Callable, Any, Dict, List, Tuple
 # Helper – load raw API keys from env / .gemini_keys files
 # ---------------------------------------------------------------------------
 
+
 def _load_raw_keys() -> List[str]:
     """Collect all provider keys.
 
@@ -60,9 +61,11 @@ def _load_raw_keys() -> List[str]:
                 pass
     return keys
 
+
 # ---------------------------------------------------------------------------
 # Core router class
 # ---------------------------------------------------------------------------
+
 
 class KeyMetrics:
     """Thread‑safe rolling error‑rate metrics for a single API key.
@@ -213,8 +216,7 @@ class KeyPoolRouter:
             self._metrics[key].record(True)
 
     def record_failure(self, key: str, *, force_cooldown: bool = False) -> None:
-        """Record a failure. ``force_cooldown`` is used for explicit 429/5xx.
-        """
+        """Record a failure. ``force_cooldown`` is used for explicit 429/5xx."""
         if key not in self._metrics:
             return
         self._metrics[key].record(False)
@@ -281,6 +283,7 @@ class KeyPoolRouter:
                     "next_available_in": max(0.0, m._cooldown_until - now),
                 }
         return out
+
 
 # ---------------------------------------------------------------------------
 # Export a ready‑to‑use singleton instance for the rest of the code‑base.

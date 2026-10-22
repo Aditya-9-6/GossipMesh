@@ -6,10 +6,10 @@ with open("gossipmesh/p2p/node.py", "r") as f:
 # Let's add that to __init__ of GossipNode.
 
 data = data.replace(
-"""        self.public_key = public_key
+    """        self.public_key = public_key
         self.pow_difficulty = pow_difficulty
         self.pow_nonce = pow_nonce""",
-"""        self.public_key = public_key
+    """        self.public_key = public_key
         self.pow_difficulty = pow_difficulty
 
         if self.pow_difficulty > 0 and self.public_key:
@@ -21,7 +21,7 @@ data = data.replace(
             else:
                 self.pow_nonce, _ = mine_pow(self.public_key, self.pow_difficulty)
         else:
-            self.pow_nonce = pow_nonce"""
+            self.pow_nonce = pow_nonce""",
 )
 
 with open("gossipmesh/p2p/node.py", "w") as f:
