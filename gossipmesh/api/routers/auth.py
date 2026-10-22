@@ -320,23 +320,38 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
             installations_count = installations_response.json().get("total_count", 0)
 
         # Map organizations
-        for org_name in org_names:
-            org = db.query(Organization).filter(Organization.name == org_name).first()
-            if not org:
-                org = Organization(name=org_name)
-                db.add(org)
-                db.commit()
-                db.refresh(org)
+        if org_names:
+            existing_orgs = db.query(Organization).filter(Organization.name.in_(org_names)).all()
+            existing_orgs_by_name = {org.name: org for org in existing_orgs}
 
-            user_org = (
-                db.query(UserOrganization)
-                .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id == org.id)
-                .first()
-            )
+            new_orgs = []
+            for org_name in org_names:
+                if org_name not in existing_orgs_by_name:
+                    new_org = Organization(name=org_name)
+                    new_orgs.append(new_org)
 
-            if not user_org:
-                user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="member")
-                db.add(user_org)
+            if new_orgs:
+                db.add_all(new_orgs)
+                db.flush()
+                for org in new_orgs:
+                    existing_orgs_by_name[org.name] = org
+
+            org_ids = [org.id for org in existing_orgs_by_name.values()]
+            if org_ids:
+                existing_user_orgs = (
+                    db.query(UserOrganization)
+                    .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id.in_(org_ids))
+                    .all()
+                )
+                existing_user_orgs_by_org_id = {uo.organization_id: uo for uo in existing_user_orgs}
+
+                new_user_orgs = []
+                for org_id in org_ids:
+                    if org_id not in existing_user_orgs_by_org_id:
+                        new_user_orgs.append(UserOrganization(user_id=user.id, organization_id=org_id, role="member"))
+
+                if new_user_orgs:
+                    db.add_all(new_user_orgs)
 
         db.commit()
 
