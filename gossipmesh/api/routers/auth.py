@@ -53,7 +53,6 @@ def login_access_token(
     elif not user.is_active:
         raise AuthorizationError(message="Inactive user")
 
-    # Create session
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
@@ -62,7 +61,6 @@ def login_access_token(
     db.commit()
     db.refresh(session)
 
-    # Generate tokens
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
@@ -70,7 +68,6 @@ def login_access_token(
     access_token = create_access_token(user.id, session_id=session.id, expires_delta=access_token_expires)
     refresh_token = create_refresh_token(user.id, session_id=session.id, jti=jti, expires_delta=refresh_token_expires)
 
-    # Store refresh token in db
     db_refresh_token = RefreshToken(
         session_id=session.id, jti=jti, expires_at=datetime.now(timezone.utc) + refresh_token_expires
     )
@@ -146,7 +143,6 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
         raise AuthenticationError(message="Refresh token not found")
 
     if db_token.is_revoked:
-        # Reuse detection: revoke all tokens for this session
         session = db.query(UserSession).filter(UserSession.id == session_id).first()
         if session:
             session.is_active = False
@@ -158,7 +154,6 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
     if db_token.expires_at < datetime.now(timezone.utc):
         raise AuthenticationError(message="Refresh token has expired")
 
-    # Mark current token as revoked
     db_token.is_revoked = True
 
     session = db.query(UserSession).filter(UserSession.id == session_id).first()
@@ -167,7 +162,6 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
 
     session.last_active_at = datetime.now(timezone.utc)
 
-    # Generate new tokens
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
@@ -177,7 +171,6 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
         user_id, session_id=session.id, jti=new_jti, expires_delta=refresh_token_expires
     )
 
-    # Store new refresh token
     new_db_refresh_token = RefreshToken(
         session_id=session.id, jti=new_jti, expires_at=datetime.now(timezone.utc) + refresh_token_expires
     )
@@ -194,11 +187,11 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
 @router.get("/github/login")
 def github_login(request: Request) -> Any:
     state = str(uuid.uuid4())
-    # store state in redis for 5 minutes
     redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     params = {
-        "client_id": settings.GITHUB_CLIENT_ID,
+        "client_id": client_id,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -209,19 +202,18 @@ def github_login(request: Request) -> Any:
 
 @router.get("/github/callback")
 def github_callback(request: Request, code: str, state: str, db: Session = Depends(deps.get_db)) -> Any:
-    # Validate state
     redis_key = f"github_oauth_state:{state}"
     if not redis_client.get(redis_key):
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
-    # Exchange code for token
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": client_id,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
@@ -234,7 +226,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         access_token = token_data["access_token"]
         refresh_token = token_data.get("refresh_token")
 
-        # Fetch user profile
         user_response = client.get(
             "https://api.github.com/user",
             headers={
@@ -246,7 +237,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         user_response.raise_for_status()
         github_user_data = user_response.json()
 
-        # Fetch primary email
         emails_response = client.get(
             "https://api.github.com/user/emails",
             headers={
@@ -266,7 +256,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
 
         github_id = github_user_data["id"]
 
-        # Match or create user
         user = db.query(User).filter(User.email == primary_email).first()
         if not user:
             user = User(email=primary_email, hashed_password=None, is_active=True)
@@ -274,7 +263,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
             db.commit()
             db.refresh(user)
 
-        # Update or create credentials
         credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == user.id).first()
         if not credential:
             credential = UserGitHubCredential(
@@ -292,7 +280,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
 
         db.commit()
 
-        # Fetch organizations
         orgs_response = client.get(
             "https://api.github.com/user/orgs",
             headers={
@@ -306,7 +293,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
 
         org_names = [org["login"] for org in github_orgs]
 
-        # Fetch installations
         installations_response = client.get(
             "https://api.github.com/user/installations",
             headers={
@@ -319,7 +305,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if installations_response.status_code == 200:
             installations_count = installations_response.json().get("total_count", 0)
 
-        # Map organizations
         for org_name in org_names:
             org = db.query(Organization).filter(Organization.name == org_name).first()
             if not org:
@@ -340,7 +325,6 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
 
         db.commit()
 
-        # Audit event
         audit_event = AuditEvent(
             action="github_login",
             actor_id=user.id,
@@ -366,12 +350,13 @@ def github_refresh_token(
 
     refresh_token = decrypt_string(credential.encrypted_refresh_token)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": client_id,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
@@ -390,7 +375,6 @@ def github_refresh_token(
 
         db.commit()
 
-        # Audit event
         audit_event = AuditEvent(
             action="github_token_refresh",
             actor_id=current_user.id,
@@ -472,7 +456,6 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
         except Exception as e:
             raise AuthenticationError(message=f"Failed to fetch OIDC discovery document: {e}")
 
-        # Exchange code for token
         token_response = client.post(
             token_endpoint,
             data={
@@ -519,7 +502,6 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
         sub = claims.get("sub")
         issuer = claims.get("iss")
 
-        # Match or create user
         user = db.query(User).filter(User.email == email).first()
         if not user:
             user = User(email=email, hashed_password=None, is_active=True)
@@ -527,7 +509,6 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
             db.commit()
             db.refresh(user)
 
-        # Map OIDC Credentials
         credential = (
             db.query(UserOIDCCredential)
             .filter(UserOIDCCredential.user_id == user.id, UserOIDCCredential.issuer == issuer)
@@ -551,7 +532,6 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
             if id_token:
                 credential.encrypted_id_token = encrypt_string(id_token)
 
-        # Handle Organization Mapping via Groups/Roles if present
         roles = claims.get("groups", claims.get("roles", []))
         if isinstance(roles, list) and roles:
             for role_name in roles:
@@ -568,7 +548,6 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
 
         db.commit()
 
-        # Audit event
         audit_event = AuditEvent(
             action="oidc_login", actor_id=user.id, details={"sub": sub, "issuer": issuer, "roles_mapped": roles}
         )
