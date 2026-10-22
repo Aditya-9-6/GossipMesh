@@ -7,9 +7,10 @@ from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.user import User
 
 # Using an in-memory SQLite database
-engine = create_engine('sqlite:///:memory:', connect_args={"check_same_thread": False})
+engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def test_original():
     db = SessionLocal()
@@ -46,6 +47,7 @@ def test_original():
     print(f"Original Code Time: {end - start:.4f}s")
     db.close()
 
+
 def test_optimized():
     db = SessionLocal()
     org_names = [f"org_opt_{i}" for i in range(100)]
@@ -75,10 +77,11 @@ def test_optimized():
             existing_orgs_by_name[org.name] = org
 
     org_ids = [org.id for org in existing_orgs_by_name.values()]
-    existing_user_orgs = db.query(UserOrganization).filter(
-        UserOrganization.user_id == user.id,
-        UserOrganization.organization_id.in_(org_ids)
-    ).all()
+    existing_user_orgs = (
+        db.query(UserOrganization)
+        .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id.in_(org_ids))
+        .all()
+    )
 
     existing_user_orgs_by_org_id = {uo.organization_id: uo for uo in existing_user_orgs}
 
@@ -95,6 +98,7 @@ def test_optimized():
     end = time.time()
     print(f"Optimized Code Time: {end - start:.4f}s")
     db.close()
+
 
 if __name__ == "__main__":
     test_original()
