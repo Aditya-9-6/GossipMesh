@@ -24,3 +24,5 @@ EXPOSE 8000
 # Run FastAPI app using python module syntax
 
 ENTRYPOINT ["python", "-m", "enterprise.packaging"]
+
+ENTRYPOINT ["python", "-m", "enterprise.packaging"]

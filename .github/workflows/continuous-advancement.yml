@@ -12,7 +12,7 @@ on:
       iterations:
         description: 'Number of autonomous development cycles to run'
         required: false
-        default: '2'
+        default: '30'
 
 permissions:
   contents: write
@@ -31,12 +31,20 @@ jobs:
       fail-fast: false
     concurrency:
       group: continuous-advancement-worker-${{ matrix.worker }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Generate GitHub App Token (Aditya's Agent)
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Install uv & Setup Python
         uses: astral-sh/setup-uv@v5
@@ -58,15 +66,10 @@ jobs:
 
       - name: Execute Continuous Multi-Cycle Development Batch
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           PYTHONPATH: ${{ github.workspace }}
           DEFAULT_INITIAL_CREDITS: "1000"
-          GOSSIPMESH_AUTOMATION_ENABLED: "true"
-          GOSSIPMESH_ALLOW_PR_CREATION: "true"
-          GOSSIPMESH_ALLOW_PUSH: "true"
-          GOSSIPMESH_ALLOW_FORCE_PUSH: "true"
-          GOSSIPMESH_ALLOW_AUTO_MERGE: "true"
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
           GEMINI_KEY_POOL: ${{ secrets.GEMINI_KEY_POOL || '' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
           GEMINI_ISSUE_KEY: ${{ secrets.GEMINI_ISSUE_KEY || '' }}
@@ -82,9 +85,9 @@ jobs:
           python3 scripts/autonomous_loop.py --workspace . --worker-id ${{ matrix.worker }} --num-workers 5 --interval 5 --iterations "$ITER" --max-minutes 180
 
       - name: Chain Next 24/7 Cloud Advancement Batch
-        if: always() && matrix.worker == 1
+        if: success() && matrix.worker == 1
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           echo "[*] Chaining next 24/7 autonomous advancement batch in GitHub Actions Cloud..."
           gh workflow run continuous-advancement.yml --ref main || true
