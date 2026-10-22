@@ -11,7 +11,7 @@ import enum
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Deque
+from typing import Any, Dict, Optional
 
 
 class MessagePriority(enum.IntEnum):
@@ -30,7 +30,7 @@ class PriorityQueueConfig:
     max_capacity: int = 10000
     aging_interval_sec: float = 0.25
     enable_aging: bool = True
-    level_weights: Optional[Dict[int, int]] = None
+    level_weights: Dict[int, int] = None
 
     def __post_init__(self):
         if self.level_weights is None:
@@ -186,7 +186,7 @@ class WeightedPriorityQueue:
             if not bucket:
                 continue
 
-            weight = self.config.level_weights.get(level, 1) if self.config.level_weights else 1
+            weight = self.config.level_weights.get(level, 1)
             self._deficits[level] += weight
             if self._deficits[level] > 0:
                 self._deficits[level] -= 1
@@ -219,7 +219,7 @@ class WeightedPriorityQueue:
             if not bucket:
                 continue
 
-            retained: Deque[PrioritizedMessage] = collections.deque()
+            retained = collections.deque()
             target_level = level - 1
 
             while bucket:

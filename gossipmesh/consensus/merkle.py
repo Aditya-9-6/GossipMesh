@@ -1,5 +1,5 @@
 import hashlib
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 
 
 def hash_data(data: str) -> str:
@@ -69,10 +69,10 @@ class MerkleTree:
 
     def get_subtree_fingerprints(self) -> Dict[str, str]:
         """Returns all subtree keys and their respective fingerprints."""
-        fingerprints: Dict[str, str] = {}
+        fingerprints = {}
         if not self.root:
             return fingerprints
-        queue: List[Tuple[MerkleNode, str]] = [(self.root, "root")]
+        queue = [(self.root, "root")]
         while queue:
             node, path = queue.pop(0)
             if node.key:

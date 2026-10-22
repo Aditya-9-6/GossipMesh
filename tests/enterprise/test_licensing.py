@@ -2,6 +2,7 @@
 Unit Tests for Enterprise Offline Cryptographic Licensing Module
 """
 
+import os
 import time
 import pytest
 from pathlib import Path
@@ -22,21 +23,17 @@ from scripts.issue_license import issue_license, load_private_key
 @pytest.fixture
 def private_key():
     """Load test private key."""
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    key_path = repo_root / "enterprise" / "test_private_key.pem"
-    return load_private_key(str(key_path))
+    return load_private_key(os.environ["LICENSE_PRIVATE_KEY_PATH"])
 
 
 @pytest.fixture
 def valid_license_token(private_key):
     """Generate a valid 1-year Enterprise B04 license token."""
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    key_path = repo_root / "enterprise" / "test_private_key.pem"
     return issue_license(
         customer_id="acme-defense-corp",
         bundle_ids=["b04"],
         plan="1_year",
-        private_key_path=str(key_path),
+        private_key_path=os.environ["LICENSE_PRIVATE_KEY_PATH"],
     )
 
 

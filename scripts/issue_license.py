@@ -46,12 +46,9 @@ def load_private_key(key_input: Optional[str] = None):
     4. enterprise/test_private_key.pem (local fallback for development)
     """
     pem_bytes = None
-    repo_root = Path(__file__).resolve().parent.parent
 
     if key_input:
         p = Path(key_input)
-        if not p.is_absolute():
-            p = repo_root / p
         if p.is_file():
             pem_bytes = p.read_bytes()
         elif "BEGIN" in key_input:
@@ -64,22 +61,13 @@ def load_private_key(key_input: Optional[str] = None):
 
     if not pem_bytes:
         env_path = os.getenv("LICENSE_PRIVATE_KEY_PATH")
-        if env_path:
-            ep = Path(env_path)
-            if not ep.is_absolute():
-                ep = repo_root / ep
-            if ep.is_file():
-                pem_bytes = ep.read_bytes()
+        if env_path and Path(env_path).is_file():
+            pem_bytes = Path(env_path).read_bytes()
 
     if not pem_bytes:
-        for candidate in [
-            repo_root / "enterprise" / "test_private_key.pem",
-            Path("enterprise/test_private_key.pem"),
-            Path("../enterprise/test_private_key.pem"),
-        ]:
-            if candidate.is_file():
-                pem_bytes = candidate.read_bytes()
-                break
+        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
+        if fallback.is_file():
+            pem_bytes = fallback.read_bytes()
 
     if not pem_bytes:
         raise ValueError(

@@ -14,8 +14,41 @@ os.environ["POSTGRES_DB"] = "testdb"
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_env():
-    """Ensure environment variables are set for all tests."""
-    pass
+    """Ensure environment variables are set for all tests and generate test keys."""
+    import tempfile
+
+    # Generate mock cryptographic keys for enterprise tests in a temporary directory
+    # so we do not overwrite or pollute the tracked source tree files.
+    temp_dir = tempfile.mkdtemp(prefix="gossipmesh_test_keys_")
+    priv_key_path = os.path.join(temp_dir, "test_private_key.pem")
+    pub_key_path = os.path.join(temp_dir, "public_key.pem")
+
+    try:
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        public_key = private_key.public_key()
+
+        pem_priv = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        pem_pub = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+
+        with open(priv_key_path, 'wb') as f:
+            f.write(pem_priv)
+        with open(pub_key_path, 'wb') as f:
+            f.write(pem_pub)
+
+        os.environ["LICENSE_PRIVATE_KEY_PATH"] = priv_key_path
+        os.environ["LICENSE_PUBLIC_KEY_PATH"] = pub_key_path
+    except ImportError:
+        pass
 
 
 @pytest.fixture
