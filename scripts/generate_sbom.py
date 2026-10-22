@@ -28,13 +28,15 @@ def generate_sbom(workspace_dir: Path | str = ".") -> Dict[str, Any]:
             continue
 
         purl = f"pkg:pypi/{name.lower()}@{version}"
-        components.append({
-            "type": "library",
-            "name": name,
-            "version": version,
-            "purl": purl,
-            "licenses": [{"license": {"name": license_name}}],
-        })
+        components.append(
+            {
+                "type": "library",
+                "name": name,
+                "version": version,
+                "purl": purl,
+                "licenses": [{"license": {"name": license_name}}],
+            }
+        )
 
     # Sort deterministically
     components.sort(key=lambda c: c["name"].lower())

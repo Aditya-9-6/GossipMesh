@@ -325,9 +325,21 @@ def main():
     args = parser.parse_args()
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip() or os.environ.get("GEMINI_SOLVER_KEY", "").strip()
-    other_keys = any(os.environ.get(k) for k in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "OPENAI_API_KEY", "NVIDIA_API_KEY", "COHERE_API_KEY", "HUGGINGFACE_API_KEY"))
+    other_keys = any(
+        os.environ.get(k)
+        for k in (
+            "OPENROUTER_API_KEY",
+            "GROQ_API_KEY",
+            "OPENAI_API_KEY",
+            "NVIDIA_API_KEY",
+            "COHERE_API_KEY",
+            "HUGGINGFACE_API_KEY",
+        )
+    )
     if not api_key and not other_keys:
-        print("MISSING_API_KEY: Neither GEMINI_API_KEY nor fallback multi-provider keys are configured.", file=sys.stderr)
+        print(
+            "MISSING_API_KEY: Neither GEMINI_API_KEY nor fallback multi-provider keys are configured.", file=sys.stderr
+        )
         sys.exit(2)
 
     workspace_root = Path(args.workspace).resolve()
@@ -375,10 +387,17 @@ Instructions:
     if not result:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from ai_pr_reviewer import (
-            call_groq_review, call_openrouter_review, call_openai_review,
-            call_deepseek_review, call_mistral_review, call_anthropic_review,
-            call_nvidia_review, call_cohere_review, call_huggingface_review
+            call_groq_review,
+            call_openrouter_review,
+            call_openai_review,
+            call_deepseek_review,
+            call_mistral_review,
+            call_anthropic_review,
+            call_nvidia_review,
+            call_cohere_review,
+            call_huggingface_review,
         )
+
         providers = [
             ("Groq", os.environ.get("GROQ_API_KEY", "").strip(), call_groq_review),
             ("OpenRouter", os.environ.get("OPENROUTER_API_KEY", "").strip(), call_openrouter_review),
@@ -386,7 +405,11 @@ Instructions:
             ("DeepSeek", os.environ.get("DEEPSEEK_API_KEY", "").strip(), call_deepseek_review),
             ("Mistral", os.environ.get("MISTRAL_API_KEY", "").strip(), call_mistral_review),
             ("Anthropic", os.environ.get("ANTHROPIC_API_KEY", "").strip(), call_anthropic_review),
-            ("NVIDIA", os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip(), call_nvidia_review),
+            (
+                "NVIDIA",
+                os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip(),
+                call_nvidia_review,
+            ),
             ("Cohere", os.environ.get("COHERE_API_KEY", "").strip(), call_cohere_review),
             ("HuggingFace", os.environ.get("HUGGINGFACE_API_KEY", "").strip(), call_huggingface_review),
         ]
@@ -400,7 +423,6 @@ Instructions:
                         break
                 except Exception as _pe:
                     print(f"[!] {name} solver failover failed: {_pe}", file=sys.stderr)
-
 
     summary = result.get("summary", "Automated resolution of issue.")
     files = result.get("files", [])

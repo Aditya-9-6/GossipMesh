@@ -22,7 +22,9 @@ def db_session():
     session = Session()
 
     org = Organization(id=1, name="FinTechOrg")
-    repo = Repository(id=1, name="core-service", full_name="FinTechOrg/core-service", github_id=12345, organization_id=1)
+    repo = Repository(
+        id=1, name="core-service", full_name="FinTechOrg/core-service", github_id=12345, organization_id=1
+    )
     budget = Budget(organization_id=1, monthly_limit_usd=100.0, current_spend_usd=20.0)
 
     session.add(org)
