@@ -38,10 +38,7 @@ def create_workflow(
 
     manager = WorkflowManager(db)
     workflow, job = manager.create_workflow_with_job(
-        request.organization_id,
-        request.repository_id,
-        request.agent_name,
-        actor_id=current_user.id,
+        request.organization_id, request.repository_id, request.agent_name, actor_id=current_user.id
     )
 
     # Normally this would enqueue a Celery task to begin execution
