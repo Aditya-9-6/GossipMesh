@@ -1,13 +1,14 @@
-from typing import Any, List, Literal
+from typing import Any, List
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
-from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation, OrganizationRole
+from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
-from gossipmesh.models.repository import Repository
+from gossipmesh.models.repository import Repository, RepositoryPolicy
 from gossipmesh.models.audit import AuditEvent
+from typing import Literal
 from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
@@ -20,6 +21,9 @@ class OrganizationResponse(BaseModel):
 
 class OrganizationCreate(BaseModel):
     name: str
+
+
+from gossipmesh.models.organization import OrganizationRole
 
 
 class InvitationCreate(BaseModel):
@@ -44,6 +48,8 @@ class RepositoryConnect(BaseModel):
 
 
 def require_org_admin(org_id: int, db: Session, current_user: User):
+    if getattr(current_user, "is_superuser", False):
+        return None
     user_org = (
         db.query(UserOrganization)
         .filter(
@@ -56,6 +62,23 @@ def require_org_admin(org_id: int, db: Session, current_user: User):
     )
     if not user_org:
         raise HTTPException(status_code=403, detail="Not authorized to perform this action.")
+    return user_org
+
+
+def require_org_member(org_id: int, db: Session, current_user: User):
+    if getattr(current_user, "is_superuser", False):
+        return None
+    user_org = (
+        db.query(UserOrganization)
+        .filter(
+            UserOrganization.organization_id == org_id,
+            UserOrganization.user_id == current_user.id,
+            UserOrganization.is_suspended == False,
+        )
+        .first()
+    )
+    if not user_org:
+        raise HTTPException(status_code=403, detail="Not authorized for this organization.")
     return user_org
 
 
@@ -91,19 +114,13 @@ def create_organization(
 def read_organizations_me(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    return (
-        db.query(Organization)
-        .join(UserOrganization, Organization.id == UserOrganization.organization_id)
-        .filter(UserOrganization.user_id == current_user.id)
-        .all()
-    )
     user_orgs = (
         db.query(UserOrganization)
         .options(joinedload(UserOrganization.organization))
         .filter(UserOrganization.user_id == current_user.id)
         .all()
     )
-    return [org.organization for org in user_orgs]
+    return [org.organization for org in user_orgs if org.organization is not None]
 
 
 @router.post("/{org_id}/invitations")
@@ -204,6 +221,18 @@ def create_project(
     return {"id": project.id, "name": project.name, "description": project.description}
 
 
+@router.get("/{org_id}/projects")
+def list_projects(
+    org_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """Lists all projects belonging to the specified organization."""
+    require_org_member(org_id, db, current_user)
+    projects = db.query(Project).filter(Project.organization_id == org_id).all()
+    return [{"id": p.id, "name": p.name, "description": p.description} for p in projects]
+
+
 @router.post("/{org_id}/repositories")
 def connect_repository(
     org_id: int,
@@ -226,11 +255,48 @@ def connect_repository(
         default_branch=repo_in.default_branch,
     )
     db.add(repo)
+    db.flush()
+
+    # Automatically initialize default policy for the newly connected repository
+    policy = RepositoryPolicy(
+        repository_id=repo.id,
+        branch_protection_enabled=True,
+        auto_merge_enabled=False,
+        require_review_approval=True,
+        min_approvals=1,
+        allowed_target_branches=["main", "master"],
+        max_diff_lines=500,
+        scan_frequency_hours=24,
+        custom_rules={},
+    )
+    db.add(policy)
 
     log_audit_event(db, "repository.connected", current_user.id, org_id, {"repository_full_name": repo_in.full_name})
     db.commit()
     db.refresh(repo)
-    return {"id": repo.id, "name": repo.name, "full_name": repo.full_name}
+    return {"id": repo.id, "name": repo.name, "full_name": repo.full_name, "default_branch": repo.default_branch}
+
+
+@router.get("/{org_id}/repositories")
+def list_repositories(
+    org_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """Lists all connected repositories belonging to the specified organization."""
+    require_org_member(org_id, db, current_user)
+    repos = db.query(Repository).filter(Repository.organization_id == org_id).all()
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "full_name": r.full_name,
+            "default_branch": r.default_branch,
+            "project_id": r.project_id,
+            "github_id": r.github_id,
+        }
+        for r in repos
+    ]
 
 
 @router.delete("/{org_id}/members/{user_id}")
