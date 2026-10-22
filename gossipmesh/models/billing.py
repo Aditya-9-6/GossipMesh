@@ -84,6 +84,7 @@ class UsageRecord(Base):
     Tracks reviewed PRs, changed lines, tokens, indexing, sandbox minutes,
     seats, storage bytes, and premium scanners.
     """
+
     __tablename__ = "usage_records"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -98,4 +99,3 @@ class UsageRecord(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     organization = relationship("Organization")
-

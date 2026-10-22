@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 class JobPriority(IntEnum):
-    LOW = 10         # Background maintenance, scheduled indexing
-    NORMAL = 50      # Standard PR reviews, CI webhook triggers
-    CRITICAL = 100   # Security hotfixes, manual user-requested reviews
+    LOW = 10  # Background maintenance, scheduled indexing
+    NORMAL = 50  # Standard PR reviews, CI webhook triggers
+    CRITICAL = 100  # Security hotfixes, manual user-requested reviews
 
 
 PLAN_PRIORITY_BOOSTS: Dict[str, int] = {
@@ -267,12 +267,7 @@ class WorkflowScheduler:
             return None, None
 
         # Fetch pending jobs
-        pending_jobs = (
-            db.query(Job)
-            .filter(Job.status == "pending")
-            .order_by(Job.created_at.asc())
-            .all()
-        )
+        pending_jobs = db.query(Job).filter(Job.status == "pending").order_by(Job.created_at.asc()).all()
         if not pending_jobs:
             return None, None
 
