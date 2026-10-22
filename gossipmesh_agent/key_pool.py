@@ -8,6 +8,7 @@ from .utils import logger, load_dotenv
 # Ensure environment is loaded
 load_dotenv()
 
+
 class ProviderKey:
     def __init__(
         self,
@@ -18,7 +19,7 @@ class ProviderKey:
         tpm: int = 10000,
         model: Optional[str] = None,
         api_key: Optional[str] = None,
-        cooldown_until: Optional[int] = None
+        cooldown_until: Optional[int] = None,
     ):
         self.key_id = key_id
         self.provider = provider
@@ -36,17 +37,33 @@ class ProviderKey:
         self.cooldown_until = int(time.time()) + seconds
         logger.warning("Key %s (%s) set to cooldown for %d seconds", self.key_id, self.provider, seconds)
 
+
 # Global pool populated at import time.
 KEY_POOL: List[ProviderKey] = []
 
 DEFAULT_KEYS = [
-    {"key_id": "key_01", "provider": "Groq", "tier": "fast", "rpm": 30, "tpm": 6000, "model": "llama-3.3-70b-versatile"},
+    {
+        "key_id": "key_01",
+        "provider": "Groq",
+        "tier": "fast",
+        "rpm": 30,
+        "tpm": 6000,
+        "model": "llama-3.3-70b-versatile",
+    },
     {"key_id": "key_02", "provider": "OpenAI", "tier": "fast", "rpm": 100, "tpm": 10000, "model": "gpt-4o-mini"},
-    {"key_id": "key_03", "provider": "Anthropic", "tier": "reasoning", "rpm": 50, "tpm": 8000, "model": "claude-3-5-sonnet-20241022"},
+    {
+        "key_id": "key_03",
+        "provider": "Anthropic",
+        "tier": "reasoning",
+        "rpm": 50,
+        "tpm": 8000,
+        "model": "claude-3-5-sonnet-20241022",
+    },
     {"key_id": "key_04", "provider": "OpenAI", "tier": "reasoning", "rpm": 40, "tpm": 6000, "model": "o3-mini"},
     {"key_id": "key_05", "provider": "OpenAI", "tier": "coding", "rpm": 50, "tpm": 10000, "model": "gpt-4o"},
     {"key_id": "key_06", "provider": "DeepSeek", "tier": "coding", "rpm": 60, "tpm": 10000, "model": "deepseek-coder"},
 ]
+
 
 def load_key_pool() -> None:
     """Populate KEY_POOL from PROVIDER_KEYS_JSON env var or fall back to DEFAULT_KEYS."""
@@ -59,7 +76,7 @@ def load_key_pool() -> None:
             entries = json.loads(raw)
         except json.JSONDecodeError as e:
             logger.error("Failed to parse PROVIDER_KEYS_JSON: %s", e)
-    
+
     if not entries:
         logger.info("Using default provider key configuration")
         entries = DEFAULT_KEYS
@@ -71,7 +88,9 @@ def load_key_pool() -> None:
             logger.error("Invalid key entry %s: %s", entry, e)
     logger.info("Loaded %d provider keys across tiers: %s", len(KEY_POOL), list(set(k.tier for k in KEY_POOL)))
 
+
 load_key_pool()
+
 
 def select_key(tier: str) -> Optional[ProviderKey]:
     """Weighted least‑loaded selection for the requested tier.
@@ -92,7 +111,7 @@ def select_key(tier: str) -> Optional[ProviderKey]:
     total_rpm = sum(k.rpm for k in candidates)
     if total_rpm == 0:
         return random.choice(candidates)
-    
+
     pick = random.uniform(0, total_rpm)
     cumulative = 0
     for k in candidates:
@@ -100,6 +119,7 @@ def select_key(tier: str) -> Optional[ProviderKey]:
         if pick <= cumulative:
             return k
     return candidates[-1]
+
 
 def call_llm(tier: str, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
     """Unified LLM Gateway with key rotation, cooldown failover, and fallback response."""
@@ -111,34 +131,37 @@ def call_llm(tier: str, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
         selected_key = select_key(tier)
         if not selected_key:
             break
-        
+
         # Check if actual API credentials are present
         api_key = selected_key.api_key or os.getenv(f"{selected_key.provider.upper()}_API_KEY")
         if api_key and selected_key.provider.lower() in ("openai", "groq", "deepseek"):
             try:
                 import urllib.request
+
                 url = "https://api.openai.com/v1/chat/completions"
                 if selected_key.provider.lower() == "groq":
                     url = "https://api.groq.com/openai/v1/chat/completions"
                 elif selected_key.provider.lower() == "deepseek":
                     url = "https://api.deepseek.com/chat/completions"
-                
-                req_data = json.dumps({
-                    "model": selected_key.model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt or "You are GossipMesh code intelligence agent."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.2
-                }).encode("utf-8")
-                
+
+                req_data = json.dumps(
+                    {
+                        "model": selected_key.model,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": system_prompt or "You are GossipMesh code intelligence agent.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.2,
+                    }
+                ).encode("utf-8")
+
                 req = urllib.request.Request(
                     url,
                     data=req_data,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    }
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 )
                 with urllib.request.urlopen(req, timeout=30) as resp:
                     resp_json = json.loads(resp.read().decode("utf-8"))
@@ -148,7 +171,7 @@ def call_llm(tier: str, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
                         "key_id": selected_key.key_id,
                         "provider": selected_key.provider,
                         "model": selected_key.model,
-                        "content": content
+                        "content": content,
                     }
             except Exception as e:
                 logger.warning("Call to %s failed (%s), setting cooldown and rotating", selected_key.provider, e)
@@ -164,12 +187,12 @@ def call_llm(tier: str, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
                 "key_id": selected_key.key_id,
                 "provider": selected_key.provider,
                 "model": selected_key.model,
-                "content": content
+                "content": content,
             }
 
     return {
         "status": "fallback",
         "key_id": selected_key.key_id if selected_key else "default_key",
         "provider": "local_fallback",
-        "content": "Execution completed via fallback gateway."
+        "content": "Execution completed via fallback gateway.",
     }

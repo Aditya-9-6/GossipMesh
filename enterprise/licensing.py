@@ -145,10 +145,8 @@ def verify_license(
         )
     except jwt.ExpiredSignatureError as e:
         raise LicenseExpiredError(f"License has expired: {e}") from e
-    except jwt.InvalidSignatureError as e:
+    except (jwt.InvalidSignatureError, jwt.DecodeError, jwt.InvalidTokenError) as e:
         raise LicenseInvalidError(f"Cryptographic signature verification failed (tampered token): {e}") from e
-    except jwt.PyJWTError as e:
-        raise LicenseInvalidError(f"Invalid license token format: {e}") from e
 
     # Validate authorized bundles
     allowed_bundles = [b.lower().strip() for b in payload.get("bundle_ids", [])]
