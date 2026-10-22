@@ -198,7 +198,7 @@ def github_login(request: Request) -> Any:
     redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
 
     params = {
-        "client_id": settings.GITHUB_CLIENT_ID,
+        "client_id": settings.GITHUB_CLIENT_SECRET,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -221,7 +221,7 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": settings.GITHUB_CLIENT_SECRET,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
@@ -371,7 +371,7 @@ def github_refresh_token(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": settings.GITHUB_CLIENT_SECRET,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
@@ -559,10 +559,7 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
                 org_ids = [org.id for org in orgs]
                 existing_user_orgs = (
                     db.query(UserOrganization)
-                    .filter(
-                        UserOrganization.user_id == user.id,
-                        UserOrganization.organization_id.in_(org_ids)
-                    )
+                    .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id.in_(org_ids))
                     .all()
                 )
                 existing_org_ids = {uo.organization_id for uo in existing_user_orgs}
