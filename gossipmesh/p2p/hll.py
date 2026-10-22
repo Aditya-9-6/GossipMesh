@@ -79,7 +79,8 @@ class WindowedHyperLogLog:
     def estimate(self, current_time: Optional[float] = None) -> float:
         t = current_time if current_time is not None else time.time()
         with self._lock:
-            self.decay(t)
+            for i in range(self.num_registers):
+                self._decay_register(i, t)
             m = self.num_registers
 
             # Alpha constant determination

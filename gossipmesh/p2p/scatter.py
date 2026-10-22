@@ -98,6 +98,6 @@ class AdaptiveScatterGovernor:
             return {
                 "smoothed_cpu": self._smoothed_cpu,
                 "smoothed_mem": self._smoothed_mem,
-                "current_scatter": self.get_scatter(),
+                "current_scatter": max(self.min_scatter, round(self._current_scatter)),
                 "base_scatter": self.base_scatter,
             }
