@@ -1,8 +1,8 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime
+from sqlalchemy import String, Integer, Boolean, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from sqlalchemy import JSON
 from gossipmesh.models.base import Base
+
 
 class GithubAppInstallation(Base):
     __tablename__ = "github_app_installations"
@@ -11,14 +11,15 @@ class GithubAppInstallation(Base):
     organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
     installation_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
     account_name: Mapped[str] = mapped_column(String, nullable=False)
-    target_type: Mapped[str] = mapped_column(String, nullable=False) # 'Organization' or 'User'
-    target_id: Mapped[int] = mapped_column(Integer, nullable=False) # GitHub's account ID
-    repository_selection: Mapped[str] = mapped_column(String, nullable=False) # 'all' or 'selected'
+    target_type: Mapped[str] = mapped_column(String, nullable=False)  # 'Organization' or 'User'
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)  # GitHub's account ID
+    repository_selection: Mapped[str] = mapped_column(String, nullable=False)  # 'all' or 'selected'
     permissions: Mapped[dict] = mapped_column(JSON, nullable=False)
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     suspended_by: Mapped[str | None] = mapped_column(String, nullable=True)
 
     organization = relationship("Organization")
+
 
 class Repository(Base):
     __tablename__ = "repositories"
@@ -36,6 +37,28 @@ class Repository(Base):
 
     organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
+    policy = relationship("RepositoryPolicy", back_populates="repository", uselist=False, cascade="all, delete-orphan")
+
+
+class RepositoryPolicy(Base):
+    __tablename__ = "repository_policies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
+    )
+    branch_protection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    auto_merge_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    require_review_approval: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    min_approvals: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    allowed_target_branches: Mapped[list] = mapped_column(JSON, default=lambda: ["main", "master"], nullable=False)
+    max_diff_lines: Mapped[int] = mapped_column(Integer, default=500, nullable=False)
+    scan_frequency_hours: Mapped[int] = mapped_column(Integer, default=24, nullable=False)
+    custom_rules: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+    repository = relationship("Repository", back_populates="policy")
+
+
 
 class IndexState(Base):
     __tablename__ = "index_states"
@@ -44,6 +67,6 @@ class IndexState(Base):
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
     last_commit_sha: Mapped[str | None] = mapped_column(String, nullable=True)
     last_indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    status: Mapped[str] = mapped_column(String, default="pending") # pending, indexing, completed, failed
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, indexing, completed, failed
 
     repository = relationship("Repository")
