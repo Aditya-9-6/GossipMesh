@@ -67,7 +67,7 @@ def test_execution_loop_sandbox_verification():
     assert loop.sandbox_verify("python -c \"print('ok')\"") is True
 
     # Failing command
-    assert loop.sandbox_verify("python -c \"import sys; sys.exit(1)\"") is False
+    assert loop.sandbox_verify('python -c "import sys; sys.exit(1)"') is False
 
 
 def test_execution_loop_verification_failure_partial_refund():
