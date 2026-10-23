@@ -17,6 +17,7 @@ class TestRepositoriesAPI(unittest.TestCase):
 
         # Create a mock user with the organization
         self.mock_user = MagicMock()
+        self.mock_user.is_superuser = False
         self.mock_user.organizations = [mock_org]
 
         # Override dependencies

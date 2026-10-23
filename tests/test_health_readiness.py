@@ -1,5 +1,4 @@
 import os
-
 os.environ["TESTING"] = "true"
 
 import pytest
