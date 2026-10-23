@@ -24,12 +24,12 @@ from gossipmesh.core.exceptions import (
 # Cloud metadata and forbidden private CIDR blocks
 FORBIDDEN_CIDRS = [
     ipaddress.ip_network("169.254.169.254/32"),  # AWS / GCP / Azure metadata service
-    ipaddress.ip_network("127.0.0.0/8"),  # Loopback
-    ipaddress.ip_network("10.0.0.0/8"),  # RFC 1918 Private
-    ipaddress.ip_network("172.16.0.0/12"),  # RFC 1918 Private
-    ipaddress.ip_network("192.168.0.0/16"),  # RFC 1918 Private
-    ipaddress.ip_network("::1/128"),  # IPv6 Loopback
-    ipaddress.ip_network("fe80::/10"),  # IPv6 Link-Local
+    ipaddress.ip_network("127.0.0.0/8"),          # Loopback
+    ipaddress.ip_network("10.0.0.0/8"),           # RFC 1918 Private
+    ipaddress.ip_network("172.16.0.0/12"),        # RFC 1918 Private
+    ipaddress.ip_network("192.168.0.0/16"),       # RFC 1918 Private
+    ipaddress.ip_network("::1/128"),              # IPv6 Loopback
+    ipaddress.ip_network("fe80::/10"),            # IPv6 Link-Local
 ]
 
 
@@ -160,7 +160,9 @@ class DependencyPolicyEngine:
 
         # Protect against metadata hostname aliases
         if host_clean in {"instance-data", "metadata.google.internal", "metadata"}:
-            raise NetworkEgressForbiddenError(f"Egress request to cloud metadata hostname {host_clean} blocked")
+            raise NetworkEgressForbiddenError(
+                f"Egress request to cloud metadata hostname {host_clean} blocked"
+            )
 
         # RESTRICTED mode requires matching whitelisted package registry and allowed port
         if self.mode == EgressMode.RESTRICTED:

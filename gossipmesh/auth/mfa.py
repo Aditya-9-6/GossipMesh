@@ -18,7 +18,6 @@ from gossipmesh.core.exceptions import GossipMeshException
 
 class MFAAuthenticationError(GossipMeshException):
     """Raised when MFA verification fails or step-up authentication is rejected."""
-
     pass
 
 
@@ -148,6 +147,8 @@ class MFAService:
 
         secret = getattr(user, "mfa_secret", None)
         if not secret or not verify_totp_code(secret, mfa_code):
-            raise MFAAuthenticationError(f"Invalid TOTP step-up authentication code for operation '{operation_name}'.")
+            raise MFAAuthenticationError(
+                f"Invalid TOTP step-up authentication code for operation '{operation_name}'."
+            )
 
         return True

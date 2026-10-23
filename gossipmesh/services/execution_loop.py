@@ -42,7 +42,6 @@ def calc_worker_concurrency() -> int:
 
 class InsufficientCreditsError(Exception):
     """Raised when an organization has insufficient credits for an action."""
-
     pass
 
 
@@ -74,13 +73,21 @@ class CreditLedger:
         return self.get_balance(org)
 
     def has_credits(self, org: str, amount_or_action: int | str) -> bool:
-        amount = self.ACTION_COSTS.get(amount_or_action, 2) if isinstance(amount_or_action, str) else amount_or_action
+        amount = (
+            self.ACTION_COSTS.get(amount_or_action, 2)
+            if isinstance(amount_or_action, str)
+            else amount_or_action
+        )
         with self.lock:
             return self.balances[org] >= amount
 
     def charge(self, org: str = "default", amount_or_action: int | str = 2) -> bool:
         """Deduct credits upfront. Returns True on success, False if insufficient."""
-        amount = self.ACTION_COSTS.get(amount_or_action, 2) if isinstance(amount_or_action, str) else amount_or_action
+        amount = (
+            self.ACTION_COSTS.get(amount_or_action, 2)
+            if isinstance(amount_or_action, str)
+            else amount_or_action
+        )
         with self.lock:
             current = self.balances[org]
             if current < amount:
@@ -135,7 +142,11 @@ class ExecutionLoop:
             return None
 
         # Determine credit cost
-        cost = self.ledger.ACTION_COSTS.get(action, 2) if isinstance(action, str) else int(action)
+        cost = (
+            self.ledger.ACTION_COSTS.get(action, 2)
+            if isinstance(action, str)
+            else int(action)
+        )
 
         if not self.ledger.charge(org, cost):
             raise InsufficientCreditsError(

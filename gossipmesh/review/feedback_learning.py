@@ -48,9 +48,7 @@ class FeedbackLearningEngine:
         if isinstance(feedback_type, str):
             f_type = feedback_type.upper()
             if f_type not in FeedbackType.__members__:
-                raise ValueError(
-                    f"Invalid feedback type: {feedback_type}. Must be one of {list(FeedbackType.__members__.keys())}"
-                )
+                raise ValueError(f"Invalid feedback type: {feedback_type}. Must be one of {list(FeedbackType.__members__.keys())}")
         else:
             f_type = feedback_type.value
 
@@ -183,9 +181,7 @@ class FeedbackLearningEngine:
             else:
                 status = FindingStatus.ACCEPTED
 
-            reason = r.user_comment or (
-                "Marked false positive" if r.feedback_type == FeedbackType.FALSE_POSITIVE.value else None
-            )
+            reason = r.user_comment or ("Marked false positive" if r.feedback_type == FeedbackType.FALSE_POSITIVE.value else None)
 
             results.append(
                 HistoricalFindingFeedback(
