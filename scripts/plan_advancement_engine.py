@@ -180,12 +180,16 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "auth" / "authorization.py").is_file()
             or any("centralized authorization" in title.lower() for title, _ in merged_prs.values())
         ),
-        35: lambda: (workspace / "gossipmesh" / "db" / "tenant.py").is_file() and (workspace / "tests" / "test_tenant_queries.py").is_file(),
+        35: lambda: (
+            (workspace / "gossipmesh" / "db" / "tenant.py").is_file()
+            and (workspace / "tests" / "test_tenant_queries.py").is_file()
+        ),
         36: lambda: (workspace / "gossipmesh" / "api" / "routers" / "organizations.py").is_file(),
         37: lambda: (
             (workspace / "gossipmesh" / "api" / "routers" / "projects.py").is_file()
             and (workspace / "tests" / "test_projects_repositories.py").is_file()
-            and "RepositoryPolicy" in (workspace / "gossipmesh" / "models" / "repository.py").read_text(encoding="utf-8", errors="ignore")
+            and "RepositoryPolicy"
+            in (workspace / "gossipmesh" / "models" / "repository.py").read_text(encoding="utf-8", errors="ignore")
         ),
         38: lambda: (
             (workspace / "gossipmesh" / "models" / "service_account.py").is_file()
@@ -276,7 +280,9 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "repository" / "vector_store.py").is_file()
             and (workspace / "tests" / "test_vector_store.py").is_file()
             and "retention_expires_at"
-            in (workspace / "gossipmesh" / "repository" / "vector_store.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "repository" / "vector_store.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         76: lambda: (
             (workspace / "gossipmesh" / "models" / "indexing.py").is_file()
@@ -295,7 +301,9 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "repository" / "hybrid_search.py").is_file()
             and (workspace / "tests" / "test_hybrid_search.py").is_file()
             and "HybridSearchEngine"
-            in (workspace / "gossipmesh" / "repository" / "hybrid_search.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "repository" / "hybrid_search.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         80: lambda: (
             (workspace / "gossipmesh" / "semantic_cache.py").is_file()
@@ -318,7 +326,9 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "runtime" / "isolated_adapter.py").is_file()
             and (workspace / "tests" / "test_isolated_adapter.py").is_file()
             and "RootlessContainerAdapter"
-            in (workspace / "gossipmesh" / "runtime" / "isolated_adapter.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "runtime" / "isolated_adapter.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         84: lambda: (
             (workspace / "gossipmesh" / "runtime" / "quarantine.py").is_file()
@@ -335,7 +345,9 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "runtime" / "dependency_policy.py").is_file()
             and (workspace / "tests" / "test_dependency_policy.py").is_file()
             and "DependencyPolicyEngine"
-            in (workspace / "gossipmesh" / "runtime" / "dependency_policy.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "runtime" / "dependency_policy.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         87: lambda: (
             (workspace / "gossipmesh" / "billing" / "stripe_service.py").is_file()
@@ -353,13 +365,17 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "billing" / "plan_enforcement.py").is_file()
             and (workspace / "tests" / "test_plan_enforcement.py").is_file()
             and "PlanEnforcementService"
-            in (workspace / "gossipmesh" / "billing" / "plan_enforcement.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "billing" / "plan_enforcement.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         90: lambda: (
             (workspace / "gossipmesh" / "api" / "routers" / "billing.py").is_file()
             and (workspace / "tests" / "test_billing_permissions.py").is_file()
             and "require_billing_admin"
-            in (workspace / "gossipmesh" / "api" / "routers" / "billing.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "api" / "routers" / "billing.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         92: lambda: (
             (workspace / "gossipmesh" / "billing" / "cost_controls.py").is_file()
@@ -401,7 +417,9 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             and (workspace / "gossipmesh" / "enterprise" / "disaster_recovery.py").is_file()
             and (workspace / "tests" / "test_disaster_recovery.py").is_file()
             and "DisasterRecoveryService"
-            in (workspace / "gossipmesh" / "enterprise" / "disaster_recovery.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "enterprise" / "disaster_recovery.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         99: lambda: (
             (workspace / "frontend" / "package.json").is_file()
@@ -411,22 +429,30 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
         100: lambda: (
             (workspace / "frontend" / "src" / "app" / "dashboard" / "page.tsx").is_file()
             and "Review Dashboard"
-            in (workspace / "frontend" / "src" / "app" / "dashboard" / "page.tsx").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "frontend" / "src" / "app" / "dashboard" / "page.tsx").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         101: lambda: (
             (workspace / "frontend" / "src" / "app" / "settings" / "page.tsx").is_file()
             and "Repository Settings"
-            in (workspace / "frontend" / "src" / "app" / "settings" / "page.tsx").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "frontend" / "src" / "app" / "settings" / "page.tsx").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         102: lambda: (
             (workspace / "frontend" / "src" / "app" / "findings" / "page.tsx").is_file()
             and "Human Feedback"
-            in (workspace / "frontend" / "src" / "app" / "findings" / "page.tsx").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "frontend" / "src" / "app" / "findings" / "page.tsx").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         103: lambda: (
             (workspace / "frontend" / "src" / "app" / "onboarding" / "page.tsx").is_file()
             and "Welcome to GossipMesh"
-            in (workspace / "frontend" / "src" / "app" / "onboarding" / "page.tsx").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "frontend" / "src" / "app" / "onboarding" / "page.tsx").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         104: lambda: (
             (workspace / "gossipmesh" / "notifications" / "service.py").is_file()
@@ -443,7 +469,9 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "security" / "secret_scanner.py").is_file()
             and (workspace / "tests" / "test_secret_scanning.py").is_file()
             and "SecretScannerEngine"
-            in (workspace / "gossipmesh" / "security" / "secret_scanner.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "security" / "secret_scanner.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         107: lambda: (
             (workspace / "docs" / "FULL_THREAT_MODEL.md").is_file()
@@ -460,7 +488,9 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "enterprise" / "disaster_recovery.py").is_file()
             and (workspace / "tests" / "test_data_export_and_deletion.py").is_file()
             and "purge_organization_data"
-            in (workspace / "gossipmesh" / "enterprise" / "disaster_recovery.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "enterprise" / "disaster_recovery.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         110: lambda: (
             (workspace / "docs" / "PRIVACY_AND_SECURITY.md").is_file()
@@ -485,8 +515,7 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
         ),
         114: lambda: (
             (workspace / "docker-compose.yml").is_file()
-            and "pgvector"
-            in (workspace / "docker-compose.yml").read_text(encoding="utf-8", errors="ignore")
+            and "pgvector" in (workspace / "docker-compose.yml").read_text(encoding="utf-8", errors="ignore")
         ),
         115: lambda: (
             (workspace / "k8s" / "deployment.yaml").is_file()
@@ -496,8 +525,7 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
         116: lambda: (
             (workspace / "terraform" / "main.tf").is_file()
             and (workspace / "terraform" / "variables.tf").is_file()
-            and "aws_db_instance"
-            in (workspace / "terraform" / "main.tf").read_text(encoding="utf-8", errors="ignore")
+            and "aws_db_instance" in (workspace / "terraform" / "main.tf").read_text(encoding="utf-8", errors="ignore")
         ),
         117: lambda: (
             (workspace / "scripts" / "staging_smoke_test.py").is_file()
@@ -528,13 +556,17 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
             (workspace / "gossipmesh" / "enterprise" / "feature_flags.py").is_file()
             and (workspace / "tests" / "test_feature_flags.py").is_file()
             and "FeatureFlagService"
-            in (workspace / "gossipmesh" / "enterprise" / "feature_flags.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "enterprise" / "feature_flags.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         125: lambda: (
             (workspace / "gossipmesh" / "enterprise" / "support_tooling.py").is_file()
             and (workspace / "tests" / "test_support_tooling.py").is_file()
             and "CustomerSupportTooling"
-            in (workspace / "gossipmesh" / "enterprise" / "support_tooling.py").read_text(encoding="utf-8", errors="ignore")
+            in (workspace / "gossipmesh" / "enterprise" / "support_tooling.py").read_text(
+                encoding="utf-8", errors="ignore"
+            )
         ),
         126: lambda: (
             (workspace / "docs" / "GO_TO_MARKET_CHECKLIST.md").is_file()
@@ -553,6 +585,7 @@ def audit_codebase_completion(tasks: List[PlanTask], workspace: Path):
                     continue
             except Exception as e:
                 import traceback
+
                 print(f"[ERROR in CODEBASE_CHECKS for Task {task.num}]: {e}", file=sys.stderr)
                 traceback.print_exc()
 

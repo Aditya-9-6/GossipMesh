@@ -7,7 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 class PRReviewService:
-    async def extract_security_findings(self, input_data: Optional[Any] = None, provider_adapter: Optional[Any] = None) -> List[SecurityFinding]:
+    async def extract_security_findings(
+        self, input_data: Optional[Any] = None, provider_adapter: Optional[Any] = None
+    ) -> List[SecurityFinding]:
         """
         Analyzes the PR for security findings.
         Returns a list of findings.
@@ -27,6 +29,7 @@ class PRReviewService:
                     return review_response.findings
         except Exception as e:
             import traceback
+
             logger.error(f"Error during AI security finding extraction: {e}")
             traceback.print_exc()
 

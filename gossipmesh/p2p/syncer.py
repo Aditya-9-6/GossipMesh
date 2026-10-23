@@ -1,12 +1,10 @@
-from typing import Dict, List, Any
-from gossipmesh.p2p.entropy import VectorClockEntropy
+from typing import Any
 
 
-class PeerSyncer:
-    def __init__(self, node_id: str):
-        self.node_id = node_id
-        self.entropy_tracker = VectorClockEntropy(node_id)
+class VectorClockEntropy:
+    pass
 
-    def sync_state(self, peer_clock: Dict[str, int]) -> bool:
-        self.entropy_tracker.update(peer_clock)
-        return True
+
+class StateSyncer:
+    def __init__(self) -> None:
+        self.clock = VectorClockEntropy()

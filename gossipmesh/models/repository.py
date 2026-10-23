@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime
+from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from sqlalchemy import JSON
@@ -39,6 +39,16 @@ class Repository(Base):
     organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
 
+
+class RepositoryPolicy(Base):
+    __tablename__ = "repository_policies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
+    require_review: Mapped[bool] = mapped_column(Boolean, default=True)
+    auto_merge_passing: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    repository = relationship("Repository")
 
 
 class IndexState(Base):

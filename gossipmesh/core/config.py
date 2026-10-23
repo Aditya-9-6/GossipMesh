@@ -1,7 +1,6 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from pydantic import PostgresDsn, RedisDsn
+from pydantic import PostgresDsn
 
 
 class Settings(BaseSettings):
@@ -9,28 +8,30 @@ class Settings(BaseSettings):
     VERSION: str = "0.2.0"
     API_V1_STR: str = "/api/v1"
 
-    SECRET_KEY: str
+    SECRET_KEY: str = "secret"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_ISSUER: str = "gossipmesh"
     JWT_AUDIENCE: str = "gossipmesh-api"
 
-    ENCRYPTION_KEY: str
+    ENCRYPTION_KEY: str = "key"
 
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_HOST: str
-    POSTGRES_PORT: str
-    POSTGRES_DB: str
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: str = "5432"
+    POSTGRES_DB: str = "gossipmesh"
 
     REDIS_HOST: str = "localhost"
     REDIS_PORT: str = "6379"
 
     DEFAULT_INITIAL_CREDITS: int = int(os.getenv("DEFAULT_INITIAL_CREDITS", "1000"))
     ERROR_RATE_THRESHOLD: float = float(os.getenv("ERROR_RATE_THRESHOLD", "0.25"))
-    # Load provider API keys list (optional, can be empty)
-    PROVIDER_API_KEYS: list[str] = os.getenv("PROVIDER_API_KEYS", "").split(",") if os.getenv("PROVIDER_API_KEYS") else []
+    KEY_COOLDOWN_SECONDS: int = int(os.getenv("KEY_COOLDOWN_SECONDS", "300"))
+    PROVIDER_API_KEYS: list[str] = (
+        os.getenv("PROVIDER_API_KEYS", "").split(",") if os.getenv("PROVIDER_API_KEYS") else []
+    )
     GITHUB_CLIENT_SECRET: str | None = None
 
     OIDC_CLIENT_ID: str | None = None
@@ -50,3 +51,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()  # type: ignore
+DEFAULT_INITIAL_CREDITS = settings.DEFAULT_INITIAL_CREDITS
+ERROR_RATE_THRESHOLD = settings.ERROR_RATE_THRESHOLD
+KEY_COOLDOWN_SECONDS = settings.KEY_COOLDOWN_SECONDS

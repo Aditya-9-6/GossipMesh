@@ -90,9 +90,8 @@ class CommandPolicyEngine:
         raw_binary = cmd_list[0]
         binary = cls.get_canonical_binary_name(raw_binary)
 
-        is_current_python = (
-            raw_binary == sys.executable
-            or os.path.abspath(raw_binary) == os.path.abspath(sys.executable)
+        is_current_python = raw_binary == sys.executable or os.path.abspath(raw_binary) == os.path.abspath(
+            sys.executable
         )
 
         if not is_current_python and binary not in cls.APPROVED_BINARIES:
@@ -169,7 +168,9 @@ class SandboxEnvironment:
         if self.workspace_dir and os.path.exists(self.workspace_dir):
             shutil.rmtree(self.workspace_dir)
 
-    def run_command(self, cmd: Union[str, List[str]], timeout: int = 30, workflow_id: Optional[Union[str, int]] = None) -> Tuple[int, str, str]:
+    def run_command(
+        self, cmd: Union[str, List[str]], timeout: int = 30, workflow_id: Optional[Union[str, int]] = None
+    ) -> Tuple[int, str, str]:
         """Runs a command within the sandbox workspace."""
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
@@ -198,10 +199,7 @@ class SandboxEnvironment:
             process.kill()
             stdout, stderr = process.communicate()
             duration = time.time() - start_time
-            logger.error(
-                f"[AUDIT:SANDBOX_EXEC_TIMEOUT] workflow_id={effective_wf} "
-                f"killed after {duration:.2f}s"
-            )
+            logger.error(f"[AUDIT:SANDBOX_EXEC_TIMEOUT] workflow_id={effective_wf} killed after {duration:.2f}s")
             raise SandboxError(
                 message=f"Command timed out after {effective_timeout}s",
                 details={"stderr": stderr, "workflow_id": effective_wf},

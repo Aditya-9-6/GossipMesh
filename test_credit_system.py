@@ -1,5 +1,6 @@
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath("."))
 
 from gossipmesh_agent.credit_manager import lock_credits, get_credit_balance, is_unlimited
