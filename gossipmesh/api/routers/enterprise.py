@@ -18,7 +18,6 @@ router = APIRouter()
 def get_audit_logs(
     tenant_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    # Ensure user has access to organization
     is_member = (
         db.query(UserOrganization)
         .filter(UserOrganization.user_id == current_user.id, UserOrganization.organization_id == tenant_id)
@@ -34,7 +33,7 @@ def get_audit_logs(
 @router.get("/reports/outcome/{tenant_id}")
 def get_outcome_report(
     tenant_id: int,
-    period: str = Query("daily", regex="^(daily|weekly)$"),
+    period: str = Query("daily", pattern="^(daily|weekly)$"),
     repo: Optional[str] = Query(None),
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
