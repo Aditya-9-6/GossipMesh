@@ -19,7 +19,7 @@ This document describes the customer security architecture, data processing flow
 ## 2. Customer Data Flow & Storage
 
 ```
-[Customer GitHub Org] 
+[Customer GitHub Org]
          │ (Webhook over TLS)
          ▼
 [GossipMesh Ingress] ──(HMAC Verified)──▶ [Ephemeral Execution Sandbox]

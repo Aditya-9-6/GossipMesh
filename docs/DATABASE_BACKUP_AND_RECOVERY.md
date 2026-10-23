@@ -21,7 +21,7 @@ GossipMesh employs a two-tier backup strategy:
 2. **Encrypted Daily Snapshots:** Automated daily full dumps encrypted at rest with AES-256 via `gossipmesh.db.backup.DatabaseBackupManager`.
 
 ```
-[PostgreSQL Primary] 
+[PostgreSQL Primary]
        │
        ├── Continuous WAL Stream ──────> [S3/GCS Immutable Bucket]
        └── Daily Encrypted Snapshot ───> [Cold Glacier/Vault Storage]

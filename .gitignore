@@ -57,3 +57,5 @@ venv/
 .env
 .env.*
 
+.pyssip_mesh/
+__pycache__/

@@ -1,8 +1,8 @@
 # GossipMesh Enterprise Sandbox Threat Model & Security Architecture
 
-**Document Version:** 1.0  
-**Phase:** Phase 9 — Secure Code Execution (Task 81)  
-**Security Status:** PRODUCTION MANDATORY  
+**Document Version:** 1.0
+**Phase:** Phase 9 — Secure Code Execution (Task 81)
+**Security Status:** PRODUCTION MANDATORY
 **Target Environment:** Isolated MicroVMs / Rootless Containers (gVisor, Firecracker, Podman)
 
 ---
