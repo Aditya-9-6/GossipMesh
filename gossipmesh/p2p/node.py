@@ -94,6 +94,7 @@ class GossipNode:
         self._load_seen_history()
         if base_scatter is not None:
             from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
+
             self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
         else:
             self.scatter_governor = AdaptiveScatterGovernor(base_scatter=4)
