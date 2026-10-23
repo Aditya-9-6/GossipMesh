@@ -195,7 +195,9 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
         print(f"[*] Running pre-flight code verification for Issue #{issue_num}...", flush=True)
         is_green, reason = verify_code_preflight(workspace)
         if not is_green:
-            print(f"[!] Pre-flight verification failed for #{issue_num}: {reason}. Reverting changes...", file=sys.stderr)
+            print(
+                f"[!] Pre-flight verification failed for #{issue_num}: {reason}. Reverting changes...", file=sys.stderr
+            )
             run_cmd(["git", "checkout", "--", "."], cwd=workspace)
             run_cmd(["git", "clean", "-fd"], cwd=workspace)
             return ("ISSUE", issue_num, "PREFLIGHT_FAIL", reason)
@@ -280,10 +282,7 @@ def main():
     # 1. Run PR Reviews in Pool A concurrently
     print(f"\n[*] Launching Pool A: {args.pr_workers} Concurrent PR Review Workers...")
     with ThreadPoolExecutor(max_workers=max(1, args.pr_workers)) as pr_executor:
-        pr_futures = [
-            pr_executor.submit(review_single_pr, pr, repo, args.workspace)
-            for pr in pr_numbers[:8]
-        ]
+        pr_futures = [pr_executor.submit(review_single_pr, pr, repo, args.workspace) for pr in pr_numbers[:8]]
         for future in as_completed(pr_futures):
             try:
                 task_type, item_id, status, details = future.result()

@@ -71,23 +71,33 @@ class RateLimitError(GossipMeshException):
 
 
 class ConflictError(GossipMeshException):
-    def __init__(self, message: str = "Resource conflict or concurrency error", details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, message: str = "Resource conflict or concurrency error", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(message, status_code=409, error_code="CONFLICT_ERROR", details=details)
 
 
 class ConcurrencyLimitError(GossipMeshException):
-    def __init__(self, message: str = "Per-tenant concurrency limit exceeded", details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, message: str = "Per-tenant concurrency limit exceeded", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(message, status_code=429, error_code="CONCURRENCY_LIMIT_EXCEEDED", details=details)
 
 
 class NetworkEgressForbiddenError(SandboxSecurityError):
-    def __init__(self, message: str = "Network egress forbidden by sandbox policy", details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, message: str = "Network egress forbidden by sandbox policy", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(message, details=details)
         self.error_code = "NETWORK_EGRESS_FORBIDDEN"
 
 
 class LockfileRequiredError(SandboxSecurityError):
-    def __init__(self, message: str = "Dependency installation requires a verified lockfile", details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        message: str = "Dependency installation requires a verified lockfile",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(message, details=details)
         self.error_code = "LOCKFILE_REQUIRED"
 
@@ -98,8 +108,10 @@ class PlanLimitExceededError(GossipMeshException):
 
 
 class FeatureNotAvailableInPlanError(AuthorizationError):
-    def __init__(self, message: str = "Feature not available in current subscription plan", details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        message: str = "Feature not available in current subscription plan",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(message, details=details)
         self.error_code = "FEATURE_NOT_IN_PLAN"
-
-
