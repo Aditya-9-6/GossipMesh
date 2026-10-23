@@ -69,7 +69,9 @@ def test_secret_redaction():
     assert "[REDACTED_TOKEN]" in redacted_bearer
 
     # Raw source code
-    text_with_code = "Error occurred in source:\ndef malicious_payload(x, y):\n    import os\n    return os.system('calc')\n"
+    text_with_code = (
+        "Error occurred in source:\ndef malicious_payload(x, y):\n    import os\n    return os.system('calc')\n"
+    )
     redacted_code = redact_sensitive_data(text_with_code)
     assert "malicious_payload" not in redacted_code
     assert "[REDACTED_SOURCE_CODE]" in redacted_code

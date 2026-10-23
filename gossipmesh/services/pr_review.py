@@ -39,6 +39,7 @@ class PRReviewService:
                     return review_response.findings
         except Exception as e:
             import traceback
+
             logger.error(f"Error during AI security finding extraction: {e}")
             traceback.print_exc()
 
