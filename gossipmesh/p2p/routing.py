@@ -1,34 +1,23 @@
-import random
-import threading
 from typing import Any, Dict, List, Optional, Tuple
+import threading
 
 
 class SkipListNode:
-    __slots__ = ("key", "score", "latency", "forward", "lock")
-
     def __init__(self, key: str, score: float, latency: float, level: int):
         self.key = key
         self.score = score
         self.latency = latency
         self.forward: List[Optional["SkipListNode"]] = [None] * level
-        self.lock = threading.Lock()
 
 
 class ConcurrentSkipListRoutingTable:
-    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
-        self.max_level = max_level
-        self.p = p
+    def __init__(self, capacity: int = 1000, max_level: int = 16):
         self.capacity = capacity
-        self.head = SkipListNode("", float("inf"), 0.0, max_level)
+        self.max_level = max_level
         self.level = 1
         self.size = 0
+        self.head = SkipListNode("", 0.0, 0.0, max_level)
         self._global_lock = threading.Lock()
-
-    def _random_level(self) -> int:
-        lvl = 1
-        while random.random() < self.p and lvl < self.max_level:
-            lvl += 1
-        return lvl
 
     def insert(self, key: str, score: float, latency: float) -> None:
         with self._global_lock:
@@ -43,7 +32,11 @@ class ConcurrentSkipListRoutingTable:
                 curr.score = score
                 curr.latency = latency
                 return
-            lvl = self._random_level()
+            import random
+
+            lvl = 1
+            while random.random() < 0.5 and lvl < self.max_level:
+                lvl += 1
             if lvl > self.level:
                 for i in range(self.level, lvl):
                     update[i] = self.head

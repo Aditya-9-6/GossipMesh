@@ -21,8 +21,8 @@ from gossipmesh.models.runtime import Budget, Job, Workflow
 
 class BudgetAlertLevel(str, Enum):
     NORMAL = "normal"
-    WARNING = "warning"      # >= 80%
-    EXCEEDED = "exceeded"    # >= 100%
+    WARNING = "warning"  # >= 80%
+    EXCEEDED = "exceeded"  # >= 100%
 
 
 @dataclass
@@ -144,15 +144,13 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         wf_result = session.execute(wf_stmt)
-        workflows_stopped = wf_result.rowcount
+        workflows_stopped = int(wf_result.rowcount or 0)
 
         # Cancel associated jobs
         job_stmt = (
             update(Job)
             .where(
-                Job.workflow_id.in_(
-                    select(Workflow.id).where(Workflow.organization_id == organization_id)
-                ),
+                Job.workflow_id.in_(select(Workflow.id).where(Workflow.organization_id == organization_id)),
                 Job.status.in_(["pending", "running"]),
             )
             .values(status="cancelled")
