@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class FileChange:
     """Represents a changed file in a commit or repository sync."""
+
     def __init__(self, path: str, content: str = "", status: str = "modified"):
         self.path = path
         self.content = content
