@@ -4,6 +4,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import os
 
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_enterprise_keys():
     """Ensure a matching test private key exists for the enterprise tests."""
@@ -26,14 +27,13 @@ def setup_enterprise_keys():
         priv_pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
         priv_path.parent.mkdir(parents=True, exist_ok=True)
         priv_path.write_bytes(priv_pem)
 
         pub_pem = private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
+            encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         pub_path.parent.mkdir(parents=True, exist_ok=True)
         pub_path.write_bytes(pub_pem)
