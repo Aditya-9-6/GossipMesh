@@ -93,27 +93,17 @@ class MalwareScanner:
     def scan_bytes(cls, content: bytes, filename: str) -> MalwareScanResult:
         # 1. EICAR test signature
         if EICAR_SIGNATURE in content:
-            return MalwareScanResult(
-                is_infected=True, signature="EICAR_TEST_VIRUS", details="Standard EICAR test file detected"
-            )
+            return MalwareScanResult(is_infected=True, signature="EICAR_TEST_VIRUS", details="Standard EICAR test file detected")
 
         # 2. Executable magic headers
         if len(content) >= 4:
             for header, desc in EXECUTABLE_HEADERS:
                 if content.startswith(header):
-                    return MalwareScanResult(
-                        is_infected=True,
-                        signature="EXECUTABLE_BINARY_PAYLOAD",
-                        details=f"Forbidden binary format: {desc}",
-                    )
+                    return MalwareScanResult(is_infected=True, signature="EXECUTABLE_BINARY_PAYLOAD", details=f"Forbidden binary format: {desc}")
 
         # 3. Shell script header in non-script artifact
         if content.startswith(b"#!/bin/bash") or content.startswith(b"#!/bin/sh"):
-            return MalwareScanResult(
-                is_infected=True,
-                signature="SHELL_SCRIPT_IN_ARTIFACT",
-                details="Embedded shell script detected in artifact",
-            )
+            return MalwareScanResult(is_infected=True, signature="SHELL_SCRIPT_IN_ARTIFACT", details="Embedded shell script detected in artifact")
 
         return MalwareScanResult(is_infected=False, details="No malware signatures detected")
 
@@ -146,13 +136,15 @@ class ArtifactQuarantineManager:
         size = len(content_bytes)
         if size > self.MAX_ARTIFACT_SIZE_BYTES:
             raise ValidationError(
-                message=f"Artifact '{name}' exceeds maximum allowed size ({self.MAX_ARTIFACT_SIZE_BYTES // (1024 * 1024)} MB)"
+                message=f"Artifact '{name}' exceeds maximum allowed size ({self.MAX_ARTIFACT_SIZE_BYTES // (1024*1024)} MB)"
             )
 
         # 2. Type & Extension Validation
         ext = os.path.splitext(name)[1].lower()
         if ext in BLOCKED_EXTENSIONS or (ext and ext not in ALLOWED_EXTENSIONS):
-            raise ValidationError(message=f"Artifact extension '{ext}' is forbidden by sandbox security policy.")
+            raise ValidationError(
+                message=f"Artifact extension '{ext}' is forbidden by sandbox security policy."
+            )
 
         content_type, _ = mimetypes.guess_type(name)
         content_type = content_type or "application/octet-stream"

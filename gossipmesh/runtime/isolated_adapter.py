@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecutionConfig:
     """Resource constraints and security policies for sandbox execution."""
-
     non_root_uid: int = 10001
     non_root_gid: int = 10001
     read_only_root: bool = True
@@ -50,7 +49,6 @@ class ExecutionConfig:
 @dataclass
 class ExecutionResult:
     """Execution telemetry and output results."""
-
     exit_code: int
     stdout: str
     stderr: str
@@ -125,22 +123,16 @@ class RootlessContainerAdapter(BaseExecutionAdapter):
 
         # Read-only root image
         if config.read_only_root:
-            args.extend(
-                [
-                    "--read-only",
-                    "--tmpfs=/tmp:rw,noexec,nosuid,size=128m",
-                ]
-            )
+            args.extend([
+                "--read-only",
+                "--tmpfs=/tmp:rw,noexec,nosuid,size=128m",
+            ])
 
         # Ephemeral workspace mount only
-        args.extend(
-            [
-                "-v",
-                f"{abs_workspace}:/workspace:rw",
-                "-w",
-                "/workspace",
-            ]
-        )
+        args.extend([
+            "-v", f"{abs_workspace}:/workspace:rw",
+            "-w", "/workspace",
+        ])
 
         # Scrubbed environment variables
         clean_env = CommandPolicyEngine.sanitize_environment(config.env_vars)

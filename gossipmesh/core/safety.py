@@ -112,8 +112,5 @@ def check_auto_merge_allowed() -> Tuple[bool, str]:
 def check_file_mutation_limit(num_files: int) -> Tuple[bool, str]:
     """Validates that modified file count is within safe limits."""
     if num_files > safety.MAX_FILES_PER_CHANGE:
-        return (
-            False,
-            f"File mutation limit exceeded: {num_files} files changed (max allowed: {safety.MAX_FILES_PER_CHANGE}).",
-        )
+        return False, f"File mutation limit exceeded: {num_files} files changed (max allowed: {safety.MAX_FILES_PER_CHANGE})."
     return True, ""
