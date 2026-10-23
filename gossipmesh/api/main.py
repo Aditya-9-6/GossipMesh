@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import os
-
     if os.getenv("TESTING", "").lower() in ("true", "1") or "sqlite" in str(settings.DATABASE_URI):
         yield
         return
@@ -138,3 +137,4 @@ def prometheus_metrics():
     from gossipmesh.observability.metrics import CONTENT_TYPE_LATEST, generate_latest_metrics
 
     return Response(content=generate_latest_metrics(), media_type=CONTENT_TYPE_LATEST)
+
