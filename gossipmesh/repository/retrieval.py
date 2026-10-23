@@ -63,7 +63,7 @@ class PermissionAwareRetriever:
         )
         if not membership:
             raise AuthorizationError(
-                message=f"Access denied: User {user_id} does not belong to organization {repo.organization_id}"
+                message=f"Not authorized for this organization: Access denied for User {user_id} to organization {repo.organization_id}"
             )
 
         # 2. Branch Authorization
