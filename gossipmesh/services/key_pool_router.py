@@ -93,11 +93,7 @@ def _load_raw_keys() -> List[str]:
                 pass
 
     if not keys:
-        is_test_env = bool(
-            os.getenv("PYTEST_CURRENT_TEST")
-            or os.getenv("TEST_MODE")
-            or "pytest" in sys.modules
-        )
+        is_test_env = bool(os.getenv("PYTEST_CURRENT_TEST") or os.getenv("TEST_MODE") or "pytest" in sys.modules)
         if is_test_env:
             keys = ["dummy-test-key-1", "dummy-test-key-2"]
         else:
@@ -242,12 +238,13 @@ router = KeyPoolRouter()
 
 def track_error_rate(fn: Callable | None = None, *, router_instance: KeyPoolRouter | None = None):
     """Decorator that wraps a function with automatic key rotation and error rate tracking.
-    
+
     If the wrapped function fails:
     1. The exception and full traceback are logged to stderr (no silent swallowing).
     2. The failure is recorded in the key metrics.
     3. The next key is selected and the operation is retried up to MAX_KEY_RETRIES.
     """
+
     def decorator(func: Callable) -> Callable:
         sig = inspect.signature(func)
         accepts_api_key = "api_key" in sig.parameters
@@ -281,8 +278,7 @@ def track_error_rate(fn: Callable | None = None, *, router_instance: KeyPoolRout
                     last_exception = e
                     err_msg = str(e).lower()
                     is_immediate = any(
-                        term in err_msg
-                        for term in ("429", "503", "quota", "rate limit", "resourceexhausted")
+                        term in err_msg for term in ("429", "503", "quota", "rate limit", "resourceexhausted")
                     )
                     active_router.record(key, is_error=True, immediate=is_immediate)
 

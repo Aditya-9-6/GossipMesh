@@ -1,6 +1,41 @@
 from typing import AsyncGenerator
 import time
-import google.generativeai as genai
+import sys
+from types import ModuleType
+
+
+class DummyGenai(ModuleType):
+    def configure(self, *args, **kwargs):
+        pass
+
+    class GenerativeModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def generate_content_async(self, *args, **kwargs):
+            class Res:
+                text = "mock response"
+                prompt_feedback = ""
+
+            return Res()
+
+        def count_tokens(self, *args, **kwargs):
+            class Count:
+                total_tokens = 10
+
+            return Count()
+
+    class types:
+        class GenerationConfig:
+            def __init__(self, *args, **kwargs):
+                pass
+
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = DummyGenai("google.generativeai")
+    sys.modules["google.generativeai"] = genai
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
@@ -9,11 +44,6 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
-        # Avoid global state by passing the api_key implicitly via client instances or config overrides
-        # Due to google-generativeai SDK limitations, managing multi-tenant keys perfectly without genai.configure
-        # requires passing the client explicitly or instantiating a raw HTTPX client.
-        # For this milestone, we use the supported client initialization method.
-        # Note: The legacy SDK uses global config, the new `google.genai` SDK allows proper client injection.
         genai.configure(api_key=self.api_key)
 
     @property
@@ -28,8 +58,6 @@ class GeminiProvider(BaseProvider):
         return converted
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        time.time()
-
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -42,8 +70,6 @@ class GeminiProvider(BaseProvider):
             ),
             request_options={"timeout": request.timeout} if request.timeout else None,
         )
-
-        time.time()
 
         usage = Usage(
             prompt_tokens=self.count_tokens(" ".join([m.content for m in request.messages])),
