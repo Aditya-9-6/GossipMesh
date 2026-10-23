@@ -339,7 +339,7 @@ def main():
 Instructions:
 1. Implement the feature or fix specified in the issue.
 2. Adhere strictly to performance, zero-allocation, and concurrency invariants.
-3. Include comprehensive unit tests ({'*_test.go' if is_go else 'test_*.py'}).
+3. Include comprehensive unit tests ({"*_test.go" if is_go else "test_*.py"}).
 4. Output your response as valid JSON adhering to the specified schema:
    {{"summary": "...", "files": [{{"path": "...", "content": "..."}}]}}
 """

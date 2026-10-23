@@ -35,8 +35,12 @@ def upgrade() -> None:
         sa.Column("job_version", sa.String(length=32), nullable=False, server_default="v1"),
         sa.Column("is_cancelled", sa.Boolean(), nullable=False, server_default=sa.text("0")),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_index_jobs_organization_id", "index_jobs", ["organization_id"])
@@ -51,7 +55,9 @@ def upgrade() -> None:
         sa.Column("filepath", sa.String(length=1024), nullable=False),
         sa.Column("file_hash", sa.String(length=64), nullable=False),
         sa.Column("commit_sha", sa.String(length=64), nullable=False),
-        sa.Column("last_indexed_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "last_indexed_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_file_index_records_organization_id", "file_index_records", ["organization_id"])

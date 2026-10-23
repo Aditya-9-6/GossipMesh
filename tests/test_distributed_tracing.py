@@ -23,7 +23,6 @@ def clean_exporter():
     exporter.clear()
 
 
-
 def test_tracing_across_all_eight_layers(clean_exporter):
     with trace_workflow(workflow_id=404, workflow_type="issue_to_pr") as wf_span:
         with trace_api(endpoint="/api/v1/projects", method="GET"):
