@@ -57,9 +57,7 @@ SECRET_PATTERNS = [
     ),
     (
         "SLACK_WEBHOOK",
-        re.compile(
-            r"https://hooks\.slack\.com/services/T[0-9A-Za-z_\-]{7,14}/B[0-9A-Za-z_\-]{7,14}/[0-9A-Za-z_\-]{20,36}"
-        ),
+        re.compile(r"https://hooks\.slack\.com/services/T[0-9A-Za-z_\-]{7,14}/B[0-9A-Za-z_\-]{7,14}/[0-9A-Za-z_\-]{20,36}"),
         "CRITICAL",
         "Slack Webhook URL detected.",
         "Store Slack webhook URLs in encrypted environment variables.",
@@ -73,10 +71,7 @@ SECRET_PATTERNS = [
     ),
     (
         "GENERIC_SECRET_ASSIGNMENT",
-        re.compile(
-            r"""(?:api_key|api_secret|jwt_secret|client_secret|auth_token)\s*=\s*['"][a-zA-Z0-9_\-]{20,}['"]""",
-            re.IGNORECASE,
-        ),
+        re.compile(r"""(?:api_key|api_secret|jwt_secret|client_secret|auth_token)\s*=\s*['"][a-zA-Z0-9_\-]{20,}['"]""", re.IGNORECASE),
         "CRITICAL",
         "Hardcoded API credential or JWT secret assignment detected.",
         "Inject secrets via environment variables or secret vaults at runtime.",
@@ -147,10 +142,7 @@ class SecretScanner:
 
 BANNED_PACKAGES = {
     "telnetlib3": ("CRITICAL", "Unencrypted protocol library telnetlib3 is banned in enterprise code."),
-    "pycrypto": (
-        "HIGH",
-        "pycrypto is unmaintained and contains multiple known vulnerabilities. Use pycryptodome or cryptography.",
-    ),
+    "pycrypto": ("HIGH", "pycrypto is unmaintained and contains multiple known vulnerabilities. Use pycryptodome or cryptography."),
     "pickle5": ("HIGH", "pickle5 introduces arbitrary code execution risks during deserialization."),
 }
 
@@ -204,7 +196,6 @@ class DependencyScanner:
 # -----------------------------------------------------------------------------
 # 3. Python AST Security Scanner (Bandit equivalent)
 # -----------------------------------------------------------------------------
-
 
 class ASTSecurityVisitor(ast.NodeVisitor):
     def __init__(self, file_path: str):
@@ -413,7 +404,6 @@ class ChangedFilePolicyScanner:
 # 5. Deterministic Review Gate Orchestrator
 # -----------------------------------------------------------------------------
 
-
 class DeterministicReviewGates:
     """Orchestrates all deterministic scanners and enforces non-overridable gating rules."""
 
@@ -439,9 +429,7 @@ class DeterministicReviewGates:
             # 4. AST Security Scanner (if full code or diff lines exist)
             if f.patch and f.path.endswith(".py"):
                 # Extract added lines or parse snippet
-                added_lines = [
-                    line[1:] for line in f.patch.splitlines() if line.startswith("+") and not line.startswith("+++")
-                ]
+                added_lines = [line[1:] for line in f.patch.splitlines() if line.startswith("+") and not line.startswith("+++")]
                 if added_lines:
                     source_chunk = "\n".join(added_lines)
                     all_findings.extend(ASTSecurityScanner.scan_code(f.path, source_chunk))

@@ -18,29 +18,17 @@ depends_on = None
 
 def upgrade() -> None:
     with op.batch_alter_table("document_chunks", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("organization_id", sa.String(length=128), nullable=False, server_default="default")
-        )
+        batch_op.add_column(sa.Column("organization_id", sa.String(length=128), nullable=False, server_default="default"))
         batch_op.add_column(sa.Column("repository_id", sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column("branch", sa.String(length=256), nullable=False, server_default="main"))
         batch_op.add_column(sa.Column("chunk_index", sa.Integer(), nullable=False, server_default="0"))
         batch_op.add_column(sa.Column("chunk_hash", sa.String(length=64), nullable=True))
-        batch_op.add_column(
-            sa.Column("provider", sa.String(length=128), nullable=False, server_default="openai:text-embedding-3-small")
-        )
+        batch_op.add_column(sa.Column("provider", sa.String(length=128), nullable=False, server_default="openai:text-embedding-3-small"))
         batch_op.add_column(sa.Column("embedding_version", sa.String(length=32), nullable=False, server_default="v1"))
         batch_op.add_column(sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.text("0")))
         batch_op.add_column(sa.Column("retention_expires_at", sa.DateTime(timezone=True), nullable=True))
-        batch_op.add_column(
-            sa.Column(
-                "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-            )
-        )
-        batch_op.add_column(
-            sa.Column(
-                "updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-            )
-        )
+        batch_op.add_column(sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False))
+        batch_op.add_column(sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False))
 
         batch_op.create_index("ix_document_chunks_organization_id", ["organization_id"])
         batch_op.create_index("ix_document_chunks_repository_id", ["repository_id"])

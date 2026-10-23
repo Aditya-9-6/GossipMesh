@@ -114,11 +114,7 @@ def test_deterministic_gates_verdict_logic():
     assert any(f.severity == "CRITICAL" for f in findings)
 
     # Case 3: Test failure -> REQUEST_CHANGES
-    failing_tests = [
-        TestResult(
-            status="failed", test_id="test_calc", name="test_square", passed=False, error_message="AssertionError"
-        )
-    ]
+    failing_tests = [TestResult(status="failed", test_id="test_calc", name="test_square", passed=False, error_message="AssertionError")]
     verdict, score, findings = gates.evaluate(files=[clean_file], test_results=failing_tests)
     assert verdict == Verdict.REQUEST_CHANGES
     assert score <= 70
