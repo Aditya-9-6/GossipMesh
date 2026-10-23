@@ -104,8 +104,9 @@ class CommandPolicyEngine:
         binary = cls.get_canonical_binary_name(raw_binary)
 
         # Allow current python executable
-        is_current_python = raw_binary == sys.executable or os.path.abspath(raw_binary) == os.path.abspath(
-            sys.executable
+        is_current_python = (
+            raw_binary == sys.executable
+            or os.path.abspath(raw_binary) == os.path.abspath(sys.executable)
         )
 
         # Rule 2: Explicit binary whitelist
@@ -258,7 +259,10 @@ class SandboxEnvironment:
             process.kill()
             stdout, stderr = process.communicate()
             duration = time.time() - start_time
-            logger.error(f"[AUDIT:SANDBOX_EXEC_TIMEOUT] workflow_id={effective_wf} killed after {duration:.2f}s")
+            logger.error(
+                f"[AUDIT:SANDBOX_EXEC_TIMEOUT] workflow_id={effective_wf} "
+                f"killed after {duration:.2f}s"
+            )
             raise SandboxError(
                 message=f"Command timed out after {effective_timeout}s",
                 details={"stderr": stderr, "workflow_id": effective_wf},

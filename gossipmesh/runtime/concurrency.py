@@ -83,7 +83,10 @@ class TenantConcurrencyLimiter:
         now = time.time()
         key = (organization_id, slot_type)
         leases = self._active_leases.get(key, {})
-        stale_ids = [lid for lid, info in leases.items() if (now - info["acquired_at"]) > self.stale_lease_seconds]
+        stale_ids = [
+            lid for lid, info in leases.items()
+            if (now - info["acquired_at"]) > self.stale_lease_seconds
+        ]
         for lid in stale_ids:
             del leases[lid]
 
@@ -124,9 +127,7 @@ class TenantConcurrencyLimiter:
                 current_global_count = len(self._active_leases.get(global_key, {}))
 
                 # Check both slot limit and overall worker capacity
-                if current_slot_count < limit and (
-                    slot_type == ConcurrencySlotType.WORKER_CAPACITY.value or current_global_count < global_limit
-                ):
+                if current_slot_count < limit and (slot_type == ConcurrencySlotType.WORKER_CAPACITY.value or current_global_count < global_limit):
                     lease_id = str(uuid.uuid4())
                     now = time.time()
                     if key not in self._active_leases:
