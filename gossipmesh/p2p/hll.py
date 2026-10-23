@@ -23,7 +23,7 @@ class WindowedHyperLogLog:
         self.p = int(math.log2(num_registers))
         self.registers = bytearray(num_registers)
         self.timestamps = [0.0] * num_registers
-        self._lock = threading.RLock()
+        self._lock = threading.Lock()
 
     def _hash(self, item: str) -> int:
         if mmh3 is not None:
