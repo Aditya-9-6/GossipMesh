@@ -16,14 +16,12 @@ from typing import Dict, Optional, Tuple
 
 class LimitExceededError(Exception):
     """Raised when an operation exceeds daily organization or repository ceilings."""
-
     pass
 
 
 @dataclass
 class DailyQuotas:
     """Configurable daily quotas for an organization or repository."""
-
     max_runs: int = 50
     max_prs: int = 20
     max_tokens: int = 1_000_000
@@ -35,7 +33,6 @@ class DailyQuotas:
 @dataclass
 class DailyUsageRecord:
     """Tracks cumulative usage consumed on a specific UTC day."""
-
     day: str  # YYYY-MM-DD
     runs: int = 0
     prs: int = 0
@@ -101,22 +98,13 @@ class DailyVolumeLimiter:
                 return False, f"Daily limit exceeded for org '{org_id}': token quota ({org_quota.max_tokens}) reached."
 
             if org_usage.cost_usd + cost_est > org_quota.max_cost_usd:
-                return (
-                    False,
-                    f"Daily limit exceeded for org '{org_id}': cost limit (${org_quota.max_cost_usd:.2f}) reached.",
-                )
+                return False, f"Daily limit exceeded for org '{org_id}': cost limit (${org_quota.max_cost_usd:.2f}) reached."
 
             if org_usage.changed_lines + lines_est > org_quota.max_changed_lines:
-                return (
-                    False,
-                    f"Daily limit exceeded for org '{org_id}': changed lines limit ({org_quota.max_changed_lines}) reached.",
-                )
+                return False, f"Daily limit exceeded for org '{org_id}': changed lines limit ({org_quota.max_changed_lines}) reached."
 
             if org_usage.sandbox_minutes + sandbox_minutes_est > org_quota.max_sandbox_minutes:
-                return (
-                    False,
-                    f"Daily limit exceeded for org '{org_id}': sandbox minutes limit ({org_quota.max_sandbox_minutes}m) reached.",
-                )
+                return False, f"Daily limit exceeded for org '{org_id}': sandbox minutes limit ({org_quota.max_sandbox_minutes}m) reached."
 
             # Check repo limits if provided
             if repo_id:
@@ -124,37 +112,22 @@ class DailyVolumeLimiter:
                 repo_usage = self._get_usage_record("repo", repo_id)
 
                 if repo_usage.runs + 1 > repo_quota.max_runs:
-                    return (
-                        False,
-                        f"Daily limit exceeded for repo '{repo_id}': max runs ({repo_quota.max_runs}) reached.",
-                    )
+                    return False, f"Daily limit exceeded for repo '{repo_id}': max runs ({repo_quota.max_runs}) reached."
 
                 if is_pr and (repo_usage.prs + 1 > repo_quota.max_prs):
                     return False, f"Daily limit exceeded for repo '{repo_id}': max PRs ({repo_quota.max_prs}) reached."
 
                 if repo_usage.tokens + tokens_est > repo_quota.max_tokens:
-                    return (
-                        False,
-                        f"Daily limit exceeded for repo '{repo_id}': token quota ({repo_quota.max_tokens}) reached.",
-                    )
+                    return False, f"Daily limit exceeded for repo '{repo_id}': token quota ({repo_quota.max_tokens}) reached."
 
                 if repo_usage.cost_usd + cost_est > repo_quota.max_cost_usd:
-                    return (
-                        False,
-                        f"Daily limit exceeded for repo '{repo_id}': cost limit (${repo_quota.max_cost_usd:.2f}) reached.",
-                    )
+                    return False, f"Daily limit exceeded for repo '{repo_id}': cost limit (${repo_quota.max_cost_usd:.2f}) reached."
 
                 if repo_usage.changed_lines + lines_est > repo_quota.max_changed_lines:
-                    return (
-                        False,
-                        f"Daily limit exceeded for repo '{repo_id}': changed lines limit ({repo_quota.max_changed_lines}) reached.",
-                    )
+                    return False, f"Daily limit exceeded for repo '{repo_id}': changed lines limit ({repo_quota.max_changed_lines}) reached."
 
                 if repo_usage.sandbox_minutes + sandbox_minutes_est > repo_quota.max_sandbox_minutes:
-                    return (
-                        False,
-                        f"Daily limit exceeded for repo '{repo_id}': sandbox minutes limit ({repo_quota.max_sandbox_minutes}m) reached.",
-                    )
+                    return False, f"Daily limit exceeded for repo '{repo_id}': sandbox minutes limit ({repo_quota.max_sandbox_minutes}m) reached."
 
             return True, ""
 

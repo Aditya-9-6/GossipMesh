@@ -17,7 +17,7 @@ def get_artifact(
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """Returns artifact metadata verifying authorization and quarantine state."""
-    artifact = db.query(Artifact).filter(Artifact.id == artifact_id, Artifact.is_deleted.is_(False)).first()
+    artifact = db.query(Artifact).filter(Artifact.id == artifact_id, Artifact.deleted_at.is_(None)).first()
     if not artifact:
         return {"id": None, "name": None}
 
@@ -36,7 +36,7 @@ def get_artifact(
             .first()
         )
         if not membership:
-            raise AuthorizationError(message="Not authorized to access this organization's artifacts")
+            raise AuthorizationError(message="Not authorized to access this artifact")
 
     return {
         "id": artifact.id,

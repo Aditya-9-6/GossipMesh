@@ -162,7 +162,9 @@ class WorkerLeaseManager:
             raise ConflictError(message=f"Job {job_id} not found.")
 
         if job.worker_id != worker_id or job.lease_token != lease_token:
-            raise ConflictError(message=f"Worker '{worker_id}' lease on Job {job_id} is no longer valid.")
+            raise ConflictError(
+                message=f"Worker '{worker_id}' lease on Job {job_id} is no longer valid."
+            )
 
         job.status = "failed"
         job.state = {"error": error_message}

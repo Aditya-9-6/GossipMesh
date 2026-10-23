@@ -1284,9 +1284,7 @@ def run_issue_job(
             volume_limiter.record_usage(org_id=org, prs=1)
         return bool(success)
     except Exception as e:
-        print(
-            f"[ExecutionLoop Watchdog] Issue #{issue_num} failed with unhandled error: {e}", file=sys.stderr, flush=True
-        )
+        print(f"[ExecutionLoop Watchdog] Issue #{issue_num} failed with unhandled error: {e}", file=sys.stderr, flush=True)
         traceback.print_exc(file=sys.stderr)
         # System-error auto-refund full 3 credits
         loop.ledger.refund(org, 3)
@@ -1382,9 +1380,7 @@ def main():
     start_time = time.time()
 
     if args.once:
-        run_loop_iteration(
-            workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
-        )
+        run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop)
     elif args.iterations > 0:
         print(
             f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, max: {args.max_minutes}m, interval: {args.interval}s, worker: {args.worker_id}/{args.num_workers})...",
@@ -1398,9 +1394,7 @@ def main():
             )
             print(f"=======================================================", flush=True)
             try:
-                run_loop_iteration(
-                    workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
-                )
+                run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop)
             except Exception as e:
                 print(f"[Error in cycle {i + 1}]: {e}", file=sys.stderr, flush=True)
 
@@ -1417,9 +1411,7 @@ def main():
         )
         while True:
             try:
-                run_loop_iteration(
-                    workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
-                )
+                run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop)
             except Exception as e:
                 print(f"[Error in loop]: {e}", file=sys.stderr, flush=True)
 

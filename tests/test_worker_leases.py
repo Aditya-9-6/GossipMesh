@@ -27,9 +27,7 @@ def db_session():
     try:
         # Seed required foreign keys
         org = Organization(id=1, name="Lease Org")
-        repo = Repository(
-            id=1, organization_id=1, github_id=555, name="repo", full_name="org/repo", default_branch="main"
-        )
+        repo = Repository(id=1, organization_id=1, github_id=555, name="repo", full_name="org/repo", default_branch="main")
         wf = Workflow(id=1, organization_id=1, repository_id=1, status="running")
         session.add_all([org, repo, wf])
         session.commit()
@@ -91,7 +89,9 @@ def test_heartbeat_and_lease_extension(db_session):
 
     # Heartbeat with invalid token fails with ConflictError (fencing)
     with pytest.raises(ConflictError) as exc:
-        WorkerLeaseManager.heartbeat(db=db_session, job_id=20, worker_id=worker_id, lease_token="stolen-wrong-token")
+        WorkerLeaseManager.heartbeat(
+            db=db_session, job_id=20, worker_id=worker_id, lease_token="stolen-wrong-token"
+        )
     assert "Fencing violation" in str(exc.value.message)
 
 
@@ -134,25 +134,9 @@ def test_crash_recovery_sweep(db_session):
     past = datetime.now(timezone.utc) - timedelta(seconds=500)
 
     # Job 1: 1 attempt (< 3) -> should be recovered to pending
-    job1 = Job(
-        id=40,
-        workflow_id=1,
-        agent_name="test_runner",
-        status="running",
-        attempts=1,
-        lease_expires_at=past,
-        worker_id="dead-worker-1",
-    )
+    job1 = Job(id=40, workflow_id=1, agent_name="test_runner", status="running", attempts=1, lease_expires_at=past, worker_id="dead-worker-1")
     # Job 2: 3 attempts (>= 3) -> should fail permanently
-    job2 = Job(
-        id=41,
-        workflow_id=1,
-        agent_name="test_runner",
-        status="running",
-        attempts=3,
-        lease_expires_at=past,
-        worker_id="dead-worker-2",
-    )
+    job2 = Job(id=41, workflow_id=1, agent_name="test_runner", status="running", attempts=3, lease_expires_at=past, worker_id="dead-worker-2")
     db_session.add_all([job1, job2])
     db_session.commit()
 
