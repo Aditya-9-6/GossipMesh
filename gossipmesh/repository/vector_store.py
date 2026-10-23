@@ -19,7 +19,6 @@ from gossipmesh.models.base import Base
 
 class DocumentChunk(Base):
     """Production vector chunk model backed by PostgreSQL pgvector."""
-
     __tablename__ = "document_chunks"
 
     id: Any = Column(String(256), primary_key=True)
