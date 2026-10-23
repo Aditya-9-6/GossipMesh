@@ -170,33 +170,37 @@ def call_ai_model(prompt: str) -> dict:
 
 
 def run_cmd(cmd: list[str], cwd: Path = Path(".")) -> tuple[int, str, str]:
+    repo = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY")
+    if repo and cmd and cmd[0] == "gh" and "--repo" not in cmd and len(cmd) > 1 and cmd[1] in ("issue", "pr", "workflow", "api"):
+        cmd = [cmd[0], cmd[1], "--repo", repo] + cmd[2:]
     res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return res.returncode, res.stdout.strip(), res.stderr.strip()
 
 
-def evaluate_issue(issue_number: str, workspace: Path, force: bool = False):
+def evaluate_issue(issue_number: str, workspace: Path, title: str = "", body: str = "", force: bool = False):
     print(f"[*] AI Gatekeeper evaluating Issue #{issue_number} in {workspace}...", flush=True)
 
-    # 1. Fetch issue metadata
-    code, stdout, stderr = run_cmd(
-        ["gh", "issue", "view", issue_number, "--json", "number,title,body,state,labels,author"], cwd=workspace
-    )
-    if code != 0 or not stdout:
-        print(f"[!] Failed to fetch Issue #{issue_number}: {stderr}", file=sys.stderr)
-        return False
+    # 1. Fetch issue metadata if not provided
+    if not title or not body:
+        code, stdout, stderr = run_cmd(
+            ["gh", "issue", "view", str(issue_number), "--json", "number,title,body,state,labels,author"], cwd=workspace
+        )
+        if code != 0 or not stdout:
+            print(f"[!] Failed to fetch Issue #{issue_number}: {stderr}", file=sys.stderr)
+            return False
 
-    issue = json.loads(stdout)
-    if issue.get("state") != "OPEN":
-        print(f"[*] Issue #{issue_number} is already closed ({issue.get('state')}). Skipping.")
-        return True
+        issue = json.loads(stdout)
+        if issue.get("state") != "OPEN":
+            print(f"[*] Issue #{issue_number} is already closed ({issue.get('state')}). Skipping.")
+            return True
 
-    labels = [l.get("name", "") for l in issue.get("labels", [])]
-    if not force and ("approved" in labels or "rejected" in labels):
-        print(f"[*] Issue #{issue_number} already has terminal label {labels}. Skipping duplicate evaluation.")
-        return True
+        labels = [l.get("name", "") for l in issue.get("labels", [])]
+        if not force and ("approved" in labels or "rejected" in labels):
+            print(f"[*] Issue #{issue_number} already has terminal label {labels}. Skipping duplicate evaluation.")
+            return True
 
-    title = issue.get("title", "")
-    body = issue.get("body", "")
+        title = issue.get("title", "")
+        body = issue.get("body", "")
 
     # 2. Fetch existing issues for context / deduplication
     _, issues_out, _ = run_cmd(
@@ -242,9 +246,9 @@ Instructions:
     print(f"[+] Evaluation Result for Issue #{issue_number}: Verdict={verdict}, Score={score}/100", flush=True)
 
     # Action 1: APPROVED
-    if verdict == "APPROVE" or (verdict == "NEEDS_CHANGES" and score >= 85 and not refined_body):
-        print(f"[*] Approving Issue #{issue_number} and triggering PR Solution Agent...", flush=True)
-        run_cmd(["gh", "issue", "edit", issue_number, "--add-label", "approved,auto-solve"], cwd=workspace)
+    if verdict == "APPROVE" or (verdict == "NEEDS_CHANGES" and score >= 80 and not refined_body):
+        print(f"[*] Approving Issue #{issue_number}...", flush=True)
+        run_cmd(["gh", "issue", "edit", str(issue_number), "--add-label", "approved,auto-solve"], cwd=workspace)
 
         comment = f"""### 🏛️ Architectural Gatekeeper: Issue Approved ✅
 
@@ -255,21 +259,15 @@ Instructions:
 {rationale}
 
 ---
-👉 **Triggering Autonomous PR Solution Agent...**
-/solve
+*Ready for autonomous solution synthesis and pre-flight verification.*
 """
-        run_cmd(["gh", "issue", "comment", issue_number, "--body", comment], cwd=workspace)
-
-        # Trigger PR solver workflow
-        print(f"[*] Dispatching ai-issue-solver.yml for issue #{issue_number}...", flush=True)
-        run_cmd(["gh", "workflow", "run", "ai-issue-solver.yml", "-f", f"issue_number={issue_number}"], cwd=workspace)
+        run_cmd(["gh", "issue", "comment", str(issue_number), "--body", comment], cwd=workspace)
         return True
 
     # Action 2: NEEDS CHANGES (Autonomous Collaborative Refinement)
     elif verdict == "NEEDS_CHANGES":
         print(f"[*] Issue #{issue_number} requires refinement. Updating specification...", flush=True)
 
-        # If the AI provided a refined body, update the issue directly!
         if refined_body:
             new_title = refined_title if refined_title else title
             run_cmd(
@@ -277,7 +275,7 @@ Instructions:
                     "gh",
                     "issue",
                     "edit",
-                    issue_number,
+                    str(issue_number),
                     "--title",
                     new_title,
                     "--body",
@@ -298,14 +296,12 @@ Instructions:
 {feedback or rationale}
 
 #### 🛠️ Autonomous Refinement
-*The Issue Maker Agent has incorporated the feedback directly into the issue description above. The ticket is now updated with strict acceptance criteria, performance invariants, and implementation scope.*
-
-> 💡 Comment `/approve-issue` or `/solve` to proceed with automated PR creation.
+*The specification has been updated with rigorous acceptance criteria and performance invariants.*
 """
-        run_cmd(["gh", "issue", "comment", issue_number, "--body", comment], cwd=workspace)
-        return True
+        run_cmd(["gh", "issue", "comment", str(issue_number), "--body", comment], cwd=workspace)
+        return False
 
-    # Action 3: REJECT / UNNECESSARY
+    # Action 3: REJECT / UNNECESSARY (Score < 55)
     else:
         print(f"[*] Issue #{issue_number} rejected as unnecessary (Score: {score}/100). Closing...", flush=True)
         comment = f"""### 🛑 Architectural Gatekeeper: Issue Closed (Unnecessary / Not Planned)
@@ -316,23 +312,31 @@ Instructions:
 #### 🔍 Evaluation Rationale
 {rationale}
 
-*Closing this issue as not planned to maintain focus on core high-value roadmap items.*
+*Closing this issue as not planned to prevent bloat and maintain focus on high-value architecture.*
 """
-        run_cmd(["gh", "issue", "comment", issue_number, "--body", comment], cwd=workspace)
-        run_cmd(["gh", "issue", "close", issue_number, "--reason", "not_planned"], cwd=workspace)
-        run_cmd(["gh", "issue", "edit", issue_number, "--add-label", "rejected"], cwd=workspace)
-        return True
+        run_cmd(["gh", "issue", "comment", str(issue_number), "--body", comment], cwd=workspace)
+        run_cmd(["gh", "issue", "close", str(issue_number), "--reason", "not_planned"], cwd=workspace)
+        run_cmd(["gh", "issue", "edit", str(issue_number), "--add-label", "rejected"], cwd=workspace)
+        return False
 
 
 def main():
     parser = argparse.ArgumentParser(description="AI Issue Approval & Gatekeeper Bot")
     parser.add_argument("--issue-number", required=True, help="GitHub Issue Number")
+    parser.add_argument("--issue-title", default="", help="Issue title (optional)")
+    parser.add_argument("--issue-body", default="", help="Issue body (optional)")
     parser.add_argument("--workspace", default=".", help="Workspace directory")
     parser.add_argument("--force", action="store_true", help="Force re-evaluation even if already labeled")
     args = parser.parse_args()
 
     workspace = Path(args.workspace).resolve()
-    success = evaluate_issue(args.issue_number, workspace, force=args.force)
+    success = evaluate_issue(
+        args.issue_number,
+        workspace,
+        title=args.issue_title,
+        body=args.issue_body,
+        force=args.force,
+    )
     sys.exit(0 if success else 1)
 
 

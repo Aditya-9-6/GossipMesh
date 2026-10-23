@@ -24,7 +24,6 @@ class FindingStatus(str, Enum):
 
 class HistoricalFindingFeedback(BaseModel):
     """Feedback on past findings to avoid repeating dismissed false positives or re-flagging accepted patterns."""
-
     fingerprint: str
     status: FindingStatus
     file_path: Optional[str] = None
@@ -34,7 +33,6 @@ class HistoricalFindingFeedback(BaseModel):
 
 class ReviewPolicyRule(BaseModel):
     """Organization or repository specific review policy rules."""
-
     rule_id: str
     name: str
     description: str
@@ -45,7 +43,6 @@ class ReviewPolicyRule(BaseModel):
 
 class SymbolContext(BaseModel):
     """Extracted AST symbols affected by the pull request."""
-
     name: str
     kind: str  # function, class, method, constant, etc.
     file_path: str
@@ -56,7 +53,6 @@ class SymbolContext(BaseModel):
 
 class ChangedFileContext(BaseModel):
     """Changed file and diff contents."""
-
     path: str
     status: str = "modified"  # modified, added, removed, renamed
     patch: str = ""
@@ -66,7 +62,6 @@ class ChangedFileContext(BaseModel):
 
 class RepositoryContext(BaseModel):
     """Repository architecture and operational guidelines."""
-
     repo_name: str
     default_branch: str = "main"
     primary_languages: List[str] = Field(default_factory=list)
@@ -76,7 +71,6 @@ class RepositoryContext(BaseModel):
 
 class EvidenceRequirement(BaseModel):
     """Strict evidence criteria required for any reported finding."""
-
     require_code_snippet: bool = True
     require_line_numbers: bool = True
     require_citations: bool = True
@@ -85,7 +79,6 @@ class EvidenceRequirement(BaseModel):
 
 class PromptPipelineInput(BaseModel):
     """Complete context container for the structured review prompt."""
-
     repo_context: RepositoryContext
     changed_files: List[ChangedFileContext]
     symbols: List[SymbolContext] = Field(default_factory=list)
@@ -200,16 +193,12 @@ Do NOT output markdown code blocks (```json ... ```) or conversational commentar
     def format_policies(self, policies: List[ReviewPolicyRule]) -> str:
         """Formats active review policy rules."""
         if not policies:
-            return (
-                "### REVIEW POLICIES\n- No custom organization policies configured (Standard secure practices apply).\n"
-            )
+            return "### REVIEW POLICIES\n- No custom organization policies configured (Standard secure practices apply).\n"
 
         lines = ["### REVIEW POLICIES"]
         for p in policies:
             patterns = f" (Blocked patterns: {', '.join(p.blocked_patterns)})" if p.blocked_patterns else ""
-            lines.append(
-                f"- Policy [{p.rule_id}] {p.name}: {p.description}. Severity threshold: {p.severity_threshold}{patterns}"
-            )
+            lines.append(f"- Policy [{p.rule_id}] {p.name}: {p.description}. Severity threshold: {p.severity_threshold}{patterns}")
         return "\n".join(lines) + "\n"
 
     def format_historical_feedback(self, feedback: List[HistoricalFindingFeedback]) -> str:
@@ -222,13 +211,9 @@ Do NOT output markdown code blocks (```json ... ```) or conversational commentar
         for item in feedback:
             reason = f" Reason: {item.reason}" if item.reason else ""
             cat = f" [{item.rule_or_category}]" if item.rule_or_category else ""
-            lines.append(
-                f"- Status: {item.status.value}{cat} | Fingerprint: {item.fingerprint} | File: {item.file_path or 'N/A'}.{reason}"
-            )
+            lines.append(f"- Status: {item.status.value}{cat} | Fingerprint: {item.fingerprint} | File: {item.file_path or 'N/A'}.{reason}")
             if item.status == FindingStatus.DISMISSED:
-                lines.append(
-                    "  -> CRITICAL: Do NOT re-flag this finding unless modified code re-introduces the vulnerability."
-                )
+                lines.append("  -> CRITICAL: Do NOT re-flag this finding unless modified code re-introduces the vulnerability.")
             elif item.status == FindingStatus.ACCEPTED:
                 lines.append("  -> Previously verified as valid: Pay close attention if similar patterns occur.")
         return "\n".join(lines) + "\n"

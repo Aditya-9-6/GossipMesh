@@ -2,7 +2,6 @@
 Unit Tests for Enterprise Packaging CLI Entry Point
 """
 
-import os
 import sys
 import subprocess
 import json
@@ -18,7 +17,7 @@ def test_license_file(tmp_path):
         customer_id="cli-test-corp",
         bundle_ids=["b04"],
         plan="1_year",
-        private_key_path=os.environ["LICENSE_PRIVATE_KEY_PATH"],
+        private_key_path="enterprise/test_private_key.pem",
     )
     lic_file = tmp_path / "license.jwt"
     lic_file.write_text(token, encoding="utf-8")

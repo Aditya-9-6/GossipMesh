@@ -106,7 +106,9 @@ class IdempotencyEngine:
                 locked_until = locked_until.replace(tzinfo=timezone.utc)
 
             if locked_until and locked_until > now:
-                raise ConflictError(message=f"Concurrent operation in progress for idempotency key '{key}'.")
+                raise ConflictError(
+                    message=f"Concurrent operation in progress for idempotency key '{key}'."
+                )
 
             # Lock expired -> renew lock and re-acquire
             record.status = "in_progress"
