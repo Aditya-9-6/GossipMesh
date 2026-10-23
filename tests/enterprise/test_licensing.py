@@ -22,14 +22,34 @@ from scripts.issue_license import issue_license, load_private_key
 @pytest.fixture
 def private_key():
     """Load test private key."""
+    for p in [
+        Path("enterprise/test_private_key.pem"),
+        Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem",
+        Path("../enterprise/test_private_key.pem"),
+    ]:
+        if p.is_file():
+            return load_private_key(str(p))
+
+    # Generate or fallback to creating/loading if needed
     key_path = Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"
-    return load_private_key(str(key_path))
+    if key_path.is_file():
+        return load_private_key(str(key_path))
+
+    return load_private_key("enterprise/test_private_key.pem")
 
 
 @pytest.fixture
 def valid_license_token(private_key):
     """Generate a valid 1-year Enterprise B04 license token."""
-    key_path = Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"
+    key_path = "enterprise/test_private_key.pem"
+    if not Path(key_path).is_file():
+        for p in [
+            Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem",
+            Path("../enterprise/test_private_key.pem"),
+        ]:
+            if p.is_file():
+                key_path = str(p)
+                break
     return issue_license(
         customer_id="acme-defense-corp",
         bundle_ids=["b04"],
