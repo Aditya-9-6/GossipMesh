@@ -39,9 +39,7 @@ def run_staging_smoke_tests(base_url: str = "http://localhost:8000") -> bool:
             print(f"[!] FAILED: Readiness probe returned {ready_res.status_code}: {ready_res.text}")
             return False
         comps = ready_res.json().get("components", {})
-        print(
-            f"[+] PASS: Readiness probe healthy. Database: {comps.get('database', {}).get('status')}, Redis: {comps.get('redis', {}).get('status')}"
-        )
+        print(f"[+] PASS: Readiness probe healthy. Database: {comps.get('database', {}).get('status')}, Redis: {comps.get('redis', {}).get('status')}")
     except Exception as e:
         print(f"[!] FAILED: Readiness probe error: {e}")
         return False

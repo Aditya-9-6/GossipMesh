@@ -11,8 +11,11 @@ from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
 
 
 class GossipTopic(str, Enum):
-    AGENT_EVENT = "agent_event"
-    CODE_REVIEW = "code_review"
+    AGENT_SPAWN = "agent:spawn"
+    AGENT_EVENT = "agent:event"
+    CODE_REVIEW = "code:review"
+    BUILD_STATUS = "build:status"
+    SECURITY_ALERT = "security:alert"
     CONSENSUS = "consensus"
     HEARTBEAT = "heartbeat"
     TASK_BID = "task_bid"
@@ -77,7 +80,7 @@ class GossipNode:
         public_key: Optional[str] = None,
         pow_difficulty: int = 0,
         pow_nonce: Optional[int] = None,
-        base_scatter: int = 4,
+        base_scatter: Optional[int] = None,
     ):
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
@@ -89,7 +92,11 @@ class GossipNode:
         self.seen_messages: Set[str] = set()
         self.recent_messages: deque = deque(maxlen=200)
         self._load_seen_history()
-        self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
+        if base_scatter is not None:
+            from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
+            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
+        else:
+            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=4)
 
     def _load_seen_history(self):
         """Loads message IDs previously witnessed to prevent duplicate processing."""
@@ -115,13 +122,14 @@ class GossipNode:
         self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
     ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
-        current_scatter = self.scatter_governor.update()
+        if getattr(self, "scatter_governor", None) is not None:
+            payload["_adaptive_scatter"] = self.scatter_governor.update()
 
         topic_str = topic.value if isinstance(topic, GossipTopic) else topic
         msg = GossipMessage(
             topic=topic_str,
             origin_node=self.node_id,
-            payload={**payload, "_adaptive_scatter": current_scatter},
+            payload=payload,
             repo=repo,
             ttl=ttl,
         )

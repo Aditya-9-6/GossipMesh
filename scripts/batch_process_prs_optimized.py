@@ -132,7 +132,10 @@ def main():
 
     results = []
     with ThreadPoolExecutor(max_workers=safe_workers) as executor:
-        future_to_pr = {executor.submit(run_reviewer, pr, target_repo, args.workspace): pr for pr in pr_numbers}
+        future_to_pr = {
+            executor.submit(run_reviewer, pr, target_repo, args.workspace): pr
+            for pr in pr_numbers
+        }
         for future in as_completed(future_to_pr):
             pr = future_to_pr[future]
             try:
