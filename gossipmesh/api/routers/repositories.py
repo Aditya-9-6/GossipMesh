@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # Schemas
 # ---------------------------------------------------------
 
+
 class SyncRequest(BaseModel):
     full_name: str
     installation_id: int
@@ -76,6 +77,7 @@ class RepositoryDetailResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------
 
+
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
     event = AuditEvent(action=action, actor_id=actor_id, organization_id=org_id, details=details)
     db.add(event)
@@ -105,9 +107,7 @@ def get_user_repo_membership(
     return repo, user_org
 
 
-def require_repo_admin(
-    repo_id: int, db: Session, current_user: User
-) -> Tuple[Repository, Optional[UserOrganization]]:
+def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[Repository, Optional[UserOrganization]]:
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
@@ -117,9 +117,7 @@ def require_repo_admin(
     return repo, user_org
 
 
-def require_repo_writer(
-    repo_id: int, db: Session, current_user: User
-) -> Tuple[Repository, Optional[UserOrganization]]:
+def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[Repository, Optional[UserOrganization]]:
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
@@ -153,6 +151,7 @@ def get_or_create_default_policy(repo: Repository, db: Session) -> RepositoryPol
 # ---------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------
+
 
 @router.post("/sync", status_code=202)
 def sync_repository(
