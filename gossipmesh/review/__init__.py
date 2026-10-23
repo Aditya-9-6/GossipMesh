@@ -1,4 +1,5 @@
 """GossipMesh PR Review and Prompt Pipeline module."""
+
 from gossipmesh.review.prompt_pipeline import (
     PromptPipeline,
     PromptPipelineInput,

@@ -65,6 +65,7 @@ def test_cache_poisoning_detection_and_eviction():
     tampered_raw = cache.client.get(key)
     tampered_envelope = eval(tampered_raw) if isinstance(tampered_raw, str) else tampered_raw
     import json
+
     envelope_dict = json.loads(tampered_raw)
     envelope_dict["data"] = {"result": "MALICIOUS_INJECTION_PAYLOAD"}
     cache.client.set(key, json.dumps(envelope_dict))

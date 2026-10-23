@@ -34,7 +34,7 @@ def get_audit_logs(
 @router.get("/reports/outcome/{tenant_id}")
 def get_outcome_report(
     tenant_id: int,
-    period: str = Query("daily", regex="^(daily|weekly)$"),
+    period: str = Query("daily", pattern="^(daily|weekly)$"),
     repo: Optional[str] = Query(None),
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
