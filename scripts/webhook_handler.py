@@ -81,4 +81,5 @@ async def handle(request: Request):
 if __name__ == "__main__":
     # For local debugging: ``uvicorn webhook_handler:app --reload``
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

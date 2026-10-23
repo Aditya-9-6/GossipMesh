@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-AI Issue Solver for GossipMesh
-Uses Google Gemini API to analyze an issue, understand the Python codebase, generate solutions,
-and write files ready for automated pull request creation.
+AI Issue Solver for DevProxy & GossipMesh
+Analyzes an issue, inspects existing repository source files and invariants,
+synthesizes high-performance code and unit tests, and prepares files for automated PR creation.
+Supports both Go (DevProxy) and Python (GossipMesh), with multi-provider failover
+across Gemini Key Pool, OpenRouter, NVIDIA NIM, and Cohere.
 """
 
 import os
@@ -13,32 +15,54 @@ import urllib.request
 import urllib.error
 import subprocess
 import time
-import hashlib
+import re
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-2.5-pro"
+DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-lite-latest",
     "gemini-2.5-pro",
-    "gemini-1.5-pro",
 ]
 
-SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, AI agent platform architecture, secure sandbox runtimes, and fastAPI backends.
+GO_SYSTEM_PROMPT = """You are a Principal Systems Engineer specializing in Go (Golang), high-throughput low-latency network proxies (DevProxy), zero-allocation memory pooling (sync.Pool), lock-free atomic primitives (sync/atomic), eBPF, and protocol implementations (HTTP/1.1, HTTP/2, HTTP/3, QUIC, TLS 1.3).
+You are working on DevProxy, a high-performance developer-first reverse proxy written in Go.
+
+CORE ARCHITECTURE GUIDELINES:
+1. High throughput and zero allocation: prefer byte slices, stack allocation, and sync.Pool on hot request/response paths. No unnecessary heap allocations.
+2. Concurrency safety: data race freedom, proper mutexes or atomic operations, context cancellation propagation.
+3. Idiomatic Go: error wrapping (%w), standard package organization under pkg/, table-driven unit tests (*_test.go).
+4. Deterministic unit tests: always include comprehensive unit tests ending in _test.go using the standard `testing` package.
+5. Preservation mandate: when editing existing files, never remove existing functionality or imports unless refactoring.
+6. Syntax integrity: Output must be 100% syntactically valid Go with proper package names and imports.
+
+CRITICAL OUTPUT FORMAT:
+Respond with ONLY a valid JSON object and nothing else:
+{
+  "summary": "Brief explanation of what was implemented",
+  "files": [
+    {
+      "path": "pkg/path/to/file.go",
+      "content": "complete file content"
+    }
+  ]
+}
+"""
+
+PYTHON_SYSTEM_PROMPT = """You are an expert autonomous systems software engineer specializing in Python, high-throughput network proxies, AI agent platform architecture, secure sandbox runtimes, and fastAPI backends.
 You are working on GossipMesh, a high-performance, developer-first AI Agent SaaS platform written in Python.
 
 CORE ARCHITECTURE GUIDELINES:
-1. High throughput and low memory footprint: prefer streaming buffers, zero-allocation pooling (sync.Pool) on hot request/response paths.
+1. High throughput and low memory footprint: prefer streaming buffers, zero-allocation pooling on hot request/response paths.
 2. Concurrency safety: ensure data race freedom using proper sync primitives or lock-free circular ring buffers.
 3. Idiomatic Python: clean error handling, context cancellation propagation, no unhandled task leaks, adhere to standard Python naming and conventions.
-4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in test_*.py) with the standard `testing` package.
-5. Code style: clean comments, adherence to standard black formatting.
-6. PRESERVATION MANDATE: When modifying an existing file, you MUST PRESERVE 100% of the existing functions, methods, structs, and imports in that file. NEVER truncate or replace existing file code with partial stubs. If adding new functionality, prefer adding a NEW dedicated Python file (e.g., gossipmesh/<feature>.py) instead of rewriting existing complex files.
-
-You will be given a GitHub issue with its title, description, and repository context.
-Analyze the requirements and generate the exact file changes needed to implement the feature or fix the bug.
+4. Deterministic unit tests: always include table-driven or comprehensive unit tests (ending in test_*.py) with standard pytest or unittest.
+5. Preservation mandate: When modifying an existing file, you MUST PRESERVE 100% of existing functions, methods, structs, and imports. Never truncate with partial stubs.
+6. Syntax integrity: Output must be 100% syntactically valid Python with all imports declared.
 
 CRITICAL OUTPUT FORMAT:
-You MUST respond with a single valid JSON object and NOTHING ELSE (no markdown formatting, no explanations outside the JSON).
-The JSON object must have this exact structure:
+Respond with ONLY a valid JSON object and nothing else:
 {
   "summary": "Brief 2-3 sentence overview of what was implemented and architecture decisions made.",
   "files": [
@@ -50,8 +74,8 @@ The JSON object must have this exact structure:
 }
 """
 
+
 def get_git_files(workspace_root: Path) -> list:
-    """Uses git ls-files for lightning-fast file discovery."""
     try:
         out = subprocess.check_output(["git", "ls-files"], cwd=workspace_root, text=True, stderr=subprocess.DEVNULL)
         return [line.strip().replace("\\", "/") for line in out.splitlines() if line.strip()]
@@ -64,235 +88,235 @@ def get_git_files(workspace_root: Path) -> list:
                 files.append(rel)
         return files
 
-def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60) -> str:
-    """Collects high-level overview of repo structure and pyproject.toml configuration."""
-    overview = []
 
-    go_mod = workspace_root / "pyproject.toml"
-    if go_mod.exists():
+def get_repo_overview(workspace_root: Path, all_files: list, max_files: int = 60) -> str:
+    overview = []
+    is_go = (workspace_root / "go.mod").exists()
+    if is_go:
         try:
-            overview.append(f"=== Root pyproject.toml ===\n{go_mod.read_text(encoding='utf-8')[:2000]}")
+            overview.append(f"=== Root go.mod ===\n{(workspace_root / 'go.mod').read_text(encoding='utf-8')[:1500]}")
         except Exception:
             pass
+        exts = (".go", ".mod", ".md", ".yaml", ".yml")
+    else:
+        go_mod = workspace_root / "pyproject.toml"
+        if go_mod.exists():
+            try:
+                overview.append(f"=== Root pyproject.toml ===\n{go_mod.read_text(encoding='utf-8')[:1500]}")
+            except Exception:
+                pass
+        exts = (".py", ".txt", ".md", ".yaml", ".yml")
 
     overview.append("\n=== Repository File Tree ===")
-    selected = [f for f in all_files if f.endswith((".py", ".mod", ".md", ".yaml", ".yml"))][:max_files]
-    selected = [f for f in all_files if f.endswith((".py", ".txt", ".md", ".yaml", ".yml"))][:max_files]
+    selected = [f for f in all_files if f.endswith(exts)][:max_files]
     overview.append("\n".join(selected))
     return "\n".join(overview)
 
-import ast
-# Add parent directory to path to import gossipmesh
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from gossipmesh.rag import VectorDB
-from gossipmesh.memetic import MemeticKnowledgeBase
 
-def summarize_python_file(content: str) -> str:
-    """Parses a Python file and returns its imports and function/class signatures with docstrings."""
-    summary = []
-    try:
-        tree = ast.parse(content)
+def get_relevant_files(workspace_root: Path, query: str, max_files: int = 5) -> str:
+    all_files = get_git_files(workspace_root)
+    is_go = (workspace_root / "go.mod").exists()
+    target_ext = ".go" if is_go else ".py"
 
-        # Helper to unparse signature without body
-        def get_signature_and_doc(node, indent=0):
-            node_copy = ast.copy_location(type(node)(), node)
-            for field, value in ast.iter_fields(node):
-                if field != 'body':
-                    setattr(node_copy, field, value)
+    scored = []
+    keywords = [w.lower() for w in re.split(r"[^a-zA-Z0-9_]+", query) if len(w) > 3]
 
-            # replace body with pass
-            node_copy.body = [ast.Pass()]
+    for f in all_files:
+        if not f.endswith(target_ext) or "test" in f.lower():
+            continue
+        score = sum(1 for kw in keywords if kw in f.lower())
+        if score > 0:
+            scored.append((score, f))
 
-            sig = ast.unparse(node_copy).strip()
-            # remove the 'pass'
-            if sig.endswith('pass'):
-                 sig = sig[:-4].strip()
-
-            lines = [(" " * indent) + sig]
-            doc = ast.get_docstring(node)
-            if doc:
-                lines.append((" " * (indent + 4)) + f'"""{doc}"""')
-            return lines
-
-        for node in tree.body:
-            if isinstance(node, ast.Import):
-                for name in node.names:
-                    summary.append(f"import {name.name}")
-            elif isinstance(node, ast.ImportFrom):
-                module = node.module or ""
-                names = ", ".join(n.name for n in node.names)
-                summary.append(f"from {module} import {names}")
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                summary.extend(get_signature_and_doc(node, 0))
-            elif isinstance(node, ast.ClassDef):
-                summary.extend(get_signature_and_doc(node, 0))
-                # Also get methods
-                for class_node in node.body:
-                    if isinstance(class_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        summary.extend(get_signature_and_doc(class_node, 4))
-    except Exception as e:
-        return f"# Error parsing python file: {e}\n{content[:1000]}"
-    return "\n".join(summary)
-
-def summarize_go_file(filepath: str, workspace_root: Path, raw_content: str) -> str:
-    """Runs the go_ast_extractor tool on a Go file to get a structural summary."""
-    try:
-        extractor_path = Path(__file__).resolve().parent / "go_ast_extractor.go"
-        target_file = workspace_root / filepath
-        res = subprocess.run(["go", "run", str(extractor_path), str(target_file)], capture_output=True, text=True, timeout=10)
-        if res.returncode == 0:
-            data = json.loads(res.stdout)
-            summary = [f"package {data.get('package', '')}", ""]
-            summary.append("import (")
-            for imp in data.get("imports", []):
-                summary.append(f"    {imp}")
-            summary.append(")")
-            summary.append("")
-            summary.extend(data.get("declarations", []))
-            return "\n".join(summary)
-        else:
-             return f"// Error parsing go file: {res.stderr}\n// Proceeding with raw context...\n{raw_content}"
-    except Exception as e:
-        return f"// Error parsing go file: {e}\n{raw_content}"
-
-def get_relevant_files(workspace_root: Path, query_text: str) -> str:
-    """Uses VectorDB RAG to find semantically relevant files for context."""
-    context_files = []
-
-    # Initialize and index workspace if not already done
-    db = VectorDB()
-    if not db.embeddings:
-        print("[*] VectorDB is empty. Indexing workspace...")
-        db.index_workspace(workspace_root)
-
-    print("[*] Querying VectorDB for relevant context files...")
-    results = db.search(query_text, top_k=3)
-
-    for path, content, score in results:
-        print(f"    [+] RAG hit: {path} (Similarity: {score:.2f})")
-        if path.endswith(".py"):
-             summarized = summarize_python_file(content)
-        elif path.endswith(".go"):
-             summarized = summarize_go_file(path, workspace_root, content)
-        else:
-             summarized = content
-
-        context_files.append(f"=== Existing File: {path} ===\n{summarized}")
-
-    return "\n\n".join(context_files)
-
-def call_gemini(api_key: str, prompt: str, model: str = DEFAULT_MODEL, cache_dir: str = ".pyssip_mesh/cache") -> dict:
-    """Calls Gemini REST API with fallback and retries across supported models."""
-    ordered = [model] + [m for m in FALLBACK_MODELS if m != model]
-    models_to_try = []
-    for m in ordered:
-        if m not in models_to_try:
-            models_to_try.append(m)
-
-    # Check cache
-    cache_path = Path(cache_dir)
-    cache_path.mkdir(parents=True, exist_ok=True)
-    cache_key = hashlib.sha256(f"{model}:{prompt}".encode("utf-8")).hexdigest()
-    cache_file = cache_path / f"{cache_key}.json"
-
-    if cache_file.exists():
+    scored.sort(key=lambda x: x[0], reverse=True)
+    snippets = []
+    for _, f in scored[:max_files]:
+        full_path = workspace_root / f
         try:
-            print("[*] Cache hit! Returning cached Gemini response...", flush=True)
-            return json.loads(cache_file.read_text(encoding="utf-8"))
+            content = full_path.read_text(encoding="utf-8", errors="replace")
+            lines = content.splitlines()[:100]
+            snippets.append(f"--- File: {f} ---\n" + "\n".join(lines))
         except Exception:
             pass
+    return "\n\n".join(snippets)
 
+
+def extract_json_response(text: str) -> dict:
+    text = text.strip()
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if m:
+        text = m.group(1).strip()
+    else:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            text = text[start : end + 1]
+    return json.loads(text)
+
+
+def load_gemini_keys() -> list[str]:
+    keys = []
+    pool = os.environ.get("GEMINI_KEY_POOL", "")
+    for k in pool.split(","):
+        if k.strip() and k.strip() not in keys:
+            keys.append(k.strip())
+    for var in ("GEMINI_SOLVER_KEY", "GEMINI_API_KEY", "GEMINI_REVIEWER_KEY"):
+        val = os.environ.get(var, "").strip()
+        if val and val not in keys:
+            keys.append(val)
+    for check_dir in (Path("."), Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent, Path.home()):
+        kf = check_dir / ".gemini_keys"
+        if kf.exists():
+            try:
+                for line in kf.read_text(encoding="utf-8").splitlines():
+                    k = line.strip()
+                    if k and not k.startswith("#") and k not in keys:
+                        keys.append(k)
+            except Exception:
+                pass
+    return keys
+
+
+def call_gemini(api_key: str, prompt: str, system_prompt: str) -> dict:
+    keys = [api_key] if api_key else []
+    for k in load_gemini_keys():
+        if k not in keys:
+            keys.append(k)
     last_err = None
-    for current_model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
-
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": SYSTEM_PROMPT},
-                        {"text": prompt}
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.2,
-                "responseMimeType": "application/json"
+    for current_key in keys:
+        for model in FALLBACK_MODELS:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={current_key}"
+            payload = {
+                "contents": [{"parts": [{"text": system_prompt}, {"text": prompt}]}],
+                "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
             }
-        }
-
-        print(f"[*] Attempting generation with model: {current_model}...", flush=True)
-        max_attempts = 3
-        for attempt in range(1, max_attempts + 1):
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
-                method="POST"
+                method="POST",
             )
             try:
-                with urllib.request.urlopen(req, timeout=90) as resp:
+                with urllib.request.urlopen(req, timeout=30) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
-                    text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-                    # Parse JSON response
-                    try:
-                        parsed_response = json.loads(text_response, strict=False)
-                    except json.JSONDecodeError:
-                        if text_response.startswith("```"):
-                            lines = text_response.splitlines()
-                            if lines[0].startswith("```"):
-                                lines = lines[1:]
-                            if lines and lines[-1].startswith("```"):
-                                lines = lines[:-1]
-                            text_response = "\n".join(lines).strip()
-                        parsed_response = json.loads(text_response, strict=False)
-
-                    try:
-                        cache_file.write_text(json.dumps(parsed_response), encoding="utf-8")
-                    except Exception:
-                        pass
-
-                    return parsed_response
+                    text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    res_dict = extract_json_response(text)
+                    if isinstance(res_dict, dict) and "files" in res_dict:
+                        return res_dict
             except urllib.error.HTTPError as e:
-                err_msg = e.read().decode("utf-8", errors="replace")
-                print(f"[Warning] HTTP {e.code} (attempt {attempt}/{max_attempts}) with model {current_model}: {err_msg[:200]}", file=sys.stderr)
-                last_err = err_msg
-                # If model is deprecated / not found, do not waste retries
-                if e.code == 404:
+                last_err = e.read().decode("utf-8", errors="replace")
+                if e.code in (400, 401, 403, 429):
                     break
-                if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
-                    time.sleep(1 * attempt)
-                    continue
-                break
+                continue
             except Exception as e:
-                print(f"[Warning] Error (attempt {attempt}/{max_attempts}) with model {current_model}: {e}", file=sys.stderr)
                 last_err = str(e)
-                if attempt < max_attempts:
-                    time.sleep(1 * attempt)
-                    continue
-                break
+                continue
+    raise RuntimeError(f"Gemini API exhausted. Last error: {last_err}")
 
-    raise RuntimeError(f"Failed to obtain solution from Gemini API across models {models_to_try}. Last error: {last_err}")
+
+def call_openrouter(prompt: str, system_prompt: str) -> dict:
+    key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not key:
+        raise ValueError("Missing OPENROUTER_API_KEY")
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    models = ["google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return extract_json_response(data["choices"][0]["message"]["content"])
+        except Exception:
+            continue
+    raise RuntimeError("OpenRouter failed.")
+
+
+def call_nvidia(prompt: str, system_prompt: str) -> dict:
+    key = os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip()
+    if not key:
+        raise ValueError("Missing NVIDIA_API_KEY")
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    models = ["nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"]
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return extract_json_response(data["choices"][0]["message"]["content"])
+        except Exception:
+            continue
+    raise RuntimeError("NVIDIA NIM failed.")
+
+
+def call_cohere(prompt: str, system_prompt: str) -> dict:
+    key = os.environ.get("COHERE_API_KEY", "").strip()
+    if not key:
+        raise ValueError("Missing COHERE_API_KEY")
+    url = "https://api.cohere.com/v2/chat"
+    models = ["command-r-plus-08-2024", "command-r-08-2024", "command-r"]
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return extract_json_response(data["message"]["content"][0]["text"])
+        except Exception:
+            continue
+    raise RuntimeError("Cohere failed.")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="GossipMesh AI Issue Solver")
+    parser = argparse.ArgumentParser(description="AI Issue Solver")
     parser.add_argument("--issue-number", required=True, help="GitHub Issue Number")
     parser.add_argument("--issue-title", required=True, help="GitHub Issue Title")
-    parser.add_argument("--issue-body", required=True, help="GitHub Issue Body")
-    parser.add_argument("--workspace", default=".", help="Workspace root path")
+    parser.add_argument("--issue-body", default="", help="GitHub Issue Body")
+    parser.add_argument("--workspace", default=".", help="Workspace Directory")
     args = parser.parse_args()
 
-    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        print("MISSING_API_KEY: Environment variable GEMINI_API_KEY is not set.", file=sys.stderr)
-        print("To enable the bot, generate a free API key at https://aistudio.google.com/ and add it to GitHub Secrets as GEMINI_API_KEY.")
-        sys.exit(2)
-
     workspace_root = Path(args.workspace).resolve()
+    is_go = (workspace_root / "go.mod").exists()
+    system_prompt = GO_SYSTEM_PROMPT if is_go else PYTHON_SYSTEM_PROMPT
+
     print(f"[*] Solving Issue #{args.issue_number}: {args.issue_title}")
-
-
+    print(f"[*] Target Architecture: {'Go (DevProxy)' if is_go else 'Python (GossipMesh)'}")
 
     print("[*] Inspecting repository context...")
     all_files = get_git_files(workspace_root)
@@ -301,12 +325,7 @@ def main():
     query_text = f"{args.issue_title} {args.issue_body}"
     relevant_files = get_relevant_files(workspace_root, query_text)
 
-    # Memetic Knowledge Injection
-    kb = MemeticKnowledgeBase()
-    meme_context = kb.format_prompt_context(repo="GossipMesh")
-
-    prompt = f"""
-GitHub Issue #{args.issue_number}: {args.issue_title}
+    prompt = f"""GitHub Issue #{args.issue_number}: {args.issue_title}
 
 ### Issue Description & Acceptance Criteria:
 {args.issue_body}
@@ -317,18 +336,48 @@ GitHub Issue #{args.issue_number}: {args.issue_title}
 ### Relevant Existing Source Files:
 {relevant_files if relevant_files else "No directly matching files found. Implement new package or integrate into existing packages."}
 
-{meme_context}
-
 Instructions:
 1. Implement the feature or fix specified in the issue.
-2. Adhere to GossipMesh performance and concurrency invariants.
-3. Write clean, idiomatic Python code with accompanying unit tests (test_*.py).
-4. Output your response as valid JSON adhering to the specified schema.
+2. Adhere strictly to performance, zero-allocation, and concurrency invariants.
+3. Include comprehensive unit tests ({'*_test.go' if is_go else 'test_*.py'}).
+4. Output your response as valid JSON adhering to the specified schema:
+   {{"summary": "...", "files": [{{"path": "...", "content": "..."}}]}}
 """
-    print("[*] Requesting solution from Gemini AI...")
-    result = call_gemini(api_key, prompt)
 
-    summary = result.get("summary", "Automated resolution of issue.")
+    result = None
+    primary_gemini = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+    try:
+        print("[*] Requesting solution from Gemini AI...", flush=True)
+        result = call_gemini(primary_gemini, prompt, system_prompt)
+    except Exception as ge:
+        print(f"[!] Gemini failed: {ge}. Initiating multi-provider failover...", file=sys.stderr)
+
+    if not result:
+        try:
+            print("[*] Requesting solution from OpenRouter...", flush=True)
+            result = call_openrouter(prompt, system_prompt)
+        except Exception as oe:
+            print(f"[!] OpenRouter failover failed: {oe}", file=sys.stderr)
+
+    if not result:
+        try:
+            print("[*] Requesting solution from NVIDIA NIM...", flush=True)
+            result = call_nvidia(prompt, system_prompt)
+        except Exception as ne:
+            print(f"[!] NVIDIA failover failed: {ne}", file=sys.stderr)
+
+    if not result:
+        try:
+            print("[*] Requesting solution from Cohere...", flush=True)
+            result = call_cohere(prompt, system_prompt)
+        except Exception as ce:
+            print(f"[!] Cohere failover failed: {ce}", file=sys.stderr)
+
+    if not result or not isinstance(result, dict) or "files" not in result:
+        print("[!] No file changes could be synthesized by any AI provider.", file=sys.stderr)
+        sys.exit(1)
+
+    summary = result.get("summary", f"Automated resolution for Issue #{args.issue_number}.")
     files = result.get("files", [])
 
     if not files:
@@ -346,21 +395,29 @@ Instructions:
         print(f"    [+] Wrote: {rel_path}")
 
     summary_file = workspace_root / "ai_pr_summary.md"
-    file_changes_str = chr(10).join(f"- `{f['path']}`" for f in files)
-    summary_content = (
-        f"## 🤖 Automated Solution for Issue #{args.issue_number}\n\n"
-        f"**Issue**: #{args.issue_number} - {args.issue_title}\n\n"
-        f"### 📝 Solution Overview\n{summary}\n\n"
-        f"### 📦 Files Changed\n{file_changes_str}\n\n"
-        "### 🛡️ Quality & Performance Invariants\n"
-        "- [x] Idiomatic Python concurrency and memory safety.\n"
-        "- [x] High throughput and streaming invariants preserved.\n"
-        "- [x] Comprehensive unit tests included.\n\n"
-        "---\n"
-        f"*Closes #{args.issue_number}*\n"
-    )
+    file_changes_str = "\n".join(f"- `{f['path']}`" for f in files)
+    lang_name = "Go" if is_go else "Python"
+    summary_content = f"""## 🤖 Automated Solution for Issue #{args.issue_number}
+
+**Issue**: #{args.issue_number} - {args.issue_title}
+
+### 📝 Solution Overview
+{summary}
+
+### 📦 Files Changed
+{file_changes_str}
+
+### 🛡️ Quality & Performance Invariants
+- [x] Idiomatic {lang_name} concurrency and memory safety.
+- [x] High throughput and streaming invariants preserved.
+- [x] Comprehensive unit tests included.
+
+---
+*Closes #{args.issue_number}*
+"""
     summary_file.write_text(summary_content, encoding="utf-8")
     print("[OK] Solution generated and files written successfully.")
+
 
 if __name__ == "__main__":
     main()

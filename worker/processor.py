@@ -16,6 +16,7 @@ def run_ai_reviewer(pr_number: int):
     if not script_path.exists():
         raise FileNotFoundError(f"ai_pr_reviewer.py not found at {script_path}")
     env = os.environ.copy()
+    # Ensure workspace is the repo root and pythonpath includes both repo root and scripts
     env["PYTHONPATH"] = f"{REPO_ROOT};{REPO_ROOT / 'scripts'}"
     result = subprocess.run(
         [sys.executable, str(script_path), "--pr-number", str(pr_number), "--workspace", str(REPO_ROOT)],
@@ -93,7 +94,7 @@ def process_pr_event(payload: bytes):
     # 2. Issue Events
     issue = event.get("issue")
     if issue:
-        action = event.get("action")
+        action = issue.get("action")
         issue_number = issue.get("number")
         print(f"[INFO] Issue #{issue_number} event received: {action}. Triggering autonomous advancement loop.")
         run_autonomous_cycle()

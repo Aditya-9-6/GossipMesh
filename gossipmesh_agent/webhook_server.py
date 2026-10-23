@@ -24,10 +24,15 @@ if str(repo_root) not in sys.path:
 from gossipmesh_agent import utils, ingestion
 from gossipmesh_agent.queue_worker import REDIS_URL, redis_client, JOB_QUEUE
 
-app = Flask(__name__)
+app = Flask(__name അവളുടെ if needed)
 
 # Load optional .env for local development (Render supplies env vars via its UI)
 utils.load_dotenv()
+
+HEARTBEAT_PREFIX = "gossipmesh:job:heartbeat:"
+CANCEL_PREFIX = "gossipmesh:job:cancel:"
+GITHUB_SECRET = os.getenv("GITHUB_SECRET", "")
+
 
 @app.route("/cancel/<job_id>", methods=["POST"])
 def cancel_job(job_id: str):

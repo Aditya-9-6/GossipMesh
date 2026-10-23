@@ -62,7 +62,11 @@ def start_worker() -> None:
             logger.exception("Job %s crashed with error: %s", job_id, exc)
             # Automatic credit refund on unexpected crash
             repo = job.get("repo")
-            task_type = "issue_scan" if job.get("type") == "issue_opened" else ("pr_review" if job.get("type") == "pr_opened" else "auto_fix")
+            task_type = (
+                "issue_scan"
+                if job.get("type") == "issue_opened"
+                else ("pr_review" if job.get("type") == "pr_opened" else "auto_fix")
+            )
             if repo:
                 from .credit_manager import release_credits
                 release_credits(repo, task_type)

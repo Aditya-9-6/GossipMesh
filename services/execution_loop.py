@@ -1,5 +1,5 @@
 # services/execution_loop.py
-"""Execution engine wrapping the core Issue→PR pipeline.
+"""Execution engine wrapping the core Issue→PR pipeline and package facade.
 
 The original pipeline lives in ``scripts/autonomous_loop.py`` (functions such as
 ``process_issue`` / ``process_pr``).  This module implements the five operational

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+
 class KnowledgeMeme:
     def __init__(
         self,
@@ -68,8 +69,10 @@ class KnowledgeMeme:
             failed_applications=data.get("failed_applications", 0),
         )
 
+
 class MemeticKnowledgeBase:
     """Persistent ledger of evolving architectural memes."""
+
     def __init__(self, storage_path: Optional[Path] = None):
         self.storage_path = storage_path or Path("G:/My Drive/.gossip_mesh/memes.json")
         self.memes: Dict[str, KnowledgeMeme] = {}
@@ -135,20 +138,14 @@ class MemeticKnowledgeBase:
                 correct_pattern="Binary search mid-points (min_mtu + current_mtu) / 2 upon fragmentation.",
                 repo="spryzen",
                 fitness_score=4.0,
-            )
+            ),
         ]
         for s in seeds:
             self.memes[s.meme_id] = s
         self.save()
 
     def record_or_update(
-        self,
-        meme_id: str,
-        title: str,
-        rule: str,
-        anti_pattern: str,
-        correct_pattern: str,
-        repo: str = "global"
+        self, meme_id: str, title: str, rule: str, anti_pattern: str, correct_pattern: str, repo: str = "global"
     ) -> KnowledgeMeme:
         if meme_id in self.memes:
             m = self.memes[meme_id]
@@ -176,7 +173,8 @@ class MemeticKnowledgeBase:
     def get_top_memes(self, repo: str = "global", min_fitness: float = 1.0, limit: int = 10) -> List[KnowledgeMeme]:
         """Returns surviving high-fitness memes for prompt injection, filtered by repo."""
         candidates = [
-            m for m in self.memes.values()
+            m
+            for m in self.memes.values()
             if m.fitness_score >= min_fitness and (m.repo == repo or m.repo == "global" or repo == "global")
         ]
         candidates.sort(key=lambda m: m.fitness_score, reverse=True)
