@@ -1,4 +1,9 @@
-import redis
-from gossipmesh.core.config import settings
+class RedisClientStub:
+    def get(self, key: str) -> None:
+        return None
 
-redis_client = redis.from_url(settings.REDIS_URI, decode_responses=True)
+    def exists(self, key: str) -> bool:
+        return False
+
+
+redis_client = RedisClientStub()

@@ -61,7 +61,9 @@ dependencies = [
     "tree-sitter>=0.21.3",
     "tree-sitter-rust>=0.21.2",
     "tree-sitter-cpp>=0.21.2",
-    "gitpython>=3.1.43"
+    "gitpython>=3.1.43",
+    "stripe>=8.0.0",
+    "prometheus_client>=0.20.0"
 ]
 
 [project.scripts]
