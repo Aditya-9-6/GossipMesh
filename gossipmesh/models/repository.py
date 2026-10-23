@@ -22,6 +22,18 @@ class GithubAppInstallation(Base):
     organization = relationship("Organization")
 
 
+class RepositoryPolicy(Base):
+    __tablename__ = "repository_policies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
+    enforce_branch_protection: Mapped[bool] = mapped_column(default=True)
+    require_signed_commits: Mapped[bool] = mapped_column(default=False)
+    max_risk_score: Mapped[int] = mapped_column(Integer, default=70)
+
+    repository = relationship("Repository", back_populates="policy")
+
+
 class Repository(Base):
     __tablename__ = "repositories"
 
@@ -38,7 +50,7 @@ class Repository(Base):
 
     organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
-
+    policy = relationship("RepositoryPolicy", uselist=False, back_populates="repository", cascade="all, delete-orphan")
 
 
 class IndexState(Base):

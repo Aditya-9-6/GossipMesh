@@ -16,7 +16,13 @@ def get_artifact(
     artifact_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     """Returns artifact metadata verifying authorization and quarantine state."""
-    artifact = db.query(Artifact).join(Job).join(Workflow).filter(Artifact.id == artifact_id, Artifact.deleted_at.is_(None)).first()
+    artifact = (
+        db.query(Artifact)
+        .join(Job)
+        .join(Workflow)
+        .filter(Artifact.id == artifact_id, Artifact.deleted_at.is_(None))
+        .first()
+    )
     if not artifact:
         # Standard fast API response usually uses HTTPException but codebase leverages custom exceptions usually.
         # Alternatively returning a generic custom empty response:
