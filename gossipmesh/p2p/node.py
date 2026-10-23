@@ -11,6 +11,7 @@ from gossipmesh.p2p.pow import mine_pow, verify_pow
 
 class GossipTopic(str, Enum):
     AGENT_SPAWN = "agent:spawn"
+    AGENT_EVENT = "agent:event"
     CODE_REVIEW = "code:review"
     BUILD_STATUS = "build:status"
     SECURITY_ALERT = "security:alert"
@@ -76,6 +77,7 @@ class GossipNode:
         public_key: Optional[str] = None,
         pow_difficulty: int = 0,
         pow_nonce: Optional[int] = None,
+        base_scatter: Optional[int] = None,
     ):
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh_ledger")
@@ -96,6 +98,11 @@ class GossipNode:
         self.seen_messages = set()
         self.recent_messages = deque(maxlen=1000)
         self._load_seen_history()
+        if base_scatter is not None:
+            from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
+            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
+        else:
+            self.scatter_governor = None
 
     def _load_seen_history(self):
         """Loads message IDs previously witnessed to prevent duplicate processing."""
@@ -120,6 +127,8 @@ class GossipNode:
         self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
     ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh."""
+        if getattr(self, "scatter_governor", None) is not None:
+            payload["_adaptive_scatter"] = self.scatter_governor.update()
         msg = GossipMessage(topic=topic, origin_node=self.node_id, payload=payload, repo=repo, ttl=ttl)
         self.recent_messages.append(msg)
         self.seen_messages.add(msg.message_id)
