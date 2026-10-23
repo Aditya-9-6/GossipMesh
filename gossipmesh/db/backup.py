@@ -113,9 +113,7 @@ class DatabaseBackupManager:
             expected_sha = meta_data.get("checksum_sha256")
             computed_sha = hashlib.sha256(decrypted_bytes).hexdigest()
             if expected_sha and computed_sha != expected_sha:
-                raise ValueError(
-                    f"Integrity check failed: Expected {expected_sha}, computed {computed_sha}"
-                )
+                raise ValueError(f"Integrity check failed: Expected {expected_sha}, computed {computed_sha}")
 
         return json.loads(decrypted_bytes.decode("utf-8"))
 
@@ -139,11 +137,7 @@ class DatabaseBackupManager:
         repos = db_session.query(Repository).filter(Repository.organization_id == organization_id).all()
         repo_ids = [r.id for r in repos]
 
-        workflows = (
-            db_session.query(Workflow).filter(Workflow.repository_id.in_(repo_ids)).all()
-            if repo_ids
-            else []
-        )
+        workflows = db_session.query(Workflow).filter(Workflow.repository_id.in_(repo_ids)).all() if repo_ids else []
         budget = db_session.query(Budget).filter(Budget.organization_id == organization_id).first()
 
         tenant_export = {
