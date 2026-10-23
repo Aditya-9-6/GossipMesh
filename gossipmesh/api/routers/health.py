@@ -35,7 +35,6 @@ def probe_redis() -> Dict[str, Any]:
     t0 = time.perf_counter()
     try:
         import redis
-
         redis_url = getattr(settings, "REDIS_URI", "redis://localhost:6379/0")
         client = redis.from_url(str(redis_url), socket_timeout=1.0)
         client.ping()
@@ -51,7 +50,6 @@ def probe_migrations() -> Dict[str, Any]:
     try:
         from alembic.config import Config
         from alembic.script import ScriptDirectory
-
         cfg = Config("alembic.ini")
         script = ScriptDirectory.from_config(cfg)
         head_rev = script.get_current_head()
@@ -83,10 +81,14 @@ def probe_providers() -> Dict[str, Any]:
     import os
 
     has_gemini = bool(
-        os.getenv("GEMINI_KEY_POOL") or os.getenv("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None)
+        os.getenv("GEMINI_KEY_POOL")
+        or os.getenv("GEMINI_API_KEY")
+        or getattr(settings, "GEMINI_API_KEY", None)
     )
     has_openai = bool(
-        os.getenv("OPENAI_API_KEYS") or os.getenv("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", None)
+        os.getenv("OPENAI_API_KEYS")
+        or os.getenv("OPENAI_API_KEY")
+        or getattr(settings, "OPENAI_API_KEY", None)
     )
 
     providers_status = {
@@ -103,6 +105,7 @@ def probe_providers() -> Dict[str, Any]:
         "status": "healthy",
         "providers": providers_status,
     }
+
 
 
 @router.get("/live")

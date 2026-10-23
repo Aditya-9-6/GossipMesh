@@ -140,9 +140,7 @@ class FindingNormalizer:
             data = dict(raw)
 
         # 1. Path & Line coordinates
-        file_path = canonicalize_path(
-            data.get("file_path") or (data.get("paths", [""])[0] if data.get("paths") else "")
-        )
+        file_path = canonicalize_path(data.get("file_path") or (data.get("paths", [""])[0] if data.get("paths") else ""))
         line = max(1, int(data.get("line") or 1))
         end_line = int(data.get("end_line")) if data.get("end_line") is not None else None
         if end_line is not None and end_line < line:
@@ -166,7 +164,10 @@ class FindingNormalizer:
         evidence_structured = data.get("evidence_structured")
         if isinstance(evidence_structured, dict):
             snippet = evidence_structured.get("code_snippet", "")
-            citations = [Citation(**c) if isinstance(c, dict) else c for c in evidence_structured.get("citations", [])]
+            citations = [
+                Citation(**c) if isinstance(c, dict) else c
+                for c in evidence_structured.get("citations", [])
+            ]
             evidence_model = Evidence(
                 description=evidence_structured.get("description", message),
                 code_snippet=snippet or None,
@@ -177,14 +178,10 @@ class FindingNormalizer:
             snippet = evidence_model.code_snippet or ""
         else:
             snippet = data.get("code_snippet") or data.get("evidence") or ""
-            evidence_model = (
-                Evidence(
-                    description=message,
-                    code_snippet=snippet or None,
-                )
-                if snippet
-                else None
-            )
+            evidence_model = Evidence(
+                description=message,
+                code_snippet=snippet or None,
+            ) if snippet else None
 
         # 6. Stable Fingerprint
         existing_fp = data.get("fingerprint")
