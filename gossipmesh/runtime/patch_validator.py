@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 class PatchValidationError(Exception):
     """Raised when an AI-generated patch violates safety or integrity rules."""
+
     pass
 
 
@@ -57,9 +58,7 @@ class PatchValidator:
         self.max_file_size = max_file_size_bytes
         self.max_total_diff = max_total_diff_bytes
         self.authorized_roots = authorized_roots
-        self.forbidden_patterns = (
-            forbidden_patterns if forbidden_patterns is not None else FORBIDDEN_PATTERNS
-        )
+        self.forbidden_patterns = forbidden_patterns if forbidden_patterns is not None else FORBIDDEN_PATTERNS
 
     def validate_path(self, rel_path: str) -> Path:
         """Validates that a file path is relative, safe, contained in workspace, and authorized."""
@@ -82,8 +81,7 @@ class PatchValidator:
         # 4. Check authorized root directories if configured
         if self.authorized_roots:
             is_authorized = any(
-                cleaned == root or cleaned.startswith(root.rstrip("/") + "/")
-                for root in self.authorized_roots
+                cleaned == root or cleaned.startswith(root.rstrip("/") + "/") for root in self.authorized_roots
             )
             if not is_authorized:
                 raise PatchValidationError(
@@ -105,7 +103,9 @@ class PatchValidator:
                 try:
                     link_target.relative_to(self.workspace)
                 except ValueError:
-                    raise PatchValidationError(f"Symlink escape detected: {curr} points outside workspace to {link_target}")
+                    raise PatchValidationError(
+                        f"Symlink escape detected: {curr} points outside workspace to {link_target}"
+                    )
             curr = curr.parent
 
         return target
@@ -157,10 +157,7 @@ class PatchValidator:
             errors.append(err)
 
         # 2. Total diff size limit
-        total_size = sum(
-            len(c) if isinstance(c, bytes) else len(c.encode("utf-8"))
-            for c in files.values()
-        )
+        total_size = sum(len(c) if isinstance(c, bytes) else len(c.encode("utf-8")) for c in files.values())
         if total_size > self.max_total_diff:
             err = f"Total patch size exceeded: {total_size} bytes (max: {self.max_total_diff})"
             errors.append(err)
