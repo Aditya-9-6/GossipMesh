@@ -17,7 +17,6 @@ class IndexJobStatus(str, Enum):
 
 class IndexJob(Base):
     """Tracks status, progress, versioning, and metrics of an indexing job."""
-
     __tablename__ = "index_jobs"
 
     id = Column(String(64), primary_key=True)
@@ -67,7 +66,6 @@ class IndexJob(Base):
 
 class FileIndexRecord(Base):
     """Tracks per-file content hash and commit SHA to power incremental change detection."""
-
     __tablename__ = "file_index_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
