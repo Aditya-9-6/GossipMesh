@@ -21,6 +21,7 @@ Environment variables expected:
 The script starts ``scripts/autonomous_loop.py`` with the same arguments used by
 the CI workflow. It writes logs to stdout which Render captures.
 """
+
 import os
 import hmac
 import hashlib
@@ -29,6 +30,7 @@ from fastapi import FastAPI, Request, HTTPException
 
 app = FastAPI()
 
+
 def verify_signature(body: bytes, signature: str, secret: str) -> bool:
     """Validate GitHub HMAC signature (sha256).
     GitHub sends header ``X-Hub-Signature-256: sha256=...``.
@@ -36,6 +38,7 @@ def verify_signature(body: bytes, signature: str, secret: str) -> bool:
     mac = hmac.new(secret.encode(), msg=body, digestmod=hashlib.sha256)
     expected = f"sha256={mac.hexdigest()}"
     return hmac.compare_digest(expected, signature)
+
 
 @app.post("/webhook")
 async def handle(request: Request):
@@ -77,6 +80,7 @@ async def handle(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start autonomous loop: {e}")
     return {"status": "autonomous loop started"}
+
 
 if __name__ == "__main__":
     # For local debugging: ``uvicorn webhook_handler:app --reload``

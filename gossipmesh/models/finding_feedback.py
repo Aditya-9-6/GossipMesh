@@ -20,6 +20,7 @@ class FindingFeedback(Base):
     Persisted human feedback on automated code review findings.
     Used for precision/recall evaluation and safe prompt enhancement without injection.
     """
+
     __tablename__ = "finding_feedback"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

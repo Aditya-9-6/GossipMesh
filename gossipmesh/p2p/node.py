@@ -56,7 +56,7 @@ class GossipMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'GossipMessage':
+    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
         return cls(
             topic=data.get("topic", GossipTopic.CUSTOM),
             origin_node=data.get("origin_node", "unknown"),
@@ -73,6 +73,7 @@ class GossipNode:
     """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence
     and Adaptive Scatter-Width CPU-Load Feedback Shaping.
     Communicates via a shared ledger directory (file-backed mesh) or local bus."""
+
     def __init__(
         self,
         node_id: str,
@@ -101,7 +102,7 @@ class GossipNode:
         self.seen_messages: Set[str] = set()
         self.recent_messages: deque = deque(maxlen=1000)
         self._load_seen_history()
-        
+
         if base_scatter is not None:
             self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
         else:
