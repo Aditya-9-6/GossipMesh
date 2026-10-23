@@ -40,7 +40,9 @@ def test_autonomous_loop_end_to_end_integration(tmp_path):
     pr_created = False
 
     # Mock reviewer status to approve PR with score 95
-    (tmp_path / "ai_review_status.json").write_text(json.dumps({"score": 95, "verdict": "APPROVED"}), encoding="utf-8")
+    (tmp_path / "ai_review_status.json").write_text(
+        json.dumps({"score": 95, "verdict": "APPROVED"}), encoding="utf-8"
+    )
 
     # Mock solver to raise 429 on first key, succeed on second key
     def fake_invoke_solver(workspace, issue_num, issue_title, issue_body, api_key=""):
@@ -77,13 +79,12 @@ def test_autonomous_loop_end_to_end_integration(tmp_path):
         mock_proc.stderr = ""
         return mock_proc
 
-    with (
-        patch("scripts.autonomous_loop.invoke_ai_solver", side_effect=fake_invoke_solver),
-        patch("scripts.autonomous_loop.create_pull_request", side_effect=fake_create_pr),
-        patch("scripts.autonomous_loop.verify_and_auto_fix_preflight", return_value=(True, "")),
-        patch("scripts.autonomous_loop.run_cmd", side_effect=fake_run_cmd),
-        patch("subprocess.run", side_effect=fake_subprocess_run),
-    ):
+    with patch("scripts.autonomous_loop.invoke_ai_solver", side_effect=fake_invoke_solver), \
+         patch("scripts.autonomous_loop.create_pull_request", side_effect=fake_create_pr), \
+         patch("scripts.autonomous_loop.verify_and_auto_fix_preflight", return_value=(True, "")), \
+         patch("scripts.autonomous_loop.run_cmd", side_effect=fake_run_cmd), \
+         patch("subprocess.run", side_effect=fake_subprocess_run):
+
         # Pre-execution assertions
         assert ledger.get_balance("default") == 1000
 
@@ -116,7 +117,9 @@ def test_autonomous_loop_iteration_discovery(tmp_path):
     router = KeyPoolRouter(initial_keys=["key-healthy"])
     exec_loop = ExecutionLoop(workspace=tmp_path, ledger=ledger, router=router)
 
-    discovered_issues = [{"number": 311, "title": "feat(consensus): Epoch Checkpointing", "body": "Specs"}]
+    discovered_issues = [
+        {"number": 311, "title": "feat(consensus): Epoch Checkpointing", "body": "Specs"}
+    ]
 
     job_called = False
 
@@ -126,11 +129,10 @@ def test_autonomous_loop_iteration_discovery(tmp_path):
         execution_loop.ledger.charge(org, "combo_fix")
         return True
 
-    with (
-        patch("scripts.autonomous_loop.get_open_advancement_issues", return_value=discovered_issues),
-        patch("scripts.autonomous_loop.heal_and_merge_open_prs", return_value=False),
-        patch("scripts.autonomous_loop.run_issue_job", side_effect=fake_run_issue_job),
-    ):
+    with patch("scripts.autonomous_loop.get_open_advancement_issues", return_value=discovered_issues), \
+         patch("scripts.autonomous_loop.heal_and_merge_open_prs", return_value=False), \
+         patch("scripts.autonomous_loop.run_issue_job", side_effect=fake_run_issue_job):
+
         run_loop_iteration(tmp_path, worker_id=1, num_workers=1, execution_loop=exec_loop)
 
         assert job_called is True

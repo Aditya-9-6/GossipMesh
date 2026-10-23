@@ -121,7 +121,9 @@ class GitHubPermissionsAuditor:
         return spec["resource"], spec["level"]
 
     @classmethod
-    def verify_operation_permission(cls, operation: str, granted_permissions: Dict[str, str]) -> bool:
+    def verify_operation_permission(
+        cls, operation: str, granted_permissions: Dict[str, str]
+    ) -> bool:
         """Verifies that the granted permissions satisfy the minimum requirement for the operation without granting excessive forbidden privileges."""
         # 1. Check for prohibited permissions
         for forbidden in FORBIDDEN_PERMISSIONS:
