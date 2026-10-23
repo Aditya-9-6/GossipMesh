@@ -23,7 +23,6 @@ from gossipmesh.repository.vector_store import DocumentChunk, PGVectorStore
 
 class CitationMetadata:
     """Structured provenance citation for a retrieved snippet."""
-
     def __init__(
         self,
         filepath: str,
@@ -50,7 +49,6 @@ class CitationMetadata:
 
 class SearchResult:
     """A scored, deduplicated, cited search result."""
-
     def __init__(
         self,
         id: str,
@@ -192,7 +190,6 @@ class HybridSearchEngine:
         repo = db.query(Repository).filter(Repository.id == repo_id).first()
         if not repo:
             from gossipmesh.core.exceptions import AuthorizationError
-
             raise AuthorizationError(message=f"Repository {repo_id} not found")
 
         self.retriever.verify_access(user=user, repo=repo, db=db, branch=branch)
@@ -258,11 +255,17 @@ class HybridSearchEngine:
 
         # Normalize lexical scores to [0, 1]
         max_lex = max(lexical_scores.values()) if lexical_scores else 0.0
-        norm_lexical = {cid: (lexical_scores.get(cid, 0.0) / max_lex if max_lex > 0 else 0.0) for cid in lexical_scores}
+        norm_lexical = {
+            cid: (lexical_scores.get(cid, 0.0) / max_lex if max_lex > 0 else 0.0)
+            for cid in lexical_scores
+        }
 
         # Normalize vector scores to [0, 1]
         max_vec = max(vector_scores.values()) if vector_scores else 0.0
-        norm_vector = {cid: (vector_scores.get(cid, 0.0) / max_vec if max_vec > 0 else 0.0) for cid in all_candidates}
+        norm_vector = {
+            cid: (vector_scores.get(cid, 0.0) / max_vec if max_vec > 0 else 0.0)
+            for cid in all_candidates
+        }
 
         # 5. Hybrid Score Fusion & Reranking
         scored_results: List[SearchResult] = []
@@ -319,7 +322,9 @@ class HybridSearchEngine:
 
         # 7. Deterministic Ordering with strict tie-breaking
         # (score DESC, filepath ASC, chunk_index ASC, id ASC)
-        deduped_results.sort(key=lambda x: (-round(x.score, 6), x.filepath, x.chunk_index, x.id))
+        deduped_results.sort(
+            key=lambda x: (-round(x.score, 6), x.filepath, x.chunk_index, x.id)
+        )
 
         # 8. Context length limit enforcement
         budget_constrained: List[SearchResult] = []

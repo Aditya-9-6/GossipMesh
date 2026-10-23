@@ -26,7 +26,6 @@ from gossipmesh.runtime.sandbox import CommandPolicyEngine, SandboxEnvironment
 # Vector 1: Path Traversal Escapes
 # =============================================================================
 
-
 def test_escape_vector_path_traversal():
     """Verify that attempting to write or read outside sandbox via dot-dot traversal fails."""
     with SandboxEnvironment(workflow_id="sec-traversal") as env:
@@ -46,7 +45,6 @@ def test_escape_vector_path_traversal():
 # =============================================================================
 # Vector 2: Symlink Escapes
 # =============================================================================
-
 
 def test_escape_vector_symlink_traversal():
     """Verify that artifacts pointing outside the workspace via symlinks are blocked."""
@@ -85,7 +83,6 @@ def test_escape_vector_symlink_traversal():
 # Vector 3: Environment Leakage & Secret Exposure
 # =============================================================================
 
-
 def test_escape_vector_environment_leakage():
     """Verify production credentials and API keys are completely scrubbed from process environment."""
     dirty_env = {
@@ -114,7 +111,6 @@ def test_escape_vector_environment_leakage():
 # Vector 4: Cloud Metadata Service Protection
 # =============================================================================
 
-
 def test_escape_vector_cloud_metadata_protection():
     """Verify that arguments attempting to access 169.254.169.254 metadata endpoint are intercepted."""
     metadata_ip = "169.254.169.254"
@@ -136,7 +132,6 @@ def test_escape_vector_cloud_metadata_protection():
 # Vector 5: Network Egress Isolation
 # =============================================================================
 
-
 def test_escape_vector_network_egress_airgap():
     """Verify container argument generation air-gaps network egress."""
     adapter = RootlessContainerAdapter(runtime_binary="podman")
@@ -150,7 +145,6 @@ def test_escape_vector_network_egress_airgap():
 # =============================================================================
 # Vector 6: Process and Resource Exhaustion (Fork Bombs & Timeouts)
 # =============================================================================
-
 
 def test_escape_vector_fork_bomb_and_timeout():
     """Verify execution timeout and PID limits terminate runaway execution."""
@@ -173,7 +167,6 @@ def test_escape_vector_fork_bomb_and_timeout():
 # Vector 7: Dangerous Commands and Reverse Shell Payloads
 # =============================================================================
 
-
 def test_escape_vector_reverse_shells_and_dangerous_binaries():
     """Verify reverse shell invocations and prohibited utilities are denied."""
     reverse_shells = [
@@ -192,7 +185,6 @@ def test_escape_vector_reverse_shells_and_dangerous_binaries():
 # =============================================================================
 # Vector 8: Artifact Manipulation and Quarantine Tampering
 # =============================================================================
-
 
 def test_escape_vector_artifact_quarantine_tampering():
     """Verify malware-infected artifacts cannot bypass quarantine."""
