@@ -3,7 +3,8 @@
 AI Issue Solver for DevProxy & GossipMesh
 Analyzes an issue, inspects existing repository source files and invariants,
 synthesizes high-performance code and unit tests, and prepares files for automated PR creation.
-Supports both Go (DevProxy) and Python (GossipMesh).
+Supports both Go (DevProxy) and Python (GossipMesh), with multi-provider failover
+across Gemini Key Pool, OpenRouter, NVIDIA NIM, and Cohere.
 """
 
 import os
@@ -133,7 +134,6 @@ def get_relevant_files(workspace_root: Path, query: str, max_files: int = 5) -> 
         full_path = workspace_root / f
         try:
             content = full_path.read_text(encoding="utf-8", errors="replace")
-            # Include first 100 lines for context
             lines = content.splitlines()[:100]
             snippets.append(f"--- File: {f} ---\n" + "\n".join(lines))
         except Exception:
@@ -147,7 +147,6 @@ def extract_json_response(text: str) -> dict:
     if m:
         text = m.group(1).strip()
     else:
-        # try to find first { and last }
         start = text.find("{")
         end = text.rfind("}")
         if start != -1 and end != -1 and end > start:
@@ -220,7 +219,7 @@ def call_openrouter(prompt: str, system_prompt: str) -> dict:
     if not key:
         raise ValueError("Missing OPENROUTER_API_KEY")
     url = "https://openrouter.ai/api/v1/chat/completions"
-    models = ["google/gemini-2.0-flash-001", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
+    models = ["google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
     for model in models:
         payload = {
             "model": model,
@@ -241,6 +240,67 @@ def call_openrouter(prompt: str, system_prompt: str) -> dict:
         except Exception:
             continue
     raise RuntimeError("OpenRouter failed.")
+
+
+def call_nvidia(prompt: str, system_prompt: str) -> dict:
+    key = os.environ.get("NVIDIA_API_KEY", "").strip() or os.environ.get("NVIDIA_API_KEY_2", "").strip()
+    if not key:
+        raise ValueError("Missing NVIDIA_API_KEY")
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    models = ["nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"]
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return extract_json_response(data["choices"][0]["message"]["content"])
+        except Exception:
+            continue
+    raise RuntimeError("NVIDIA NIM failed.")
+
+
+def call_cohere(prompt: str, system_prompt: str) -> dict:
+    key = os.environ.get("COHERE_API_KEY", "").strip()
+    if not key:
+        raise ValueError("Missing COHERE_API_KEY")
+    url = "https://api.cohere.com/v2/chat"
+    models = ["command-r-plus-08-2024", "command-r-08-2024", "command-r"]
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return extract_json_response(data["message"]["content"][0]["text"])
+        except Exception:
+            continue
+    raise RuntimeError("Cohere failed.")
 
 
 def main():
@@ -298,6 +358,20 @@ Instructions:
             result = call_openrouter(prompt, system_prompt)
         except Exception as oe:
             print(f"[!] OpenRouter failover failed: {oe}", file=sys.stderr)
+
+    if not result:
+        try:
+            print("[*] Requesting solution from NVIDIA NIM...", flush=True)
+            result = call_nvidia(prompt, system_prompt)
+        except Exception as ne:
+            print(f"[!] NVIDIA failover failed: {ne}", file=sys.stderr)
+
+    if not result:
+        try:
+            print("[*] Requesting solution from Cohere...", flush=True)
+            result = call_cohere(prompt, system_prompt)
+        except Exception as ce:
+            print(f"[!] Cohere failover failed: {ce}", file=sys.stderr)
 
     if not result or not isinstance(result, dict) or "files" not in result:
         print("[!] No file changes could be synthesized by any AI provider.", file=sys.stderr)
