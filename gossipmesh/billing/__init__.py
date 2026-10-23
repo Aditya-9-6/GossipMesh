@@ -1,21 +1,10 @@
 """
-Billing and commercialization for GossipMesh.
+Billing package initialization.
 """
 
-from gossipmesh.billing.stripe_service import StripeBillingService
-from gossipmesh.billing.commercialization import (
-    StripeBillingEngine,
-    SubscriptionPlanManager,
-    SeatManager,
-    MeteredUsageTracker,
-    EnterpriseContractManager,
-)
+try:
+    from gossipmesh.billing.stripe_service import StripeBillingService
+except Exception:
+    StripeBillingService = None  # type: ignore
 
-__all__ = [
-    "StripeBillingService",
-    "StripeBillingEngine",
-    "SubscriptionPlanManager",
-    "SeatManager",
-    "MeteredUsageTracker",
-    "EnterpriseContractManager",
-]
+__all__ = ["StripeBillingService"]
