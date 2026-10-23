@@ -264,6 +264,7 @@ class StripeBillingService:
             raise AuthenticationError("Stripe webhook signature mismatch")
 
         import json
+
         return json.loads(payload_bytes.decode("utf-8"))
 
     def handle_webhook_event(self, session: Session, event: Dict[str, Any]) -> Dict[str, Any]:
@@ -297,9 +298,7 @@ class StripeBillingService:
                 cust_stmt = select(StripeCustomer).where(StripeCustomer.stripe_customer_id == cust_id)
                 db_cust = session.execute(cust_stmt).scalars().first()
                 if db_cust:
-                    sub_stmt = select(BillingSubscription).where(
-                        BillingSubscription.stripe_subscription_id == sub_id
-                    )
+                    sub_stmt = select(BillingSubscription).where(BillingSubscription.stripe_subscription_id == sub_id)
                     sub = session.execute(sub_stmt).scalars().first()
                     if not sub:
                         sub = BillingSubscription(
@@ -320,9 +319,7 @@ class StripeBillingService:
 
             elif event_type == "customer.subscription.deleted":
                 sub_id = data_obj.get("id")
-                sub_stmt = select(BillingSubscription).where(
-                    BillingSubscription.stripe_subscription_id == sub_id
-                )
+                sub_stmt = select(BillingSubscription).where(BillingSubscription.stripe_subscription_id == sub_id)
                 sub = session.execute(sub_stmt).scalars().first()
                 if sub:
                     sub.status = "canceled"
@@ -352,8 +349,8 @@ class StripeBillingService:
                             amount_paid=amount_paid,
                             currency=currency,
                             status=status,
-                            hosted_invoice_url=invoice_url,
-                            invoice_pdf=invoice_pdf,
+                            hosted_invoice_url=invoice_url or "",
+                            invoice_pdf=invoice_pdf or "",
                         )
                         session.add(inv)
                     else:

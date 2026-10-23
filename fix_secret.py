@@ -1,4 +1,5 @@
 import sys, os
+
 file_path = "gossipmesh/security/secret_scanner.py"
 if os.path.exists(file_path):
     with open(file_path, "r") as f:

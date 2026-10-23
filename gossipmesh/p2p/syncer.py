@@ -1,16 +1,27 @@
-from typing import Dict, List, Tuple, Optional
-from gossipmesh.p2p.entropy import VectorClockEntropy
+from __future__ import annotations
+
+from typing import Any
 
 
-class AntiEntropySyncer:
-    """Anti-entropy synchronization daemon coordinating peer sessions using entropy-driven selection."""
-
-    def __init__(self, node_id: str, window_size: int = 100):
+class VectorClockEntropy:
+    def __init__(self, node_id: str):
         self.node_id = node_id
-        self.entropy_evaluator = VectorClockEntropy(window_size=window_size)
+        self.clock: dict[str, int] = {}
 
-    def select_sync_peers(
-        self, local_clock: Dict[str, int], active_peers: Dict[str, Dict[str, int]], limit: int = 3
-    ) -> List[Tuple[str, float]]:
-        """Selects the best peers to synchronize with based on vector clock entropy."""
-        return self.entropy_evaluator.select_best_peers(local_clock, active_peers, top_k=limit)
+    def increment(self) -> None:
+        self.clock[self.node_id] = self.clock.get(self.node_id, 0) + 1
+
+    def sync(self, other_clock: dict[str, int]) -> None:
+        for k, v in other_clock.items():
+            self.clock[k] = max(self.clock.get(k, 0), v)
+
+
+class StateSyncer:
+    def __init__(self, node_id: str):
+        self.entropy = VectorClockEntropy(node_id)
+
+    def get_clock(self) -> dict[str, int]:
+        return self.entropy.clock
+
+    def update(self, other_clock: dict[str, int]) -> None:
+        self.entropy.sync(other_clock)
