@@ -1,4 +1,9 @@
-from gossipmesh.models.base import Base
+try:
+    from gossipmesh.models.base import Base
+except ImportError:
+    from sqlalchemy.orm import declarative_base
+
+    Base = declarative_base()
 
 # Import all models to ensure they are registered with Base.metadata
 from gossipmesh.models.user import User, UserGitHubCredential, UserOIDCCredential
@@ -15,3 +20,33 @@ from gossipmesh.models.usage import UsageRecord
 from gossipmesh.models.gossip import GossipMessageModel, GossipHeartbeat
 from gossipmesh.models.session import UserSession, RefreshToken
 from gossipmesh.models.webhooks import WebhookEvent
+
+__all__ = [
+    "Base",
+    "User",
+    "UserGitHubCredential",
+    "UserOIDCCredential",
+    "Organization",
+    "UserOrganization",
+    "OrganizationInvitation",
+    "Project",
+    "AuditEvent",
+    "ProviderCredential",
+    "Repository",
+    "RepositoryPolicy",
+    "IndexState",
+    "Workflow",
+    "Job",
+    "Budget",
+    "Artifact",
+    "ServiceAccount",
+    "APIKey",
+    "Finding",
+    "ReviewResult",
+    "UsageRecord",
+    "GossipMessageModel",
+    "GossipHeartbeat",
+    "UserSession",
+    "RefreshToken",
+    "WebhookEvent",
+]

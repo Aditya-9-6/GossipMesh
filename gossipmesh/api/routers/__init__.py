@@ -1,5 +1,27 @@
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from fastapi import APIRouter
+
+if TYPE_CHECKING:
+    from gossipmesh.api.routers import (
+        approvals,
+        auth,
+        billing,
+        organizations,
+        projects,
+        providers,
+        repositories,
+        users,
+        runtime,
+        artifacts,
+        enterprise,
+        vector_search,
+        service_accounts,
+        sso,
+        scim,
+        runs,
+        health,
+    )
+
 from gossipmesh.api.routers import (
     approvals,
     auth,
@@ -48,7 +70,7 @@ try:
     if hasattr(auth_mod, "router"):
         router.include_router(auth_mod.router)
 except Exception:
-    pass
+    auth = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import organizations as orgs_mod
@@ -56,7 +78,7 @@ try:
     if hasattr(orgs_mod, "router"):
         router.include_router(orgs_mod.router)
 except Exception:
-    pass
+    organizations = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import projects as proj_mod
@@ -64,7 +86,7 @@ try:
     if hasattr(proj_mod, "router"):
         router.include_router(proj_mod.router)
 except Exception:
-    pass
+    projects = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import repositories as repo_mod
@@ -72,7 +94,7 @@ try:
     if hasattr(repo_mod, "router"):
         router.include_router(repo_mod.router)
 except Exception:
-    pass
+    repositories = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import providers as prov_mod
@@ -80,7 +102,7 @@ try:
     if hasattr(prov_mod, "router"):
         router.include_router(prov_mod.router)
 except Exception:
-    pass
+    providers = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import billing as bill_mod
@@ -88,7 +110,7 @@ try:
     if hasattr(bill_mod, "router"):
         router.include_router(bill_mod.router)
 except Exception:
-    pass
+    billing = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import enterprise as ent_mod
@@ -96,7 +118,87 @@ try:
     if hasattr(ent_mod, "router"):
         router.include_router(ent_mod.router)
 except Exception:
-    pass
+    enterprise = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import approvals
+
+    if hasattr(approvals, "router"):
+        router.include_router(approvals.router)
+except Exception:
+    approvals = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import users
+
+    if hasattr(users, "router"):
+        router.include_router(users.router)
+except Exception:
+    users = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import runtime
+
+    if hasattr(runtime, "router"):
+        router.include_router(runtime.router)
+except Exception:
+    runtime = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import artifacts
+
+    if hasattr(artifacts, "router"):
+        router.include_router(artifacts.router)
+except Exception:
+    artifacts = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import vector_search
+
+    if hasattr(vector_search, "router"):
+        router.include_router(vector_search.router)
+except Exception:
+    vector_search = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import service_accounts
+
+    if hasattr(service_accounts, "router"):
+        router.include_router(service_accounts.router)
+except Exception:
+    service_accounts = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import sso
+
+    if hasattr(sso, "router"):
+        router.include_router(sso.router)
+except Exception:
+    sso = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import scim
+
+    if hasattr(scim, "router"):
+        router.include_router(scim.router)
+except Exception:
+    scim = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import runs
+
+    if hasattr(runs, "router"):
+        router.include_router(runs.router)
+except Exception:
+    runs = None  # type: ignore
+
+try:
+    from gossipmesh.api.routers import health
+
+    if hasattr(health, "router"):
+        router.include_router(health.router)
+except Exception:
+    health = None  # type: ignore
 
 __all__ = [
     "router",
