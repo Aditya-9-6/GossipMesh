@@ -35,7 +35,7 @@ from gossipmesh.auth.password import (
     create_password_reset_token,
     verify_and_consume_reset_token,
 )
-from gossipmesh.security.throttler import login_throttler
+from gossipmesh.auth.throttle import login_throttler
 from pydantic import BaseModel
 import base64
 import hashlib
@@ -75,6 +75,7 @@ def login_access_token(
         raise AuthenticationError(message="Incorrect email or password")
     elif not user.is_active:
         raise AuthorizationError(message="Inactive user")
+    login_throttler.record_success(form_data.username)
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     session = UserSession(user_id=user.id, ip_address=ip_address, user_agent=user_agent)
@@ -192,7 +193,7 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
 @router.get("/github/login")
 def github_login(request: Request) -> Any:
     state = str(uuid.uuid4())
-    redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
+    redis_client.set(f"github_oauth_state:{state}", "pending")
     client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     params = {
         "client_id": client_id,
@@ -413,7 +414,7 @@ def oidc_login(request: Request) -> Any:
     code_challenge = (
         base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode("utf-8")).digest()).decode("utf-8").rstrip("=")
     )
-    redis_client.setex(f"oidc_state:{state}", 300, f"{nonce}:{code_verifier}")
+    redis_client.set(f"oidc_state:{state}", f"{nonce}:{code_verifier}")
     with httpx.Client() as client:
         try:
             discovery_response = client.get(settings.OIDC_DISCOVERY_URL)

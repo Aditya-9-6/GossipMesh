@@ -65,9 +65,24 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = Path(env_path).read_bytes()
 
     if not pem_bytes:
-        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
+        # Search for test_private_key.pem
+        current_file = Path(__file__).resolve()
+        # Look in workspace root (GossipMesh/enterprise/)
+        workspace_root = current_file.parent.parent
+        fallback = workspace_root / "enterprise" / "test_private_key.pem"
+
         if fallback.is_file():
             pem_bytes = fallback.read_bytes()
+        else:
+            # Maybe we are in another directory? Let's check cwd
+            cwd_fallback = Path.cwd() / "enterprise" / "test_private_key.pem"
+            if cwd_fallback.is_file():
+                pem_bytes = cwd_fallback.read_bytes()
+            else:
+                # Also try test_private_key.pem directly inside the same dir if somehow placed there
+                same_dir = Path("test_private_key.pem")
+                if same_dir.is_file():
+                    pem_bytes = same_dir.read_bytes()
 
     if not pem_bytes:
         raise ValueError(

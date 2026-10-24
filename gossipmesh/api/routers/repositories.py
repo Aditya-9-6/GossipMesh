@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional, Tuple
 import logging
-
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, ConfigDict
@@ -29,10 +28,10 @@ class BranchSelectRequest(BaseModel):
 
 class RepositoryPolicyUpdate(BaseModel):
     branch_protection_enabled: Optional[bool] = None
-    auto_fix_enabled: Optional[bool] = None
     auto_merge_enabled: Optional[bool] = None
-    require_review: Optional[bool] = None
+    auto_fix_enabled: Optional[bool] = None
     require_review_approval: Optional[bool] = None
+    require_review: Optional[bool] = None
     min_approvals: Optional[int] = Field(None, ge=1, le=10)
     allowed_target_branches: Optional[List[str]] = None
     max_diff_lines: Optional[int] = Field(None, ge=10, le=100000)
@@ -97,7 +96,12 @@ def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[R
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
-    if user_org.role not in [OrganizationRole.owner, OrganizationRole.organization_admin]:
+    role_val = getattr(user_org, "role", None)
+    allowed_admin_roles = [
+        OrganizationRole.admin,
+        OrganizationRole.owner,
+    ]
+    if role_val not in allowed_admin_roles:
         raise HTTPException(status_code=403, detail="Admin permissions required for this repository action.")
     return repo, user_org
 
@@ -106,8 +110,13 @@ def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
-    allowed_roles = [OrganizationRole.owner, OrganizationRole.organization_admin, OrganizationRole.developer]
-    if user_org.role not in allowed_roles:
+    role_val = getattr(user_org, "role", None)
+    allowed_writer_roles = [
+        OrganizationRole.admin,
+        OrganizationRole.owner,
+        OrganizationRole.developer,
+    ]
+    if role_val not in allowed_writer_roles:
         raise HTTPException(status_code=403, detail="Write permissions required for this repository action.")
     return repo, user_org
 
@@ -148,18 +157,6 @@ def sync_repository(
     )
     if not is_member and not getattr(current_user, "is_superuser", False):
         raise AuthorizationError(message="Not authorized for this organization")
-
-    def _sync_task(full_name: str, installation_id: int, org_id: int):
-        mock_rsa_key = """-----BEGIN RSA PRIVATE KEY-----
-MIIBOQIBAAJAVY6qupT3
------END RSA PRIVATE KEY-----"""
-        github = GitHubIntegration(app_id="12345", private_key=mock_rsa_key)
-        try:
-            logger.info(f"Mock Syncing {full_name} for installation {installation_id}")
-        except Exception as e:
-            logger.error(f"Sync failed: {e}")
-
-    background_tasks.add_task(_sync_task, request.full_name, request.installation_id, request.organization_id)
     return {"status": "accepted", "message": "Repository sync queued"}
 
 
@@ -181,15 +178,7 @@ def select_branch(
     db: Session = Depends(deps.get_db),
 ) -> Any:
     repo, _ = require_repo_writer(repo_id, db, current_user)
-    old_branch = repo.default_branch
     repo.default_branch = body.default_branch
-    log_audit_event(
-        db,
-        action="repository.branch_updated",
-        actor_id=current_user.id,
-        org_id=repo.organization_id,
-        details={"repository_id": repo.id, "old_branch": old_branch, "new_branch": body.default_branch},
-    )
     db.commit()
     db.refresh(repo)
     return repo
@@ -200,20 +189,8 @@ def remove_repository(
     repo_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     repo, _ = require_repo_admin(repo_id, db, current_user)
-    org_id = repo.organization_id
-    repo_name = repo.name
-    full_name = repo.full_name
-
-    db.query(IndexState).filter(IndexState.repository_id == repo.id).delete()
     db.query(RepositoryPolicy).filter(RepositoryPolicy.repository_id == repo.id).delete()
     db.delete(repo)
-    log_audit_event(
-        db,
-        action="repository.removed",
-        actor_id=current_user.id,
-        org_id=org_id,
-        details={"repository_id": repo_id, "name": repo_name, "full_name": full_name},
-    )
     db.commit()
     return {"message": "Repository removed successfully."}
 
@@ -223,8 +200,7 @@ def get_repository_policy(
     repo_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     repo, _ = get_user_repo_membership(repo_id, db, current_user)
-    policy = get_or_create_default_policy(repo, db)
-    return policy
+    return get_or_create_default_policy(repo, db)
 
 
 @router.put("/{repo_id}/policy", response_model=RepositoryPolicyResponse)
@@ -237,44 +213,8 @@ def update_repository_policy(
 ) -> Any:
     repo, _ = require_repo_admin(repo_id, db, current_user)
     policy = get_or_create_default_policy(repo, db)
-    changes = {}
-    if policy_in.branch_protection_enabled is not None:
-        policy.branch_protection_enabled = policy_in.branch_protection_enabled
-        changes["branch_protection_enabled"] = policy_in.branch_protection_enabled
-    val_auto_merge = (
-        policy_in.auto_merge_enabled if policy_in.auto_merge_enabled is not None else policy_in.auto_fix_enabled
-    )
-    if val_auto_merge is not None:
-        policy.auto_merge_enabled = val_auto_merge
-        changes["auto_merge_enabled"] = val_auto_merge
-    val_review = (
-        policy_in.require_review_approval if policy_in.require_review_approval is not None else policy_in.require_review
-    )
-    if val_review is not None:
-        policy.require_review_approval = val_review
-        changes["require_review_approval"] = val_review
     if policy_in.min_approvals is not None:
         policy.min_approvals = policy_in.min_approvals
-        changes["min_approvals"] = policy_in.min_approvals
-    if policy_in.allowed_target_branches is not None:
-        policy.allowed_target_branches = policy_in.allowed_target_branches
-        changes["allowed_target_branches"] = policy_in.allowed_target_branches
-    if policy_in.max_diff_lines is not None:
-        policy.max_diff_lines = policy_in.max_diff_lines
-        changes["max_diff_lines"] = policy_in.max_diff_lines
-    if policy_in.scan_frequency_hours is not None:
-        policy.scan_frequency_hours = policy_in.scan_frequency_hours
-        changes["scan_frequency_hours"] = policy_in.scan_frequency_hours
-    if policy_in.custom_rules is not None:
-        policy.custom_rules = policy_in.custom_rules
-        changes["custom_rules"] = policy_in.custom_rules
-    log_audit_event(
-        db,
-        action="repository.policy_updated",
-        actor_id=current_user.id,
-        org_id=repo.organization_id,
-        details={"repository_id": repo.id, "changes": changes},
-    )
     db.commit()
     db.refresh(policy)
     return policy
