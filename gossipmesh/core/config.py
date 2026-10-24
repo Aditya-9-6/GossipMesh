@@ -1,6 +1,6 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import PostgresDsn
+from pydantic import PostgresDsn, RedisDsn
 
 DEFAULT_INITIAL_CREDITS = int(os.getenv("DEFAULT_INITIAL_CREDITS", "1000"))
 
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     KEY_COOLDOWN_SECONDS: int = int(os.getenv("KEY_COOLDOWN_SECONDS", "60"))
     MAX_KEY_RETRIES: int = int(os.getenv("MAX_KEY_RETRIES", "3"))
     GITHUB_CLIENT_ID: str | None = os.getenv("GITHUB_CLIENT_ID")
-
+    # Load provider API keys list (optional, can be empty)
     PROVIDER_API_KEYS: list[str] = (
         os.getenv("PROVIDER_API_KEYS", "").split(",") if os.getenv("PROVIDER_API_KEYS") else []
     )
@@ -56,7 +56,14 @@ class Settings(BaseSettings):
 
 
 def parse_key_pool(pool_str: str) -> list[str]:
+    """Parses a comma-separated key pool string into a list of keys."""
+    if not pool_str:
+        return []
     return [k.strip() for k in pool_str.split(",") if k.strip()]
 
 
 settings = Settings()  # type: ignore
+DEFAULT_INITIAL_CREDITS = settings.DEFAULT_INITIAL_CREDITS
+ERROR_RATE_THRESHOLD = settings.ERROR_RATE_THRESHOLD
+KEY_COOLDOWN_SECONDS = settings.KEY_COOLDOWN_SECONDS
+MAX_KEY_RETRIES = settings.MAX_KEY_RETRIES

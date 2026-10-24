@@ -26,8 +26,7 @@ pytestmark = pytest.mark.skipif(not HAS_OTEL, reason="opentelemetry not installe
 @pytest.fixture(autouse=True)
 def clean_exporter():
     if not HAS_OTEL:
-        yield None
-        return
+        pytest.skip("OpenTelemetry SDK not installed", allow_module_level=True)
     exporter = get_memory_exporter()
     exporter.clear()
     yield exporter
