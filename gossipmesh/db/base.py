@@ -1,6 +1,5 @@
 from gossipmesh.db.base_class import Base
 
-# Import all models to ensure they are registered with Base.metadata
 from gossipmesh.models.user import User, UserGitHubCredential, UserOIDCCredential
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project

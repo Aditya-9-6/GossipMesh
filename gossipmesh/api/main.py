@@ -64,11 +64,8 @@ async def lifespan(app: FastAPI):
                 logger.info("Database migration state is up-to-date.")
     except Exception as e:
         logger.error(f"Failed to validate migration state: {e}")
-        # Not exiting here to allow app to start even if db is temporarily down,
-        # but the warning/error is logged per policy.
 
     yield
-    # Cleanup on shutdown can go here if needed
 
 
 app = FastAPI(

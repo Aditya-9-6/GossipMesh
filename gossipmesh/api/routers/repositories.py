@@ -98,9 +98,8 @@ def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[R
         return repo, user_org
     role_val = getattr(user_org, "role", None)
     allowed_admin_roles = [
-        getattr(OrganizationRole, "admin", "admin"),
-        getattr(OrganizationRole, "owner", "owner"),
-        getattr(OrganizationRole, "organization_admin", "organization_admin"),
+        OrganizationRole.ADMIN,
+        OrganizationRole.OWNER,
     ]
     if role_val not in allowed_admin_roles:
         raise HTTPException(status_code=403, detail="Admin permissions required for this repository action.")
@@ -113,10 +112,9 @@ def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[
         return repo, user_org
     role_val = getattr(user_org, "role", None)
     allowed_writer_roles = [
-        getattr(OrganizationRole, "admin", "admin"),
-        getattr(OrganizationRole, "owner", "owner"),
-        getattr(OrganizationRole, "organization_admin", "organization_admin"),
-        getattr(OrganizationRole, "developer", "developer"),
+        OrganizationRole.ADMIN,
+        OrganizationRole.OWNER,
+        OrganizationRole.DEVELOPER,
     ]
     if role_val not in allowed_writer_roles:
         raise HTTPException(status_code=403, detail="Write permissions required for this repository action.")

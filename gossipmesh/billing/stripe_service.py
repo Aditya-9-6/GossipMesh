@@ -57,9 +57,6 @@ class StripeBillingService:
         if not self.test_mode and stripe is not None:
             stripe.api_key = self.api_key
 
-    # -------------------------------------------------------------------------
-    # Customer Operations
-    # -------------------------------------------------------------------------
     def get_customer_by_org(self, session: Session, organization_id: int) -> Optional[StripeCustomer]:
         stmt = select(StripeCustomer).where(StripeCustomer.organization_id == organization_id)
         return session.execute(stmt).scalars().first()
@@ -79,12 +76,13 @@ class StripeBillingService:
         if not org:
             raise ValidationError(f"Organization ID {organization_id} not found")
 
+        cust_name = name or org.name or ""
         if self.test_mode or stripe is None:
             stripe_cust_id = f"cus_test_{organization_id}_{int(time.time())}"
         else:
             res = stripe.Customer.create(
                 email=email,
-                name=name or org.name,
+                name=cust_name,
                 metadata={"organization_id": str(organization_id)},
             )
             stripe_cust_id = res.id
@@ -93,16 +91,13 @@ class StripeBillingService:
             organization_id=organization_id,
             stripe_customer_id=stripe_cust_id,
             email=email,
-            name=name or org.name,
+            name=cust_name,
         )
         session.add(customer)
         session.commit()
         session.refresh(customer)
         return customer
 
-    # -------------------------------------------------------------------------
-    # Checkout Session Creation
-    # -------------------------------------------------------------------------
     def create_checkout_session(
         self,
         session: Session,
@@ -135,9 +130,6 @@ class StripeBillingService:
         )
         return {"id": session_obj.id, "url": session_obj.url}
 
-    # -------------------------------------------------------------------------
-    # Billing Portal
-    # -------------------------------------------------------------------------
     def create_billing_portal_session(
         self,
         session: Session,
@@ -159,9 +151,6 @@ class StripeBillingService:
         )
         return {"url": portal_session.url}
 
-    # -------------------------------------------------------------------------
-    # Subscription Management
-    # -------------------------------------------------------------------------
     def get_active_subscription(self, session: Session, organization_id: int) -> Optional[BillingSubscription]:
         stmt = (
             select(BillingSubscription)
@@ -197,9 +186,6 @@ class StripeBillingService:
         session.refresh(sub)
         return sub
 
-    # -------------------------------------------------------------------------
-    # Invoices
-    # -------------------------------------------------------------------------
     def list_invoices(
         self,
         session: Session,
@@ -214,16 +200,12 @@ class StripeBillingService:
         )
         return list(session.execute(stmt).scalars().all())
 
-    # -------------------------------------------------------------------------
-    # Webhooks & Idempotent Processing
-    # -------------------------------------------------------------------------
     def verify_webhook_signature(
         self,
         payload_bytes: bytes,
         signature_header: str,
         tolerance: int = 300,
     ) -> Dict[str, Any]:
-        """Verifies HMAC-SHA256 signature from Stripe."""
         if not self.test_mode and stripe is not None:
             try:
                 return stripe.Webhook.construct_event(
@@ -235,7 +217,7 @@ class StripeBillingService:
             except Exception as e:
                 raise AuthenticationError(f"Stripe signature verification failed: {str(e)}")
 
-        parts = {}
+        parts: Dict[str, str] = {}
         for item in signature_header.split(","):
             if "=" in item:
                 k, v = item.split("=", 1)
