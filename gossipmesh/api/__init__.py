@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .webhooks import router as webhooks_router
+from gossipmesh.api.webhooks import router as webhooks_router
 from gossipmesh.api.routers.approvals import router as approvals_router
 from gossipmesh.api.errors import gossipmesh_exception_handler, global_exception_handler
 from gossipmesh.core.exceptions import GossipMeshException

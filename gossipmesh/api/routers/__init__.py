@@ -1,17 +1,17 @@
 from gossipmesh.api.routers import (
     auth,
+    billing,
     organizations,
     projects,
-    repositories,
     providers,
-    billing,
+    repositories,
 )
 
 __all__ = [
     "auth",
+    "billing",
     "organizations",
     "projects",
-    "repositories",
     "providers",
-    "billing",
+    "repositories",
 ]
