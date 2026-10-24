@@ -38,7 +38,6 @@ def get_totp_token(secret: str, time_step: int = 30, t: float | None = None) -> 
     counter = int(t // time_step)
     counter_bytes = struct.pack(">Q", counter)
 
-    # Pad secret if padding was stripped
     padded_secret = secret
     missing_padding = len(padded_secret) % 8
     if missing_padding != 0:
@@ -90,10 +89,6 @@ class MFAService:
 
     @staticmethod
     def setup_mfa_for_user(user_id: int, db: Session) -> Tuple[str, List[str]]:
-        """
-        Initiate MFA setup: generates a new secret and recovery codes.
-        Does not activate MFA until verified with a valid token.
-        """
         from gossipmesh.models.user import User
 
         user = db.query(User).filter(User.id == user_id).first()
@@ -103,8 +98,16 @@ class MFAService:
         secret = generate_totp_secret()
         recovery_codes = generate_recovery_codes()
 
-        user.mfa_secret = secret
-        user.mfa_enabled = False
+        if not hasattr(user, "mfa_secret"):
+            user.mfa_secret = secret  # type: ignore
+        else:
+            user.mfa_secret = secret
+
+        if not hasattr(user, "mfa_enabled"):
+            user.mfa_enabled = False  # type: ignore
+        else:
+            user.mfa_enabled = False
+
         db.commit()
         db.refresh(user)
 
@@ -112,31 +115,24 @@ class MFAService:
 
     @staticmethod
     def verify_and_activate(user_id: int, code: str, db: Session) -> bool:
-        """
-        Verify code against newly setup secret and mark MFA as enabled.
-        """
         from gossipmesh.models.user import User
 
         user = db.query(User).filter(User.id == user_id).first()
-        if not user or not user.mfa_secret:
+        if not user or not getattr(user, "mfa_secret", None):
             raise MFAAuthenticationError("MFA setup has not been initiated for this user")
 
-        if not verify_totp_code(user.mfa_secret, code):
+        secret = getattr(user, "mfa_secret", "")
+        if not verify_totp_code(secret, code):
             raise MFAAuthenticationError("Invalid MFA TOTP verification code")
 
-        user.mfa_enabled = True
+        user.mfa_enabled = True  # type: ignore
         db.commit()
         db.refresh(user)
         return True
 
     @staticmethod
     def require_step_up_auth(user, mfa_code: str | None, operation_name: str = "destructive_action") -> bool:
-        """
-        Enforce step-up authentication for sensitive/destructive operations
-        (e.g., organization deletion, audit log export, break-glass invocation).
-        """
         if not getattr(user, "mfa_enabled", False):
-            # If user has not enabled MFA, require MFA setup before allowing destructive enterprise action
             raise MFAAuthenticationError(
                 f"Operation '{operation_name}' requires Multi-Factor Authentication (MFA) to be enabled on your account."
             )

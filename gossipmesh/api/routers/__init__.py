@@ -4,8 +4,12 @@ from gossipmesh.api.routers import (
     projects,
     repositories,
     providers,
-    billing,
 )
+
+try:
+    from gossipmesh.api.routers import billing
+except ImportError:
+    billing = None  # type: ignore
 
 __all__ = [
     "auth",
