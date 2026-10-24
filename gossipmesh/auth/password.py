@@ -1,5 +1,5 @@
 import hashlib
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -20,11 +20,11 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def validate_password_strength(password: str) -> bool:
+def validate_password_strength(password: str) -> Tuple[bool, Optional[str]]:
     """Validate that a password meets minimum complexity requirements."""
     if len(password) < 8:
-        return False
-    return True
+        return False, "Password must be at least 8 characters long"
+    return True, None
 
 
 def invalidate_user_sessions(user_id: Any) -> None:
