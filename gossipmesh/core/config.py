@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     ERROR_RATE_THRESHOLD: float = 0.5
     KEY_COOLDOWN_SECONDS: int = 60
     MAX_KEY_RETRIES: int = 3
-    DEFAULT_INITIAL_CREDITS: int = 1000
+    DEFAULT_INITIAL_CREDITS: int = int(os.getenv("DEFAULT_INITIAL_CREDITS", "1000"))
 
     def parse_key_pool(self, raw: str) -> list[str]:
         if not raw:
