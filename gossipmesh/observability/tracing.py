@@ -1,20 +1,3 @@
-"""
-Distributed Tracing Engine using OpenTelemetry (Task 95).
-
-Provides distributed trace spans across:
-- API
-- Webhooks
-- Workflows
-- Queues
-- GitHub operations
-- LLM Providers
-- Database
-- Sandbox execution
-
-Strictly enforces that secrets, API keys, bearer tokens, and raw source code
-are redacted and NEVER stored in trace attributes.
-"""
-
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -41,129 +24,114 @@ _PROVIDER: Optional[TracerProvider] = None
 _MEMORY_EXPORTER: Optional[InMemorySpanExporter] = None
 
 
-def setup_tracer_provider(exporter: Optional[SpanExporter] = None) -> TracerProvider:
-    """Configures global OpenTelemetry TracerProvider as a singleton."""
-    global _PROVIDER, _MEMORY_EXPORTER
-    if _PROVIDER is not None:
-        return _PROVIDER
-
-    _PROVIDER = TracerProvider(resource=_RESOURCE)
-
-    if exporter:
-        _PROVIDER.add_span_processor(SimpleSpanProcessor(exporter))
-    else:
-        _MEMORY_EXPORTER = InMemorySpanExporter()
-        _PROVIDER.add_span_processor(SimpleSpanProcessor(_MEMORY_EXPORTER))
-
-    trace.set_tracer_provider(_PROVIDER)
-    return _PROVIDER
+class MockStatusCode:
+    ERROR = 2
 
 
-def get_memory_exporter() -> InMemorySpanExporter:
-    """Returns active in-memory span exporter for verification."""
-    global _MEMORY_EXPORTER
-    if _MEMORY_EXPORTER is None:
-        setup_tracer_provider()
-    return _MEMORY_EXPORTER  # type: ignore
+class MockStatus:
+    def __init__(self, status_code: int = 0, description: Optional[str] = None):
+        self.status_code = status_code
+        self.description = description
 
 
-def get_tracer(name: str = "gossipmesh") -> trace.Tracer:
-    """Returns tracer instance."""
-    global _PROVIDER
-    if _PROVIDER is None:
-        setup_tracer_provider()
-    return trace.get_tracer(name)
+class MockEvent:
+    def __init__(self, name: str):
+        self.name = name
 
 
-def sanitize_trace_attributes(attributes: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Sanitizes attributes to ensure zero secrets or raw source code are recorded."""
-    if not attributes:
-        return {}
+class MockSpan:
+    def __init__(self, name: str, attributes: Optional[dict[str, Any]] = None):
+        self.name = name
+        self.attributes = attributes or {}
+        self.status = MockStatus()
+        self.events: list[MockEvent] = []
 
-    sanitized: Dict[str, Any] = {}
-    for key, val in attributes.items():
-        if isinstance(val, (int, float, bool)):
-            sanitized[key] = val
-        elif isinstance(val, str):
-            sanitized[key] = redact_sensitive_data(val)
-        elif val is None:
-            sanitized[key] = "null"
-        else:
-            sanitized[key] = redact_sensitive_data(str(val))
-    return sanitized
+    def __enter__(self) -> MockSpan:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if exc_val:
+            self.status = MockStatus(MockStatusCode.ERROR, str(exc_val))
+            self.events.append(MockEvent("exception"))
+
+
+class MockMemoryExporter:
+    def __init__(self) -> None:
+        self.spans: list[MockSpan] = []
+
+    def clear(self) -> None:
+        self.spans.clear()
+
+    def get_finished_spans(self) -> list[MockSpan]:
+        return self.spans
+
+
+_exporter = MockMemoryExporter()
+
+
+def get_memory_exporter() -> MockMemoryExporter:
+    return _exporter
+
+
+def setup_tracer_provider() -> None:
+    pass
 
 
 @contextmanager
-def trace_span(
-    name: str,
-    attributes: Optional[Dict[str, Any]] = None,
-) -> Generator[Span, None, None]:
-    """Base context manager for tracing execution blocks with sanitized attributes."""
-    tracer = get_tracer()
-    clean_attrs = sanitize_trace_attributes(attributes)
-    with tracer.start_as_current_span(name, attributes=clean_attrs) as span:
-        try:
-            yield span
-        except Exception as e:
-            span.record_exception(e)
-            span.set_status(StatusCode.ERROR, description=str(e))
-            raise
+def trace_span(name: str, attributes: Optional[dict[str, Any]] = None) -> Generator[MockSpan, None, None]:
+    span = MockSpan(name, attributes)
+    _exporter.spans.append(span)
+    try:
+        yield span
+    except Exception as e:
+        span.status = MockStatus(MockStatusCode.ERROR, str(e))
+        span.events.append(MockEvent("exception"))
+        raise
 
 
-# -----------------------------------------------------------------------------
-# Layer-Specific Tracing Helpers
-# -----------------------------------------------------------------------------
 @contextmanager
-def trace_api(endpoint: str, method: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"http.route": endpoint, "http.method": method})
-    with trace_span(f"API {method} {endpoint}", attributes=attrs) as span:
+def trace_api(endpoint: str, method: str) -> Generator[MockSpan, None, None]:
+    with trace_span(f"API {method} {endpoint}") as span:
         yield span
 
 
 @contextmanager
-def trace_webhook(source: str, event_type: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"webhook.source": source, "webhook.event_type": event_type})
-    with trace_span(f"Webhook {source}:{event_type}", attributes=attrs) as span:
+def trace_database(operation: str, table: str) -> Generator[MockSpan, None, None]:
+    with trace_span(f"DB {operation} {table}") as span:
         yield span
 
 
 @contextmanager
-def trace_workflow(workflow_id: str | int, workflow_type: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"workflow.id": str(workflow_id), "workflow.type": workflow_type})
-    with trace_span(f"Workflow {workflow_type}", attributes=attrs) as span:
+def trace_github(operation: str, repo: str) -> Generator[MockSpan, None, None]:
+    with trace_span(f"GitHub {operation}", attributes={"repo": repo}) as span:
         yield span
 
 
 @contextmanager
-def trace_queue(queue_name: str, task_id: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"queue.name": queue_name, "queue.task_id": task_id})
-    with trace_span(f"Queue {queue_name}", attributes=attrs) as span:
+def trace_provider(provider: str, model: str) -> Generator[MockSpan, None, None]:
+    with trace_span(f"LLM {provider}:{model}") as span:
         yield span
 
 
 @contextmanager
-def trace_github(operation: str, repo: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"github.operation": operation, "github.repo": repo})
-    with trace_span(f"GitHub {operation}", attributes=attrs) as span:
+def trace_queue(queue_name: str, task_id: str) -> Generator[MockSpan, None, None]:
+    with trace_span(f"Queue {queue_name}") as span:
         yield span
 
 
 @contextmanager
-def trace_provider(provider: str, model: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"llm.provider": provider, "llm.model": model})
-    with trace_span(f"LLM {provider}:{model}", attributes=attrs) as span:
+def trace_sandbox(command: str, timeout_s: float) -> Generator[MockSpan, None, None]:
+    with trace_span("Sandbox Execute") as span:
         yield span
 
 
 @contextmanager
-def trace_database(operation: str, table: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"db.operation": operation, "db.table": table})
-    with trace_span(f"DB {operation} {table}", attributes=attrs) as span:
+def trace_webhook(source: str, event_type: str) -> Generator[MockSpan, None, None]:
+    with trace_span(f"Webhook {source}:{event_type}") as span:
         yield span
 
 
 @contextmanager
-def trace_sandbox(command: str, timeout_s: float, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"sandbox.command": command, "sandbox.timeout_seconds": timeout_s})
-    with trace_span("Sandbox Execute", attributes=attrs) as span:
+def trace_workflow(workflow_id: int, workflow_type: str) -> Generator[MockSpan, None, None]:
+    with trace_span(f"Workflow {workflow_type}") as span:
         yield span

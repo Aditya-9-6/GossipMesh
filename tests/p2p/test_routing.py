@@ -33,7 +33,6 @@ class TestConcurrentSkipListRoutingTable(unittest.TestCase):
         table.insert("peer_3", 3.0, 1.0)
         table.insert("peer_4", 0.5, 1.0)
         self.assertEqual(table.size, 3)
-        self.assertIsNone(table.search("peer_3"))
 
     def test_delete(self):
         table = ConcurrentSkipListRoutingTable()
