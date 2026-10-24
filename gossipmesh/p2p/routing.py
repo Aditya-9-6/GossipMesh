@@ -1,6 +1,8 @@
-from typing import List, Optional, Any, Tuple, Dict
+from __future__ import annotations
+
 import random
 import threading
+from typing import Any, List, Optional, Tuple, Dict
 
 
 class SkipListNode:
@@ -129,18 +131,15 @@ class SkipList:
             curr = curr.forward[0]
         return res
 
-    def range_query(self, start_key: str, end_key: str) -> List[Dict[str, Any]]:
-        res: List[Dict[str, Any]] = []
-        curr = self.header
-        for i in range(self.level - 1, -1, -1):
-            while curr.forward[i] is not None and curr.forward[i].key < start_key:
-                curr = curr.forward[i]  # type: ignore
-
-        curr = curr.forward[0]  # type: ignore
-        while curr is not None and curr.key <= end_key:
-            res.append({"key": curr.key, "value": curr.value})
-            curr = curr.forward[0]  # type: ignore
-
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
+        res: List[Tuple[str, Any]] = []
+        current = self.header.forward[0]
+        while current:
+            if start_key <= current.key <= end_key:
+                res.append((current.key, current.value))
+            elif current.key > end_key:
+                break
+            current = current.forward[0]
         return res
 
 
@@ -151,39 +150,53 @@ class P2PRoutingTable(SkipList):
         super().__init__(max_level=max_levels, p=p)
 
 
-class ConcurrentSkipListRoutingTable(P2PRoutingTable):
-    """Thread-safe extension of P2PRoutingTable with capacity constraints supporting test_routing.py."""
+class SkipListRoutingTable(SkipList):
+    """Alias or subclass of SkipList for backward compatibility with routing table naming."""
 
-    def __init__(self, max_levels: int = 16, p: float = 0.5, capacity: Optional[int] = None):
-        super().__init__(max_levels=max_levels, p=p)
-        if capacity is not None:
-            self.capacity = capacity
+    pass
+
+
+class ConcurrentSkipListRoutingTable:
+    """Thread-safe routing table wrapping SkipList with capacity and extra compatibility methods."""
+
+    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
+        self.capacity = capacity
+        self.table = SkipList(max_level=max_level, p=p, capacity=capacity)
+        self._size = 0
         self._lock = threading.Lock()
 
-    def insert(self, key: str, *args: Any) -> None:
+    @property
+    def size(self) -> int:
         with self._lock:
-            val = args[0] if len(args) == 1 else args
-            exists = self.search(key) is not None
-            super().insert(key, val)
-            if not exists:
-                self.size += 1
-                if self.capacity is not None and self.size > self.capacity:
-                    curr = self.header.forward[0]
-                    last_key = None
-                    while curr is not None:
-                        last_key = curr.key
-                        curr = curr.forward[0]
-                    if last_key is not None:
-                        super().delete(last_key)
-                        self.size -= 1
+            return self._size
+
+    def insert(self, key: str, *args: Any) -> None:
+        if len(args) == 1:
+            val = args[0]
+        elif len(args) > 1:
+            val = args
+        else:
+            val = None
+
+        with self._lock:
+            existing = self.table.search(key)
+            if existing is None:
+                self._size += 1
+            self.table.insert(key, val)
+
+    def search(self, key: str) -> Any:
+        with self._lock:
+            return self.table.search(key)
 
     def delete(self, key: str) -> bool:
         with self._lock:
-            res = super().delete(key)
-            if res:
-                self.size = max(0, self.size - 1)
-            return res
+            existing = self.table.search(key)
+            if existing is not None:
+                self.table.delete(key)
+                self._size = max(0, self._size - 1)
+                return True
+            return False
 
-    def search(self, key: str) -> Optional[Any]:
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
         with self._lock:
-            return super().search(key)
+            return self.table.range_query(start_key, end_key)

@@ -114,6 +114,11 @@ class CostControlsEngine:
         reason: str,
         actor: str = "cost_controls_watchdog",
     ) -> int:
+        """
+        Immediately pauses and cancels all running and pending workflows and jobs
+        for the given organization to prevent uncontrolled runaway spend.
+        Emits high-severity audit record.
+        """
         wf_stmt = (
             update(Workflow)
             .where(
@@ -123,7 +128,8 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         wf_result = session.execute(wf_stmt)
-        workflows_stopped = int(wf_result.rowcount) if hasattr(wf_result, "rowcount") else 0
+        session.commit()
+        workflows_stopped = int(getattr(wf_result, "rowcount", 0) or 0)
 
         job_stmt = (
             update(Job)
@@ -134,6 +140,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         session.execute(job_stmt)
+        session.commit()
 
         audit = AuditEvent(
             action="billing.emergency_shutdown_triggered",
