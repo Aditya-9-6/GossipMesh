@@ -7,6 +7,16 @@ from __future__ import annotations
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
+class VectorClockEntropy:
+    def increment(self, *args, **kwargs):
+        pass
+
+
+class AntiEntropyEntropy:
+    def scan_mesh(self, *args, **kwargs):
+        pass
+
+
 class P2PSyncer:
     def __init__(self):
         self.entropy = VectorClockEntropy()
@@ -15,4 +25,4 @@ class P2PSyncer:
         return self.entropy.reconcile(state)
 
 
-__all__ = ["P2PSyncer"]
+__all__ = ["P2PSyncer", "VectorClockEntropy", "AntiEntropyEntropy"]
