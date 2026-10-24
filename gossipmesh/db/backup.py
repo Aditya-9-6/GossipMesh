@@ -1,11 +1,7 @@
-"""Database backup, restore validation, encryption, and tenant export (Task 32)."""
-
 import base64
 import hashlib
 import json
 import logging
-import os
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -18,15 +14,24 @@ from gossipmesh.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class BackupMetadata:
-    backup_id: str
-    timestamp: str
-    database: str
-    tables_included: List[str]
-    checksum_sha256: str
-    is_encrypted: bool
-    version: str = "1.0"
+    def __init__(
+        self,
+        backup_id: str,
+        timestamp: str,
+        database: str,
+        tables_included: List[str],
+        checksum_sha256: str,
+        is_encrypted: bool,
+        version: str = "1.0",
+    ):
+        self.backup_id = backup_id
+        self.timestamp = timestamp
+        self.database = database
+        self.tables_included = tables_included
+        self.checksum_sha256 = checksum_sha256
+        self.is_encrypted = is_encrypted
+        self.version = version
 
 
 class DatabaseBackupManager:
@@ -72,6 +77,9 @@ class DatabaseBackupManager:
             is_encrypted=True,
         )
 
+        meta_path = self.backup_dir / f"{backup_id}.meta.json"
+        meta_path.write_text(json.dumps(metadata.__dict__, indent=2), encoding="utf-8")
+
         return enc_path, metadata
 
     def verify_and_restore(
@@ -102,7 +110,6 @@ class DatabaseBackupManager:
         output_file: Optional[Path] = None,
     ) -> Dict[str, Any]:
         from gossipmesh.models.organization import Organization
-        from gossipmesh.models.user import User
         from gossipmesh.models.repository import Repository
         from gossipmesh.models.runtime import Workflow, Budget
 
@@ -117,6 +124,7 @@ class DatabaseBackupManager:
         workflows = db_session.query(Workflow).filter(Workflow.repository_id.in_(repo_ids)).all() if repo_ids else []
         budget = db_session.query(Budget).filter(Budget.organization_id == organization_id).first()
 
+        tenant_slug = getattr(tenant, "slug", getattr(tenant, "name", ""))
         tenant_export = {
             "metadata": {
                 "organization_id": organization_id,
@@ -126,7 +134,7 @@ class DatabaseBackupManager:
             "organization": {
                 "id": tenant.id,
                 "name": tenant.name,
-                "slug": getattr(tenant, "slug", tenant.name),
+                "slug": tenant_slug,
                 "created_at": str(tenant.created_at) if hasattr(tenant, "created_at") else None,
             },
             "users": [
