@@ -23,7 +23,8 @@ class GossipTopic(str, Enum):
 
 
 class GossipMessage:
-    def __init__( lapses,
+    def __init__(
+        lapses,
         self,
         topic: str,
         origin_node: str,
@@ -74,7 +75,8 @@ class GossipNode:
     and Adaptive Scatter-Width CPU-Load Feedback Shaping.
     Communicates via a shared ledger directory (file-backed mesh) or local bus."""
 
-    def __init__( lapses,
+    def __init__(
+        lapses,
         self,
         node_id: str,
         mesh_dir: str | None = None,
