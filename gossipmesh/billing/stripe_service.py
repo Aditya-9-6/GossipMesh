@@ -1,5 +1,8 @@
 """
 Production Stripe Billing Service (Task 87).
+
+Implements real Stripe customer management, checkout sessions, billing portal,
+subscription lifecycle, invoices, signature-verified webhooks, and idempotent processing.
 """
 
 from __future__ import annotations
@@ -8,7 +11,7 @@ import hmac
 import hashlib
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional
 
 try:
     import stripe
@@ -33,6 +36,8 @@ from gossipmesh.models.organization import Organization
 
 
 class StripeBillingService:
+    """Enterprise Stripe billing integration service."""
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -71,13 +76,14 @@ class StripeBillingService:
         if not org:
             raise ValidationError(f"Organization ID {organization_id} not found")
 
+        cust_name = name or org.name or ""
         if self.test_mode or stripe is None:
             stripe_cust_id = f"cus_test_{organization_id}_{int(time.time())}"
         else:
             res = stripe.Customer.create(
                 email=email,
-                name=name or org.name,
-                metadata=cast(Any, {"organization_id": str(organization_id)}),
+                name=cust_name,
+                metadata={"organization_id": str(organization_id)},
             )
             stripe_cust_id = res.id
 
@@ -85,7 +91,7 @@ class StripeBillingService:
             organization_id=organization_id,
             stripe_customer_id=stripe_cust_id,
             email=email,
-            name=name or org.name,
+            name=cust_name,
         )
         session.add(customer)
         session.commit()
@@ -115,12 +121,12 @@ class StripeBillingService:
 
         session_obj = stripe.checkout.Session.create(
             customer=customer.stripe_customer_id,
-            payment_method_types=cast(Any, ["card"]),
-            line_items=cast(Any, [{"price": price_id, "quantity": quantity}]),
+            payment_method_types=["card"],
+            line_items=[{"price": price_id, "quantity": quantity}],
             mode="subscription",
             success_url=f"{s_url}?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=c_url,
-            subscription_data=cast(Any, {"metadata": {"organization_id": str(organization_id), "plan_id": plan_id}}),
+            subscription_data={"metadata": {"organization_id": str(organization_id), "plan_id": plan_id}},
         )
         return {"id": session_obj.id, "url": session_obj.url}
 
@@ -200,7 +206,6 @@ class StripeBillingService:
         signature_header: str,
         tolerance: int = 300,
     ) -> Dict[str, Any]:
-        """Verifies HMAC-SHA256 signature from Stripe."""
         if not self.test_mode and stripe is not None:
             try:
                 return stripe.Webhook.construct_event(
@@ -212,8 +217,7 @@ class StripeBillingService:
             except Exception as e:
                 raise AuthenticationError(f"Stripe signature verification failed: {str(e)}")
 
-        # Pure Python fallback for tests / test_mode
-        parts = {}
+        parts: Dict[str, str] = {}
         for item in signature_header.split(","):
             if "=" in item:
                 k, v = item.split("=", 1)
@@ -245,7 +249,7 @@ class StripeBillingService:
 
         import json
 
-        return cast(Dict[str, Any], json.loads(payload_bytes.decode("utf-8")))
+        return json.loads(payload_bytes.decode("utf-8"))
 
     def handle_webhook_event(self, session: Session, event: Dict[str, Any]) -> Dict[str, Any]:
         event_id = event.get("id")
@@ -265,7 +269,7 @@ class StripeBillingService:
                 sub_id = data_obj.get("id")
                 cust_id = data_obj.get("customer")
                 plan_id = data_obj.get("plan", {}).get("id") or "pro"
-                status = data_obj.get("status", "active")
+                status_val = data_obj.get("status", "active")
                 cancel_at_period_end = data_obj.get("cancel_at_period_end", False)
                 quantity = data_obj.get("quantity", 1)
 
@@ -280,13 +284,13 @@ class StripeBillingService:
                             stripe_subscription_id=sub_id,
                             stripe_customer_id=cust_id,
                             plan_id=plan_id,
-                            status=status,
+                            status=status_val,
                             quantity=quantity,
                             cancel_at_period_end=cancel_at_period_end,
                         )
                         session.add(sub)
                     else:
-                        sub.status = status
+                        sub.status = status_val
                         sub.plan_id = plan_id
                         sub.quantity = quantity
                         sub.cancel_at_period_end = cancel_at_period_end
@@ -305,7 +309,7 @@ class StripeBillingService:
                 amount_due = data_obj.get("amount_due", 0)
                 amount_paid = data_obj.get("amount_paid", 0)
                 currency = data_obj.get("currency", "usd")
-                status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
+                inv_status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
                 invoice_url = data_obj.get("hosted_invoice_url")
                 invoice_pdf = data_obj.get("invoice_pdf")
 
@@ -322,13 +326,13 @@ class StripeBillingService:
                             amount_due=amount_due,
                             amount_paid=amount_paid,
                             currency=currency,
-                            status=status,
+                            status=inv_status,
                             hosted_invoice_url=invoice_url or "",
                             invoice_pdf=invoice_pdf or "",
                         )
                         session.add(inv)
                     else:
-                        inv.status = status
+                        inv.status = inv_status
                         inv.amount_paid = amount_paid
 
             record = ProcessedWebhookEvent(
@@ -351,6 +355,3 @@ class StripeBillingService:
             session.add(record)
             session.commit()
             raise GossipMeshException(f"Failed to handle Stripe webhook event {event_id}: {str(e)}")
-
-
-__all__ = ["StripeBillingService"]
