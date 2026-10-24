@@ -54,42 +54,42 @@ class MerkleTree:
         if not nodes:
             self.root = None
             return
+        self.root = self._build_level(nodes)
 
-        while len(nodes) > 1:
-            parent_level: List[MerkleNode] = []
-            for i in range(0, len(nodes), 2):
-                left = nodes[i]
-                if i + 1 < len(nodes):
-                    right = nodes[i + 1]
-                    parent_hash = hash_pair(left.hash_value, right.hash_value)
-                    parent_level.append(MerkleNode(hash_value=parent_hash, left=left, right=right))
-                else:
-                    parent_level.append(left)
-            nodes = parent_level
-        self.root = nodes[0]
+    def _build_level(self, nodes: List[MerkleNode]) -> MerkleNode:
+        if len(nodes) == 1:
+            return nodes[0]
+        next_level = []
+        for i in range(0, len(nodes), 2):
+            left = nodes[i]
+            right = nodes[i + 1] if i + 1 < len(nodes) else nodes[i]
+            parent_hash = hash_pair(left.hash_value, right.hash_value)
+            parent = MerkleNode(hash_value=parent_hash, left=left, right=right)
+            next_level.append(parent)
+        return self._build_level(next_level)
 
-    def get_root_hash(self) -> Optional[str]:
-        return self.root.hash_value if self.root else None
+    def get_root_hash(self) -> str:
+        return self.root.hash_value if self.root else hash_data("")
 
-    def get_proof(self, key: str) -> List[Tuple[str, str]]:
-        if key not in self.items or not self.root:
-            return []
-        proof: List[Tuple[str, str]] = []
+    def get_subtree_fingerprints(self) -> Dict[str, str]:
+        fingerprints: Dict[str, str] = {}
+        if not self.root:
+            return fingerprints
+        queue = [(self.root, "root")]
+        while queue:
+            node, path = queue.pop(0)
+            fingerprints[path] = node.hash_value
+            if node.left:
+                queue.append((node.left, f"{path}/left"))
+            if node.right:
+                queue.append((node.right, f"{path}/right"))
+        return fingerprints
 
-        def _find(node: Optional[MerkleNode], target_key: str) -> bool:
-            if not node:
-                return False
-            if node.key == target_key:
-                return True
-            if node.left and _find(node.left, target_key):
-                if node.right:
-                    proof.append(("right", node.right.hash_value))
-                return True
-            if node.right and _find(node.right, target_key):
-                if node.left:
-                    proof.append(("left", node.left.hash_value))
-                return True
-            return False
-
-        _find(self.root, key)
-        return proof
+    def verify_proof(self, key: str, value: str, proof: List[Tuple[str, bool]]) -> bool:
+        current_hash = hash_data(key + value)
+        for sibling_hash, is_right in proof:
+            if is_right:
+                current_hash = hash_pair(current_hash, sibling_hash)
+            else:
+                current_hash = hash_pair(sibling_hash, current_hash)
+        return self.root is not None and current_hash == self.root.hash_value
