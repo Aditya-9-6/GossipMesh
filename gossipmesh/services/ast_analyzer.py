@@ -198,9 +198,9 @@ class AstAnalyzer:
 
         report = []
         for func_info in modified_functions:
-            empty_list: List[Dict[str, Any]] = []
-            key_name = str(func_info["name"])
-            dep_list = dependencies.get(key_name, empty_list)
+            key_seq: Sequence[str] = [func_info["name"]]
+            func_name_str = str(func_info["name"])
+            dep_list = dependencies.get(func_name_str, [])
             report.append(
                 {
                     "modified_file": func_info["file"],

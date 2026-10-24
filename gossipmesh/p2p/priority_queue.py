@@ -167,7 +167,7 @@ class WeightedPriorityQueue:
             if not bucket:
                 continue
 
-            weight = self.config.level_weights.get(level, 1)
+            weight = self.config.level_weights.get(level, 1) if self.config.level_weights else 1
             self._deficits[level] += weight
             if self._deficits[level] > 0:
                 self._deficits[level] -= 1
