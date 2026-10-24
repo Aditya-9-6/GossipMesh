@@ -77,7 +77,8 @@ def login_access_token(
     elif not user.is_active:
         raise AuthorizationError(message="Inactive user")
 
-    login_throttler.record_success(form_data.username)
+    if hasattr(login_throttler, "record_success"):
+        login_throttler.record_success(form_data.username)
 
     # Create session
     ip_address = request.client.host if request.client else None
@@ -216,8 +217,9 @@ def github_login(request: Request) -> Any:
     state = str(uuid.uuid4())
     redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     params = {
-        "client_id": settings.GITHUB_CLIENT_ID,
+        "client_id": client_id,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -233,12 +235,13 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": client_id,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
@@ -292,16 +295,16 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
-                github_id=github_id,
-                encrypted_access_token=encrypt_string(access_token),
-                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
+                github_user_id=github_id,
+                access_token=encrypt_string(access_token),
+                refresh_token=encrypt_string(refresh_token) if refresh_token else None,
             )
             db.add(credential)
         else:
-            credential.github_id = github_id
-            credential.encrypted_access_token = encrypt_string(access_token)
+            credential.github_user_id = github_id
+            credential.access_token = encrypt_string(access_token)
             if refresh_token:
-                credential.encrypted_refresh_token = encrypt_string(refresh_token)
+                credential.refresh_token = encrypt_string(refresh_token)
 
         db.commit()
 
@@ -370,17 +373,20 @@ def github_refresh_token(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
-    if not credential or not credential.encrypted_refresh_token:
+    if not credential or not getattr(credential, "refresh_token", getattr(credential, "encrypted_refresh_token", None)):
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
-    refresh_token = decrypt_string(credential.encrypted_refresh_token)
+    refresh_token = decrypt_string(
+        getattr(credential, "refresh_token", getattr(credential, "encrypted_refresh_token", ""))
+    )
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": client_id,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
@@ -393,9 +399,16 @@ def github_refresh_token(
         new_access_token = token_data["access_token"]
         new_refresh_token = token_data.get("refresh_token")
 
-        credential.encrypted_access_token = encrypt_string(new_access_token)
+        if hasattr(credential, "access_token"):
+            credential.access_token = encrypt_string(new_access_token)
+        else:
+            credential.encrypted_access_token = encrypt_string(new_access_token)
+
         if new_refresh_token:
-            credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
+            if hasattr(credential, "refresh_token"):
+                credential.refresh_token = encrypt_string(new_refresh_token)
+            else:
+                credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
 
         db.commit()
 
@@ -403,7 +416,7 @@ def github_refresh_token(
             action="github_token_refresh",
             actor_id=current_user.id,
             details={
-                "github_id": credential.github_id,
+                "github_id": getattr(credential, "github_user_id", None),
             },
         )
         db.add(audit_event)
@@ -543,18 +556,18 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
                 user_id=user.id,
                 sub=sub,
                 issuer=issuer,
-                encrypted_access_token=encrypt_string(access_token),
-                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
-                encrypted_id_token=encrypt_string(id_token),
+                access_token=encrypt_string(access_token),
+                refresh_token=encrypt_string(refresh_token) if refresh_token else None,
+                id_token=encrypt_string(id_token),
             )
             db.add(credential)
         else:
             credential.sub = str(sub)
-            credential.encrypted_access_token = encrypt_string(access_token)
+            credential.access_token = encrypt_string(access_token)
             if refresh_token:
-                credential.encrypted_refresh_token = encrypt_string(refresh_token)
+                credential.refresh_token = encrypt_string(refresh_token)
             if id_token:
-                credential.encrypted_id_token = encrypt_string(id_token)
+                credential.id_token = encrypt_string(id_token)
 
         roles = claims.get("groups", claims.get("roles", []))
         if isinstance(roles, list) and roles:
