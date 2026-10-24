@@ -1,19 +1,16 @@
+"""
+P2P Syncer module.
+"""
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class StateSyncer:
-    def __init__(self, node_id: str, entropy: VectorClockEntropy | None = None) -> None:
+class P2PSyncer:
+    def __init__(self, node_id: str):
         self.node_id = node_id
-        self.entropy = entropy or VectorClockEntropy()
+        self.entropy = VectorClockEntropy(node_id)
 
-    def sync(self, peer_state: Dict[str, Any] | None = None) -> Dict[str, Any] | Any:
-        if peer_state is None:
-            return True
-        return {"status": "synced", "peer": self.node_id}
-
-
-P2PSyncer = StateSyncer
-Syncer = StateSyncer
+    def sync_state(self, peer_vector: dict[str, int]) -> None:
+        self.entropy.merge(peer_vector)
