@@ -46,7 +46,7 @@ def invalidate_user_sessions(db: Session, user_id: int) -> None:
     db.commit()
 
 
-def create_password_reset_token(db_or_email: Any) -> str:
+def create_password_reset_token(db: Session, email: str) -> str:
     token = secrets.token_urlsafe(32)
     return token
 

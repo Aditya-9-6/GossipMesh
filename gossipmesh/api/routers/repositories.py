@@ -29,8 +29,8 @@ class BranchSelectRequest(BaseModel):
 
 class RepositoryPolicyUpdate(BaseModel):
     branch_protection_enabled: Optional[bool] = None
-    auto_merge_enabled: Optional[bool] = None
-    require_review_approval: Optional[bool] = None
+    auto_fix_enabled: Optional[bool] = None
+    require_review: Optional[bool] = None
     min_approvals: Optional[int] = Field(None, ge=1, le=10)
     allowed_target_branches: Optional[List[str]] = None
     max_diff_lines: Optional[int] = Field(None, ge=10, le=100000)
@@ -262,12 +262,12 @@ def update_repository_policy(
     if policy_in.branch_protection_enabled is not None:
         policy.branch_protection_enabled = policy_in.branch_protection_enabled
         changes["branch_protection_enabled"] = policy_in.branch_protection_enabled
-    if policy_in.auto_merge_enabled is not None:
-        policy.auto_merge_enabled = policy_in.auto_merge_enabled
-        changes["auto_merge_enabled"] = policy_in.auto_merge_enabled
-    if policy_in.require_review_approval is not None:
-        policy.require_review_approval = policy_in.require_review_approval
-        changes["require_review_approval"] = policy_in.require_review_approval
+    if policy_in.auto_fix_enabled is not None:
+        policy.auto_merge_enabled = policy_in.auto_fix_enabled
+        changes["auto_merge_enabled"] = policy_in.auto_fix_enabled
+    if policy_in.require_review is not None:
+        policy.require_review_approval = policy_in.require_review
+        changes["require_review_approval"] = policy_in.require_review
     if policy_in.min_approvals is not None:
         policy.min_approvals = policy_in.min_approvals
         changes["min_approvals"] = policy_in.min_approvals

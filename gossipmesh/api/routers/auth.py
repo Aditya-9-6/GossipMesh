@@ -617,7 +617,7 @@ def change_password(
         raise HTTPException(status_code=400, detail=err_msg)
 
     current_user.hashed_password = get_password_hash(body.new_password)
-    invalidate_user_sessions(current_user.id)
+    invalidate_user_sessions(db, current_user.id)
 
     event = AuditEvent(
         action="password.changed", actor_id=current_user.id, organization_id=None, details={"user_id": current_user.id}
@@ -636,7 +636,7 @@ def request_password_reset(
     if not user:
         return {"message": "If an active account with that email exists, a reset token has been generated."}
 
-    token = create_password_reset_token(user.email)
+    token = create_password_reset_token(db, user.email)
     event = AuditEvent(
         action="password.reset_requested", actor_id=user.id, organization_id=None, details={"email": user.email}
     )
@@ -650,9 +650,7 @@ def confirm_password_reset(
     body: PasswordResetConfirm,
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    reset_res = verify_and_consume_reset_token(body.token)
-    user_email = reset_res if isinstance(reset_res, str) else (getattr(reset_res, "email", None) if reset_res else None)
-    user = db.query(User).filter(User.email == user_email).first() if user_email else None
+    user = verify_and_consume_reset_token(db, body.token)
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired password reset token.")
 
@@ -669,7 +667,7 @@ def confirm_password_reset(
         raise HTTPException(status_code=400, detail=err_msg)
 
     user.hashed_password = get_password_hash(body.new_password)
-    invalidate_user_sessions(user.id)
+    invalidate_user_sessions(db, user.id)
 
     event = AuditEvent(
         action="password.reset_completed", actor_id=user.id, organization_id=None, details={"user_id": user.id}
