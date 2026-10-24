@@ -7,6 +7,7 @@ class P2PSyncer:
         self.node_id = node_id
         self.entropy_calculator = VectorClockEntropy(node_id)
         self.entropy_tracker = self.entropy_calculator
+        self.entropy = self.entropy_calculator
 
     def evaluate_sync_urgency(self, peer_clocks: List[Dict[str, int]]) -> float:
         return self.entropy_calculator.compute_entropy(peer_clocks)
@@ -14,3 +15,13 @@ class P2PSyncer:
     def sync_state(self, peer_clock: Dict[str, int]) -> bool:
         self.entropy_tracker.update(peer_clock)
         return True
+
+    def sync(self, peer_data: Any) -> None:
+        if isinstance(peer_data, list):
+            self.evaluate_sync_urgency(peer_data)
+        elif isinstance(peer_data, dict):
+            self.sync_state(peer_data)
+
+
+class Syncer(P2PSyncer):
+    pass
