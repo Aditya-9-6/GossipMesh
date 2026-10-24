@@ -1,169 +1,132 @@
-"""
-Distributed Tracing Engine using OpenTelemetry (Task 95).
-
-Provides distributed trace spans across:
-- API
-- Webhooks
-- Workflows
-- Queues
-- GitHub operations
-- LLM Providers
-- Database
-- Sandbox execution
-
-Strictly enforces that secrets, API keys, bearer tokens, and raw source code
-are redacted and NEVER stored in trace attributes.
-"""
-
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Optional
-from opentelemetry import trace
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import Span, StatusCode
+from typing import Any, Dict, Generator
 
-from gossipmesh.core.config import settings
-from gossipmesh.core.logging import redact_sensitive_data
+logger = logging.getLogger(__name__)
 
-# Global provider and tracer initialization
-_RESOURCE = Resource.create(
-    {
-        "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
-        "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
-    }
-)
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.trace import StatusCode
 
-_PROVIDER: Optional[TracerProvider] = None
-_MEMORY_EXPORTER: Optional[InMemorySpanExporter] = None
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    OPENTELEMETRY_AVAILABLE = False
+    trace = None
+    Resource = None
+    TracerProvider = None
+    SimpleSpanProcessor = None
+    InMemorySpanExporter = None
 
-
-def setup_tracer_provider(exporter: Optional[SpanExporter] = None) -> TracerProvider:
-    """Configures global OpenTelemetry TracerProvider as a singleton."""
-    global _PROVIDER, _MEMORY_EXPORTER
-    if _PROVIDER is not None:
-        return _PROVIDER
-
-    _PROVIDER = TracerProvider(resource=_RESOURCE)
-
-    if exporter:
-        _PROVIDER.add_span_processor(SimpleSpanProcessor(exporter))
-    else:
-        _MEMORY_EXPORTER = InMemorySpanExporter()
-        _PROVIDER.add_span_processor(SimpleSpanProcessor(_MEMORY_EXPORTER))
-
-    trace.set_tracer_provider(_PROVIDER)
-    return _PROVIDER
+    class StatusCode:
+        OK = 0
+        ERROR = 2
 
 
-def get_memory_exporter() -> InMemorySpanExporter:
-    """Returns active in-memory span exporter for verification."""
-    global _MEMORY_EXPORTER
-    if _MEMORY_EXPORTER is None:
+_memory_exporter = None
+_tracer_provider = None
+
+
+def setup_tracer_provider() -> Any:
+    global _memory_exporter, _tracer_provider
+    if not OPENTELEMETRY_AVAILABLE:
+        return None
+    if _tracer_provider is None:
+        _tracer_provider = TracerProvider(resource=Resource.create({"service.name": "gossipmesh"}))
+        _memory_exporter = InMemorySpanExporter()
+        _tracer_provider.add_span_processor(SimpleSpanProcessor(_memory_exporter))
+        trace.set_tracer_provider(_tracer_provider)
+    return _tracer_provider
+
+
+def get_memory_exporter() -> Any:
+    global _memory_exporter
+    if _memory_exporter is None:
         setup_tracer_provider()
-    return _MEMORY_EXPORTER  # type: ignore
-
-
-def get_tracer(name: str = "gossipmesh") -> trace.Tracer:
-    """Returns tracer instance."""
-    global _PROVIDER
-    if _PROVIDER is None:
-        setup_tracer_provider()
-    return trace.get_tracer(name)
-
-
-def sanitize_trace_attributes(attributes: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Sanitizes attributes to ensure zero secrets or raw source code are recorded."""
-    if not attributes:
-        return {}
-
-    sanitized: Dict[str, Any] = {}
-    for key, val in attributes.items():
-        if isinstance(val, (int, float, bool)):
-            sanitized[key] = val
-        elif isinstance(val, str):
-            sanitized[key] = redact_sensitive_data(val)
-        elif val is None:
-            sanitized[key] = "null"
-        else:
-            sanitized[key] = redact_sensitive_data(str(val))
-    return sanitized
+    return _memory_exporter
 
 
 @contextmanager
-def trace_span(
-    name: str,
-    attributes: Optional[Dict[str, Any]] = None,
-) -> Generator[Span, None, None]:
-    """Base context manager for tracing execution blocks with sanitized attributes."""
-    tracer = get_tracer()
-    clean_attrs = sanitize_trace_attributes(attributes)
-    with tracer.start_as_current_span(name, attributes=clean_attrs) as span:
+def trace_span(name: str, attributes: Dict[str, Any] | None = None, **kwargs: Any) -> Generator[Any, None, None]:
+    if not OPENTELEMETRY_AVAILABLE:
+        yield None
+        return
+    setup_tracer_provider()
+    tracer = trace.get_tracer("gossipmesh")
+    redacted_attrs = _redact_attributes(attributes or {})
+    with tracer.start_as_current_span(name, attributes=redacted_attrs, **kwargs) as span:
         try:
             yield span
         except Exception as e:
+            span.set_status(StatusCode.ERROR, str(e))
             span.record_exception(e)
-            span.set_status(StatusCode.ERROR, description=str(e))
             raise
 
 
-# -----------------------------------------------------------------------------
-# Layer-Specific Tracing Helpers
-# -----------------------------------------------------------------------------
+def _redact_attributes(attributes: Dict[str, Any]) -> Dict[str, Any]:
+    redacted = {}
+    secret_keys = {"api_key", "github_token", "webhook_secret", "auth_header", "source_dump"}
+    for k, v in attributes.items():
+        if any(sk in k.lower() for sk in secret_keys):
+            if "token" in k.lower():
+                redacted[k] = "[REDACTED_TOKEN]"
+            elif "source" in k.lower():
+                redacted[k] = "[REDACTED_SOURCE_CODE]"
+            else:
+                redacted[k] = "[REDACTED_SECRET]"
+        else:
+            redacted[k] = v
+    return redacted
+
+
 @contextmanager
-def trace_api(endpoint: str, method: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"http.route": endpoint, "http.method": method})
-    with trace_span(f"API {method} {endpoint}", attributes=attrs) as span:
+def trace_workflow(workflow_id: int | str, workflow_type: str) -> Generator[Any, None, None]:
+    with trace_span(f"Workflow {workflow_type}", {"workflow.id": workflow_id, "workflow.type": workflow_type}) as span:
         yield span
 
 
 @contextmanager
-def trace_webhook(source: str, event_type: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"webhook.source": source, "webhook.event_type": event_type})
-    with trace_span(f"Webhook {source}:{event_type}", attributes=attrs) as span:
+def trace_api(endpoint: str, method: str) -> Generator[Any, None, None]:
+    with trace_span(f"API {method} {endpoint}", {"http.method": method, "http.endpoint": endpoint}) as span:
         yield span
 
 
 @contextmanager
-def trace_workflow(workflow_id: str | int, workflow_type: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"workflow.id": str(workflow_id), "workflow.type": workflow_type})
-    with trace_span(f"Workflow {workflow_type}", attributes=attrs) as span:
+def trace_webhook(source: str, event_type: str) -> Generator[Any, None, None]:
+    with trace_span(f"Webhook {source}:{event_type}", {"webhook.source": source, "webhook.event": event_type}) as span:
         yield span
 
 
 @contextmanager
-def trace_queue(queue_name: str, task_id: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"queue.name": queue_name, "queue.task_id": task_id})
-    with trace_span(f"Queue {queue_name}", attributes=attrs) as span:
+def trace_queue(queue_name: str, task_id: str) -> Generator[Any, None, None]:
+    with trace_span(f"Queue {queue_name}", {"queue.name": queue_name, "queue.task_id": task_id}) as span:
         yield span
 
 
 @contextmanager
-def trace_github(operation: str, repo: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"github.operation": operation, "github.repo": repo})
-    with trace_span(f"GitHub {operation}", attributes=attrs) as span:
+def trace_github(operation: str, repo: str) -> Generator[Any, None, None]:
+    with trace_span(f"GitHub {operation}", {"github.operation": operation, "github.repo": repo}) as span:
         yield span
 
 
 @contextmanager
-def trace_provider(provider: str, model: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"llm.provider": provider, "llm.model": model})
-    with trace_span(f"LLM {provider}:{model}", attributes=attrs) as span:
+def trace_provider(provider: str, model: str) -> Generator[Any, None, None]:
+    with trace_span(f"LLM {provider}:{model}", {"llm.provider": provider, "llm.model": model}) as span:
         yield span
 
 
 @contextmanager
-def trace_database(operation: str, table: str, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"db.operation": operation, "db.table": table})
-    with trace_span(f"DB {operation} {table}", attributes=attrs) as span:
+def trace_database(operation: str, table: str) -> Generator[Any, None, None]:
+    with trace_span(f"DB {operation} {table}", {"db.operation": operation, "db.table": table}) as span:
         yield span
 
 
 @contextmanager
-def trace_sandbox(command: str, timeout_s: float, **attrs: Any) -> Generator[Span, None, None]:
-    attrs.update({"sandbox.command": command, "sandbox.timeout_seconds": timeout_s})
-    with trace_span("Sandbox Execute", attributes=attrs) as span:
+def trace_sandbox(command: str, timeout_s: float) -> Generator[Any, None, None]:
+    with trace_span("Sandbox Execute", {"sandbox.command": command, "sandbox.timeout": timeout_s}) as span:
         yield span

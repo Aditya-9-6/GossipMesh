@@ -19,6 +19,11 @@ SECRET_RULES: Dict[str, Dict[str, Any]] = {
         "severity": "CRITICAL",
         "description": "GitHub Personal Access Token detected",
     },
+    "GM-SEC-GITHUB-PAT": {
+        "pattern": re.compile(r"(?:^|[^A-Za-z0-9])(ghp_[a-zA-Z0-9]{36})(?:[^A-Za-z0-9]|$)"),
+        "severity": "CRITICAL",
+        "description": "GitHub Personal Access Token detected",
+    },
     "GM-SEC-SLACK-TOKEN": {
         "pattern": re.compile(r"(xox[baprs]-[0-9a-zA-Z]{10,48})"),
         "severity": "HIGH",
@@ -34,17 +39,40 @@ SECRET_RULES: Dict[str, Dict[str, Any]] = {
         "severity": "CRITICAL",
         "description": "Stripe Secret API Key detected",
     },
+    "GM-SEC-STRIPE-LIVE": {
+        "pattern": re.compile(r"(?:rk|sk)_live_[0-9a-zA-Z]{24,}"),
+        "severity": "CRITICAL",
+        "description": "Stripe Live API Key detected",
+    },
 }
 
 
+def mask_secret(secret: str) -> str:
+    if not secret:
+        return "****"
+    if len(secret) <= 8:
+        return "****"
+    return secret[:4] + "..." + secret[-2:]
+
+
 class SecretFinding:
-    def __init__(self, rule_id: str, severity: str, description: str, file_path: str, line_number: int, snippet: str):
+    def __init__(
+        self,
+        rule_id: str,
+        severity: str,
+        description: str,
+        file_path: str,
+        line_number: int,
+        snippet: str,
+        matched_text_masked: Optional[str] = None,
+    ):
         self.rule_id = rule_id
         self.severity = severity
         self.description = description
         self.file_path = file_path
         self.line_number = line_number
         self.snippet = snippet
+        self.matched_text_masked = matched_text_masked or mask_secret(snippet)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -54,6 +82,7 @@ class SecretFinding:
             "file_path": self.file_path,
             "line_number": self.line_number,
             "snippet": self.snippet,
+            "matched_text_masked": self.matched_text_masked,
         }
 
 
@@ -70,11 +99,12 @@ class SecretScanner:
         for line_idx, line in enumerate(lines, start=1):
             for rule_id, rule_info in self.rules.items():
                 pattern = rule_info["pattern"]
-                if pattern.search(line):
-                    # Mask snippet for safety
+                match = pattern.search(line)
+                if match:
                     snippet = line.strip()
                     if len(snippet) > 80:
                         snippet = snippet[:80] + "..."
+                    matched_group = match.group(1) if match.groups() else snippet
                     findings.append(
                         SecretFinding(
                             rule_id=rule_id,
@@ -83,9 +113,13 @@ class SecretScanner:
                             file_path=file_path,
                             line_number=line_idx,
                             snippet=snippet,
+                            matched_text_masked=mask_secret(matched_group),
                         )
                     )
         return findings
+
+    def scan_content(self, text: str, file_path: str = "<string>") -> List[SecretFinding]:
+        return self.scan_text(text, file_path)
 
     def scan_file(self, file_path: Path | str) -> List[SecretFinding]:
         path = Path(file_path)
@@ -110,3 +144,7 @@ class SecretScanner:
             if path.is_file():
                 all_findings.extend(self.scan_file(path))
         return all_findings
+
+
+# Alias for compatibility with tests expecting SecretScannerEngine
+SecretScannerEngine = SecretScanner
