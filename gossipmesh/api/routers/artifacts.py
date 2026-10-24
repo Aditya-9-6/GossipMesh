@@ -60,6 +60,10 @@ def download_artifact(
         artifact, content = res
     else:
         artifact, content = res, b""
+    
+    if not artifact:
+        raise AuthorizationError(message="Artifact not found")
+
     return Response(
         content=content,
         media_type=getattr(artifact, "content_type", "application/octet-stream"),

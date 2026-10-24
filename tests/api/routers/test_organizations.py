@@ -32,6 +32,11 @@ def mock_db():
     app.dependency_overrides.pop(deps.get_db, None)
 
 
+@pytest.fixture
+def test_client():
+    return TestClient(app)
+
+
 def test_create_organization(test_client, mock_db, mock_current_user):
     mock_db.query.return_value.filter.return_value.first.return_value = None
 

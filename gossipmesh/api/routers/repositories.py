@@ -79,10 +79,8 @@ def get_user_repo_membership(
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found.")
-
     if getattr(current_user, "is_superuser", False):
         return repo, None
-
     user_org = (
         db.query(UserOrganization)
         .filter(
@@ -101,7 +99,6 @@ def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[R
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
-
     if user_org.role not in [OrganizationRole.owner, OrganizationRole.organization_admin]:
         raise HTTPException(status_code=403, detail="Admin permissions required for this repository action.")
     return repo, user_org
@@ -111,7 +108,6 @@ def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
-
     allowed_roles = [OrganizationRole.owner, OrganizationRole.organization_admin, OrganizationRole.developer]
     if user_org.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Write permissions required for this repository action.")
@@ -189,7 +185,6 @@ def select_branch(
     repo, _ = require_repo_writer(repo_id, db, current_user)
     old_branch = repo.default_branch
     repo.default_branch = body.default_branch
-
     log_audit_event(
         db,
         action="repository.branch_updated",
@@ -216,7 +211,6 @@ def remove_repository(
     db.query(IndexState).filter(IndexState.repository_id == repo.id).delete()
     db.query(RepositoryPolicy).filter(RepositoryPolicy.repository_id == repo.id).delete()
     db.delete(repo)
-
     log_audit_event(
         db,
         action="repository.removed",
@@ -249,7 +243,6 @@ def update_repository_policy(
 ) -> Any:
     repo, _ = require_repo_admin(repo_id, db, current_user)
     policy = get_or_create_default_policy(repo, db)
-
     changes = {}
     if policy_in.branch_protection_enabled is not None:
         policy.branch_protection_enabled = policy_in.branch_protection_enabled
@@ -275,7 +268,6 @@ def update_repository_policy(
     if policy_in.custom_rules is not None:
         policy.custom_rules = policy_in.custom_rules
         changes["custom_rules"] = policy_in.custom_rules
-
     log_audit_event(
         db,
         action="repository.policy_updated",
