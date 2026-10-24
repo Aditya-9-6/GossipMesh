@@ -2,6 +2,9 @@
 Billing and commercialization for GossipMesh.
 """
 
-from gossipmesh.billing.stripe_service import StripeBillingService
+try:
+    from gossipmesh.billing.stripe_service import StripeBillingService
 
-__all__ = ["StripeBillingService"]
+    __all__ = ["StripeBillingService"]
+except ImportError:
+    __all__ = []

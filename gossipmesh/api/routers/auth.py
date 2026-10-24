@@ -36,7 +36,6 @@ from gossipmesh.models.user import UserGitHubCredential
 from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.db.redis import redis_client
-from gossipmesh.security.throttler import login_throttler
 from pydantic import BaseModel
 import base64
 import hashlib
@@ -295,13 +294,13 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
-                github_id=github_id,
+                github_user_id=github_id,
                 encrypted_access_token=encrypt_string(access_token),
                 encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
             )
             db.add(credential)
         else:
-            credential.github_id = github_id
+            credential.github_user_id = github_id
             credential.encrypted_access_token = encrypt_string(access_token)
             if refresh_token:
                 credential.encrypted_refresh_token = encrypt_string(refresh_token)

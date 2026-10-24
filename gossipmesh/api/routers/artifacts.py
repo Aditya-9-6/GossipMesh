@@ -23,8 +23,6 @@ def get_artifact(
         .first()
     )
     if not artifact:
-        # Standard fast API response usually uses HTTPException but codebase leverages custom exceptions usually.
-        # Alternatively returning a generic custom empty response:
         return {"id": None, "name": None}
 
     is_member = (
