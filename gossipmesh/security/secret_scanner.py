@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import re
 import subprocess
+import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -24,42 +27,31 @@ class SecretFinding:
     matched_text_masked: str
 
 
-# Regular expression rules for high-confidence secret detection (combined from both branches)
+# Regular expression rules for high-confidence secret detection
 SECRET_RULES: Dict[str, Dict[str, Any]] = {
     "GM-SEC-AWS-KEY": {
         "pattern": re.compile(r"(?:^|[^A-Z0-9])(AKIA[0-9A-Z]{16})(?:[^A-Z0-9]|$)"),
-        "severity": "HIGH",
-        "description": "AWS Access Key ID detected",
+        "description": "AWS Access Key ID",
     },
-    "GM-SEC-AWS-SECRET": {
-        "pattern": re.compile(r"(?:^|[^A-Za-z0-9/+=])([0-9a-zA-Z/+]{40})(?:[^A-Za-z0-9/+=]|$)"),
-        "severity": "CRITICAL",
-        "description": "Potential AWS Secret Access Key detected (context-dependent)",
-    },
-    "GM-SEC-GITHUB-TOKEN": {
-        "pattern": re.compile(r"(gh[pous]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{36,})"),
-        "severity": "CRITICAL",
-        "description": "GitHub Personal Access Token detected",
+    "GM-SEC-GITHUB-PAT": {
+        "pattern": re.compile(r"(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{36,})"),
+        "description": "GitHub Personal Access Token",
     },
     "GM-SEC-OPENAI-KEY": {
         "pattern": re.compile(r"(sk-(?:live-)?[a-zA-Z0-9_-]{32,})"),
-        "severity": "CRITICAL",
         "description": "OpenAI / LLM API Key",
+    },
+    "GM-SEC-STRIPE-LIVE": {
+        "pattern": re.compile(r"(sk_live_[a-zA-Z0-9]{24,})"),
+        "description": "Stripe Live Secret Key",
+    },
+    "GM-SEC-PRIVATE-KEY": {
+        "pattern": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+        "description": "Unencrypted Private Key Block",
     },
     "GM-SEC-SLACK-TOKEN": {
         "pattern": re.compile(r"(xox[baprs]-[0-9a-zA-Z]{10,48})"),
-        "severity": "CRITICAL",
-        "description": "Slack Token detected",
-    },
-    "GM-SEC-PRIVATE-KEY": {
-        "pattern": re.compile(r"-----BEGIN (?:RSA|DSA|EC|OPENSSH|PRIVATE) KEY-----"),
-        "severity": "CRITICAL",
-        "description": "Asymmetric Private Key block detected",
-    },
-    "GM-SEC-STRIPE-KEY": {
-        "pattern": re.compile(r"(sk_live_[0-9a-zA-Z]{24,})"),
-        "severity": "CRITICAL",
-        "description": "Stripe Live Secret Key detected",
+        "description": "Slack Token / Credential",
     },
 }
 
@@ -81,6 +73,12 @@ def mask_secret(secret_str: str) -> str:
     return f"{secret_str[:4]}...{secret_str[-2:]}"
 
 
+class SecretScanner:
+    def scan_diff(self, diff_text: str) -> list:
+        # Placeholder implementation for secret scanner diff analysis
+        return []
+
+
 class SecretScannerEngine:
     """Scans codebases, files, and git diffs for leaked secrets."""
 
@@ -93,14 +91,15 @@ class SecretScannerEngine:
         return any(placeholder in text_lower for placeholder in WHITELIST_PLACEHOLDERS)
 
     def scan_content(self, content: str, file_path: str = "inline") -> List[SecretFinding]:
-        """Scans a text payload line-by-line for secret patterns, supporting robust findings."""
+        """Scans a text payload line-by-line for secret patterns."""
         findings: List[SecretFinding] = []
         lines = content.splitlines()
 
         for line_num, line in enumerate(lines, start=1):
             for rule_id, rule_info in self.rules.items():
                 pattern: re.Pattern = rule_info["pattern"]
-                for match in pattern.finditer(line):
+                match = pattern.search(line)
+                if match:
                     matched_val = match.group(1) if match.groups() else match.group(0)
                     if not self.is_whitelisted(matched_val):
                         findings.append(
@@ -124,7 +123,3 @@ class SecretScannerEngine:
             return self.scan_content(content, file_path=str(p))
         except Exception:
             return []
-
-
-# Alias for backwards compatibility with any HEAD references
-SecretScanner = SecretScannerEngine

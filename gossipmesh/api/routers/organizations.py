@@ -1,6 +1,6 @@
-from typing import Any, List, Literal
+from typing import Any, List
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -49,7 +49,7 @@ def require_org_admin(org_id: int, db: Session, current_user: User):
         .filter(
             UserOrganization.organization_id == org_id,
             UserOrganization.user_id == current_user.id,
-            UserOrganization.role.in_([OrganizationRole.organization_admin, OrganizationRole.owner]),
+            UserOrganization.role.in_([OrganizationRole.admin, OrganizationRole.owner]),
             UserOrganization.is_suspended == False,
         )
         .first()
@@ -68,19 +68,15 @@ def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, detail
 def create_organization(
     org_in: OrganizationCreate, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    # Check if org exists
     existing_org = db.query(Organization).filter(Organization.name == org_in.name).first()
     if existing_org:
         raise HTTPException(status_code=400, detail="Organization name already exists.")
-
     org = Organization(name=org_in.name)
     db.add(org)
     db.commit()
     db.refresh(org)
-
     user_org = UserOrganization(user_id=current_user.id, organization_id=org.id, role=OrganizationRole.owner)
     db.add(user_org)
-
     log_audit_event(db, "organization.created", current_user.id, org.id, {"name": org.name})
     db.commit()
     db.refresh(org)
@@ -91,19 +87,13 @@ def create_organization(
 def read_organizations_me(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    return (
-        db.query(Organization)
-        .join(UserOrganization, Organization.id == UserOrganization.organization_id)
-        .filter(UserOrganization.user_id == current_user.id)
-        .all()
-    )
     user_orgs = (
         db.query(UserOrganization)
         .options(joinedload(UserOrganization.organization))
         .filter(UserOrganization.user_id == current_user.id)
         .all()
     )
-    return [org.organization for org in user_orgs]
+    return [org.organization for org in user_orgs if org.organization is not None]
 
 
 @router.post("/{org_id}/invitations")
@@ -114,13 +104,11 @@ def create_invitation(
     db: Session = Depends(deps.get_db),
 ) -> Any:
     require_org_admin(org_id, db, current_user)
-
     token = secrets.token_urlsafe(32)
     invitation = OrganizationInvitation(
         email=invitation_in.email, token=token, organization_id=org_id, role=invitation_in.role
     )
     db.add(invitation)
-
     log_audit_event(
         db, "invitation.created", current_user.id, org_id, {"email": invitation_in.email, "role": invitation_in.role}
     )
@@ -135,8 +123,6 @@ def accept_invitation(
     invitation = db.query(OrganizationInvitation).filter(OrganizationInvitation.token == token).first()
     if not invitation:
         raise HTTPException(status_code=404, detail="Invitation not found or invalid.")
-
-    # Check if user already in org
     existing_member = (
         db.query(UserOrganization)
         .filter(
@@ -144,18 +130,15 @@ def accept_invitation(
         )
         .first()
     )
-
     if existing_member:
         db.delete(invitation)
         db.commit()
         return {"message": "User already a member of this organization."}
-
     user_org = UserOrganization(
         user_id=current_user.id, organization_id=invitation.organization_id, role=invitation.role
     )
     db.add(user_org)
     db.delete(invitation)
-
     log_audit_event(db, "invitation.accepted", current_user.id, invitation.organization_id, {"email": invitation.email})
     db.commit()
     return {"message": "Invitation accepted."}
@@ -170,16 +153,13 @@ def assign_role(
     db: Session = Depends(deps.get_db),
 ) -> Any:
     require_org_admin(org_id, db, current_user)
-
     user_org = (
         db.query(UserOrganization)
         .filter(UserOrganization.organization_id == org_id, UserOrganization.user_id == user_id)
         .first()
     )
-
     if not user_org:
         raise HTTPException(status_code=404, detail="User not found in organization.")
-
     user_org.role = role_in.role
     log_audit_event(db, "member.role_updated", current_user.id, org_id, {"user_id": user_id, "new_role": role_in.role})
     db.commit()
@@ -194,10 +174,8 @@ def create_project(
     db: Session = Depends(deps.get_db),
 ) -> Any:
     require_org_admin(org_id, db, current_user)
-
     project = Project(organization_id=org_id, name=project_in.name, description=project_in.description)
     db.add(project)
-
     log_audit_event(db, "project.created", current_user.id, org_id, {"project_name": project_in.name})
     db.commit()
     db.refresh(project)
@@ -212,12 +190,9 @@ def connect_repository(
     db: Session = Depends(deps.get_db),
 ) -> Any:
     require_org_admin(org_id, db, current_user)
-
-    # Check if repo already exists globally or in org
     existing_repo = db.query(Repository).filter(Repository.github_id == repo_in.github_id).first()
     if existing_repo:
         raise HTTPException(status_code=400, detail="Repository already connected.")
-
     repo = Repository(
         organization_id=org_id,
         github_id=repo_in.github_id,
@@ -226,7 +201,6 @@ def connect_repository(
         default_branch=repo_in.default_branch,
     )
     db.add(repo)
-
     log_audit_event(db, "repository.connected", current_user.id, org_id, {"repository_full_name": repo_in.full_name})
     db.commit()
     db.refresh(repo)
@@ -238,19 +212,15 @@ def remove_member(
     org_id: int, user_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
-
     user_org = (
         db.query(UserOrganization)
         .filter(UserOrganization.organization_id == org_id, UserOrganization.user_id == user_id)
         .first()
     )
-
     if not user_org:
         raise HTTPException(status_code=404, detail="User not found in organization.")
-
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot remove yourself. Use leave organization.")
-
     db.delete(user_org)
     log_audit_event(db, "member.removed", current_user.id, org_id, {"user_id": user_id})
     db.commit()
@@ -262,19 +232,15 @@ def suspend_member(
     org_id: int, user_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     require_org_admin(org_id, db, current_user)
-
     user_org = (
         db.query(UserOrganization)
         .filter(UserOrganization.organization_id == org_id, UserOrganization.user_id == user_id)
         .first()
     )
-
     if not user_org:
         raise HTTPException(status_code=404, detail="User not found in organization.")
-
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot suspend yourself.")
-
     user_org.is_suspended = True
     log_audit_event(db, "member.suspended", current_user.id, org_id, {"user_id": user_id})
     db.commit()

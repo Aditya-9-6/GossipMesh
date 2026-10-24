@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 class RepositorySummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     name: str
     full_name: str
@@ -27,7 +26,6 @@ class RepositorySummary(BaseModel):
 
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     organization_id: int
     name: str
@@ -36,6 +34,7 @@ class ProjectResponse(BaseModel):
 
 
 class ProjectUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
 
@@ -78,7 +77,7 @@ def require_project_admin(project_id: int, db: Session, current_user: User) -> P
         )
         .first()
     )
-    if not user_org or user_org.role not in [OrganizationRole.owner, OrganizationRole.organization_admin]:
+    if not user_org or user_org.role not in [OrganizationRole.admin, OrganizationRole.owner]:
         raise HTTPException(status_code=403, detail="Admin permissions required for this project action.")
     return project
 
