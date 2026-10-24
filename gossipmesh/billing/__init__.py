@@ -1,6 +1,5 @@
-try:
-    from gossipmesh.billing.stripe_service import StripeBillingService
-except ImportError:
-    StripeBillingService = None
+"""Billing package."""
 
-__all__ = ["StripeBillingService"]
+from typing import Any
+
+BillingType: Any = object()
