@@ -12,7 +12,7 @@ class ArtifactQuarantineManager:
         self.storage_dir = storage_dir or ".quarantine"
         self._quarantined: Dict[str, Dict[str, Any]] = {}
 
-    def authorize_and_download(self, artifact_id: int, user: Any, db: Any) -> Any:
+    def authorize_and_download(self, artifact_id: int, current_user: Any, db: Any) -> Any:
         artifact = MagicMock() if "MagicMock" in globals() else None
         return artifact, b"content"
 

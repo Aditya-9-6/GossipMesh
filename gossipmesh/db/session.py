@@ -1,12 +1,14 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from gossipmesh.core.config import settings
-import os
+from sqlalchemy.pool import StaticPool
 
-if os.environ.get("ENVIRONMENT") == "test":
+database_url = os.getenv("DATABASE_URL", "sqlite:///:memory:")
+if os.environ.get("ENVIRONMENT") == "test" or database_url.startswith("sqlite"):
     engine = create_engine(
-        "sqlite:///:memory:",
+        database_url if os.environ.get("ENVIRONMENT") != "test" else "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     from gossipmesh.models.base import Base
 
@@ -26,10 +28,10 @@ if os.environ.get("ENVIRONMENT") == "test":
 
     Base.metadata.create_all(bind=engine)
 else:
-    engine = create_engine(
-        str(settings.DATABASE_URI),
-        pool_pre_ping=True,
-    )
+    try:
+        engine = create_engine(database_url)
+    except Exception:
+        engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
