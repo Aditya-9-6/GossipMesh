@@ -74,5 +74,11 @@ class ReviewResponse(BaseModel):
     usage: Optional[UsageSchema] = None
 
 
+class ReviewTestResult(BaseModel):
+    status: str
+
+
 class TestResult(BaseModel):
     status: str
+    name: Optional[str] = None
+    message: Optional[str] = None
