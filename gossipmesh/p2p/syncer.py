@@ -16,3 +16,10 @@ class P2PSyncer:
         if isinstance(peer_state, dict):
             self.entropy_tracker.update(peer_state)
         return True
+
+    def sync(self, peer_data: Any) -> None:
+        self.sync_state(peer_data)
+
+
+class Syncer(P2PSyncer):
+    pass

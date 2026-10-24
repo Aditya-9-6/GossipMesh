@@ -7,6 +7,7 @@ from gossipmesh.api.routers import (
     repositories,
     providers,
     billing,
+    enterprise,
 )
 
 router = APIRouter()
@@ -17,6 +18,7 @@ router.include_router(projects.router)
 router.include_router(repositories.router)
 router.include_router(providers.router)
 router.include_router(billing.router)
+router.include_router(enterprise.router)
 
 __all__ = [
     "router",
@@ -26,4 +28,5 @@ __all__ = [
     "repositories",
     "providers",
     "billing",
+    "enterprise",
 ]
