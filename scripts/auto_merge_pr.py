@@ -8,7 +8,6 @@ Auto-merge is disabled per repository safety policy.
 """
 
 import sys
-import os
 import json
 import time
 import subprocess
