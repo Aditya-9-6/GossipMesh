@@ -134,6 +134,10 @@ def main():
         help="Path to license token file (e.g. license.jwt).",
     )
     parser.add_argument(
+        "--public-key-path",
+        help="Path to RSA public key PEM file for validation.",
+    )
+    parser.add_argument(
         "--output-format",
         choices=["text", "json"],
         default="text",
@@ -156,6 +160,7 @@ def main():
         license_data = verify_license(
             token=args.license_token,
             token_path=Path(args.license_path) if args.license_path else None,
+            public_key_path=Path(args.public_key_path) if args.public_key_path else None,
             required_bundle=args.bundle,
             required_task=args.task if args.task != "all" else None,
         )
