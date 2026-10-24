@@ -151,6 +151,13 @@ class SkipList:
         self.size -= 1
 
 
+class P2PRoutingTable(SkipList):
+    """Probabilistic Skip List based routing table for peer discovery and key-value indexing."""
+
+    def __init__(self, max_levels: int = 16, p: float = 0.5):
+        super().__init__(max_level=max_levels, p=p)
+
+
 class SkipListRoutingTable(SkipList):
     """Alias or subclass of SkipList for backward compatibility with routing table naming."""
 
