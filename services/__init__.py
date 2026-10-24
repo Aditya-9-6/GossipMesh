@@ -1,19 +1,5 @@
-"""Root-level services package facade for backward compatibility and clean importing."""
+# services package initialization
 
-from gossipmesh.services.key_pool_router import (
-    KeyPoolRouter,
-    KeyRouter,
-    KeyMetrics,
-    router,
-    track_error_rate,
-    mask_key,
-)
-
-__all__ = [
-    "KeyPoolRouter",
-    "KeyRouter",
-    "KeyMetrics",
-    "router",
-    "track_error_rate",
-    "mask_key",
-]
+# Export key components for easy imports
+from .key_pool_router import router, KeyPoolRouter, track_error_rate  # noqa: F401
+from .execution_loop import ExecutionLoop, CreditLedger, run_issue_job  # noqa: F401
