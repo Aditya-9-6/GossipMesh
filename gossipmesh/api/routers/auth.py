@@ -10,25 +10,18 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import jwt
-from pydantic import ValidationError
+from pydantic import ValidationError, EmailStr
 
 from gossipmesh.api import deps
 from gossipmesh.core.config import settings
 from gossipmesh.core.security import (
     verify_password,
-    get_password_hash,
     create_access_token,
     create_refresh_token,
     encrypt_string,
     decrypt_string,
+    get_password_hash,
 )
-from gossipmesh.auth.password import (
-    validate_password_strength,
-    invalidate_user_sessions,
-    create_password_reset_token,
-    verify_and_consume_reset_token,
-)
-from gossipmesh.auth.throttle import login_throttler
 from gossipmesh.core.exceptions import AuthenticationError, AuthorizationError
 from gossipmesh.models.user import User
 from gossipmesh.models.session import UserSession, RefreshToken
@@ -36,10 +29,16 @@ from gossipmesh.models.user import UserGitHubCredential
 from gossipmesh.models.organization import Organization, UserOrganization
 from gossipmesh.models.audit import AuditEvent
 from gossipmesh.db.redis import redis_client
-from pydantic import BaseModel, EmailStr
+from gossipmesh.auth.password import (
+    validate_password_strength,
+    invalidate_user_sessions,
+    create_password_reset_token,
+    verify_and_consume_reset_token,
+)
+from gossipmesh.security.throttler import login_throttler
+from pydantic import BaseModel
 import base64
 import hashlib
-import jwt
 from gossipmesh.models.user import UserOIDCCredential
 
 router = APIRouter()
@@ -78,9 +77,6 @@ def login_access_token(
         raise AuthenticationError(message="Incorrect email or password")
     elif not user.is_active:
         raise AuthorizationError(message="Inactive user")
-
-    # Successful login: reset throttling counters
-    login_throttler.record_success(form_data.username)
 
     # Create session
     ip_address = request.client.host if request.client else None
