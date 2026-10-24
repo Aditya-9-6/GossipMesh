@@ -1,10 +1,10 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 import time
 
 try:
     import google.generativeai as genai
 except ImportError:
-    genai = None
+    genai = None  # type: ignore
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
@@ -29,7 +29,7 @@ class GeminiProvider(BaseProvider):
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         if genai is None:
-            raise RuntimeError("google-generativeai package is not installed")
+            raise RuntimeError("google.generativeai package is not installed.")
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -60,7 +60,7 @@ class GeminiProvider(BaseProvider):
 
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
         if genai is None:
-            raise RuntimeError("google-generativeai package is not installed")
+            raise RuntimeError("google.generativeai package is not installed.")
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -78,6 +78,8 @@ class GeminiProvider(BaseProvider):
             yield chunk.text
 
     async def check_health(self) -> ProviderHealth:
+        if genai is None:
+            return ProviderHealth(is_healthy=False, error="google.generativeai package not installed")
         start_time = time.time()
         try:
             if genai is None:
