@@ -1,5 +1,6 @@
-from typing import Optional
+from __future__ import annotations
 import time
+from typing import Optional
 
 
 class RTOEstimator:
@@ -32,7 +33,9 @@ class RTOEstimator:
 
         assert self.srtt is not None
         assert self.rttvar is not None
-        self.rto = self.srtt + max(0.01, 4.0 * self.rttvar)
+        rttvar_val = self.rttvar if self.rttvar is not None else 0.0
+        srtt_val = self.srtt if self.srtt is not None else rtt
+        self.rto = srtt_val + max(0.01, 4.0 * rttvar_val)
         return self.rto
 
     def calculate(self, sample: float) -> float:

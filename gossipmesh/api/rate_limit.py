@@ -14,14 +14,14 @@ def get_org_id_from_request(request: Request) -> Optional[int]:
         try:
             return int(org_id)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="Invalid organization_id format")
 
     org_id = request.query_params.get("organization_id")
     if org_id:
         try:
             return int(org_id)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="Invalid organization_id format")
 
     return None
 
@@ -54,16 +54,9 @@ def rate_limit(limit_type: str, limit: int, window: int):
     async def dependency(request: Request, response: Response):
         identifier = get_identifier(request)
 
-        # Enforce rate limit (this will raise RateLimitError if exceeded)
-        # Note: If it raises RateLimitError, the exception handler needs to set the headers!
         try:
             remaining, reset_time = limiter.enforce(identifier, limit_type)
         except Exception as exc:
-            # We catch it, set headers on response, then re-raise
-            # Wait, if we raise, the headers on the `response` object might not be returned
-            # if we use a global exception handler. We need to handle this in exception handler
-            # or raise HTTPException directly.
-            # We will handle it by raising and the exception handler will add headers
             raise exc
 
         response.headers["X-RateLimit-Limit"] = str(limit)

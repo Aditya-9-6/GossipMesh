@@ -21,4 +21,6 @@ class P2PSyncer:
         return True
 
 
-Syncer = P2PSyncer
+class Syncer:
+    def __init__(self) -> None:
+        self.entropy = VectorClockEntropy()

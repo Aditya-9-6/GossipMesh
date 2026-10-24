@@ -349,8 +349,8 @@ class StripeBillingService:
                             amount_paid=amount_paid,
                             currency=currency,
                             status=status,
-                            hosted_invoice_url=invoice_url,
-                            invoice_pdf=invoice_pdf,
+                            hosted_invoice_url=invoice_url or "",
+                            invoice_pdf=invoice_pdf or "",
                         )
                         session.add(inv)
                     else:
