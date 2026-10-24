@@ -1,13 +1,23 @@
 import hashlib
 from typing import Any, Optional
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return hash_password(plain) == hashed
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return hash_password(plain_password) == hashed_password
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
 
 def validate_password_strength(password: str) -> bool:
