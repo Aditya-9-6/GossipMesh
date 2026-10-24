@@ -2,11 +2,6 @@ from typing import Any, Dict, List, Optional
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class VectorClockEntropy:
-    def __init__(self) -> None:
-        pass
-
-
 class P2PSyncer:
     def __init__(self, node_id: str) -> None:
         self.node_id = node_id
@@ -17,7 +12,7 @@ class P2PSyncer:
 
 
 class Syncer:
-    def __init__(self, node_id: str) -> None:
+    def __init__(self, node_id: Optional[str] = None) -> None:
         self.node_id = node_id
         self.entropy = VectorClockEntropy()
 
