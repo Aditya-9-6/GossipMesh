@@ -43,7 +43,9 @@ class UserOIDCCredential(Base):
     __tablename__ = "user_oidc_credentials"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     sub: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     issuer: Mapped[str] = mapped_column(String(255), nullable=False)
     provider: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
