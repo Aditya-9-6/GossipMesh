@@ -22,22 +22,22 @@ logger = logging.getLogger(__name__)
 
 
 class RepositorySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     full_name: str
     default_branch: str
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 class ProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     organization_id: int
     name: str
     description: Optional[str] = None
     repositories: List[RepositorySummary] = []
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectUpdate(BaseModel):
@@ -107,6 +107,7 @@ def get_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
+    """Fetches project details along with its associated repositories."""
     project = require_project_member(project_id, db, current_user)
     return project
 
@@ -118,6 +119,7 @@ def update_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
+    """Updates project details."""
     project = require_project_admin(project_id, db, current_user)
     changes = {}
 
@@ -146,10 +148,12 @@ def delete_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
+    """Deletes a project and unlinks its associated repositories."""
     project = require_project_admin(project_id, db, current_user)
     org_id = project.organization_id
     project_name = project.name
 
+    # Unlink associated repositories
     for repo in project.repositories:
         repo.project_id = None
 
@@ -172,6 +176,7 @@ def link_repository_to_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
+    """Associates a repository with a project within the same organization."""
     project = require_project_admin(project_id, db, current_user)
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo:
@@ -203,6 +208,7 @@ def unlink_repository_from_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
+    """Unlinks a repository from a project."""
     project = require_project_admin(project_id, db, current_user)
     repo = db.query(Repository).filter(Repository.id == repo_id, Repository.project_id == project.id).first()
     if not repo:
