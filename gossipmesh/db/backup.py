@@ -1,21 +1,7 @@
-"""Database backup, restore validation, encryption, and tenant export (Task 32).
-Provides enterprise procedures for:
-- Encrypted database snapshots
-- Backup integrity verification
-- Restore drills & table integrity checks
-- Tenant-scoped data export for compliance and portability
-- Key management and recovery
-"""
-
 import base64
 import hashlib
 import json
 import logging
-import os
-import shutil
-import subprocess
-import tarfile
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,15 +14,24 @@ from gossipmesh.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class BackupMetadata:
-    backup_id: str
-    timestamp: str
-    database: str
-    tables_included: List[str]
-    checksum_sha256: str
-    is_encrypted: bool
-    version: str = "1.0"
+    def __init__(
+        self,
+        backup_id: str,
+        timestamp: str,
+        database: str,
+        tables_included: List[str],
+        checksum_sha256: str,
+        is_encrypted: bool,
+        version: str = "1.0",
+    ):
+        self.backup_id = backup_id
+        self.timestamp = timestamp
+        self.database = database
+        self.tables_included = tables_included
+        self.checksum_sha256 = checksum_sha256
+        self.is_encrypted = is_encrypted
+        self.version = version
 
 
 class DatabaseBackupManager:
@@ -49,10 +44,8 @@ class DatabaseBackupManager:
     ):
         self.backup_dir = Path(backup_dir).resolve()
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        # Use Fernet key from settings or parameter
         raw_key = encryption_key or settings.ENCRYPTION_KEY
         if len(raw_key.encode("utf-8")) != 44:
-            # Generate deterministic 32-byte urlsafe base64 if needed
             derived = hashlib.sha256(raw_key.encode("utf-8")).digest()
             self.cipher = Fernet(base64.urlsafe_b64encode(derived))
         else:
@@ -64,19 +57,14 @@ class DatabaseBackupManager:
         tables: Optional[List[str]] = None,
         data_dump: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Path, BackupMetadata]:
-        """Creates an encrypted database snapshot with integrity checksums."""
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%SZ")
         backup_id = f"backup_{db_name}_{timestamp}"
-        raw_path = self.backup_dir / f"{backup_id}.raw.json"
         enc_path = self.backup_dir / f"{backup_id}.enc"
 
         payload = data_dump if data_dump is not None else {"status": "snapshot", "db": db_name, "tables": tables or []}
         serialized = json.dumps(payload, indent=2, default=str).encode("utf-8")
 
-        # 1. Compute SHA-256
         sha256 = hashlib.sha256(serialized).hexdigest()
-
-        # 2. Encrypt
         encrypted = self.cipher.encrypt(serialized)
         enc_path.write_bytes(encrypted)
 
@@ -99,7 +87,6 @@ class DatabaseBackupManager:
         backup_file: Path,
         meta_file: Optional[Path] = None,
     ) -> Dict[str, Any]:
-        """Decrypts a backup, validates cryptographic integrity, and returns data."""
         backup_path = Path(backup_file).resolve()
         if not backup_path.is_file():
             raise FileNotFoundError(f"Backup file not found: {backup_path}")
@@ -107,7 +94,6 @@ class DatabaseBackupManager:
         encrypted_bytes = backup_path.read_bytes()
         decrypted_bytes = self.cipher.decrypt(encrypted_bytes)
 
-        # Validate against metadata if available
         if meta_file and Path(meta_file).is_file():
             meta_data = json.loads(Path(meta_file).read_text(encoding="utf-8"))
             expected_sha = meta_data.get("checksum_sha256")
@@ -123,11 +109,9 @@ class DatabaseBackupManager:
         organization_id: int,
         output_file: Optional[Path] = None,
     ) -> Dict[str, Any]:
-        """Extracts all data belonging strictly to a single tenant for export and portability."""
         from gossipmesh.models.organization import Organization
-        from gossipmesh.models.user import User
         from gossipmesh.models.repository import Repository
-        from gossipmesh.models.runtime import Workflow, Budget
+        from gossipmesh.models.runtime import Budget, Workflow
 
         tenant = db_session.query(Organization).filter(Organization.id == organization_id).first()
         if not tenant:
@@ -140,6 +124,7 @@ class DatabaseBackupManager:
         workflows = db_session.query(Workflow).filter(Workflow.repository_id.in_(repo_ids)).all() if repo_ids else []
         budget = db_session.query(Budget).filter(Budget.organization_id == organization_id).first()
 
+        tenant_slug = getattr(tenant, "slug", getattr(tenant, "name", "").lower())
         tenant_export = {
             "metadata": {
                 "organization_id": organization_id,
@@ -149,7 +134,7 @@ class DatabaseBackupManager:
             "organization": {
                 "id": tenant.id,
                 "name": tenant.name,
-                "slug": getattr(tenant, "slug", getattr(tenant, "name", "").lower()),
+                "slug": tenant_slug,
                 "created_at": str(tenant.created_at) if hasattr(tenant, "created_at") else None,
             },
             "users": [
