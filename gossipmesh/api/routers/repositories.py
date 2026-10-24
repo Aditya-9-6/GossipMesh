@@ -45,6 +45,7 @@ class RepositoryPolicyUpdate(BaseModel):
 
 class RepositoryPolicyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     repository_id: int
     branch_protection_enabled: bool
@@ -59,6 +60,7 @@ class RepositoryPolicyResponse(BaseModel):
 
 class RepositoryDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     organization_id: int
     project_id: Optional[int] = None
@@ -67,6 +69,11 @@ class RepositoryDetailResponse(BaseModel):
     full_name: str
     default_branch: str
     policy: Optional[RepositoryPolicyResponse] = None
+
+
+# ---------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):

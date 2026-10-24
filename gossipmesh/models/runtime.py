@@ -39,18 +39,11 @@ class Job(SoftDeleteMixin, Base):
     __mapper_args__ = {"version_id_col": version_id}
     workflow_id: Mapped[int] = mapped_column(ForeignKey("workflows.id"), nullable=False)
     agent_name: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, default="pending")  # pending, running, completed, failed, cancelled
+    status: Mapped[str] = mapped_column(String, default="pending")
     state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    # Worker ownership, fencing lease tokens, and crash recovery (Task 63)
-    worker_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
-    lease_token: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
-    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
-    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
 
     workflow = relationship("Workflow", back_populates="jobs")
 
@@ -90,5 +83,4 @@ class Artifact(SoftDeleteMixin, Base):
     download_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    organization = relationship("Organization")
     job = relationship("Job")
