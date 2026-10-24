@@ -193,10 +193,10 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
 @router.get("/github/login")
 def github_login(request: Request) -> Any:
     state = str(uuid.uuid4())
-    redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
-    github_client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    redis_client.set(f"github_oauth_state:{state}", "pending")
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     params = {
-        "client_id": github_client_id,
+        "client_id": client_id,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -211,14 +211,16 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
     if not redis_client.get(redis_key):
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
-    github_client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
+
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": github_client_id,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
             },
@@ -269,25 +271,25 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
                 github_user_id=github_user_id,
                 access_token_ciphertext=enc_access,
                 refresh_token_ciphertext=enc_refresh,
+                encrypted_access_token=enc_access,
+                encrypted_refresh_token=enc_refresh,
             )
             setattr(credential, "encrypted_access_token", enc_access)
             if hasattr(credential, "encrypted_refresh_token"):
                 setattr(credential, "encrypted_refresh_token", enc_refresh)
             db.add(credential)
         else:
-            if hasattr(credential, "github_user_id"):
-                setattr(credential, "github_user_id", github_user_id)
-            elif hasattr(credential, "github_id"):
-                setattr(credential, "github_id", github_user_id)
+            credential.github_user_id = github_user_id
             if hasattr(credential, "access_token_ciphertext"):
                 credential.access_token_ciphertext = enc_access
-            elif hasattr(credential, "encrypted_access_token"):
+            if hasattr(credential, "encrypted_access_token"):
                 credential.encrypted_access_token = enc_access
             if refresh_token:
                 if hasattr(credential, "refresh_token_ciphertext"):
                     credential.refresh_token_ciphertext = enc_refresh
-                elif hasattr(credential, "encrypted_refresh_token"):
+                if hasattr(credential, "encrypted_refresh_token"):
                     credential.encrypted_refresh_token = enc_refresh
+
         db.commit()
         orgs_response = client.get(
             "https://api.github.com/user/orgs",
@@ -358,20 +360,17 @@ def github_refresh_token(
     if not credential or not token_cipher:
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
-    refresh_credential_token = getattr(
-        credential, "encrypted_refresh_token", getattr(credential, "refresh_token_ciphertext", None)
-    )
-    refresh_token = (
-        decrypt_string(refresh_credential_token) if refresh_credential_token else decrypt_string(token_cipher)
-    )
-    github_client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    refresh_token = decrypt_string(token_cipher)
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
+
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": github_client_id,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
             },
@@ -383,21 +382,20 @@ def github_refresh_token(
         new_refresh_token = token_data.get("refresh_token")
         if hasattr(credential, "access_token_ciphertext"):
             credential.access_token_ciphertext = encrypt_string(new_access_token)
-        elif hasattr(credential, "encrypted_access_token"):
+        if hasattr(credential, "encrypted_access_token"):
             credential.encrypted_access_token = encrypt_string(new_access_token)
         if new_refresh_token:
             if hasattr(credential, "refresh_token_ciphertext"):
                 credential.refresh_token_ciphertext = encrypt_string(new_refresh_token)
-            elif hasattr(credential, "encrypted_refresh_token"):
+            if hasattr(credential, "encrypted_refresh_token"):
                 credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
 
         db.commit()
-        github_uid = getattr(credential, "github_user_id", getattr(credential, "github_id", None))
         audit_event = AuditEvent(
             action="github_token_refresh",
             actor_id=current_user.id,
             details={
-                "github_id": github_uid,
+                "github_id": getattr(credential, "github_user_id", None),
             },
         )
         db.add(audit_event)
@@ -527,9 +525,9 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
         else:
             credential.sub = str(sub)
             credential.encrypted_access_token = encrypt_string(access_token)
-            if refresh_token and hasattr(credential, "encrypted_refresh_token"):
+            if refresh_token:
                 credential.encrypted_refresh_token = encrypt_string(refresh_token)
-            if id_token and hasattr(credential, "encrypted_id_token"):
+            if id_token:
                 credential.encrypted_id_token = encrypt_string(id_token)
         roles = claims.get("groups", claims.get("roles", []))
         if isinstance(roles, list) and roles:
