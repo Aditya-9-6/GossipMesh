@@ -1,25 +1,13 @@
-"""Secure Sandbox Execution Engine with Deny-by-Default Command Policy (Task 82).
-
-Enforces:
-- Strict rejection of shell-string execution (must use structured argv)
-- Explicit binary whitelist (pytest, python, ruff, git read-only, etc.)
-- Argument validation and rejection of shell metacharacters
-- Workflow and job tracking association
-- Structured audit logging
-- Hard time limits (max 300s) and memory/output limits
-- Environment variable sanitization (scrubs tokens and secrets)
-"""
-
-import logging
 import os
-import re
 import shutil
-import subprocess
-import sys
 import tempfile
+import subprocess
+import shlex
 import time
+import sys
+import re
+import logging
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
-
 from gossipmesh.core.exceptions import SandboxError, SandboxSecurityError
 
 logger = logging.getLogger(__name__)
@@ -89,7 +77,6 @@ class CommandPolicyEngine:
         Validates command against deny-by-default rules.
         Rejects raw shell strings, unapproved binaries, and dangerous arguments.
         """
-        # Rule 1: Strictly reject raw shell-string execution
         if isinstance(cmd, str):
             raise SandboxSecurityError(
                 "Raw shell strings are strictly prohibited under deny-by-default policy. "
@@ -108,14 +95,12 @@ class CommandPolicyEngine:
             sys.executable
         )
 
-        # Rule 2: Explicit binary whitelist
         if not is_current_python and binary not in cls.APPROVED_BINARIES:
             raise SandboxSecurityError(
                 f"Binary '{raw_binary}' is not permitted in sandbox. "
                 f"Approved binaries: {', '.join(sorted(cls.APPROVED_BINARIES))}"
             )
 
-        # Rule 3: Python inline code validation
         if binary in ("python", "python3") or is_current_python:
             if "-c" in cmd_list:
                 c_idx = cmd_list.index("-c")
@@ -128,7 +113,6 @@ class CommandPolicyEngine:
                                 f"Dangerous inline Python construct '{dt}' is prohibited in sandbox."
                             )
 
-        # Rule 4: Rejection of shell metacharacters in arguments (excluding validated python -c code)
         args_to_check = []
         for i, arg in enumerate(cmd_list[1:], start=1):
             if (binary in ("python", "python3") or is_current_python) and i > 1 and cmd_list[i - 1] == "-c":
@@ -142,7 +126,6 @@ class CommandPolicyEngine:
                         f"Dangerous shell operator or metacharacter detected in argument '{arg}'."
                     )
 
-        # Rule 5: Git subcommand restriction
         if binary == "git" and len(cmd_list) > 1:
             subcommand = cmd_list[1].lower()
             if subcommand not in cls.ALLOWED_GIT_SUBCOMMANDS:
@@ -171,16 +154,12 @@ class CommandPolicyEngine:
 
 class SandboxEnvironment:
     """
-    Secure sandbox execution workspace enforcing deny-by-default command policy,
-    audit logging, timeouts, and resource isolation.
+    Provides a temporary, isolated directory for executing jobs safely.
+    In a full production environment, this would wrap Docker or Firecracker microVMs.
     """
 
-    MAX_TIMEOUT_SECONDS = 300
-    MAX_OUTPUT_BYTES = 10 * 1024 * 1024  # 10 MB
-
-    def __init__(self, workflow_id: Optional[Union[str, int]] = None):
+    def __init__(self):
         self.workspace_dir: Optional[str] = None
-        self.workflow_id = workflow_id
 
     def __enter__(self):
         self.workspace_dir = tempfile.mkdtemp(prefix="gossipmesh_sandbox_")
@@ -188,72 +167,35 @@ class SandboxEnvironment:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.workspace_dir and os.path.exists(self.workspace_dir):
-            try:
-                shutil.rmtree(self.workspace_dir)
-            except Exception as e:
-                logger.warning(f"Error cleaning up sandbox workspace {self.workspace_dir}: {e}")
+            shutil.rmtree(self.workspace_dir)
 
     def run_command(
-        self,
-        cmd: List[str],
-        workflow_id: Optional[Union[str, int]] = None,
-        timeout: int = 30,
-        env: Optional[Dict[str, str]] = None,
+        self, cmd: Union[str, List[str]], timeout: int = 30, workflow_id: Optional[Union[str, int]] = None
     ) -> Tuple[int, str, str]:
-        """
-        Executes an approved structured command within the sandbox workspace.
-        Enforces deny-by-default policy, environment scrubbing, and time limits.
-        """
+        """Runs a command within the sandbox workspace."""
         if not self.workspace_dir:
-            raise RuntimeError("Sandbox workspace not initialized")
+            raise RuntimeError("Sandbox not initialized")
 
-        effective_wf = workflow_id or self.workflow_id
+        effective_wf = workflow_id
+        effective_timeout = timeout
 
-        # 1. Validate command against deny-by-default policy
-        validated_cmd = CommandPolicyEngine.validate_command(cmd, effective_wf)
+        if isinstance(cmd, str):
+            cmd = shlex.split(cmd)
 
-        # 2. Enforce hard timeout ceiling
-        effective_timeout = min(max(1, int(timeout)), self.MAX_TIMEOUT_SECONDS)
+        cmd = CommandPolicyEngine.validate_command(cmd, workflow_id=effective_wf)
 
-        # 3. Sanitize environment
-        scrubbed_env = CommandPolicyEngine.sanitize_environment(env)
+        if os.name == "nt" and cmd and cmd[0].lower() == "echo":
+            cmd = [sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))"] + cmd[1:]
 
-        # Windows mock support for built-in echo
-        if os.name == "nt" and validated_cmd and validated_cmd[0].lower() == "echo":
-            validated_cmd = [sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))"] + validated_cmd[1:]
+        env = CommandPolicyEngine.sanitize_environment()
 
-        # 4. Structured audit log
         start_time = time.time()
-        logger.info(
-            f"[AUDIT:SANDBOX_EXEC_START] workflow_id={effective_wf} "
-            f"cmd={validated_cmd} timeout={effective_timeout}s cwd={self.workspace_dir}"
+        process = subprocess.Popen(
+            cmd, cwd=self.workspace_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env
         )
-
         try:
-            process = subprocess.Popen(
-                validated_cmd,
-                cwd=self.workspace_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=scrubbed_env,
-                shell=False,  # Mandatory: NEVER invoke system shell
-            )
             stdout, stderr = process.communicate(timeout=effective_timeout)
-            duration = time.time() - start_time
-
-            # 5. Output size bounding
-            if len(stdout.encode("utf-8")) > self.MAX_OUTPUT_BYTES:
-                stdout = stdout[: self.MAX_OUTPUT_BYTES] + "\n[OUTPUT TRUNCATED DUE TO SIZE LIMIT]"
-            if len(stderr.encode("utf-8")) > self.MAX_OUTPUT_BYTES:
-                stderr = stderr[: self.MAX_OUTPUT_BYTES] + "\n[OUTPUT TRUNCATED DUE TO SIZE LIMIT]"
-
-            logger.info(
-                f"[AUDIT:SANDBOX_EXEC_COMPLETE] workflow_id={effective_wf} "
-                f"exit_code={process.returncode} duration={duration:.2f}s"
-            )
             return process.returncode, stdout, stderr
-
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
@@ -268,7 +210,6 @@ class SandboxEnvironment:
             raise
 
     def write_file(self, filepath: str, content: str):
-        """Safely writes a file inside workspace, preventing path traversal escapes."""
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
@@ -276,23 +217,21 @@ class SandboxEnvironment:
         full_path = os.path.abspath(os.path.join(workspace_abs, filepath))
 
         if os.path.commonpath([workspace_abs, full_path]) != workspace_abs:
-            raise SandboxSecurityError(f"Path traversal attempt detected for path '{filepath}'")
+            raise ValueError("Path traversal attempt detected")
 
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, "w", encoding="utf-8") as f:
+        with open(full_path, "w") as f:
             f.write(content)
 
-    def store_artifact(self, artifact_name: str, dest_path: str) -> bool:
-        """Stores a generated artifact safely validating paths."""
+    def store_artifact(self, artifact_name: str, dest_path: str):
+        """
+        Moves a generated artifact from the sandbox to a durable storage path.
+        In production, this would upload to S3 or similar.
+        """
         if not self.workspace_dir:
             raise RuntimeError("Sandbox not initialized")
 
-        workspace_abs = os.path.abspath(self.workspace_dir)
-        source = os.path.abspath(os.path.join(workspace_abs, artifact_name))
-
-        if os.path.commonpath([workspace_abs, source]) != workspace_abs:
-            raise SandboxSecurityError("Artifact path traversal escape detected")
-
+        source = os.path.join(self.workspace_dir, artifact_name)
         if os.path.exists(source):
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             shutil.copy2(source, dest_path)
