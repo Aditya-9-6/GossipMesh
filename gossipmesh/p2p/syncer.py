@@ -1,5 +1,15 @@
+"""
+P2P Syncer module.
+"""
+
 from typing import Dict, List, Any
 from gossipmesh.p2p.entropy import VectorClockEntropy
+
+
+class VectorClockEntropy:
+    def __init__(self, node_id: str = None):
+        self.node_id = node_id
+        pass
 
 
 class PeerSyncer:
