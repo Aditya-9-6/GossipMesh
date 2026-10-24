@@ -1,14 +1,4 @@
-"""Deterministic Review Gates (Task 72).
-
-Enforces non-overridable deterministic checks including:
-- Secret scanning (high-entropy tokens, private keys, API credentials)
-- Dependency scanning (banned / vulnerable packages, unpinned dependencies)
-- AST security scanning (equivalent to Bandit: shell injection, eval, pickle, SQL injection)
-- Syntax and lint verification
-- Changed-file policies (blocked extensions, workflow tampering, file sizes)
-
-Core Invariant: Critical deterministic findings cannot be overridden by AI approval.
-"""
+"""Deterministic Review Gates (Task 72)."""
 
 import ast
 import json
@@ -34,11 +24,6 @@ from gossipmesh.review.normalization import (
 from gossipmesh.review.prompt_pipeline import ChangedFileContext
 
 logger = logging.getLogger(__name__)
-
-
-# -----------------------------------------------------------------------------
-# 1. Secret Scanner
-# -----------------------------------------------------------------------------
 
 SECRET_PATTERNS = [
     (
@@ -74,7 +59,7 @@ SECRET_PATTERNS = [
     (
         "GENERIC_SECRET_ASSIGNMENT",
         re.compile(
-            r"""(?:api_key|api_secret|jwt_secret|client_secret|auth_token)\s*=\s*['"][a-zA-Z0-9_\-]{20,}['"]""",
+            r"(?:api_key|api_secret|jwt_secret|client_secret|auth_token)\s*=\s*['"][a-zA-Z0-9_\-]{20,}['"]",
             re.IGNORECASE,
         ),
         "CRITICAL",
@@ -85,11 +70,9 @@ SECRET_PATTERNS = [
 
 
 class SecretScanner:
-    """Deterministic regex & pattern-based secret scanner."""
-
     @classmethod
     def scan(cls, file: ChangedFileContext) -> List[SecurityFinding]:
-        findings = []
+        findings: List[SecurityFinding] = []
         content = file.patch or ""
         lines = content.splitlines()
         is_diff = any(l.strip().startswith("@@") or l.strip().startswith("+++") for l in lines)
@@ -141,10 +124,6 @@ class SecretScanner:
         return findings
 
 
-# -----------------------------------------------------------------------------
-# 2. Dependency Scanner
-# -----------------------------------------------------------------------------
-
 BANNED_PACKAGES = {
     "telnetlib3": ("CRITICAL", "Unencrypted protocol library telnetlib3 is banned in enterprise code."),
     "pycrypto": (
@@ -156,11 +135,9 @@ BANNED_PACKAGES = {
 
 
 class DependencyScanner:
-    """Scans requirements.txt and pyproject.toml for banned and unpinned dependencies."""
-
     @classmethod
     def scan(cls, file: ChangedFileContext) -> List[SecurityFinding]:
-        findings = []
+        findings: List[SecurityFinding] = []
         norm_path = canonicalize_path(file.path).lower()
         if not (norm_path.endswith("requirements.txt") or norm_path.endswith("pyproject.toml")):
             return findings
@@ -201,11 +178,6 @@ class DependencyScanner:
         return findings
 
 
-# -----------------------------------------------------------------------------
-# 3. Python AST Security Scanner (Bandit equivalent)
-# -----------------------------------------------------------------------------
-
-
 class ASTSecurityVisitor(ast.NodeVisitor):
     def __init__(self, file_path: str):
         self.file_path = file_path
@@ -218,7 +190,6 @@ class ASTSecurityVisitor(ast.NodeVisitor):
         elif isinstance(node.func, ast.Attribute):
             func_name = node.func.attr
 
-        # 1. Code execution: eval / exec (B102)
         if func_name in ("eval", "exec"):
             fp = compute_stable_fingerprint(self.file_path, "AST_SECURITY", "B102", line=node.lineno)
             self.findings.append(
@@ -240,7 +211,6 @@ class ASTSecurityVisitor(ast.NodeVisitor):
                 )
             )
 
-        # 2. Deserialization: pickle.loads / pickle.load (B301)
         if func_name in ("loads", "load") and isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name) and node.func.value.id in ("pickle", "_pickle", "cPickle"):
                 fp = compute_stable_fingerprint(self.file_path, "AST_SECURITY", "B301", line=node.lineno)
@@ -263,7 +233,6 @@ class ASTSecurityVisitor(ast.NodeVisitor):
                     )
                 )
 
-        # 3. Shell injection: subprocess with shell=True (B602)
         if func_name in ("Popen", "call", "run", "check_call", "check_output"):
             for keyword in node.keywords:
                 if keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True:
@@ -287,7 +256,6 @@ class ASTSecurityVisitor(ast.NodeVisitor):
                         )
                     )
 
-        # 4. Weak cryptography: hashlib.md5 or hashlib.sha1 (B303)
         if func_name in ("md5", "sha1") and isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name) and node.func.value.id == "hashlib":
                 fp = compute_stable_fingerprint(self.file_path, "AST_SECURITY", "B303", line=node.lineno)
@@ -314,8 +282,6 @@ class ASTSecurityVisitor(ast.NodeVisitor):
 
 
 class ASTSecurityScanner:
-    """Parses Python source code and flags AST security hazards."""
-
     @classmethod
     def scan_code(cls, file_path: str, source_code: str) -> List[SecurityFinding]:
         norm_path = canonicalize_path(file_path)
@@ -347,24 +313,17 @@ class ASTSecurityScanner:
             ]
 
 
-# -----------------------------------------------------------------------------
-# 4. Changed File Policies
-# -----------------------------------------------------------------------------
-
 BLOCKED_FILE_EXTENSIONS = {".pem", ".key", ".pfx", ".p12", ".env", ".credentials", ".id_rsa"}
 PROTECTED_PATHS = [".github/workflows/", ".circleci/", "alembic/versions/"]
 
 
 class ChangedFilePolicyScanner:
-    """Enforces policy on file paths, extensions, and restricted directories."""
-
     @classmethod
     def scan(cls, file: ChangedFileContext) -> List[SecurityFinding]:
-        findings = []
+        findings: List[SecurityFinding] = []
         path = canonicalize_path(file.path)
         ext = os.path.splitext(path)[1].lower()
 
-        # 1. Blocked private key or credentials files
         if ext in BLOCKED_FILE_EXTENSIONS or os.path.basename(path).lower() in (".env", "id_rsa"):
             fp = compute_stable_fingerprint(path, "POLICY_VIOLATION", "FILE-BLOCKED-EXT", line=1)
             findings.append(
@@ -384,10 +343,8 @@ class ChangedFilePolicyScanner:
                 )
             )
 
-        # 2. Workflow modification policy check
         if any(path.startswith(p) for p in [".github/workflows/"]):
-            # Check if workflow patch modifies external actions without SHA pinning
-            if "@v" in file.patch and "uses:" in file.patch:
+            if file.patch and "@v" in file.patch and "uses:" in file.patch:
                 fp = compute_stable_fingerprint(path, "POLICY_VIOLATION", "WF-UNPINNED-ACTION", line=1)
                 findings.append(
                     SecurityFinding(
@@ -409,44 +366,28 @@ class ChangedFilePolicyScanner:
         return findings
 
 
-# -----------------------------------------------------------------------------
-# 5. Deterministic Review Gate Orchestrator
-# -----------------------------------------------------------------------------
-
-
 class DeterministicReviewGates:
-    """Orchestrates all deterministic scanners and enforces non-overridable gating rules."""
-
     @classmethod
     def run_all_scanners(
         cls,
         changed_files: List[ChangedFileContext],
         test_results: Optional[TestResult] = None,
     ) -> List[SecurityFinding]:
-        """Runs all deterministic scanners across changed files."""
         all_findings: List[SecurityFinding] = []
 
         for f in changed_files:
-            # 1. Secret Scanner
             all_findings.extend(SecretScanner.scan(f))
-
-            # 2. Dependency Scanner
             all_findings.extend(DependencyScanner.scan(f))
-
-            # 3. File Policy Scanner
             all_findings.extend(ChangedFilePolicyScanner.scan(f))
 
-            # 4. AST Security Scanner (if full code or diff lines exist)
             if f.patch and f.path.endswith(".py"):
-                # Extract added lines or parse snippet
-                added_lines = [
+                added_lines: List[str] = [
                     line[1:] for line in f.patch.splitlines() if line.startswith("+") and not line.startswith("+++")
                 ]
                 if added_lines:
                     source_chunk = "\n".join(added_lines)
                     all_findings.extend(ASTSecurityScanner.scan_code(f.path, source_chunk))
 
-        # Normalize and consolidate findings
         return FindingNormalizer.consolidate_findings(all_findings)
 
     @classmethod
@@ -456,21 +397,15 @@ class DeterministicReviewGates:
         deterministic_findings: List[SecurityFinding],
         test_results: Optional[TestResult] = None,
     ) -> Tuple[Verdict, str]:
-        """
-        Enforces non-overridable gate invariants.
-        CRITICAL RULE: Critical deterministic findings cannot be overridden by AI approval.
-        """
         critical_findings = [f for f in deterministic_findings if f.severity == "CRITICAL"]
         high_findings = [f for f in deterministic_findings if f.severity == "HIGH"]
 
-        # Gate 1: Test failures block approval
         if test_results and test_results.status.lower() not in ("passed", "success"):
             return (
                 Verdict.ACTION_REQUIRED,
                 f"Automated test suite failed with status '{test_results.status}'. PR cannot be approved.",
             )
 
-        # Gate 2: Any CRITICAL deterministic finding overrides approval to REJECTED
         if critical_findings:
             override_msg = (
                 f"OVERRIDE: AI suggested {ai_verdict.value}, but {len(critical_findings)} CRITICAL deterministic "
@@ -479,7 +414,6 @@ class DeterministicReviewGates:
             )
             return Verdict.REJECTED, override_msg
 
-        # Gate 3: Any HIGH deterministic finding overrides approval to ACTION_REQUIRED
         if high_findings:
             if ai_verdict == Verdict.APPROVED:
                 override_msg = (
@@ -488,5 +422,4 @@ class DeterministicReviewGates:
                 )
                 return Verdict.ACTION_REQUIRED, override_msg
 
-        # No deterministic overrides triggered; AI verdict stands
         return ai_verdict, "Deterministic review gates passed."

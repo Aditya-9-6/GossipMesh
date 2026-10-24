@@ -3,10 +3,10 @@ from typing import Any
 
 try:
     from prometheus_client import (
-        Counter,
-        Histogram,
-        Gauge,
-        generate_latest,
+        Counter as PromCounter,
+        Histogram as PromHistogram,
+        Gauge as PromGauge,
+        generate_latest as prom_generate_latest,
         CONTENT_TYPE_LATEST,
     )
 except ImportError:
@@ -25,43 +25,50 @@ except ImportError:
         def set(self, value: float, *args: Any, **kwargs: Any) -> None:
             pass
 
-    def Counter(*args: Any, **kwargs: Any) -> _DummyMetric:
+    def PromCounter(*args: Any, **kwargs: Any) -> _DummyMetric:
         return _DummyMetric()
 
-    def Histogram(*args: Any, **kwargs: Any) -> _DummyMetric:
+    def PromHistogram(*args: Any, **kwargs: Any) -> _DummyMetric:
         return _DummyMetric()
 
-    def Gauge(*args: Any, **kwargs: Any) -> _DummyMetric:
+    def PromGauge(*args: Any, **kwargs: Any) -> _DummyMetric:
         return _DummyMetric()
 
-    def generate_latest(*args: Any, **kwargs: Any) -> bytes:
+    def prom_generate_latest(*args: Any, **kwargs: Any) -> bytes:
         return b"# prometheus_client not installed\n"
 
 
-# Define standard metrics
-REQUEST_COUNT = Counter("gossipmesh_http_requests_total", "Total HTTP requests", ["method", "endpoint", "status_code"])
-REQUEST_LATENCY = Histogram("gossipmesh_http_request_duration_seconds", "HTTP request latency", ["method", "endpoint"])
-REQUEST_ERRORS = Counter("gossipmesh_http_errors_total", "Total HTTP errors", ["method", "endpoint", "status_code"])
-WEBHOOK_COUNT = Counter("gossipmesh_webhook_events_total", "Total webhook events", ["source", "event_type", "status"])
-WORKFLOW_DURATION = Histogram("gossipmesh_workflow_duration_seconds", "Workflow execution duration", ["workflow_type"])
-QUEUE_DEPTH = Gauge("gossipmesh_queue_depth", "Queue depth", ["queue_name", "priority"])
-JOB_RETRIES = Counter("gossipmesh_job_retries_total", "Total job retries", ["job_type", "reason"])
-PROVIDER_LATENCY = Histogram(
+REQUEST_COUNT = PromCounter(
+    "gossipmesh_http_requests_total", "Total HTTP requests", ["method", "endpoint", "status_code"]
+)
+REQUEST_LATENCY = PromHistogram(
+    "gossipmesh_http_request_duration_seconds", "HTTP request latency", ["method", "endpoint"]
+)
+REQUEST_ERRORS = PromCounter("gossipmesh_http_errors_total", "Total HTTP errors", ["method", "endpoint", "status_code"])
+WEBHOOK_COUNT = PromCounter(
+    "gossipmesh_webhook_events_total", "Total webhook events", ["source", "event_type", "status"]
+)
+WORKFLOW_DURATION = PromHistogram(
+    "gossipmesh_workflow_duration_seconds", "Workflow execution duration", ["workflow_type"]
+)
+QUEUE_DEPTH = PromGauge("gossipmesh_queue_depth", "Queue depth", ["queue_name", "priority"])
+JOB_RETRIES = PromCounter("gossipmesh_job_retries_total", "Total job retries", ["job_type", "reason"])
+PROVIDER_LATENCY = PromHistogram(
     "gossipmesh_provider_request_duration_seconds", "AI provider request latency", ["provider", "model"]
 )
-PROVIDER_FAILURES = Counter(
+PROVIDER_FAILURES = PromCounter(
     "gossipmesh_provider_failures_total", "Total AI provider failures", ["provider", "model", "error_type"]
 )
-AI_TOKENS = Counter(
+AI_TOKENS = PromCounter(
     "gossipmesh_ai_tokens_consumed_total", "Total AI tokens consumed", ["provider", "model", "token_type"]
 )
-REVIEW_FINDINGS = Counter(
+REVIEW_FINDINGS = PromCounter(
     "gossipmesh_review_findings_total", "Total review findings", ["severity", "rule_category", "tenant_id"]
 )
-SANDBOX_FAILURES = Counter(
+SANDBOX_FAILURES = PromCounter(
     "gossipmesh_sandbox_execution_failures_total", "Total sandbox execution failures", ["failure_reason", "exit_code"]
 )
-BILLING_USAGE = Counter(
+BILLING_USAGE = PromCounter(
     "gossipmesh_billing_usage_units_total", "Total billing usage units", ["metric_type", "tenant_id"]
 )
 
@@ -115,4 +122,4 @@ def record_billing_metric(metric_type: str, units: int | float, tenant_id: str) 
 
 
 def generate_latest_metrics() -> bytes:
-    return generate_latest()
+    return prom_generate_latest()

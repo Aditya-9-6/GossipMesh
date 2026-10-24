@@ -100,7 +100,6 @@ def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[R
     allowed_admin_roles = [
         OrganizationRole.admin,
         OrganizationRole.owner,
-        OrganizationRole.organization_admin,
     ]
     if role_val not in allowed_admin_roles:
         raise HTTPException(status_code=403, detail="Admin permissions required for this repository action.")
@@ -115,7 +114,6 @@ def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[
     allowed_writer_roles = [
         OrganizationRole.admin,
         OrganizationRole.owner,
-        OrganizationRole.organization_admin,
         OrganizationRole.developer,
     ]
     if role_val not in allowed_writer_roles:

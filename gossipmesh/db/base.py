@@ -3,9 +3,8 @@ try:
 except ImportError:
     from sqlalchemy.orm import declarative_base
 
-    Base = declarative_base()
+    Base = declarative_base()  # type: ignore[misc]
 
-# Import all models to ensure they are registered with Base.metadata
 from gossipmesh.models.user import User, UserGitHubCredential, UserOIDCCredential
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project

@@ -1,15 +1,9 @@
-"""Feedback Learning and Evaluation Engine (Task 74).
-
-Manages human feedback persistence (accepted, dismissed, false_positive, reopened, corrected),
-evaluates precision/recall/false-positive rates per rule, and safely injects historical feedback
-into review prompts while strictly neutralizing prompt injection threats.
-"""
+"""Feedback Learning and Evaluation Engine (Task 74)."""
 
 from datetime import datetime
 import logging
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from gossipmesh.models.finding_feedback import FindingFeedback, FeedbackType
 from gossipmesh.review.prompt_pipeline import (
@@ -40,11 +34,6 @@ class FeedbackLearningEngine:
         file_path: Optional[str] = None,
         rule_id: Optional[str] = None,
     ) -> FindingFeedback:
-        """
-        Records human feedback on a finding.
-        Sanitizes user comment to prevent prompt injection attacks if later referenced.
-        """
-        # Validate feedback type
         if isinstance(feedback_type, str):
             f_type = feedback_type.upper()
             if f_type not in FeedbackType.__members__:
@@ -54,7 +43,6 @@ class FeedbackLearningEngine:
         else:
             f_type = feedback_type.value
 
-        # Sanitize comment against prompt injection attempts
         sanitized_comment = PromptPipeline.sanitize_untrusted_text(user_comment or "") if user_comment else None
 
         record = FindingFeedback(
@@ -79,14 +67,6 @@ class FeedbackLearningEngine:
         organization_id: str,
         repository_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Computes review accuracy evaluation metrics based on human feedback:
-        - Total reviews evaluated
-        - Acceptance rate
-        - False positive rate
-        - Dismissal rate
-        - Rule-level precision breakdown
-        """
         query = self.db.query(FindingFeedback).filter(FindingFeedback.organization_id == organization_id)
         if repository_id:
             query = query.filter(FindingFeedback.repository_id == repository_id)
@@ -109,10 +89,10 @@ class FeedbackLearningEngine:
         rule_stats: Dict[str, Dict[str, int]] = {}
 
         for item in all_feedback:
-            t = item.feedback_type
+            t = str(item.feedback_type)
             counts[t] = counts.get(t, 0) + 1
 
-            rule = item.rule_id or "GENERAL"
+            rule = str(item.rule_id or "GENERAL")
             if rule not in rule_stats:
                 rule_stats[rule] = {"accepted": 0, "false_positive": 0, "dismissed": 0, "total": 0}
 
@@ -161,10 +141,6 @@ class FeedbackLearningEngine:
         repository_id: str,
         limit: int = 50,
     ) -> List[HistoricalFindingFeedback]:
-        """
-        Exports safe, structured HistoricalFindingFeedback list for PromptPipeline.
-        Ensures user feedback reasons are sanitized and cannot manipulate system instructions.
-        """
         records = (
             self.db.query(FindingFeedback)
             .filter(

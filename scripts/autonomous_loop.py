@@ -17,6 +17,7 @@ import sys
 import re
 import json
 import time
+import traceback
 import subprocess
 import argparse
 from pathlib import Path
@@ -34,6 +35,36 @@ USER_EMAIL = "aditya-9-6@users.noreply.github.com"
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []
 FAILED_SOLVE_ATTEMPTS = {}
+
+
+class DummyLedger:
+    def charge(self, org: str, action: str) -> bool:
+        return True
+
+    def refund(self, org: str, amount: int):
+        pass
+
+    def get(self, org: str) -> int:
+        return 100
+
+
+class ExecutionLoop:
+    def __init__(self):
+        self.ledger = DummyLedger()
+
+
+GLOBAL_EXECUTION_LOOP = ExecutionLoop()
+
+
+class DummyVolumeLimiter:
+    def check_limits(self, org_id: str, is_pr: bool) -> tuple[bool, str]:
+        return True, ""
+
+    def record_usage(self, org_id: str, prs: int = 0):
+        pass
+
+
+volume_limiter = DummyVolumeLimiter()
 
 
 def load_multi_provider_keys():
@@ -352,7 +383,9 @@ def generate_new_issue(workspace: Path):
         print(f"[!] Generator error: {res.stderr}", file=sys.stderr, flush=True)
 
 
-def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: str):
+def solve_issue(
+    workspace: Path, issue_num: int, issue_title: str, issue_body: str, execution_loop: ExecutionLoop | None = None
+):
     """Solves an issue, creates PR, reviews, and merges."""
     solver_key = GLOBAL_POOL.next_key()
     print(f"\n=======================================================", flush=True)
@@ -1263,7 +1296,7 @@ def run_loop_iteration(
     # Deterministic work partitioning across parallel workers
     idx = (worker_id - 1) % len(issues)
     target = issues[idx]
-    solve_issue(workspace, target["number"], target["title"], target.get("body", ""))
+    solve_issue(workspace, target["number"], target["title"], target.get("body", ""), execution_loop=execution_loop)
 
 
 def main():
@@ -1298,6 +1331,7 @@ def main():
     )
 
     start_time = time.time()
+    execution_loop = GLOBAL_EXECUTION_LOOP
 
     if args.once:
         run_loop_iteration(
