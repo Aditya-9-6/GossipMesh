@@ -1,5 +1,8 @@
-from __init__ import VectorClockEntropy
+class VectorClockEntropy:
+    def increment(self, *args, **kwargs):
+        pass
 
 
-class Syncer:
-    pass
+class AntiEntropyEntropy:
+    def scan_mesh(self, *args, **kwargs):
+        pass

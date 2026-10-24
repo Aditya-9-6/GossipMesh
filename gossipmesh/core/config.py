@@ -7,12 +7,13 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "GossipMesh"
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
+    DATABASE_URL: str = "sqlite:///./test.db"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-for-development")
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_AUDIENCE: str = "gossipmesh-api"
     JWT_ISSUER: str = "gossipmesh-auth"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "0" * 32)
     GITHUB_CLIENT_ID: str = os.getenv("GITHUB_CLIENT_ID", "")
     GITHUB_CLIENT_SECRET: str | None = os.getenv("GITHUB_CLIENT_SECRET", "")
@@ -43,10 +44,6 @@ class Settings(BaseSettings):
         if not raw:
             return []
         return [k.strip() for k in raw.split(",") if k.strip()]
-
-    @property
-    def DATABASE_URI(self) -> PostgresDsn | str:
-        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     @property
     def REDIS_URI(self) -> str:
