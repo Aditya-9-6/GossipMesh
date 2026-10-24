@@ -77,8 +77,6 @@ def login_access_token(
     elif not user.is_active:
         raise AuthorizationError(message="Inactive user")
 
-    login_throttler.record_success(form_data.username)
-
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
@@ -213,10 +211,11 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
 @router.get("/github/login")
 def github_login(request: Request) -> Any:
     state = str(uuid.uuid4())
-    redis_client.set(f"github_oauth_state:{state}", "pending", ex=300)
+    redis_client.setex(f"github_oauth_state:{state}", 300, "pending")
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     params = {
-        "client_id": settings.GITHUB_CLIENT_ID,
+        "client_id": client_id,
         "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
         "scope": "read:user user:email read:org",
         "state": state,
@@ -232,12 +231,13 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": client_id,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
@@ -288,19 +288,27 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
             db.refresh(user)
 
         credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == user.id).first()
+        enc_access = encrypt_string(access_token)
+        enc_refresh = encrypt_string(refresh_token) if refresh_token else None
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
                 github_user_id=github_user_id,
-                access_token=encrypt_string(access_token),
-                refresh_token=encrypt_string(refresh_token) if refresh_token else None,
+                access_token_ciphertext=enc_access,
+                refresh_token_ciphertext=enc_refresh,
             )
             db.add(credential)
         else:
             credential.github_user_id = github_user_id
-            credential.access_token = encrypt_string(access_token)
+            if hasattr(credential, "access_token_ciphertext"):
+                credential.access_token_ciphertext = enc_access
+            elif hasattr(credential, "encrypted_access_token"):
+                credential.encrypted_access_token = enc_access
             if refresh_token:
-                credential.refresh_token = encrypt_string(refresh_token)
+                if hasattr(credential, "refresh_token_ciphertext"):
+                    credential.refresh_token_ciphertext = enc_refresh
+                elif hasattr(credential, "encrypted_refresh_token"):
+                    credential.encrypted_refresh_token = enc_refresh
 
         db.commit()
 
@@ -373,17 +381,23 @@ def github_refresh_token(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
-    if not credential or not credential.refresh_token:
+    token_cipher = None
+    if credential:
+        token_cipher = getattr(
+            credential, "access_token_ciphertext", getattr(credential, "encrypted_access_token", None)
+        )
+    if not credential or not token_cipher:
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
-    refresh_token = decrypt_string(credential.refresh_token)
+    refresh_token = decrypt_string(token_cipher)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": client_id,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
@@ -396,9 +410,15 @@ def github_refresh_token(
         new_access_token = token_data["access_token"]
         new_refresh_token = token_data.get("refresh_token")
 
-        credential.access_token = encrypt_string(new_access_token)
+        if hasattr(credential, "access_token_ciphertext"):
+            credential.access_token_ciphertext = encrypt_string(new_access_token)
+        elif hasattr(credential, "encrypted_access_token"):
+            credential.encrypted_access_token = encrypt_string(new_access_token)
         if new_refresh_token:
-            credential.refresh_token = encrypt_string(new_refresh_token)
+            if hasattr(credential, "refresh_token_ciphertext"):
+                credential.refresh_token_ciphertext = encrypt_string(new_refresh_token)
+            elif hasattr(credential, "encrypted_refresh_token"):
+                credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
 
         db.commit()
 
@@ -406,7 +426,7 @@ def github_refresh_token(
             action="github_token_refresh",
             actor_id=current_user.id,
             details={
-                "github_id": credential.github_user_id,
+                "github_id": getattr(credential, "github_user_id", None),
             },
         )
         db.add(audit_event)
@@ -427,7 +447,7 @@ def oidc_login(request: Request) -> Any:
         base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode("utf-8")).digest()).decode("utf-8").rstrip("=")
     )
 
-    redis_client.set(f"oidc_state:{state}", f"{nonce}:{code_verifier}", ex=300)
+    redis_client.setex(f"oidc_state:{state}", 300, f"{nonce}:{code_verifier}")
 
     with httpx.Client() as client:
         try:
@@ -469,8 +489,9 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
 
-    state_str = state_data.decode("utf-8") if isinstance(state_data, bytes) else str(state_data)
-    nonce, code_verifier = state_str.split(":", 1)
+    nonce, code_verifier = (
+        state_data.decode("utf-8").split(":") if isinstance(state_data, bytes) else state_data.split(":")
+    )
 
     with httpx.Client() as client:
         try:
@@ -610,12 +631,7 @@ def change_password(
     if not current_user.hashed_password or not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password.")
 
-    strength_res = validate_password_strength(body.new_password)
-    if isinstance(strength_res, tuple):
-        is_valid, err_msg = strength_res
-    else:
-        is_valid, err_msg = (strength_res, "Password is too weak") if not strength_res else (True, "")
-
+    is_valid, err_msg = validate_password_strength(body.new_password, current_user.email)
     if not is_valid:
         raise HTTPException(status_code=400, detail=err_msg)
 
@@ -639,7 +655,7 @@ def request_password_reset(
     if not user:
         return {"message": "If an active account with that email exists, a reset token has been generated."}
 
-    token = create_password_reset_token(db, user.email)
+    token = create_password_reset_token(db, user)
     event = AuditEvent(
         action="password.reset_requested", actor_id=user.id, organization_id=None, details={"email": user.email}
     )
@@ -648,7 +664,6 @@ def request_password_reset(
     return {"message": "Password reset token generated.", "reset_token": token}
 
 
-@router.post("/{password/reset-confirm}")
 @router.post("/password/reset-confirm")
 def confirm_password_reset(
     body: PasswordResetConfirm,
@@ -661,12 +676,7 @@ def confirm_password_reset(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Inactive user account.")
 
-    strength_res = validate_password_strength(body.new_password)
-    if isinstance(strength_res, tuple):
-        is_valid, err_msg = strength_res
-    else:
-        is_valid, err_msg = (strength_res, "Password is too weak") if not strength_res else (True, "")
-
+    is_valid, err_msg = validate_password_strength(body.new_password, user.email)
     if not is_valid:
         raise HTTPException(status_code=400, detail=err_msg)
 
