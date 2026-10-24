@@ -1,9 +1,15 @@
+from enum import Enum
 from typing import Optional, List, Dict, Any
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean, Column, Table, Text, JSON
+from sqlalchemy import String, Integer, ForeignKey, DateTime, JSON, Boolean, Column, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from gossipmesh.models.base import Base
+
+
+class IndexStateEnum(str, Enum):
+    PENDING = "pending"
+    INDEXED = "indexed"
 
 
 class RepositoryPolicy(Base):
@@ -34,17 +40,13 @@ class GithubAppInstallation(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
     installation_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
-    account_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    account_login: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    account_name: Mapped[str] = mapped_column(String, nullable=False)
     target_type: Mapped[str] = mapped_column(String, nullable=False)
     target_id: Mapped[int] = mapped_column(Integer, nullable=False)
     repository_selection: Mapped[str] = mapped_column(String, nullable=False)
     permissions: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
     suspended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    suspended_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-
-    organization = relationship("Organization")
 
 
 class Repository(Base):
@@ -55,12 +57,12 @@ class Repository(Base):
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    full_name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    full_name: Mapped[str] = mapped_column(String, nullable=False)
     default_branch: Mapped[str] = mapped_column(String, default="main", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
 
-    organization = relationship("Organization", back_populates="repositories")
+    organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
     policy: Mapped[Optional["RepositoryPolicy"]] = relationship(
         "RepositoryPolicy", back_populates="repository", uselist=False, cascade="all, delete-orphan"
@@ -77,5 +79,3 @@ class IndexState(Base):
     last_indexed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-
-    repository = relationship("Repository")
