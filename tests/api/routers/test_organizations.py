@@ -2,15 +2,6 @@ import pytest
 from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
-from unittest.mock import MagicMock
-import pytest
-
-
-@pytest.fixture
-def mock_db_session():
-    return MagicMock()
-
-
 from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -18,6 +9,11 @@ from gossipmesh.models.organization import Organization, UserOrganization, Organ
 from gossipmesh.models.project import Project
 from gossipmesh.models.repository import Repository
 from gossipmesh.models.audit import AuditEvent
+
+
+@pytest.fixture
+def mock_db_session():
+    return MagicMock()
 
 
 @pytest.fixture
@@ -36,6 +32,11 @@ def mock_db():
     app.dependency_overrides.pop(deps.get_db, None)
 
 
+@pytest.fixture
+def test_client():
+    return TestClient(app)
+
+
 def test_create_organization(test_client, mock_db, mock_current_user):
     mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -51,7 +52,7 @@ def test_create_organization(test_client, mock_db, mock_current_user):
 
     assert response.status_code == 200
     assert response.json() == {"id": 1, "name": "New Org"}
-    assert mock_db.add.call_count == 3  # Org, UserOrg, AuditEvent
+    assert mock_db.add.call_count == 3
 
 
 def test_create_organization_exists(test_client, mock_db, mock_current_user):
@@ -75,7 +76,7 @@ def test_create_invitation(test_client, mock_db, mock_current_user):
 
 
 def test_create_invitation_unauthorized(test_client, mock_db, mock_current_user):
-    mock_db.query.return_value.filter.return_value.first.return_value = None  # Not an admin
+    mock_db.query.return_value.filter.return_value.first.return_value = None
 
     response = test_client.post(
         "/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "developer"}
@@ -85,23 +86,20 @@ def test_create_invitation_unauthorized(test_client, mock_db, mock_current_user)
 
 
 def test_accept_invitation(test_client, mock_db, mock_current_user):
-    # Mock finding the invitation
     mock_invitation = OrganizationInvitation(
         id=1, email="invite@example.com", token="valid_token", organization_id=1, role="developer"
     )
 
-    # First query is for invitation, second is for existing member
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_invitation, None]
 
     response = test_client.post("/api/v1/organizations/invitations/valid_token/accept")
 
     assert response.status_code == 200
-    assert mock_db.add.call_count == 2  # UserOrg, AuditEvent
-    assert mock_db.delete.call_count == 1  # Invitation
+    assert mock_db.add.call_count == 2
+    assert mock_db.delete.call_count == 1
 
 
 def test_assign_role(test_client, mock_db, mock_current_user):
-    # First query checks admin, second finds the user to update
     mock_admin_check = UserOrganization(role="organization_admin", is_suspended=False)
     mock_user_org = UserOrganization(organization_id=1, user_id=2, role="developer")
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_admin_check, mock_user_org]
@@ -130,7 +128,6 @@ def test_create_project(test_client, mock_db, mock_current_user):
 
 
 def test_connect_repository(test_client, mock_db, mock_current_user):
-    # First query admin check, second repo check
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         UserOrganization(role="organization_admin", is_suspended=False),
         None,
@@ -152,7 +149,6 @@ def test_connect_repository(test_client, mock_db, mock_current_user):
 
 
 def test_remove_member(test_client, mock_db, mock_current_user):
-    # First admin check, second find member
     mock_admin_check = UserOrganization(role="organization_admin", is_suspended=False)
     mock_user_org = UserOrganization(organization_id=1, user_id=2, role="developer")
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_admin_check, mock_user_org]
@@ -164,7 +160,6 @@ def test_remove_member(test_client, mock_db, mock_current_user):
 
 
 def test_suspend_member(test_client, mock_db, mock_current_user):
-    # First admin check, second find member
     mock_admin_check = UserOrganization(role="organization_admin", is_suspended=False)
     mock_user_org = UserOrganization(organization_id=1, user_id=2, role="developer", is_suspended=False)
     mock_db.query.return_value.filter.return_value.first.side_effect = [mock_admin_check, mock_user_org]
