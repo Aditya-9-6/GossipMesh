@@ -88,6 +88,9 @@ class TestResultRecord(BaseModel):
     message: Optional[str] = None
     _is_test_class: bool = PrivateAttr(default=False)
 
+    def __init__(self, **data):
+        super().__init__(**data)
+
 
 # Alias for compatibility imports
 TestResult = TestResultRecord

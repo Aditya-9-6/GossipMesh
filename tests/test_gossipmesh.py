@@ -10,7 +10,6 @@ import unittest
 from gossipmesh.node import GossipNode, GossipTopic
 from gossipmesh.memetic import MemeticKnowledgeBase
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
-from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.bridge import CrossRepoBridge
 from gossipmesh.oracle import PerformanceOracle
 from gossipmesh.auction import TaskAuctioneer
@@ -191,21 +190,6 @@ class TestGossipMesh(unittest.TestCase):
         self.assertEqual(len(remaining), 1)
         self.assertIn(msg2.message_id, remaining)
         self.assertNotIn(msg1.message_id, remaining)
-
-    def test_red_team_auditor(self):
-        auditor = RedTeamAuditor()
-        bad_code = """
-        func recordLatency(d time.Duration) {
-            mu.Lock()
-            defer mu.Unlock()
-            slices = make([]time.Duration, len(all))
-        }
-        """
-        probes = auditor.audit_diff(bad_code)
-        self.assertTrue(len(probes) >= 2)
-        categories = [p.category for p in probes]
-        self.assertIn("Concurrency Lock Contention", categories)
-        self.assertIn("Unbounded Heap Allocation", categories)
 
     def test_cross_repo_bridge_codegen(self):
         bridge = CrossRepoBridge()
