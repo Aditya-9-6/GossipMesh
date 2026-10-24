@@ -2,8 +2,17 @@
 Organization and related models.
 """
 
-from sqlalchemy import Column, Integer, String, ForeignKey
+import enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from sqlalchemy.orm import relationship
 from gossipmesh.db.base_class import Base
+
+
+class OrganizationRole(str, enum.Enum):
+    owner = "owner"
+    admin = "admin"
+    developer = "developer"
+    member = "member"
 
 
 class Organization(Base):
@@ -11,6 +20,18 @@ class Organization(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, index=True, nullable=False)
+
+
+class UserOrganization(Base):
+    __tablename__ = "user_organizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    role = Column(String(50), nullable=False, default="member")
+    is_suspended = Column(Boolean, default=False, nullable=False)
+
+    organization = relationship("Organization", backref="user_memberships")
 
 
 class OrganizationMember(Base):
@@ -29,3 +50,4 @@ class OrganizationInvitation(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     email = Column(String(255), nullable=False)
     role: str = Column(String(50), nullable=False, default="member")
+    token = Column(String(255), unique=True, index=True, nullable=True)
