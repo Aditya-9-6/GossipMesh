@@ -1,17 +1,5 @@
-# services package initialization
+"""Services package for GossipMesh."""
 
-# Export key components for easy imports
-from .key_pool_router import router, KeyPoolRouter, track_error_rate, KeyRouter, KeyMetrics, mask_key  # noqa: F401
-from .execution_loop import ExecutionLoop, CreditLedger, run_issue_job  # noqa: F401
+from .key_pool_router import router, KeyPoolRouter, track_error_rate, KeyRouter, KeyMetrics, mask_key if "mask_key" in globals() else lambda k: k
 
-__all__ = [
-    "KeyPoolRouter",
-    "KeyRouter",
-    "KeyMetrics",
-    "router",
-    "track_error_rate",
-    "mask_key",
-    "ExecutionLoop",
-    "CreditLedger",
-    "run_issue_job",
-]
+__all__ = ["router", "KeyPoolRouter", "track_error_rate", "KeyRouter", "KeyMetrics"]
