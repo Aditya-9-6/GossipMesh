@@ -38,13 +38,18 @@ class LoginThrottler:
         self.attempts[key].append(now)
         self.record_attempt(key)
 
-    def record_failure(self, username: str) -> Tuple[bool, int, float]:
-        self.record(username)
-        limited = self.is_rate_limited(username)
+    def record_failure(self, key: str) -> Tuple[bool, int, float]:
+        now = time.time()
+        self.record(key)
+        attempts, _ = self.attempts_tuple.get(key, (0, now))
+        if attempts >= self.max_attempts:
+            self.lockouts[key] = now + self.window_seconds
+            return True, self.max_attempts, float(self.window_seconds)
+        limited = self.is_rate_limited(key)
         return limited, self.max_attempts, float(self.window_seconds)
 
-    def record_success(self, username: str) -> None:
-        self.reset(username)
+    def record_success(self, key: str) -> None:
+        self.reset(key)
 
     def check_lockout(self, username: str) -> Tuple[bool, int]:
         limited = self.is_rate_limited(username)

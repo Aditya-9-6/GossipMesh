@@ -23,7 +23,7 @@ class GossipTopic(str, Enum):
 
 
 class GossipMessage:
-    def __init__(
+    def __init__( lapses,
         self,
         topic: str,
         origin_node: str,
@@ -74,7 +74,7 @@ class GossipNode:
     and Adaptive Scatter-Width CPU-Load Feedback Shaping.
     Communicates via a shared ledger directory (file-backed mesh) or local bus."""
 
-    def __init__(
+    def __init__( lapses,
         self,
         node_id: str,
         mesh_dir: str | None = None,
@@ -91,7 +91,7 @@ class GossipNode:
         self.pow_nonce = pow_nonce
         self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
         self.seen_messages: Set[str] = set()
-        self.recent_messages: deque = deque(maxlen=1000)
+        self.recent_messages: deque[GossipMessage] = deque(maxlen=1000)
         self._load_seen_history()
 
         if base_scatter is not None:
