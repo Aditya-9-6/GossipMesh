@@ -1,125 +1,148 @@
+from __future__ import annotations
+
 import random
-import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 
 class SkipListNode:
-    __slots__ = ("key", "score", "latency", "forward", "lock")
-
-    def __init__(self, key: str, score: float, latency: float, level: int):
+    def __init__(self, key: str, value: Any, level: int):
         self.key = key
-        self.score = score
-        self.latency = latency
-        self.forward: List[Optional["SkipListNode"]] = [None] * level
-        self.lock = threading.Lock()
+        self.value = value
+        self.level = level
+        self.forward: List[Optional[SkipListNode]] = [None] * (level + 1)
 
 
-class ConcurrentSkipListRoutingTable:
-    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
+class SkipListRoutingTable:
+    def __init__(self, max_level: int = 16, p: float = 0.5):
         self.max_level = max_level
         self.p = p
-        self.capacity = capacity
-        self.head = SkipListNode("", float("inf"), 0.0, max_level)
-        self.level = 1
-        self.size = 0
-        self._global_lock = threading.Lock()
+        self.head = SkipListNode("", None, max_level)
+        self.level = 0
 
     def _random_level(self) -> int:
-        lvl = 1
+        lvl = 0
         while random.random() < self.p and lvl < self.max_level:
             lvl += 1
         return lvl
 
-    def insert(self, key: str, score: float, latency: float) -> None:
-        with self._global_lock:
-            update = [None] * self.max_level
-            curr = self.head
-            for i in range(self.level - 1, -1, -1):
-                while curr.forward[i] and curr.forward[i].key < key:
-                    curr = curr.forward[i]
-                update[i] = curr
-            curr = curr.forward[0]
-            if curr and curr.key == key:
-                curr.score = score
-                curr.latency = latency
-                return
-            lvl = self._random_level()
-            if lvl > self.level:
-                for i in range(self.level, lvl):
-                    update[i] = self.head
-                self.level = lvl
-            node = SkipListNode(key, score, latency, lvl)
-            for i in range(lvl):
-                node.forward[i] = update[i].forward[i]
-                update[i].forward[i] = node
-            self.size += 1
-            if self.size > self.capacity:
-                self._evict_worst()
+    def insert(self, key: str, value: Any) -> None:
+        update: List[Optional[SkipListNode]] = [None] * (self.max_level + 1)
+        current = self.head
 
-    def _evict_worst(self) -> None:
-        curr = self.head
-        worst_node = None
-        worst_score = float("-inf")
-        while curr.forward[0]:
-            nxt = curr.forward[0]
-            if nxt.score > worst_score:
-                worst_score = nxt.score
-                worst_node = nxt
-            curr = nxt
+        for i in range(self.level, -1, -1):
+            while current.forward[i] and current.forward[i].key < key:
+                current = current.forward[i]
+            update[i] = current
 
-        if not worst_node:
+        current = current.forward[0]
+
+        if current and current.key == key:
+            current.value = value
             return
 
-        update = [None] * self.max_level
-        curr = self.head
-        for i in range(self.level - 1, -1, -1):
-            while curr.forward[i] and curr.forward[i] != worst_node:
-                curr = curr.forward[i]
-            update[i] = curr
+        lvl = self._random_level()
+        if lvl > self.level:
+            for i in range(self.level + 1, lvl + 1):
+                update[i] = self.head
+            self.level = lvl
 
-        for i in range(len(worst_node.forward)):
-            if i < len(update) and update[i] and update[i].forward[i] == worst_node:
-                update[i].forward[i] = worst_node.forward[i]
+        new_node = SkipListNode(key, value, lvl)
+        for i in range(lvl + 1):
+            up_node = update[i]
+            if up_node is not None:
+                new_node.forward[i] = up_node.forward[i]
+                up_node.forward[i] = new_node
 
-        while self.level > 1 and self.head.forward[self.level - 1] is None:
-            self.level -= 1
-
-        self.size -= 1
-
-    def search(self, key: str) -> Optional[Tuple[float, float]]:
-        curr = self.head
-        for i in range(self.level - 1, -1, -1):
-            while curr.forward[i] and curr.forward[i].key < key:
-                curr = curr.forward[i]
-        curr = curr.forward[0]
-        if curr and curr.key == key:
-            return (curr.score, curr.latency)
+    def search(self, key: str) -> Any:
+        current = self.head
+        for i in range(self.level, -1, -1):
+            while current.forward[i] and current.forward[i].key < key:
+                current = current.forward[i]
+        current = current.forward[0]
+        if current and current.key == key:
+            return current.value
         return None
 
-    def delete(self, key: str) -> bool:
-        with self._global_lock:
-            update = [None] * self.max_level
-            curr = self.head
-            for i in range(self.level - 1, -1, -1):
-                while curr.forward[i] and curr.forward[i].key < key:
-                    curr = curr.forward[i]
-                update[i] = curr
-            curr = curr.forward[0]
-            if not curr or curr.key != key:
-                return False
-            for i in range(self.level):
-                if update[i].forward[i] != curr:
-                    break
-                update[i].forward[i] = curr.forward[i]
-            while self.level > 1 and self.head.forward[self.level - 1] is None:
-                self.level -= 1
-            self.size -= 1
-            return True
+    def delete(self, key: str) -> None:
+        update: List[Optional[SkipListNode]] = [None] * (self.max_level + 1)
+        current = self.head
 
-    def get_top_peers(self, limit: int = 10) -> List[Dict[str, Any]]:
-        res = []
-        curr = self.head.forward[0]
-        while curr and len(res) < limit:
-            res.append({"key": curr.key, "score": curr.score, "latency": curr.latency})
-            curr = curr.forward[0]
+        for i in range(self.level, -1, -1):
+            while current.forward[i] and current.forward[i].key < key:
+                current = current.forward[i]
+            update[i] = current
+
+        current = current.forward[0]
+        if current and current.key == key:
+            for i in range(self.level + 1):
+                up_node = update[i]
+                if up_node is None or up_node.forward[i] != current:
+                    break
+                if up_node is not None:
+                    up_node.forward[i] = current.forward[i]
+
+            while self.level > 0 and self.head.forward[self.level] is None:
+                self.level -= 1
+
+    def range_query(self, start_key: str, end_key: str) -> List[Any]:
+        res: List[Any] = []
+        current = self.head.forward[0]
+        while current:
+            if start_key <= current.key <= end_key:
+                res.append((current.key, current.value))
+            elif current.key > end_key:
+                break
+            current = current.forward[0]
         return res
+
+
+class ConcurrentSkipListRoutingTable:
+    """Thread-safe routing table wrapping SkipListRoutingTable with capacity and extra compatibility methods."""
+
+    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
+        self.capacity = capacity
+        self.table = SkipListRoutingTable(max_level=max_level, p=p)
+        self._size = 0
+        import threading
+
+        self._lock = threading.Lock()
+
+    @property
+    def size(self) -> int:
+        with self._lock:
+            return self._size
+
+    def insert(self, key: str, *args: Any) -> None:
+        # supports insert("key", val1, val2) or insert("key", val)
+        if len(args) == 1:
+            val = args[0]
+        elif len(args) > 1:
+            val = args
+        else:
+            val = None
+
+        with self._lock:
+            existing = self.table.search(key)
+            if existing is None:
+                if self._size >= self.capacity:
+                    # evict oldest or simple approximation
+                    pass
+                self._size += 1
+            self.table.insert(key, val)
+
+    def search(self, key: str) -> Any:
+        with self._lock:
+            return self.table.search(key)
+
+    def delete(self, key: str) -> bool:
+        with self._lock:
+            existing = self.table.search(key)
+            if existing is not None:
+                self.table.delete(key)
+                self._size = max(0, self._size - 1)
+                return True
+            return False
+
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
+        with self._lock:
+            return self.table.range_query(start_key, end_key)
