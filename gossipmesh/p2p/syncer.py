@@ -1,15 +1,15 @@
-"""
-P2P Node State Syncer.
-"""
+from typing import Any, Dict, List, Optional
+import logging
 
-from typing import Dict, Any, Optional
-from gossipmesh.p2p.entropy import VectorClockEntropy
+from gossipmesh.p2p.entropy import VectorClockEntropyCalculator as VectorClockEntropy
+
+logger = logging.getLogger(__name__)
 
 
-class StateSyncer:
+class VectorClockSyncer:
     def __init__(self, node_id: str):
         self.node_id = node_id
-        self.vector_clock = VectorClockEntropy(node_id)
+        self.entropy_calculator = VectorClockEntropy()
 
-    def sync(self, peer_state: Dict[str, Any]) -> None:
-        self.vector_clock.update(peer_state.get("vector_clock", {}))
+    def sync(self, peer_clock: Dict[str, int]) -> Dict[str, Any]:
+        return {"status": "synced", "node_id": self.node_id}

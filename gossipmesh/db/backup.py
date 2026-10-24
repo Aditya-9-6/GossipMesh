@@ -140,6 +140,8 @@ class DatabaseBackupManager:
         workflows = db_session.query(Workflow).filter(Workflow.repository_id.in_(repo_ids)).all() if repo_ids else []
         budget = db_session.query(Budget).filter(Budget.organization_id == organization_id).first()
 
+        tenant_slug = getattr(tenant, "slug", getattr(tenant, "name", str(tenant.id)))
+
         tenant_export = {
             "metadata": {
                 "organization_id": organization_id,
@@ -149,7 +151,7 @@ class DatabaseBackupManager:
             "organization": {
                 "id": tenant.id,
                 "name": tenant.name,
-                "slug": tenant.slug,
+                "slug": tenant_slug,
                 "created_at": str(tenant.created_at) if hasattr(tenant, "created_at") else None,
             },
             "users": [

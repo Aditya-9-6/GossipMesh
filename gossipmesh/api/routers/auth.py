@@ -291,7 +291,7 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if not primary_email:
             raise AuthenticationError(message="No verified primary email found on GitHub account")
 
-        github_id = github_user_data["id"]
+        github_user_id = github_user_data["id"]
 
         # Match or create user
         user = db.query(User).filter(User.email == primary_email).first()
@@ -306,13 +306,16 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
-                github_id=github_id,
+                github_user_id=github_user_id,
                 encrypted_access_token=encrypt_string(access_token),
                 encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
             )
             db.add(credential)
         else:
-            credential.github_id = github_id
+            if hasattr(credential, "github_user_id"):
+                credential.github_user_id = github_user_id
+            elif hasattr(credential, "github_id"):
+                credential.github_id = github_user_id
             credential.encrypted_access_token = encrypt_string(access_token)
             if refresh_token:
                 credential.encrypted_refresh_token = encrypt_string(refresh_token)
@@ -371,7 +374,11 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         audit_event = AuditEvent(
             action="github_login",
             actor_id=user.id,
-            details={"github_id": github_id, "organizations": org_names, "installations_count": installations_count},
+            details={
+                "github_id": github_user_id,
+                "organizations": org_names,
+                "installations_count": installations_count,
+            },
         )
         db.add(audit_event)
         db.commit()
@@ -388,7 +395,7 @@ def github_refresh_token(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
-    if not credential or not credential.encrypted_refresh_token:
+    if not credential or not getattr(credential, "encrypted_refresh_token", None):
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
     refresh_token = decrypt_string(credential.encrypted_refresh_token)
@@ -413,17 +420,18 @@ def github_refresh_token(
         new_refresh_token = token_data.get("refresh_token")
 
         credential.encrypted_access_token = encrypt_string(new_access_token)
-        if new_refresh_token:
+        if new_refresh_token and hasattr(credential, "encrypted_refresh_token"):
             credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
 
         db.commit()
 
+        github_uid = getattr(credential, "github_user_id", getattr(credential, "github_id", None))
         # Audit event
         audit_event = AuditEvent(
             action="github_token_refresh",
             actor_id=current_user.id,
             details={
-                "github_id": credential.github_id,
+                "github_id": github_uid,
             },
         )
         db.add(audit_event)
@@ -574,9 +582,9 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
         else:
             credential.sub = str(sub)
             credential.encrypted_access_token = encrypt_string(access_token)
-            if refresh_token:
+            if refresh_token and hasattr(credential, "encrypted_refresh_token"):
                 credential.encrypted_refresh_token = encrypt_string(refresh_token)
-            if id_token:
+            if id_token and hasattr(credential, "encrypted_id_token"):
                 credential.encrypted_id_token = encrypt_string(id_token)
 
         # Handle Organization Mapping via Groups/Roles if present

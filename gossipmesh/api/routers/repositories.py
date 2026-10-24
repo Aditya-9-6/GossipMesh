@@ -34,7 +34,9 @@ class BranchSelectRequest(BaseModel):
 
 class RepositoryPolicyUpdate(BaseModel):
     branch_protection_enabled: Optional[bool] = None
+    auto_fix_enabled: Optional[bool] = None
     auto_merge_enabled: Optional[bool] = None
+    require_review: Optional[bool] = None
     require_review_approval: Optional[bool] = None
     min_approvals: Optional[int] = Field(None, ge=1, le=10)
     allowed_target_branches: Optional[List[str]] = None
@@ -49,7 +51,9 @@ class RepositoryPolicyResponse(BaseModel):
     id: int
     repository_id: int
     branch_protection_enabled: bool
+    auto_fix_enabled: bool = True
     auto_merge_enabled: bool
+    require_review: bool = True
     require_review_approval: bool
     min_approvals: int
     allowed_target_branches: List[str]
@@ -132,7 +136,9 @@ def get_or_create_default_policy(repo: Repository, db: Session) -> RepositoryPol
         policy = RepositoryPolicy(
             repository_id=repo.id,
             branch_protection_enabled=True,
+            auto_fix_enabled=True,
             auto_merge_enabled=False,
+            require_review=True,
             require_review_approval=True,
             min_approvals=1,
             allowed_target_branches=["main", "master"],
@@ -276,9 +282,15 @@ def update_repository_policy(
     if policy_in.branch_protection_enabled is not None:
         policy.branch_protection_enabled = policy_in.branch_protection_enabled
         changes["branch_protection_enabled"] = policy_in.branch_protection_enabled
+    if policy_in.auto_fix_enabled is not None and hasattr(policy, "auto_fix_enabled"):
+        policy.auto_fix_enabled = policy_in.auto_fix_enabled
+        changes["auto_fix_enabled"] = policy_in.auto_fix_enabled
     if policy_in.auto_merge_enabled is not None:
         policy.auto_merge_enabled = policy_in.auto_merge_enabled
         changes["auto_merge_enabled"] = policy_in.auto_merge_enabled
+    if policy_in.require_review is not None and hasattr(policy, "require_review"):
+        policy.require_review = policy_in.require_review
+        changes["require_review"] = policy_in.require_review
     if policy_in.require_review_approval is not None:
         policy.require_review_approval = policy_in.require_review_approval
         changes["require_review_approval"] = policy_in.require_review_approval

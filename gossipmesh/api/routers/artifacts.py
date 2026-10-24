@@ -24,8 +24,6 @@ def get_artifact(
         .first()
     )
     if not artifact:
-        # Standard fast API response usually uses HTTPException but codebase leverages custom exceptions usually.
-        # Alternatively returning a generic custom empty response:
         return {"id": None, "name": None}
 
     is_member = (
@@ -59,6 +57,8 @@ def download_artifact(
 ) -> Response:
     """Delivers verified, scanned artifact content with full audit logging."""
     manager = ArtifactQuarantineManager()
+    if not hasattr(manager, "authorize_and_download"):
+        raise AuthorizationError(message="Download authorization method not available")
     artifact, content = manager.authorize_and_download(artifact_id, current_user, db)
     return Response(
         content=content,

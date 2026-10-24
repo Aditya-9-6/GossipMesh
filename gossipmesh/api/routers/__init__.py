@@ -20,6 +20,9 @@ router.include_router(projects.router)
 router.include_router(repositories.router)
 router.include_router(providers.router)
 
+if billing is not None and hasattr(billing, "router"):
+    router.include_router(billing.router)
+
 __all__ = [
     "router",
     "auth",
@@ -27,4 +30,5 @@ __all__ = [
     "projects",
     "repositories",
     "providers",
+    "billing",
 ]
