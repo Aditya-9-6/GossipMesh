@@ -3,7 +3,7 @@ import logging
 import re
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 import git
 import tree_sitter_rust

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
 class VectorClockEntropy:
-    def __init__(self, node_id: str):
-        self.node_id = node_id
+    def __init__(self, node_id: str | None = None):
+        self.node_id = node_id or ""
         self.clock: dict[str, int] = {}
 
     def increment(self) -> None:
-        self.clock[self.node_id] = self.clock.get(self.node_id, 0) + 1
+        if self.node_id:
+            self.clock[self.node_id] = self.clock.get(self.node_id, 0) + 1
 
     def sync(self, other_clock: dict[str, int]) -> None:
         for k, v in other_clock.items():
