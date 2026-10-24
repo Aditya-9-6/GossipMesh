@@ -24,11 +24,12 @@ if str(repo_root) not in sys.path:
 from gossipmesh_agent import utils, ingestion
 from gossipmesh_agent.queue_worker import REDIS_URL, redis_client, JOB_QUEUE, HEARTBEAT_PREFIX, CANCEL_PREFIX
 
+GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
+
 app = Flask(__name__)
 
 # Load optional .env for local development (Render supplies env vars via its UI)
 utils.load_dotenv()
-GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 
 
 @app.route("/cancel/<job_id>", methods=["POST"])

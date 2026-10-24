@@ -26,7 +26,7 @@ def get_artifact(
     if not artifact:
         return {"id": None, "name": None}
 
-    membership = (
+    is_member = (
         db.query(UserOrganization)
         .filter(
             UserOrganization.user_id == current_user.id,
@@ -34,7 +34,7 @@ def get_artifact(
         )
         .first()
     )
-    if not membership:
+    if not is_member:
         raise AuthorizationError(message="Not authorized to access this artifact")
 
     return {
@@ -61,5 +61,5 @@ def download_artifact(
     return Response(
         content=content,
         media_type=artifact.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{artifact.name}"'},
+        headers={"Content-Disposition": f'attachment; filename="{artifact.name}"'_},
     )

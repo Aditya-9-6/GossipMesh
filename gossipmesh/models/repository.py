@@ -1,104 +1,62 @@
-from typing import Optional, Any
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import String, Integer, ForeignKey, DateTime
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime
+from sqlalchemy import JSON
 from gossipmesh.models.base import Base
 
 
 class GithubAppInstallation(Base):
     __tablename__ = "github_app_installations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    installation_id = Column(Integer, unique=True, nullable=False, index=True)
-    account_login = Column(String, nullable=False)
-    account_type = Column(String, nullable=False)
-    target_type = Column(String, nullable=False)
-    repositories = relationship("Repository", back_populates="installation", cascade="all, delete-orphan")
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    installation_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    account_name: Mapped[str] = mapped_column(String, nullable=False)
+    target_type: Mapped[str] = mapped_column(String, nullable=False)  # 'Organization' or 'User'
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)  # GitHub's account ID
+    repository_selection: Mapped[str] = mapped_column(String, nullable=False)  # 'all' or 'selected'
+    permissions: Mapped[dict] = mapped_column(JSON, nullable=False)
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    suspended_by: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    def __init__(
-        self,
-        installation_id: int,
-        account_login: str,
-        account_type: str,
-        target_type: str,
-        **kwargs: Any,
-    ) -> None:
-        self.installation_id = installation_id
-        self.account_login = account_login
-        self.account_type = account_type
-        self.target_type = target_type
+    organization = relationship("Organization")
 
 
 class Repository(Base):
     __tablename__ = "repositories"
 
-    id = Column(Integer, primary_key=True, index=True)
-    github_id = Column(Integer, unique=True, nullable=False, index=True)
-    name = Column(String, nullable=False)
-    full_name = Column(String, nullable=False, index=True)
-    default_branch = Column(String, default="main")
-    installation_id = Column(Integer, ForeignKey("github_app_installations.id"), nullable=True)
-    organization_id = Column(Integer, nullable=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
-    installation = relationship("GithubAppInstallation", back_populates="repositories")
-    policy = relationship("RepositoryPolicy", back_populates="repository", uselist=False, cascade="all, delete-orphan")
+    __mapper_args__ = {"version_id_col": version_id}
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
+    github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    full_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    default_branch: Mapped[str] = mapped_column(String, default="main")
+
+    organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
-
-    def __init__(
-        self,
-        github_id: int,
-        name: str,
-        full_name: str,
-        installation_id: Optional[int] = None,
-        organization_id: Optional[int] = None,
-        project_id: Optional[int] = None,
-        default_branch: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        if id is not None:
-            self.id = id
-        self.github_id = github_id
-        self.name = name
-        self.full_name = full_name
-        self.installation_id = installation_id
-        self.organization_id = organization_id
-        self.project_id = project_id
-        if default_branch is not None:
-            self.default_branch = default_branch
 
 
 class RepositoryPolicy(Base):
     __tablename__ = "repository_policies"
 
-    id = Column(Integer, primary_key=True, index=True)
-    repository_id = Column(Integer, ForeignKey("repositories.id"), unique=True, nullable=False)
-    branch_protection_enabled = Column(Boolean, default=True)
-    auto_merge_enabled = Column(Boolean, default=False)
-    require_review_approval = Column(Boolean, default=True)
-    min_approvals = Column(Integer, default=1)
-    allowed_target_branches = Column(JSON, default=list)
-    max_diff_lines = Column(Integer, default=500)
-    scan_frequency_hours = Column(Integer, default=24)
-    custom_rules = Column(JSON, default=dict)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
+    policy_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
-    repository = relationship("Repository", back_populates="policy")
-
-    def __init__(
-        self, name: str, repository_id: Optional[int] = None, scan_frequency_hours: Optional[int] = 24, **kwargs: Any
-    ) -> None:
-        self.name = name
-        if repository_id is not None:
-            self.repository_id = repository_id
-        self.scan_frequency_hours = scan_frequency_hours
+    repository = relationship("Repository")
 
 
 class IndexState(Base):
     __tablename__ = "index_states"
 
-    id = Column(Integer, primary_key=True, index=True)
-    installation_id = Column(Integer, nullable=False, index=True)
-    organization_id = Column(Integer, nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
+    last_commit_sha: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, indexing, completed, failed
 
-    def __init__(self, installation_id: int, organization_id: Optional[int] = None, **kwargs: Any) -> None:
-        self.installation_id = installation_id
-        self.organization_id = organization_id
+    repository = relationship("Repository")
