@@ -61,8 +61,10 @@ def download_artifact(
 ) -> Response:
     manager = ArtifactQuarantineManager()
     artifact, content = manager.authorize_and_download(artifact_id, current_user, db)
+    if not artifact:
+        raise AuthorizationError(message="Artifact not found")
     return Response(
         content=content,
         media_type=artifact.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{artifact.name}"0'},
+        headers={"Content-Disposition": f'attachment; filename="{artifact.name}"_'},
     )

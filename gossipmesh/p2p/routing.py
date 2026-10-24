@@ -84,8 +84,8 @@ class SkipListRoutingTable:
             while self.level > 0 and self.head.forward[self.level] is None:
                 self.level -= 1
 
-    def range_query(self, start_key: str, end_key: str) -> List[Any]:
-        res: List[Any] = []
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
+        res: List[Tuple[str, Any]] = []
         current = self.head.forward[0]
         while current:
             if start_key <= current.key <= end_key:
