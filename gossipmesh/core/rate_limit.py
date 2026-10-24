@@ -1,65 +1,47 @@
 import time
-from typing import Tuple
-from gossipmesh.db.redis import redis_client
-from gossipmesh.core.exceptions import RateLimitError
+from typing import Any, Optional
 
 
-class RateLimiter:
-    """Redis-backed rate limiter."""
+class RedisPipelineStub:
+    def __init__(self) -> None:
+        self.commands: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
 
-    def __init__(self, limit: int, window: int):
-        self.limit = limit
-        self.window = window
+    def incr(self, key: str) -> "RedisPipelineStub":
+        self.commands.append(("incr", (key,), {}))
+        return self
 
-    def _get_key(self, identifier: str, limit_type: str) -> str:
-        return f"ratelimit:{limit_type}:{identifier}"
+    def expire(self, key: str, seconds: int) -> "RedisPipelineStub":
+        self.commands.append(("expire", (key, seconds), {}))
+        return self
 
-    def check_limit(self, identifier: str, limit_type: str) -> Tuple[bool, int, int]:
-        """
-        Check if the request is within the rate limit.
-        Returns: (is_allowed, remaining, reset_time)
-        """
-        key = self._get_key(identifier, limit_type)
+    def execute(self) -> list[Any]:
+        return [1 for _ in self.commands]
 
-        pipe = redis_client.pipeline()
-        pipe.incr(key)
-        pipe.pttl(key)
-        results = pipe.execute()
 
-        current_count = results[0]
-        ttl_ms = results[1]
+class RedisClientStub:
+    def __init__(self) -> None:
+        self._store: dict[str, Any] = {}
 
-        # Ensure correct type extraction for mock handling
-        try:
-            current_count_int = int(current_count)
-        except Exception:
-            current_count_int = 0
+    def get(self, key: str) -> Optional[bytes]:
+        val = self._store.get(key)
+        if val is not None:
+            if isinstance(val, bytes):
+                return val
+            return str(val).encode("utf-8")
+        return None
 
-        try:
-            ttl_ms_int = int(ttl_ms)
-        except Exception:
-            ttl_ms_int = 0
+    def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
+        self._store[key] = value
+        return True
 
-        if current_count_int == 1:
-            redis_client.expire(key, self.window)
-            reset_time = int(time.time() + self.window)
-            remaining = self.limit - 1
-        else:
-            if ttl_ms_int > 0:
-                reset_time = int(time.time() + (ttl_ms_int / 1000.0))
-            else:
-                reset_time = int(time.time() + self.window)
+    def incr(self, key: str) -> int:
+        current = int(self._store.get(key, 0))
+        current += 1
+        self._store[key] = current
+        return current
 
-            remaining = max(0, self.limit - current_count_int)
+    def expire(self, key: str, seconds: int) -> bool:
+        return True
 
-        is_allowed = bool(current_count_int <= self.limit)
-
-        return is_allowed, remaining, reset_time
-
-    def enforce(self, identifier: str, limit_type: str) -> Tuple[int, int]:
-        is_allowed, remaining, reset_time = self.check_limit(identifier, limit_type)
-        if not is_allowed:
-            raise RateLimitError(
-                message="Rate limit exceeded", details={"limit": self.limit, "remaining": 0, "reset": reset_time}
-            )
-        return remaining, reset_time
+    def pipeline(self) -> RedisPipelineStub:
+        return RedisPipelineStub()
