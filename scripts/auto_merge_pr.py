@@ -7,7 +7,6 @@ it auto-merges the PR to main and cleans up the branch.
 """
 
 import sys
-import os
 import json
 import time
 import subprocess

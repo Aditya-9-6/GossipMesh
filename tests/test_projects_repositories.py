@@ -1,6 +1,7 @@
 """Unit and integration tests for Project and Repository APIs (Task 37)."""
 
 import os
+
 os.environ["TESTING"] = "true"
 
 import pytest
@@ -72,7 +73,9 @@ def test_project_lifecycle(client, test_db):
     app.dependency_overrides[deps.get_current_user] = lambda: admin_user
 
     # 1. Create Project
-    res = client.post("/api/v1/organizations/1/projects", json={"name": "Core Backend", "description": "Backend services"})
+    res = client.post(
+        "/api/v1/organizations/1/projects", json={"name": "Core Backend", "description": "Backend services"}
+    )
     assert res.status_code == 200, res.text
     project_data = res.json()
     proj_id = project_data["id"]
@@ -191,7 +194,9 @@ def test_project_repository_link_and_unlink(client, test_db):
     test_db.add(user_org)
 
     proj = Project(id=50, organization_id=3, name="Gamma Core")
-    repo = Repository(id=60, organization_id=3, github_id=4455, name="gamma-repo", full_name="gamma/repo", default_branch="main")
+    repo = Repository(
+        id=60, organization_id=3, github_id=4455, name="gamma-repo", full_name="gamma/repo", default_branch="main"
+    )
     test_db.add_all([proj, repo])
     test_db.commit()
 
@@ -220,7 +225,9 @@ def test_permission_enforcement(client, test_db):
     user_org = UserOrganization(user_id=30, organization_id=4, role=OrganizationRole.developer)
     test_db.add(user_org)
 
-    repo = Repository(id=70, organization_id=4, github_id=9999, name="delta-repo", full_name="delta/repo", default_branch="main")
+    repo = Repository(
+        id=70, organization_id=4, github_id=9999, name="delta-repo", full_name="delta/repo", default_branch="main"
+    )
     test_db.add(repo)
     test_db.commit()
 

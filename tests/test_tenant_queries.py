@@ -65,8 +65,12 @@ def test_filter_query_tenant_isolation(db_session):
     org2 = Organization(id=2, name="Tenant Two")
     db_session.add_all([org1, org2])
 
-    repo1 = Repository(id=10, organization_id=1, github_id=1001, full_name="org1/repo-one", name="repo-one", default_branch="main")
-    repo2 = Repository(id=20, organization_id=2, github_id=2002, full_name="org2/repo-two", name="repo-two", default_branch="main")
+    repo1 = Repository(
+        id=10, organization_id=1, github_id=1001, full_name="org1/repo-one", name="repo-one", default_branch="main"
+    )
+    repo2 = Repository(
+        id=20, organization_id=2, github_id=2002, full_name="org2/repo-two", name="repo-two", default_branch="main"
+    )
     db_session.add_all([repo1, repo2])
 
     wf1 = Workflow(id=100, organization_id=1, repository_id=10, status="running")
@@ -136,14 +140,10 @@ def test_scope_utilities():
     assert cache_key == "tenant:42:cache:repo:commits:main"
 
     # Vector filter scoping
-    vec_filter = TenantQueryGuard.scope_vector_filter(
-        organization_id=42, base_filter={"file_type": "python"}
-    )
+    vec_filter = TenantQueryGuard.scope_vector_filter(organization_id=42, base_filter={"file_type": "python"})
     assert vec_filter == {"file_type": "python", "organization_id": 42}
 
     # Artifact path scoping with directory traversal sanitization
-    art_path = TenantQueryGuard.scope_artifact_path(
-        organization_id=42, filename="../../etc/passwd.patch"
-    )
+    art_path = TenantQueryGuard.scope_artifact_path(organization_id=42, filename="../../etc/passwd.patch")
     assert art_path == "artifacts/42/etc/passwd.patch"
     assert ".." not in art_path

@@ -1,192 +1,118 @@
-"""
-Prometheus Metrics Engine for GossipMesh Enterprise (Task 94).
+import os
+from typing import Any
 
-Tracks:
-- Requests, Latency, Errors
-- Webhooks
-- Workflow duration & queue depth
-- Job retries
-- Provider latency & failures
-- AI Token consumption
-- PR review findings
-- Sandbox failures
-- Billing usage
-"""
+try:
+    from prometheus_client import (
+        Counter,
+        Histogram,
+        Gauge,
+        generate_latest,
+        CONTENT_TYPE_LATEST,
+    )
+except ImportError:
+    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
-from __future__ import annotations
+    class _DummyMetric:
+        def labels(self, *args: Any, **kwargs: Any) -> "_DummyMetric":
+            return self
 
-import time
-from typing import Optional
-from prometheus_client import (
-    CollectorRegistry,
-    Counter,
-    Gauge,
-    Histogram,
-    generate_latest,
-    CONTENT_TYPE_LATEST,
+        def inc(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def observe(self, amount: float, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def set(self, value: float, *args: Any, **kwargs: Any) -> None:
+            pass
+
+    def Counter(*args: Any, **kwargs: Any) -> _DummyMetric:
+        return _DummyMetric()
+
+    def Histogram(*args: Any, **kwargs: Any) -> _DummyMetric:
+        return _DummyMetric()
+
+    def Gauge(*args: Any, **kwargs: Any) -> _DummyMetric:
+        return _DummyMetric()
+
+    def generate_latest(*args: Any, **kwargs: Any) -> bytes:
+        return b"# prometheus_client not installed\n"
+
+
+# Define standard metrics
+REQUEST_COUNT = Counter("gossipmesh_http_requests_total", "Total HTTP requests", ["method", "endpoint", "status_code"])
+REQUEST_LATENCY = Histogram("gossipmesh_http_request_duration_seconds", "HTTP request latency", ["method", "endpoint"])
+REQUEST_ERRORS = Counter("gossipmesh_http_errors_total", "Total HTTP errors", ["method", "endpoint", "status_code"])
+WEBHOOK_COUNT = Counter("gossipmesh_webhook_events_total", "Total webhook events", ["source", "event_type", "status"])
+WORKFLOW_DURATION = Histogram("gossipmesh_workflow_duration_seconds", "Workflow execution duration", ["workflow_type"])
+QUEUE_DEPTH = Gauge("gossipmesh_queue_depth", "Queue depth", ["queue_name", "priority"])
+JOB_RETRIES = Counter("gossipmesh_job_retries_total", "Total job retries", ["job_type", "reason"])
+PROVIDER_LATENCY = Histogram(
+    "gossipmesh_provider_request_duration_seconds", "AI provider request latency", ["provider", "model"]
 )
-
-# Dedicated registry to isolate application metrics
-REGISTRY = CollectorRegistry(auto_describe=True)
-
-# 1. HTTP Traffic & Errors
-HTTP_REQUESTS_TOTAL = Counter(
-    "gossipmesh_http_requests_total",
-    "Total HTTP requests handled by the API",
-    ["method", "endpoint", "status_code"],
-    registry=REGISTRY,
+PROVIDER_FAILURES = Counter(
+    "gossipmesh_provider_failures_total", "Total AI provider failures", ["provider", "model", "error_type"]
 )
-
-HTTP_REQUEST_DURATION_SECONDS = Histogram(
-    "gossipmesh_http_request_duration_seconds",
-    "HTTP request latency in seconds",
-    ["method", "endpoint"],
-    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
-    registry=REGISTRY,
+AI_TOKENS = Counter(
+    "gossipmesh_ai_tokens_consumed_total", "Total AI tokens consumed", ["provider", "model", "token_type"]
 )
-
-HTTP_ERRORS_TOTAL = Counter(
-    "gossipmesh_http_errors_total",
-    "Total HTTP errors categorized by error type",
-    ["method", "endpoint", "error_type"],
-    registry=REGISTRY,
+REVIEW_FINDINGS = Counter(
+    "gossipmesh_review_findings_total", "Total review findings", ["severity", "rule_category", "tenant_id"]
 )
-
-# 2. Webhook Ingestion
-WEBHOOK_EVENTS_TOTAL = Counter(
-    "gossipmesh_webhook_events_total",
-    "Total inbound webhook events processed",
-    ["source", "event_type", "status"],
-    registry=REGISTRY,
+SANDBOX_FAILURES = Counter(
+    "gossipmesh_sandbox_execution_failures_total", "Total sandbox execution failures", ["failure_reason", "exit_code"]
 )
-
-# 3. Workflows & Queue Depth
-WORKFLOW_DURATION_SECONDS = Histogram(
-    "gossipmesh_workflow_duration_seconds",
-    "End-to-end autonomous workflow duration in seconds",
-    ["workflow_type"],
-    buckets=[1.0, 5.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0],
-    registry=REGISTRY,
-)
-
-QUEUE_DEPTH = Gauge(
-    "gossipmesh_queue_depth",
-    "Current pending tasks waiting in task execution queues",
-    ["queue_name", "priority"],
-    registry=REGISTRY,
-)
-
-JOB_RETRIES_TOTAL = Counter(
-    "gossipmesh_job_retries_total",
-    "Total background job retry attempts",
-    ["job_type", "reason"],
-    registry=REGISTRY,
-)
-
-# 4. LLM Providers
-PROVIDER_LATENCY_SECONDS = Histogram(
-    "gossipmesh_provider_request_duration_seconds",
-    "Upstream AI provider call latency in seconds",
-    ["provider", "model"],
-    buckets=[0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 45.0],
-    registry=REGISTRY,
-)
-
-PROVIDER_FAILURES_TOTAL = Counter(
-    "gossipmesh_provider_failures_total",
-    "Total failed provider calls by error category",
-    ["provider", "model", "error_type"],
-    registry=REGISTRY,
-)
-
-AI_TOKENS_CONSUMED_TOTAL = Counter(
-    "gossipmesh_ai_tokens_consumed_total",
-    "Total AI tokens consumed across prompt and completion",
-    ["provider", "model", "token_type"],
-    registry=REGISTRY,
-)
-
-# 5. Review Findings
-REVIEW_FINDINGS_TOTAL = Counter(
-    "gossipmesh_review_findings_total",
-    "Total code review findings produced",
-    ["severity", "rule_category", "tenant_id"],
-    registry=REGISTRY,
-)
-
-# 6. Sandbox Execution
-SANDBOX_FAILURES_TOTAL = Counter(
-    "gossipmesh_sandbox_execution_failures_total",
-    "Total isolated sandbox failures by failure reason",
-    ["failure_reason", "exit_code"],
-    registry=REGISTRY,
-)
-
-# 7. Billing Usage
-BILLING_USAGE_UNITS_TOTAL = Counter(
-    "gossipmesh_billing_usage_units_total",
-    "Total metered billing usage consumed",
-    ["metric_type", "tenant_id"],
-    registry=REGISTRY,
+BILLING_USAGE = Counter(
+    "gossipmesh_billing_usage_units_total", "Total billing usage units", ["metric_type", "tenant_id"]
 )
 
 
 def record_request(method: str, endpoint: str, status_code: int, duration_s: float) -> None:
-    HTTP_REQUESTS_TOTAL.labels(method=method, endpoint=endpoint, status_code=str(status_code)).inc()
-    HTTP_REQUEST_DURATION_SECONDS.labels(method=method, endpoint=endpoint).observe(duration_s)
+    REQUEST_COUNT.labels(method=method, endpoint=endpoint, status_code=str(status_code)).inc()
+    REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(duration_s)
     if status_code >= 400:
-        error_type = f"{status_code}_error"
-        HTTP_ERRORS_TOTAL.labels(method=method, endpoint=endpoint, error_type=error_type).inc()
+        REQUEST_ERRORS.labels(method=method, endpoint=endpoint, status_code=str(status_code)).inc()
 
 
-def record_webhook(source: str, event_type: str, status: str = "success") -> None:
-    WEBHOOK_EVENTS_TOTAL.labels(source=source, event_type=event_type, status=status).inc()
+def record_webhook(source: str, event_type: str, status: str) -> None:
+    WEBHOOK_COUNT.labels(source=source, event_type=event_type, status=status).inc()
 
 
 def record_workflow(workflow_type: str, duration_s: float) -> None:
-    WORKFLOW_DURATION_SECONDS.labels(workflow_type=workflow_type).observe(duration_s)
+    WORKFLOW_DURATION.labels(workflow_type=workflow_type).observe(duration_s)
 
 
-def set_queue_depth(queue_name: str, depth: float, priority: str = "default") -> None:
+def set_queue_depth(queue_name: str, depth: float, priority: str = "normal") -> None:
     QUEUE_DEPTH.labels(queue_name=queue_name, priority=priority).set(depth)
 
 
 def record_retry(job_type: str, reason: str) -> None:
-    JOB_RETRIES_TOTAL.labels(job_type=job_type, reason=reason).inc()
+    JOB_RETRIES.labels(job_type=job_type, reason=reason).inc()
 
 
 def record_provider_call(
-    provider: str,
-    model: str,
-    duration_s: float,
-    is_error: bool = False,
-    error_type: Optional[str] = None,
+    provider: str, model: str, duration_s: float, is_error: bool = False, error_type: str = ""
 ) -> None:
-    PROVIDER_LATENCY_SECONDS.labels(provider=provider, model=model).observe(duration_s)
+    PROVIDER_LATENCY.labels(provider=provider, model=model).observe(duration_s)
     if is_error:
-        err = error_type or "unknown_error"
-        PROVIDER_FAILURES_TOTAL.labels(provider=provider, model=model, error_type=err).inc()
+        PROVIDER_FAILURES.labels(provider=provider, model=model, error_type=error_type or "UNKNOWN").inc()
 
 
 def record_tokens(provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> None:
-    if prompt_tokens > 0:
-        AI_TOKENS_CONSUMED_TOTAL.labels(provider=provider, model=model, token_type="prompt").inc(prompt_tokens)
-    if completion_tokens > 0:
-        AI_TOKENS_CONSUMED_TOTAL.labels(provider=provider, model=model, token_type="completion").inc(completion_tokens)
+    AI_TOKENS.labels(provider=provider, model=model, token_type="prompt").inc(float(prompt_tokens))
+    AI_TOKENS.labels(provider=provider, model=model, token_type="completion").inc(float(completion_tokens))
 
 
-def record_finding(severity: str, rule_category: str, tenant_id: str = "default") -> None:
-    REVIEW_FINDINGS_TOTAL.labels(severity=severity, rule_category=rule_category, tenant_id=str(tenant_id)).inc()
+def record_finding(severity: str, rule_category: str, tenant_id: str) -> None:
+    REVIEW_FINDINGS.labels(severity=severity, rule_category=rule_category, tenant_id=tenant_id).inc()
 
 
-def record_sandbox_failure(failure_reason: str, exit_code: int = 1) -> None:
-    SANDBOX_FAILURES_TOTAL.labels(failure_reason=failure_reason, exit_code=str(exit_code)).inc()
+def record_sandbox_failure(failure_reason: str, exit_code: int) -> None:
+    SANDBOX_FAILURES.labels(failure_reason=failure_reason, exit_code=str(exit_code)).inc()
 
 
-def record_billing_metric(metric_type: str, units: float = 1.0, tenant_id: str = "default") -> None:
-    BILLING_USAGE_UNITS_TOTAL.labels(metric_type=metric_type, tenant_id=str(tenant_id)).inc(units)
+def record_billing_metric(metric_type: str, units: float, tenant_id: str) -> None:
+    BILLING_USAGE.labels(metric_type=metric_type, tenant_id=tenant_id).inc(units)
 
 
 def generate_latest_metrics() -> bytes:
-    """Returns the Prometheus formatted metrics payload."""
-    return generate_latest(REGISTRY)
+    return generate_latest()
