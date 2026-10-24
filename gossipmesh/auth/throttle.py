@@ -5,7 +5,13 @@ import time
 class LoginThrottler:
     """Throttles login attempts based on IP or username to prevent brute-force attacks."""
 
-    def __init__(self, limit: int = 5, window: int = 300, max_attempts: Optional[int] = None, window_seconds: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        limit: int = 5,
+        window: int = 300,
+        max_attempts: Optional[int] = None,
+        window_seconds: Optional[int] = None,
+    ) -> None:
         self.limit = limit if max_attempts is None else max_attempts
         self.window = window if window_seconds is None else window_seconds
         self.max_attempts = self.limit
@@ -61,7 +67,7 @@ class LoginThrottler:
                 self._attempts[key] = (1, now)
             else:
                 self._attempts[key] = (count + 1, first_attempt)
-        
+
         if key not in self.attempts_tuple:
             self.attempts_tuple[key] = (1, now)
             return
