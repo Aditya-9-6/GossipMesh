@@ -161,7 +161,7 @@ def refresh_token(request: RefreshTokenRequest, db: Session = Depends(deps.get_d
         session_id = payload.get("sid")
         if not jti or not user_id or not session_id:
             raise AuthenticationError(message="Invalid token claims")
-    except (jwt.InvalidTokenError, ValidationError) as e:
+    except (jwt.InvalidTokenError, ValidationError):
         raise AuthenticationError(message="Invalid refresh token")
 
     db_token = db.query(RefreshToken).filter(RefreshToken.jti == jti).first()
@@ -281,7 +281,7 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if not primary_email:
             raise AuthenticationError(message="No verified primary email found on GitHub account")
 
-        github_id = github_user_data["id"]
+        github_user_id = github_user_data["id"]
 
         user = db.query(User).filter(User.email == primary_email).first()
         if not user:
@@ -291,19 +291,27 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
             db.refresh(user)
 
         credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == user.id).first()
+        enc_access = encrypt_string(access_token)
+        enc_refresh = encrypt_string(refresh_token) if refresh_token else None
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
-                github_user_id=github_id,
-                encrypted_access_token=encrypt_string(access_token),
-                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
+                github_user_id=github_user_id,
+                access_token_ciphertext=enc_access,
+                refresh_token_ciphertext=enc_refresh,
             )
             db.add(credential)
         else:
-            credential.github_user_id = github_id
-            credential.encrypted_access_token = encrypt_string(access_token)
+            credential.github_user_id = github_user_id
+            if hasattr(credential, "access_token_ciphertext"):
+                credential.access_token_ciphertext = enc_access
+            elif hasattr(credential, "encrypted_access_token"):
+                credential.encrypted_access_token = enc_access
             if refresh_token:
-                credential.encrypted_refresh_token = encrypt_string(refresh_token)
+                if hasattr(credential, "refresh_token_ciphertext"):
+                    credential.refresh_token_ciphertext = enc_refresh
+                elif hasattr(credential, "encrypted_refresh_token"):
+                    credential.encrypted_refresh_token = enc_refresh
 
         db.commit()
 
@@ -318,6 +326,18 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         orgs_response.raise_for_status()
         github_orgs = orgs_response.json()
         org_names = [org["login"] for org in github_orgs]
+
+        installations_response = client.get(
+            "https://api.github.com/user/installations",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/vnd.github.v3+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        installations_count = 0
+        if installations_response.status_code == 200:
+            installations_count = installations_response.json().get("total_count", 0)
 
         for org_name in org_names:
             org = db.query(Organization).filter(Organization.name == org_name).first()
@@ -341,7 +361,11 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         audit_event = AuditEvent(
             action="github_login",
             actor_id=user.id,
-            details={"github_id": github_id, "organizations": org_names},
+            details={
+                "github_id": github_user_id,
+                "organizations": org_names,
+                "installations_count": installations_count,
+            },
         )
         db.add(audit_event)
         db.commit()
@@ -358,12 +382,17 @@ def github_refresh_token(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
-    if not credential or not credential.encrypted_refresh_token:
+    token_cipher = None
+    if credential:
+        token_cipher = getattr(
+            credential, "access_token_ciphertext", getattr(credential, "encrypted_access_token", None)
+        )
+    if not credential or not token_cipher:
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
-    refresh_token = decrypt_string(credential.encrypted_refresh_token)
-    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    refresh_token = decrypt_string(token_cipher)
 
+    client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
@@ -382,11 +411,28 @@ def github_refresh_token(
         new_access_token = token_data["access_token"]
         new_refresh_token = token_data.get("refresh_token")
 
-        credential.encrypted_access_token = encrypt_string(new_access_token)
+        if hasattr(credential, "access_token_ciphertext"):
+            credential.access_token_ciphertext = encrypt_string(new_access_token)
+        elif hasattr(credential, "encrypted_access_token"):
+            credential.encrypted_access_token = encrypt_string(new_access_token)
         if new_refresh_token:
-            credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
+            if hasattr(credential, "refresh_token_ciphertext"):
+                credential.refresh_token_ciphertext = encrypt_string(new_refresh_token)
+            elif hasattr(credential, "encrypted_refresh_token"):
+                credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
 
         db.commit()
+
+        audit_event = AuditEvent(
+            action="github_token_refresh",
+            actor_id=current_user.id,
+            details={
+                "github_id": getattr(credential, "github_user_id", None),
+            },
+        )
+        db.add(audit_event)
+        db.commit()
+
         return {"status": "success", "message": "GitHub token refreshed successfully"}
 
 
@@ -533,6 +579,26 @@ def oidc_callback(request: Request, state: str, code: str, db: Session = Depends
             if id_token:
                 credential.encrypted_id_token = encrypt_string(id_token)
 
+        roles = claims.get("groups", claims.get("roles", []))
+        if isinstance(roles, list) and roles:
+            for role_name in roles:
+                org = db.query(Organization).filter(Organization.name == role_name).first()
+                if org:
+                    user_org = (
+                        db.query(UserOrganization)
+                        .filter(UserOrganization.user_id == user.id, UserOrganization.organization_id == org.id)
+                        .first()
+                    )
+                    if not user_org:
+                        user_org = UserOrganization(user_id=user.id, organization_id=org.id, role="member")
+                        db.add(user_org)
+
+        db.commit()
+
+        audit_event = AuditEvent(
+            action="oidc_login", actor_id=user.id, details={"sub": sub, "issuer": issuer, "roles_mapped": roles}
+        )
+        db.add(audit_event)
         db.commit()
 
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -578,8 +644,11 @@ def change_password(
 
 
 @router.post("/password/reset-request")
-def request_password_reset(body: PasswordResetRequest, db: Session = Depends(deps.get_db)) -> Any:
-    user = db.query(User).filter(User.email == body.email).first()
+def request_password_reset(
+    body: PasswordResetRequest,
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    user = db.query(User).filter(User.email == body.email, User.is_active == True).first()
     if not user:
         return {"message": "If user exists, reset token sent."}
     token = create_password_reset_token(db, user)
@@ -587,7 +656,10 @@ def request_password_reset(body: PasswordResetRequest, db: Session = Depends(dep
 
 
 @router.post("/password/reset-confirm")
-def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(deps.get_db)) -> Any:
+def confirm_password_reset(
+    body: PasswordResetConfirm,
+    db: Session = Depends(deps.get_db),
+) -> Any:
     user = verify_and_consume_reset_token(db, body.token)
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired token.")

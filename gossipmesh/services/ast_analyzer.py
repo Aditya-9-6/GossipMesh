@@ -3,7 +3,7 @@ import logging
 import re
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any, Sequence, Optional
 
 import git
 import tree_sitter_rust
@@ -197,7 +197,8 @@ class AstAnalyzer:
 
         report = []
         for func_info in modified_functions:
-            dep_list = dependencies.get(func_info["name"]) or []
+            func_name_str = str(func_info["name"])
+            dep_list = dependencies.get(func_name_str) or []
             report.append(
                 {
                     "modified_file": func_info["file"],
