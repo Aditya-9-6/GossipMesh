@@ -1,9 +1,9 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -16,40 +16,27 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------
-
-
 class RepositorySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
     full_name: str
     default_branch: str
 
-    class Config:
-        from_attributes = True
-
 
 class ProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     organization_id: int
     name: str
     description: Optional[str] = None
     repositories: List[RepositorySummary] = []
 
-    class Config:
-        from_attributes = True
-
 
 class ProjectUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
-
-
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
@@ -61,10 +48,8 @@ def require_project_member(project_id: int, db: Session, current_user: User) -> 
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
-
     if getattr(current_user, "is_superuser", False):
         return project
-
     user_org = (
         db.query(UserOrganization)
         .filter(
@@ -83,7 +68,6 @@ def require_project_admin(project_id: int, db: Session, current_user: User) -> P
     project = require_project_member(project_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return project
-
     user_org = (
         db.query(UserOrganization)
         .filter(
@@ -98,18 +82,12 @@ def require_project_admin(project_id: int, db: Session, current_user: User) -> P
     return project
 
 
-# ---------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------
-
-
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(
     project_id: int,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Fetches project details along with its associated repositories."""
     project = require_project_member(project_id, db, current_user)
     return project
 
@@ -121,17 +99,14 @@ def update_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Updates project details."""
     project = require_project_admin(project_id, db, current_user)
     changes = {}
-
     if project_in.name is not None:
         project.name = project_in.name
         changes["name"] = project_in.name
     if project_in.description is not None:
         project.description = project_in.description
         changes["description"] = project_in.description
-
     log_audit_event(
         db,
         action="project.updated",
@@ -150,15 +125,11 @@ def delete_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Deletes a project and unlinks its associated repositories."""
     project = require_project_admin(project_id, db, current_user)
     org_id = project.organization_id
     project_name = project.name
-
-    # Unlink associated repositories
     for repo in project.repositories:
         repo.project_id = None
-
     db.delete(project)
     log_audit_event(
         db,
@@ -178,18 +149,15 @@ def link_repository_to_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Associates a repository with a project within the same organization."""
     project = require_project_admin(project_id, db, current_user)
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found.")
-
     if repo.organization_id != project.organization_id:
         raise HTTPException(
             status_code=400,
             detail="Repository and Project must belong to the same organization.",
         )
-
     repo.project_id = project.id
     log_audit_event(
         db,
@@ -210,12 +178,10 @@ def unlink_repository_from_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Unlinks a repository from a project."""
     project = require_project_admin(project_id, db, current_user)
     repo = db.query(Repository).filter(Repository.id == repo_id, Repository.project_id == project.id).first()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not linked to this project.")
-
     repo.project_id = None
     log_audit_event(
         db,
