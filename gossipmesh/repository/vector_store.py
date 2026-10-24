@@ -1,26 +1,13 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, JSON
-from sqlalchemy.orm import relationship
-from gossipmesh.db.base import Base
+""PGVectorStore implementation for semantic code search.""
 
-
-class DocumentChunk(Base):
-    __tablename__ = "document_chunks"
-
-    id = Column(String, primary_key=True, index=True)
-    organization_id = Column(String, nullable=False, index=True)
-    repo_id = Column(Integer, ForeignKey("repositories.id"), nullable=True)
-    repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=True)
-    branch = Column(String, default="main", nullable=False)
-    chunk_index = Column(Integer, default=0, nullable=False)
-    filepath = Column(String, nullable=True)
-    content = Column(String, nullable=True)
-    is_deleted = Column(Boolean, default=False, nullable=False)
-    metadata_json = Column(JSON, default=dict)
-
+from typing import Any, Dict, List, Optional
 
 class PGVectorStore:
-    def __init__(self, db_session_factory=None):
-        self.db_session_factory = db_session_factory
+    def __init__(self, db_session: Any = None):
+        self.db_session = db_session
 
-    def search(self, vector: list, filter: dict, top_k: int = 5) -> list:
-        return []
+    def delete_by_metadata(self, repo_id: int, filepath: str, organization_id: str, hard_delete: bool = True) -> None:
+        pass
+
+    def upsert(self, id: str, vector: List[float], metadata: Dict[str, Any], content: str) -> None:
+        pass
