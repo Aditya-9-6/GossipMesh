@@ -24,7 +24,7 @@ if str(repo_root) not in sys.path:
 from gossipmesh_agent import utils, ingestion
 from gossipmesh_agent.queue_worker import REDIS_URL, redis_client, JOB_QUEUE, HEARTBEAT_PREFIX, CANCEL_PREFIX
 
-GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET") or os.getenv("GITHUB_SECRET")
+GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET") or os.getenv("GITHUB_SECRET") or ""
 
 app = Flask(__name__)
 
