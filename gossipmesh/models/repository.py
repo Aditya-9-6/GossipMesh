@@ -40,6 +40,17 @@ class Repository(Base):
     project = relationship("Project", back_populates="repositories")
 
 
+class RepositoryPolicy(Base):
+    __tablename__ = "repository_policies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
+    enforce_branch_protection: Mapped[bool] = mapped_column(default=True)
+    required_approvals: Mapped[int] = mapped_column(Integer, default=1)
+
+    repository = relationship("Repository")
+
+
 class IndexState(Base):
     __tablename__ = "index_states"
 
