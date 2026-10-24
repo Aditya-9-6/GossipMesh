@@ -86,7 +86,7 @@ def webhook():
         job = ingestion.handle_github_event(event_type, payload)
         job_id = utils.slugify(json.dumps(job)[:80])
         job["id"] = job_id
-        
+
         if redis_client:
             redis_client.rpush(JOB_QUEUE, json.dumps(job))
             utils.logger.info("Enqueued job %s of type %s to Redis queue %s", job_id, event_type, JOB_QUEUE)
