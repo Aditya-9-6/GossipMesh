@@ -17,11 +17,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------
-
-
 class SyncRequest(BaseModel):
     full_name: str
     installation_id: int
@@ -34,7 +29,9 @@ class BranchSelectRequest(BaseModel):
 
 class RepositoryPolicyUpdate(BaseModel):
     branch_protection_enabled: Optional[bool] = None
+    auto_fix_enabled: Optional[bool] = None
     auto_merge_enabled: Optional[bool] = None
+    require_review: Optional[bool] = None
     require_review_approval: Optional[bool] = None
     min_approvals: Optional[int] = Field(None, ge=1, le=10)
     allowed_target_branches: Optional[List[str]] = None
@@ -69,11 +66,6 @@ class RepositoryDetailResponse(BaseModel):
     full_name: str
     default_branch: str
     policy: Optional[RepositoryPolicyResponse] = None
-
-
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
@@ -144,11 +136,6 @@ def get_or_create_default_policy(repo: Repository, db: Session) -> RepositoryPol
         db.commit()
         db.refresh(policy)
     return policy
-
-
-# ---------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------
 
 
 @router.post("/sync", status_code=202)

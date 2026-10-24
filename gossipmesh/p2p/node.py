@@ -181,3 +181,9 @@ class P2PNode(GossipNode):
     """Alias/Compat wrapper for GossipNode."""
 
     pass
+
+
+class P2PServer(P2PNode):
+    """Server alias/compat for P2PNode."""
+
+    pass

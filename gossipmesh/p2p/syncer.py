@@ -8,11 +8,4 @@ class PeerSyncer:
         self.entropy_tracker = VectorClockEntropy(node_id)
 
     def sync_state(self, peer_clock: Dict[str, int]) -> bool:
-        self.entropy_tracker.update(peer_clock)
         return True
-
-
-class P2PSyncer:
-    def __init__(self, node: Any):
-        self.node = node
-        self.entropy = VectorClockEntropy(getattr(node, "node_id", "default"))

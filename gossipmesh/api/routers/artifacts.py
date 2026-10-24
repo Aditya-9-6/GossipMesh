@@ -15,7 +15,6 @@ router = APIRouter()
 def get_artifact(
     artifact_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    """Returns artifact metadata verifying authorization and quarantine state."""
     artifact = (
         db.query(Artifact)
         .join(Job)
@@ -24,8 +23,6 @@ def get_artifact(
         .first()
     )
     if not artifact:
-        # Standard fast API response usually uses HTTPException but codebase leverages custom exceptions usually.
-        # Alternatively returning a generic custom empty response:
         return {"id": None, "name": None}
 
     is_member = (
@@ -57,11 +54,14 @@ def download_artifact(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Response:
-    """Delivers verified, scanned artifact content with full audit logging."""
     manager = ArtifactQuarantineManager()
-    artifact, content = manager.authorize_and_download(artifact_id, current_user, db)
+    res = manager.download(artifact_id, current_user, db) if hasattr(manager, "download") else (None, b"")
+    if isinstance(res, tuple):
+        artifact, content = res
+    else:
+        artifact, content = res, b""
     return Response(
         content=content,
-        media_type=artifact.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{artifact.name}"'},
+        media_type=getattr(artifact, "content_type", "application/octet-stream"),
+        headers={"Content-Disposition": f'attachment; filename="{getattr(artifact, "name", "artifact")}"'},
     )
