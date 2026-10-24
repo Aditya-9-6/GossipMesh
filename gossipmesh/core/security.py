@@ -1,29 +1,26 @@
 from datetime import datetime, timedelta, timezone
-import uuid
-from typing import Any
-import bcrypt
+from passlib.context import CryptContext
 from cryptography.fernet import Fernet
 import jwt
+from typing import Any
 
 from gossipmesh.core.config import settings
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 fernet = Fernet(
     settings.ENCRYPTION_KEY.encode() if isinstance(settings.ENCRYPTION_KEY, str) else settings.ENCRYPTION_KEY
 )
 
 
-def verify_password(plain_password: str, hashed_password: str | None) -> bool:
-    if not plain_password or not hashed_password:
-        return False
-    try:
-        return bcrypt.checkpw(plain_password[:72].encode("utf-8"), hashed_password.encode("utf-8"))
-    except Exception:
-        return False
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    # Truncate at 72 bytes per bcrypt standard
-    return bcrypt.hashpw(password[:72].encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return pwd_context.hash(password)
+
+
+import uuid
 
 
 def create_access_token(
