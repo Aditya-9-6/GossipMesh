@@ -82,6 +82,19 @@ class SkipList:
             current = current.forward[0]
         return res
 
+    def range_query(self, start_key: str, end_key: str) -> List[Any]:
+        res: List[Any] = []
+        current = self.header
+        for i in range(self.level - 1, -1, -1):
+            while current.forward[i] and current.forward[i].key < start_key:
+                current = current.forward[i]
+
+        current = current.forward[0]
+        while current and current.key <= end_key:
+            res.append(current.value)
+            current = current.forward[0]
+        return res
+
 
 class ConcurrentSkipListRoutingTable(SkipList):
     def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):

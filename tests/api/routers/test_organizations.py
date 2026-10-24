@@ -33,6 +33,11 @@ def mock_db():
     app.dependency_overrides.pop(deps.get_db, None)
 
 
+@pytest.fixture
+def test_client():
+    return TestClient(app)
+
+
 def test_create_organization(test_client, mock_db, mock_current_user):
     mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -48,7 +53,7 @@ def test_create_organization(test_client, mock_db, mock_current_user):
 
     assert response.status_code == 200
     assert response.json() == {"id": 1, "name": "New Org"}
-    assert mock_db.add.call_count == 3  # Org, UserOrg, AuditEvent
+    assert mock_db.add.call_count == 3
 
 
 def test_create_organization_exists(test_client, mock_db, mock_current_user):
@@ -72,7 +77,7 @@ def test_create_invitation(test_client, mock_db, mock_current_user):
 
 
 def test_create_invitation_unauthorized(test_client, mock_db, mock_current_user):
-    mock_db.query.return_value.filter.return_value.first.return_value = None  # Not an admin
+    mock_db.query.return_value.filter.return_value.first.return_value = None
 
     response = test_client.post(
         "/api/v1/organizations/1/invitations", json={"email": "invite@example.com", "role": "developer"}
