@@ -65,24 +65,9 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = Path(env_path).read_bytes()
 
     if not pem_bytes:
-        # Search for test_private_key.pem
-        current_file = Path(__file__).resolve()
-        # Look in workspace root (GossipMesh/enterprise/)
-        workspace_root = current_file.parent.parent
-        fallback = workspace_root / "enterprise" / "test_private_key.pem"
-
+        fallback = Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem"
         if fallback.is_file():
             pem_bytes = fallback.read_bytes()
-        else:
-            # Maybe we are in another directory? Let's check cwd
-            cwd_fallback = Path.cwd() / "enterprise" / "test_private_key.pem"
-            if cwd_fallback.is_file():
-                pem_bytes = cwd_fallback.read_bytes()
-            else:
-                # Also try test_private_key.pem directly inside the same dir if somehow placed there
-                same_dir = Path("test_private_key.pem")
-                if same_dir.is_file():
-                    pem_bytes = same_dir.read_bytes()
 
     if not pem_bytes:
         raise ValueError(
@@ -90,15 +75,7 @@ def load_private_key(key_input: Optional[str] = None):
             "or set LICENSE_PRIVATE_KEY_PATH."
         )
 
-    try:
-        return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
-    except Exception as pem_err:
-        from cryptography.hazmat.primitives.serialization import load_der_private_key
-
-        try:
-            return load_der_private_key(pem_bytes, password=None, backend=default_backend())
-        except Exception as der_err:
-            raise ValueError(f"Unable to load private key PEM/DER: PEM error: {pem_err}, DER error: {der_err}")
+    return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
 
 
 def parse_task_map(map_str: Optional[str]) -> Optional[Dict[str, str]]:

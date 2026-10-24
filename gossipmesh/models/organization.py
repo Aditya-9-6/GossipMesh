@@ -1,53 +1,62 @@
-"""
-Organization and related models.
-"""
-
 import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
-from sqlalchemy.orm import relationship
-from gossipmesh.db.base_class import Base
+from sqlalchemy import Boolean, ForeignKey, String, Enum as SQLAlchemyEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from gossipmesh.models.base import Base
+from gossipmesh.models.mixins import SoftDeleteMixin
 
 
 class OrganizationRole(str, enum.Enum):
     owner = "owner"
-    admin = "admin"
+    billing_admin = "billing_admin"
+    organization_admin = "organization_admin"
+    security_admin = "security_admin"
     developer = "developer"
-    member = "member"
+    reviewer = "reviewer"
+    auditor = "auditor"
+    analyst = "analyst"
+    service_account = "service_account"
 
 
-class Organization(Base):
+class Organization(SoftDeleteMixin, Base):
     __tablename__ = "organizations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    users = relationship("UserOrganization", back_populates="organization")
+    owner = relationship("User")
+    projects = relationship("Project", back_populates="organization")
+    saml_config = relationship(
+        "OrganizationSAMLConfig", back_populates="organization", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class UserOrganization(Base):
     __tablename__ = "user_organizations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    role = Column(String(50), nullable=False, default="member")
-    is_suspended = Column(Boolean, default=False, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), primary_key=True)
+    role: Mapped[OrganizationRole] = mapped_column(
+        SQLAlchemyEnum(OrganizationRole), nullable=False, default=OrganizationRole.developer
+    )
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active")  # active, invited, suspended
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    organization = relationship("Organization", backref="user_memberships")
-
-
-class OrganizationMember(Base):
-    __tablename__ = "organization_members"
-
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role: str = Column(String(50), nullable=False, default="member")
+    user = relationship("User", back_populates="organizations")
+    organization = relationship("Organization", back_populates="users")
 
 
 class OrganizationInvitation(Base):
     __tablename__ = "organization_invitations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    email = Column(String(255), nullable=False)
-    role: str = Column(String(50), nullable=False, default="member")
-    token = Column(String(255), unique=True, index=True, nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    token: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    role: Mapped[OrganizationRole] = mapped_column(
+        SQLAlchemyEnum(OrganizationRole), nullable=False, default=OrganizationRole.developer
+    )
+
+    organization = relationship("Organization")

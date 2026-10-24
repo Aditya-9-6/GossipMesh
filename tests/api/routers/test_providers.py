@@ -5,11 +5,7 @@ from gossipmesh.api.main import app
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
-
-
-@pytest.fixture
-def test_client():
-    return TestClient(app)
+from gossipmesh.models.provider import ProviderCredential
 
 
 @pytest.fixture
@@ -41,10 +37,12 @@ def mock_provider_manager(monkeypatch):
 
 
 def test_register_provider_success(test_client, mock_current_user, mock_provider_manager):
+
     mock_db_session = MagicMock()
+    # authorized check
     mock_db_session.query.return_value.filter.return_value.first.side_effect = [
         UserOrganization(user_id=1, organization_id=1, role="developer"),
-        None,
+        None,  # no existing cred
     ]
     app.dependency_overrides[deps.get_db] = lambda: mock_db_session
 

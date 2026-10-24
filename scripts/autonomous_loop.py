@@ -112,7 +112,6 @@ class KeyPool:
 
 # Deprecated global pool; using services.key_pool_router.router for key rotation
 from services.key_pool_router import router  # noqa: E402
-
 # Compatibility alias for legacy code expecting GLOBAL_POOL
 GLOBAL_POOL = router
 
@@ -195,33 +194,21 @@ def verify_and_auto_fix_preflight(workspace: Path) -> tuple[bool, str]:
     # Pass 2: Syntax compilation check
     comp_res = subprocess.run(
         [py_bin, "-m", "compileall", "-q", "-x", r"(\.venv|\.git|tests/fixtures)", "gossipmesh", "tests", "scripts"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=120,
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
     )
     if comp_res.returncode != 0:
         errors.append(f"Syntax/Compilation Failure:\n{comp_res.stderr.strip() or comp_res.stdout.strip()}")
 
     # Pass 3: Strict Ruff Lint Check
     ruff_check_cmd = [ruff_bin, "check", "."] if ruff_bin != "ruff" else [py_bin, "-m", "ruff", "check", "."]
-    ruff_res = subprocess.run(
-        ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
-    )
+    ruff_res = subprocess.run(ruff_check_cmd, cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     if ruff_res.returncode != 0:
         errors.append(f"Ruff Lint Failure:\n{ruff_res.stdout.strip() or ruff_res.stderr.strip()}")
 
     # Pass 4: Pytest Unit Tests
     test_res = subprocess.run(
         [py_bin, "-m", "pytest", "tests/", "-q", "--durations=5"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=1200,
+        cwd=workspace, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200
     )
     if test_res.returncode != 0:
         combined_tests = (test_res.stdout + "\n" + test_res.stderr).strip()
@@ -593,16 +580,11 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
 
         # Re-run reviewer to verify the fixes
         print(f"[*] Re-running Autonomous Architectural Reviewer on PR #{pr_num} after fixes...", flush=True)
-        rev_res = subprocess.run(
-            [sys.executable, "scripts/ai_pr_reviewer.py", "--pr-number", str(pr_num), "--workspace", str(workspace)],
-            cwd=workspace,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=1200,
-        )
+        rev_res = subprocess.run([
+            sys.executable, "scripts/ai_pr_reviewer.py",
+            "--pr-number", str(pr_num),
+            "--workspace", str(workspace)
+        ], cwd=workspace, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
         print(rev_res.stdout, flush=True)
 
         if review_status_file.exists():
@@ -1011,23 +993,11 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                 rev_env["GEMINI_REVIEWER_KEY"] = GLOBAL_POOL.next_key()
                 rev_env["GH_REPO"] = REPO
 
-                rev_res = subprocess.run(
-                    [
-                        sys.executable,
-                        "scripts/ai_pr_reviewer.py",
-                        "--pr-number",
-                        str(pr_num),
-                        "--workspace",
-                        str(workspace),
-                    ],
-                    cwd=workspace,
-                    env=rev_env,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    timeout=1200,
-                )
+                rev_res = subprocess.run([
+                    sys.executable, "scripts/ai_pr_reviewer.py",
+                    "--pr-number", str(pr_num),
+                    "--workspace", str(workspace)
+                ], cwd=workspace, env=rev_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1200)
                 print(rev_res.stdout, flush=True)
 
                 review_status_file = workspace / "ai_review_status.json"
@@ -1140,7 +1110,7 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
                         "executive_summary",
                         "Architectural gatekeeper evaluated this change as unnecessary, duplicate, or anti-pattern.",
                     )
-                    full_comment = f"🛑 **Architectural Gatekeeper: PR Closed as Unnecessary / Not Viable**\n\n**Verdict**: {verdict} | **Score**: {score}/100\n\n**Rationale**: {reason_text}\n\n*Closing PR and deleting branch to keep strict repository invariants.*"
+                    full_comment = f"🛑 **Architectural Gatekeeper: PR Closed as Unnecessary / Not Viable**\n\n**Verdict**: {verdict} | **Score**: {score}/100\n\n**Rationale**: {reason_text}\n\n*Closing PR and deleting branch to maintain strict repository invariants.*"
                     run_cmd(
                         [
                             "gh",
@@ -1170,64 +1140,7 @@ def heal_and_merge_open_prs(workspace: Path, worker_id: int = 1, num_workers: in
     return False
 
 
-def run_issue_job(
-    workspace: Path,
-    issue: dict,
-    execution_loop: ExecutionLoop | None = None,
-    org: str = "default",
-) -> bool:
-    """Executes the full issue-to-PR workflow for a given issue using ExecutionLoop.
-    Charges 3 credits for combo_fix upfront.
-    Returns True if issue was successfully solved and PR opened/merged.
-    """
-    loop = execution_loop or GLOBAL_EXECUTION_LOOP
-    issue_num = issue["number"]
-    issue_title = issue["title"]
-    issue_body = issue.get("body", "")
-
-    print(f"\n[*] ExecutionLoop initiating combo_fix (3 credits) for Issue #{issue_num}...", flush=True)
-
-    # Check daily volume and cost limits (Task 15)
-    can_proceed, limit_reason = volume_limiter.check_limits(org_id=org, is_pr=True)
-    if not can_proceed:
-        print(f"[Volume Limit Gate] {limit_reason}", file=sys.stderr, flush=True)
-        return False
-
-    if not loop.ledger.charge(org, "combo_fix"):
-        print(
-            f"[ExecutionLoop] Insufficient credits for org '{org}' (balance: {loop.ledger.get(org)}, required: 3).",
-            file=sys.stderr,
-            flush=True,
-        )
-        return False
-
-    try:
-        success = solve_issue(
-            workspace=workspace,
-            issue_num=issue_num,
-            issue_title=issue_title,
-            issue_body=issue_body,
-            execution_loop=loop,
-        )
-        if success:
-            volume_limiter.record_usage(org_id=org, prs=1)
-        return bool(success)
-    except Exception as e:
-        print(
-            f"[ExecutionLoop Watchdog] Issue #{issue_num} failed with unhandled error: {e}", file=sys.stderr, flush=True
-        )
-        traceback.print_exc(file=sys.stderr)
-        # System-error auto-refund full 3 credits
-        loop.ledger.refund(org, 3)
-        return False
-
-
-def run_loop_iteration(
-    workspace: Path,
-    worker_id: int = 1,
-    num_workers: int = 5,
-    execution_loop: ExecutionLoop | None = None,
-):
+def run_loop_iteration(workspace: Path, worker_id: int = 1, num_workers: int = 5):
     """Executes a single cycle of the autonomous loop."""
     # 0. Active Triage & Cleanup Gatekeeper: Automatically close unneeded, obsolete, or duplicate PRs & issues
     if worker_id == 1:
@@ -1300,9 +1213,7 @@ def main():
     start_time = time.time()
 
     if args.once:
-        run_loop_iteration(
-            workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
-        )
+        run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers)
     elif args.iterations > 0:
         print(
             f"[*] Starting GossipMesh Autonomous Batch ({args.iterations} cycles, max: {args.max_minutes}m, interval: {args.interval}s, worker: {args.worker_id}/{args.num_workers})...",
@@ -1316,9 +1227,7 @@ def main():
             )
             print(f"=======================================================", flush=True)
             try:
-                run_loop_iteration(
-                    workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
-                )
+                run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers)
             except Exception as e:
                 print(f"[Error in cycle {i + 1}]: {e}", file=sys.stderr, flush=True)
 
@@ -1335,9 +1244,7 @@ def main():
         )
         while True:
             try:
-                run_loop_iteration(
-                    workspace, worker_id=args.worker_id, num_workers=args.num_workers, execution_loop=execution_loop
-                )
+                run_loop_iteration(workspace, worker_id=args.worker_id, num_workers=args.num_workers)
             except Exception as e:
                 print(f"[Error in loop]: {e}", file=sys.stderr, flush=True)
 

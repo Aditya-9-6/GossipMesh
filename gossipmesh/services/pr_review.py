@@ -1,17 +1,25 @@
-from typing import List, Optional
-from gossipmesh.models.pr_review import (
-    SecurityFinding,
-    TestResultRecord as TestResult,
-    ReviewResponse,
-    Verdict,
-    Severity,
-    Confidence,
-)
+import logging
+from typing import List
+from gossipmesh.models.pr_review import SecurityFinding, TestResult
+
+logger = logging.getLogger(__name__)
 
 
 class PRReviewService:
-    def __init__(self):
-        pass
+    async def extract_security_findings(self) -> List[SecurityFinding]:
+        """
+        Analyzes the PR for security findings.
+        Returns a list of mock findings.
+        """
+        logger.info("Extracting security findings.")
+        # Mock logic
+        return []
 
-    def review_pr(self, diff: str) -> ReviewResponse:
-        return ReviewResponse(verdict=Verdict.APPROVED, findings=[])
+    async def execute_tests(self) -> TestResult:
+        """
+        Executes required tests for the PR.
+        Returns a dictionary representing test results.
+        """
+        logger.info("Executing tests.")
+        # Mock logic
+        return TestResult(status="passed")

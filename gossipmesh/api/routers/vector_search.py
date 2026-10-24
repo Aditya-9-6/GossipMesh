@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -6,20 +6,12 @@ from pydantic import BaseModel
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
-from gossipmesh.models.organization import Organization
 from gossipmesh.models.repository import Repository
 from gossipmesh.core.exceptions import AuthorizationError
 from gossipmesh.repository.retrieval import HybridRetriever
 from gossipmesh.repository.vector_store import PGVectorStore
 
 router = APIRouter()
-
-
-class VectorSearchRouterHelper:
-    def check_repo(self, repo: Repository) -> Dict[str, Any]:
-        repo_id = getattr(repo, "id", None)
-        org_id = getattr(repo, "organization_id", None)
-        return {"repository_id": repo_id, "organization_id": org_id}
 
 
 class SearchQuery(BaseModel):

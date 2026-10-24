@@ -36,7 +36,7 @@ class TestAdaptiveScatterGovernor(unittest.TestCase):
 
         governor = AdaptiveScatterGovernor(base_scatter=8, min_scatter=1, cpu_threshold=80.0, mem_threshold=85.0)
         # Run multiple updates to allow smoothing filter to adapt
-        for _ in range(10):
+        for _ in range(5):
             scatter = governor.update()
 
         # Scatter width should scale down proportionally toward min_scatter

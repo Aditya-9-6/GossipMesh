@@ -24,7 +24,6 @@ from typing import Callable, Any, Dict, List, Tuple
 # Helper – load raw API keys from env / .gemini_keys files
 # ---------------------------------------------------------------------------
 
-
 def _load_raw_keys() -> List[str]:
     """Collect all provider keys.
 
@@ -61,11 +60,9 @@ def _load_raw_keys() -> List[str]:
                 pass
     return keys
 
-
 # ---------------------------------------------------------------------------
 # Core router class
 # ---------------------------------------------------------------------------
-
 
 class KeyMetrics:
     """Thread‑safe rolling error‑rate metrics for a single API key.
@@ -216,7 +213,8 @@ class KeyPoolRouter:
             self._metrics[key].record(True)
 
     def record_failure(self, key: str, *, force_cooldown: bool = False) -> None:
-        """Record a failure. ``force_cooldown`` is used for explicit 429/5xx."""
+        """Record a failure. ``force_cooldown`` is used for explicit 429/5xx.
+        """
         if key not in self._metrics:
             return
         self._metrics[key].record(False)
@@ -284,15 +282,8 @@ class KeyPoolRouter:
                 }
         return out
 
-
 # ---------------------------------------------------------------------------
 # Export a ready‑to‑use singleton instance for the rest of the code‑base.
 # ---------------------------------------------------------------------------
 router = KeyPoolRouter.get_instance()
 track_error_rate = router.track_error_rate
-
-# Re-export gossipmesh services if available
-try:
-    from gossipmesh.services.key_pool_router import *  # noqa: F401, F403
-except ImportError:
-    pass

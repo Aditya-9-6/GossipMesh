@@ -1,6 +1,6 @@
 from enum import Enum
-from typing import List, Optional, Union
-from pydantic import BaseModel, Field, PrivateAttr
+from typing import List, Literal, Optional, Union
+from pydantic import BaseModel, Field
 
 
 class Verdict(str, Enum):
@@ -66,9 +66,6 @@ class SecurityFinding(BaseModel):
     usage: Optional[UsageSchema] = None
     paths: Optional[List[str]] = None
     lines: Optional[List[int]] = None
-    category: Optional[str] = None
-    rule_id: Optional[str] = None
-    sources: Optional[List[str]] = None
 
 
 class ReviewResponse(BaseModel):
@@ -77,20 +74,5 @@ class ReviewResponse(BaseModel):
     usage: Optional[UsageSchema] = None
 
 
-class ReviewTestResult(BaseModel):
+class TestResult(BaseModel):
     status: str
-
-
-class TestResultRecord(BaseModel):
-    __test__ = False
-    status: str
-    name: Optional[str] = None
-    message: Optional[str] = None
-    _is_test_class: bool = PrivateAttr(default=False)
-
-    def __init__(self, **data):
-        super().__init__(**data)
-
-
-# Alias for compatibility imports
-TestResult = TestResultRecord

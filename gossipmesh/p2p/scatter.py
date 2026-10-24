@@ -34,7 +34,7 @@ class AdaptiveScatterGovernor:
         self._smoothed_mem = 0.0
         self._last_update = 0.0
         self._current_scatter = float(base_scatter)
-        self._lock = threading.RLock()
+        self._lock = threading.Lock()
 
         if psutil is not None:
             try:

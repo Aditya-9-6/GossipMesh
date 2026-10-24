@@ -15,14 +15,12 @@ class TestOrganizationScoping(unittest.TestCase):
         # Mock users for org A and org B
         self.mock_user_a = MagicMock()
         self.mock_user_a.id = 1
-        self.mock_user_a.is_superuser = False
         mock_org_a = MagicMock()
         mock_org_a.organization_id = 1
         self.mock_user_a.organizations = [mock_org_a]
 
         self.mock_user_b = MagicMock()
         self.mock_user_b.id = 2
-        self.mock_user_b.is_superuser = False
         mock_org_b = MagicMock()
         mock_org_b.organization_id = 2
         self.mock_user_b.organizations = [mock_org_b]

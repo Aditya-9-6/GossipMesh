@@ -1,3 +1,1 @@
-#!/bin/bash
-export PYTHONPATH=.
-pytest
+python -m unittest tests/test_webhooks.py

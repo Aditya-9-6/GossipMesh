@@ -11,11 +11,8 @@ from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
 
 
 class GossipTopic(str, Enum):
-    AGENT_SPAWN = "agent:spawn"
-    AGENT_EVENT = "agent:event"
-    CODE_REVIEW = "code:review"
-    BUILD_STATUS = "build:status"
-    SECURITY_ALERT = "security:alert"
+    AGENT_EVENT = "agent_event"
+    CODE_REVIEW = "code_review"
     CONSENSUS = "consensus"
     HEARTBEAT = "heartbeat"
     TASK_BID = "task_bid"
@@ -55,7 +52,7 @@ class GossipMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
+    def from_dict(cls, data: Dict[str, Any]) -> 'GossipMessage':
         return cls(
             topic=data["topic"],
             origin_node=data["origin_node"],
@@ -72,7 +69,6 @@ class GossipNode:
     """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence
     and Adaptive Scatter-Width CPU-Load Feedback Shaping.
     Communicates via a shared ledger directory (file-backed mesh) or local bus."""
-
     def __init__(
         self,
         node_id: str,
@@ -80,7 +76,7 @@ class GossipNode:
         public_key: Optional[str] = None,
         pow_difficulty: int = 0,
         pow_nonce: Optional[int] = None,
-        base_scatter: Optional[int] = None,
+        base_scatter: int = 4,
     ):
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
@@ -92,10 +88,7 @@ class GossipNode:
         self.seen_messages: Set[str] = set()
         self.recent_messages: deque = deque(maxlen=200)
         self._load_seen_history()
-        if base_scatter is not None:
-            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
-        else:
-            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=4)
+        self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
 
     def _load_seen_history(self):
         """Loads message IDs previously witnessed to prevent duplicate processing."""
@@ -121,14 +114,13 @@ class GossipNode:
         self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
     ) -> GossipMessage:
         """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
-        if getattr(self, "scatter_governor", None) is not None:
-            payload["_adaptive_scatter"] = self.scatter_governor.update()
+        current_scatter = self.scatter_governor.update()
 
         topic_str = topic.value if isinstance(topic, GossipTopic) else topic
         msg = GossipMessage(
             topic=topic_str,
             origin_node=self.node_id,
-            payload=payload,
+            payload={**payload, "_adaptive_scatter": current_scatter},
             repo=repo,
             ttl=ttl,
         )
@@ -175,9 +167,3 @@ class GossipNode:
                 handler(msg)
             except Exception as e:
                 print(f"Error in subscriber handler: {e}")
-
-
-class P2PNode(GossipNode):
-    """Alias/Compat wrapper for GossipNode."""
-
-    pass

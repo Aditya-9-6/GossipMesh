@@ -36,18 +36,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    import os
-
-    if os.getenv("TESTING", "").lower() in ("true", "1") or "sqlite" in str(settings.DATABASE_URL):
-        yield
-        return
-
     # Startup Migration Policy: Prevent accidental destructive migrations by validating state
     logger.info("Validating database migration state...")
     alembic_cfg = Config("alembic.ini")
     script = ScriptDirectory.from_config(alembic_cfg)
 
-    engine = create_engine(str(settings.DATABASE_URL))
+    engine = create_engine(str(settings.DATABASE_URI))
     try:
         with engine.connect() as connection:
             context = MigrationContext.configure(connection)
@@ -130,11 +124,3 @@ app.add_exception_handler(Exception, global_exception_handler)  # type: ignore
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
-
-
-@app.get("/metrics")
-def prometheus_metrics():
-    from fastapi import Response
-    from gossipmesh.observability.metrics import CONTENT_TYPE_LATEST, generate_latest_metrics
-
-    return Response(content=generate_latest_metrics(), media_type=CONTENT_TYPE_LATEST)
