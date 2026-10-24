@@ -30,7 +30,6 @@ class GeminiProvider(BaseProvider):
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         if genai is None:
             raise RuntimeError("google.generativeai package is not installed.")
-
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -62,7 +61,6 @@ class GeminiProvider(BaseProvider):
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
         if genai is None:
             raise RuntimeError("google.generativeai package is not installed.")
-
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -84,6 +82,8 @@ class GeminiProvider(BaseProvider):
             return ProviderHealth(is_healthy=False, error="google.generativeai package not installed")
         start_time = time.time()
         try:
+            if genai is None:
+                return ProviderHealth(is_healthy=False, error="google-generativeai not installed")
             model = genai.GenerativeModel("gemini-1.5-flash")
             await model.generate_content_async("ping")
             latency = (time.time() - start_time) * 1000

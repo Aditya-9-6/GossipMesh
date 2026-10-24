@@ -27,10 +27,30 @@ except ImportError:
     InMemorySpanExporter = None
     StatusCode = None
 
+# Global provider and tracer initialization
+if Resource is not None:
+    try:
+        _RESOURCE = Resource.create(
+            {
+                "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
+                "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+            }
+        )
+    except NameError:
+        _RESOURCE = Resource.create(
+            {
+                "service.name": "gossipmesh",
+                "deployment.environment": "production",
+            }
+        )
+else:
+    _RESOURCE = None
+
 logger = logging.getLogger(__name__)
 
 _tracer_provider: Any = None
 _memory_exporter: Any = None
+_MEMORY_EXPORTER: Any = None
 
 
 class DummySpan:
@@ -87,14 +107,16 @@ def redact_attributes(attributes: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def setup_tracer_provider() -> Any:
-    global _tracer_provider, _memory_exporter
+    global _tracer_provider, _memory_exporter, _MEMORY_EXPORTER
     if not HAS_OTEL:
         _memory_exporter = DummyMemoryExporter()
+        _MEMORY_EXPORTER = _memory_exporter
         return None
     if _tracer_provider is None:
-        resource = Resource.create({"service.name": "gossipmesh"})
+        resource = _RESOURCE or Resource.create({"service.name": "gossipmesh"})
         _tracer_provider = TracerProvider(resource=resource)
         _memory_exporter = InMemorySpanExporter()
+        _MEMORY_EXPORTER = _memory_exporter
         processor = SimpleSpanProcessor(_memory_exporter)
         _tracer_provider.add_span_processor(processor)
         trace.set_tracer_provider(_tracer_provider)
@@ -102,10 +124,11 @@ def setup_tracer_provider() -> Any:
 
 
 def get_memory_exporter() -> Any:
-    global _memory_exporter
+    """Returns active in-memory span exporter for verification."""
+    global _memory_exporter, _MEMORY_EXPORTER
     if _tracer_provider is None:
         setup_tracer_provider()
-    return _memory_exporter
+    return _memory_exporter or _MEMORY_EXPORTER
 
 
 @contextlib.contextmanager
@@ -113,8 +136,9 @@ def trace_span(name: str, attributes: Optional[Dict[str, Any]] = None) -> Genera
     if not HAS_OTEL:
         span = DummySpan(name, attributes)
         yield span
-        if _memory_exporter and hasattr(_memory_exporter, "spans"):
-            _memory_exporter.spans.append(span)
+        exporter = get_memory_exporter()
+        if exporter and hasattr(exporter, "spans"):
+            exporter.spans.append(span)
         return
 
     provider = setup_tracer_provider()
