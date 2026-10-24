@@ -30,7 +30,7 @@ class PriorityQueueConfig:
     max_capacity: int = 10000
     aging_interval_sec: float = 0.25
     enable_aging: bool = True
-    level_weights: Dict[int, int] = None
+    level_weights: Dict[int, int] = None  # type: ignore
 
     def __post_init__(self):
         if self.level_weights is None:

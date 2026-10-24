@@ -75,7 +75,15 @@ def load_private_key(key_input: Optional[str] = None):
             "or set LICENSE_PRIVATE_KEY_PATH."
         )
 
-    return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
+    try:
+        return serialization.load_pem_private_key(pem_bytes, password=None, backend=default_backend())
+    except Exception as pem_err:
+        from cryptography.hazmat.primitives.serialization import load_der_private_key
+
+        try:
+            return load_der_private_key(pem_bytes, password=None, backend=default_backend())
+        except Exception as der_err:
+            raise ValueError(f"Unable to load private key PEM/DER: PEM error: {pem_err}, DER error: {der_err}")
 
 
 def parse_task_map(map_str: Optional[str]) -> Optional[Dict[str, str]]:
