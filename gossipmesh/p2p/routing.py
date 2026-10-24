@@ -1,4 +1,5 @@
 from typing import List, Optional, Any
+import random
 
 
 class SkipListNode:
@@ -37,8 +38,6 @@ class SkipList:
         if current and current.key == key:
             current.value = value
             return
-
-        import random
 
         lvl = 1
         while random.random() < self.p and lvl < self.max_level:
@@ -82,3 +81,28 @@ class SkipList:
             res.append((current.key, current.value))
             current = current.forward[0]
         return res
+
+
+class ConcurrentSkipListRoutingTable(SkipList):
+    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
+        super().__init__(max_level=max_level, p=p)
+        self.capacity = capacity
+        self.size = 0
+
+    def insert(self, key: str, score: float, latency: float) -> None:
+        super().insert(key, (score, latency))
+        self.size = len(self.items())
+        if self.size > self.capacity:
+            items = self.items()
+            if items:
+                worst = max(items, key=lambda x: x[1][0])
+                super().delete(worst[0])
+                self.size = len(self.items())
+
+    def delete(self, key: str) -> bool:
+        res = self.search(key)
+        if res is not None:
+            super().delete(key)
+            self.size = len(self.items())
+            return True
+        return False

@@ -3,7 +3,14 @@ from typing import Optional
 
 
 class RTOEstimator:
-    def __init__(self, alpha: float = 0.125, beta: float = 0.25, rttvar: Optional[float] = None, srtt: Optional[float] = None, initial_rto: float = 1.0) -> None:
+    def __init__(
+        self,
+        alpha: float = 0.125,
+        beta: float = 0.25,
+        rttvar: Optional[float] = None,
+        srtt: Optional[float] = None,
+        initial_rto: float = 1.0,
+    ) -> None:
         self.alpha = alpha
         self.beta = beta
         self.rto = initial_rto
