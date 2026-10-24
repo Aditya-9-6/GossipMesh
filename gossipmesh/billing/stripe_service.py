@@ -75,7 +75,6 @@ class StripeBillingService:
         if customer:
             return customer
 
-        # Verify org exists
         org = session.get(Organization, organization_id)
         if not org:
             raise ValidationError(f"Organization ID {organization_id} not found")
@@ -236,7 +235,6 @@ class StripeBillingService:
             except Exception as e:
                 raise AuthenticationError(f"Stripe signature verification failed: {str(e)}")
 
-        # Pure Python fallback for tests / test_mode
         parts = {}
         for item in signature_header.split(","):
             if "=" in item:
@@ -272,16 +270,11 @@ class StripeBillingService:
         return json.loads(payload_bytes.decode("utf-8"))
 
     def handle_webhook_event(self, session: Session, event: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Processes Stripe webhook events idempotently.
-        Prevents double-application of subscriptions, invoices, and payments.
-        """
         event_id = event.get("id")
         event_type = event.get("type")
         if not event_id or not event_type:
             raise ValidationError("Malformed Stripe event payload")
 
-        # Idempotency check: see if already processed
         stmt = select(ProcessedWebhookEvent).where(ProcessedWebhookEvent.stripe_event_id == event_id)
         existing = session.execute(stmt).scalars().first()
         if existing:
@@ -294,11 +287,10 @@ class StripeBillingService:
                 sub_id = data_obj.get("id")
                 cust_id = data_obj.get("customer")
                 plan_id = data_obj.get("plan", {}).get("id") or "pro"
-                status = data_obj.get("status", "active")
+                status_val = data_obj.get("status", "active")
                 cancel_at_period_end = data_obj.get("cancel_at_period_end", False)
                 quantity = data_obj.get("quantity", 1)
 
-                # Look up customer in DB
                 cust_stmt = select(StripeCustomer).where(StripeCustomer.stripe_customer_id == cust_id)
                 db_cust = session.execute(cust_stmt).scalars().first()
                 if db_cust:
@@ -310,13 +302,13 @@ class StripeBillingService:
                             stripe_subscription_id=sub_id,
                             stripe_customer_id=cust_id,
                             plan_id=plan_id,
-                            status=status,
+                            status=status_val,
                             quantity=quantity,
                             cancel_at_period_end=cancel_at_period_end,
                         )
                         session.add(sub)
                     else:
-                        sub.status = status
+                        sub.status = status_val
                         sub.plan_id = plan_id
                         sub.quantity = quantity
                         sub.cancel_at_period_end = cancel_at_period_end
@@ -335,7 +327,7 @@ class StripeBillingService:
                 amount_due = data_obj.get("amount_due", 0)
                 amount_paid = data_obj.get("amount_paid", 0)
                 currency = data_obj.get("currency", "usd")
-                status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
+                inv_status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
                 invoice_url = data_obj.get("hosted_invoice_url")
                 invoice_pdf = data_obj.get("invoice_pdf")
 
@@ -352,16 +344,15 @@ class StripeBillingService:
                             amount_due=amount_due,
                             amount_paid=amount_paid,
                             currency=currency,
-                            status=status,
+                            status=inv_status,
                             hosted_invoice_url=invoice_url or "",
                             invoice_pdf=invoice_pdf or "",
                         )
                         session.add(inv)
                     else:
-                        inv.status = status
+                        inv.status = inv_status
                         inv.amount_paid = amount_paid
 
-            # Record successful processing
             record = ProcessedWebhookEvent(
                 stripe_event_id=event_id,
                 event_type=event_type,

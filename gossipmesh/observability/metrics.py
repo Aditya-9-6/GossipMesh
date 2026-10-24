@@ -3,9 +3,9 @@ from typing import Any
 
 try:
     from prometheus_client import (
-        Counter,
-        Histogram,
-        Gauge,
+        Counter as PromCounter,
+        Histogram as PromHistogram,
+        Gauge as PromGauge,
         generate_latest,
         CONTENT_TYPE_LATEST,
     )
@@ -25,17 +25,29 @@ except ImportError:
         def set(self, value: float, *args: Any, **kwargs: Any) -> None:
             pass
 
-    def Counter(*args: Any, **kwargs: Any) -> _DummyMetric:
+    def PromCounter(*args: Any, **kwargs: Any) -> _DummyMetric:
         return _DummyMetric()
 
-    def Histogram(*args: Any, **kwargs: Any) -> _DummyMetric:
+    def PromHistogram(*args: Any, **kwargs: Any) -> _DummyMetric:
         return _DummyMetric()
 
-    def Gauge(*args: Any, **kwargs: Any) -> _DummyMetric:
+    def PromGauge(*args: Any, **kwargs: Any) -> _DummyMetric:
         return _DummyMetric()
 
     def generate_latest(*args: Any, **kwargs: Any) -> bytes:
         return b"# prometheus_client not installed\n"
+
+
+def Counter(*args: Any, **kwargs: Any) -> Any:
+    return PromCounter(*args, **kwargs)
+
+
+def Histogram(*args: Any, **kwargs: Any) -> Any:
+    return PromHistogram(*args, **kwargs)
+
+
+def Gauge(*args: Any, **kwargs: Any) -> Any:
+    return PromGauge(*args, **kwargs)
 
 
 # Define standard metrics
@@ -115,4 +127,4 @@ def record_billing_metric(metric_type: str, units: int | float, tenant_id: str) 
 
 
 def generate_latest_metrics() -> bytes:
-    return generate_latest()
+    return generate_latest()  # type: ignore

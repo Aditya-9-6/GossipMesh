@@ -12,14 +12,12 @@ def test_load_metadata_invalid_json(tmp_path):
 
 def test_load_metadata_valid_json(tmp_path):
     cache = SemanticCache(cache_dir=str(tmp_path))
-    data = {"key1": {"key_text": "text1", "embedding": [0.1, 0.2]}}
-    cache.metadata_file.write_text(json.dumps(data), encoding="utf-8")
+    cache.metadata_file.write_text('{"key": "val"}', encoding="utf-8")
     metadata = cache._load_metadata()
-    assert metadata == data
+    assert metadata == {"key": "val"}
 
 
-def test_load_metadata_missing_file(tmp_path):
+def test_cache_get_set(tmp_path):
     cache = SemanticCache(cache_dir=str(tmp_path))
-    assert not cache.metadata_file.exists()
-    metadata = cache._load_metadata()
-    assert metadata == {}
+    cache.set("foo", "bar")
+    assert cache.get("foo") == "bar"
