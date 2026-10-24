@@ -38,7 +38,8 @@ from gossipmesh.models.organization import Organization
 class StripeBillingService:
     """Enterprise Stripe billing integration service."""
 
-    def __init__(self,
+    def __init__(
+        self,
         api_key: Optional[str] = None,
         webhook_secret: Optional[str] = None,
         test_mode: bool = False,
