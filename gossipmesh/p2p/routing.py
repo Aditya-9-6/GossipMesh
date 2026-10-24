@@ -1,6 +1,8 @@
-from typing import List, Optional, Any, Tuple, Dict
-import threading
+from __future__ import annotations
+
 import random
+import threading
+from typing import Any, List, Optional, Tuple, Dict
 
 
 class SkipListNode:
@@ -129,54 +131,65 @@ class SkipList:
             curr = curr.forward[0]
         return res
 
-    def range_query(self, start_key: str, end_key: str) -> List[Any]:
-        res: List[Any] = []
-        current = self.header
-        for i in range(self.level - 1, -1, -1):
-            while current.forward[i] and current.forward[i].key < start_key:
-                current = current.forward[i]
-
-        current = current.forward[0]
-        while current and current.key <= end_key:
-            res.append(current.value)
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
+        res: List[Tuple[str, Any]] = []
+        current = self.header.forward[0]
+        while current:
+            if start_key <= current.key <= end_key:
+                res.append((current.key, current.value))
+            elif current.key > end_key:
+                break
             current = current.forward[0]
         return res
 
 
+class SkipListRoutingTable(SkipList):
+    """Alias or subclass of SkipList for backward compatibility with routing table naming."""
+
+    pass
+
+
 class ConcurrentSkipListRoutingTable:
-    def __init__(self, capacity: int = 1000):
+    """Thread-safe routing table wrapping SkipList with capacity and extra compatibility methods."""
+
+    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
         self.capacity = capacity
-        self.skip_list = SkipList()
-        self._lock = threading.Lock()
+        self.table = SkipList(max_level=max_level, p=p, capacity=capacity)
         self._size = 0
+        self._lock = threading.Lock()
 
     @property
     def size(self) -> int:
         with self._lock:
             return self._size
 
-    def insert(self, key: str, *values: Any) -> None:
-        val = values[0] if len(values) == 1 else values
+    def insert(self, key: str, *args: Any) -> None:
+        if len(args) == 1:
+            val = args[0]
+        elif len(args) > 1:
+            val = args
+        else:
+            val = None
+
         with self._lock:
-            existing = self.skip_list.search(key)
+            existing = self.table.search(key)
             if existing is None:
-                if self._size >= self.capacity:
-                    # Evict some or skip
-                    pass
                 self._size += 1
-            self.skip_list.insert(key, val)
+            self.table.insert(key, val)
 
     def search(self, key: str) -> Any:
         with self._lock:
-            return self.skip_list.search(key)
+            return self.table.search(key)
 
     def delete(self, key: str) -> bool:
         with self._lock:
-            res = self.skip_list.delete(key)
-            if res:
+            existing = self.table.search(key)
+            if existing is not None:
+                self.table.delete(key)
                 self._size = max(0, self._size - 1)
-            return res
+                return True
+            return False
 
-    def range_query(self, start_key: str, end_key: str) -> List[Any]:
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
         with self._lock:
-            return self.skip_list.range_query(start_key, end_key)
+            return self.table.range_query(start_key, end_key)
