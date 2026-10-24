@@ -358,8 +358,12 @@ def github_refresh_token(
     if not credential or not token_cipher:
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
-    refresh_credential_token = getattr(credential, "encrypted_refresh_token", getattr(credential, "refresh_token_ciphertext", None))
-    refresh_token = decrypt_string(refresh_credential_token) if refresh_credential_token else decrypt_string(token_cipher)
+    refresh_credential_token = getattr(
+        credential, "encrypted_refresh_token", getattr(credential, "refresh_token_ciphertext", None)
+    )
+    refresh_token = (
+        decrypt_string(refresh_credential_token) if refresh_credential_token else decrypt_string(token_cipher)
+    )
     github_client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
     with httpx.Client() as client:
         token_response = client.post(

@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, Tuple, List
+from typing import Dict, Tuple, List
 
 
 class LoginThrottler:
@@ -38,27 +38,6 @@ class LoginThrottler:
         self.attempts[key].append(now)
         self.record_attempt(key)
 
-    def record_failure(self, key: str) -> Tuple[bool, int, int]:
-        now = time.time()
-        self.record(key)
-        attempts, first_time = self.attempts_tuple.get(key, (0, now))
-        if attempts >= self.max_attempts:
-            self.lockouts[key] = now + self.window_seconds
-            return True, self.window_seconds, 0
-        return False, 0, 0
-
-    def record_success(self, key: str) -> None:
-        self.attempts.pop(key, None)
-        self.attempts_tuple.pop(key, None)
-        self.lockouts.pop(key, None)
-
-    def check_lockout(self, key: str) -> Tuple[bool, int]:
-        now = time.time()
-        lock_until = self.lockouts.get(key, 0)
-        if now < lock_until:
-            return True, int(lock_until - now)
-        return False, 0
-
     def clear(self, key: str) -> None:
         self.reset(key)
 
@@ -89,12 +68,21 @@ class LoginThrottler:
         self.lockouts.pop(key, None)
 
     def check_lockout(self, username: str) -> Tuple[bool, int]:
+        now = time.time()
+        lock_until = self.lockouts.get(username, 0)
+        if now < lock_until:
+            return True, int(lock_until - now)
         limited = self.is_rate_limited(username)
         remaining = 0 if not limited else self.window_seconds
         return limited, remaining
 
     def record_failure(self, username: str) -> Tuple[bool, int, float]:
         self.record(username)
+        now = time.time()
+        attempts, _ = self.attempts_tuple.get(username, (0, now))
+        if attempts >= self.max_attempts:
+            self.lockouts[username] = now + self.window_seconds
+            return True, self.window_seconds, 0.0
         limited = self.is_rate_limited(username)
         return limited, self.max_attempts, float(self.window_seconds)
 
