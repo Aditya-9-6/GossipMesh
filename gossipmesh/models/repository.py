@@ -5,6 +5,19 @@ from sqlalchemy import JSON
 from gossipmesh.models.base import Base
 
 
+class RepositoryPolicy(Base):
+    __tablename__ = "repository_policies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
+    rules: Mapped[dict] = mapped_column(JSON, default=dict)
+    policy_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    auto_fix_enabled: Mapped[bool] = mapped_column(default=True)
+    require_review: Mapped[bool] = mapped_column(default=True)
+
+    repository = relationship("Repository", back_populates="policy")
+
+
 class GithubAppInstallation(Base):
     __tablename__ = "github_app_installations"
 
@@ -38,16 +51,7 @@ class Repository(Base):
 
     organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
-
-
-class RepositoryPolicy(Base):
-    __tablename__ = "repository_policies"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
-    policy_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-
-    repository = relationship("Repository")
+    policy = relationship("RepositoryPolicy", back_populates="repository", uselist=False)
 
 
 class IndexState(Base):
