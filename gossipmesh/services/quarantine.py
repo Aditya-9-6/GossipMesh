@@ -11,6 +11,9 @@ class ArtifactQuarantineManager:
         self.storage_dir = storage_dir or ".quarantine"
         self._quarantined: Dict[str, Dict[str, Any]] = {}
 
+    def authorize_and_download(self, artifact_id: int, current_user: Any, db: Any) -> Any:
+        pass
+
     def quarantine(self, artifact_id: str, reason_or_payload: Any = "payload_quarantine") -> Any:
         if isinstance(reason_or_payload, dict):
             self._quarantined[artifact_id] = {"reason": "payload_quarantine", "metadata": reason_or_payload}
