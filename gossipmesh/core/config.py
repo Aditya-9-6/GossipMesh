@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     DEFAULT_INITIAL_CREDITS: int = int(os.getenv("DEFAULT_INITIAL_CREDITS", "1000"))
     ERROR_RATE_THRESHOLD: float = float(os.getenv("ERROR_RATE_THRESHOLD", "0.25"))
     KEY_COOLDOWN_SECONDS: int = int(os.getenv("KEY_COOLDOWN_SECONDS", "300"))
+    MAX_KEY_RETRIES: int = int(os.getenv("MAX_KEY_RETRIES", "3"))
     PROVIDER_API_KEYS: list[str] = (
         os.getenv("PROVIDER_API_KEYS", "").split(",") if os.getenv("PROVIDER_API_KEYS") else []
     )
@@ -54,3 +55,11 @@ settings = Settings()  # type: ignore
 DEFAULT_INITIAL_CREDITS = settings.DEFAULT_INITIAL_CREDITS
 ERROR_RATE_THRESHOLD = settings.ERROR_RATE_THRESHOLD
 KEY_COOLDOWN_SECONDS = settings.KEY_COOLDOWN_SECONDS
+MAX_KEY_RETRIES = settings.MAX_KEY_RETRIES
+
+
+def parse_key_pool(pool_str: str) -> list[str]:
+    """Parses a comma-separated key pool string into a list of keys."""
+    if not pool_str:
+        return []
+    return [k.strip() for k in pool_str.split(",") if k.strip()]
