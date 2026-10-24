@@ -69,7 +69,6 @@ class RepositoryDetailResponse(BaseModel):
     policy: Optional[RepositoryPolicyResponse] = None
 
 
-
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
     event = AuditEvent(action=action, actor_id=actor_id, organization_id=org_id, details=details)
     db.add(event)
