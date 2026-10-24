@@ -14,6 +14,14 @@ try:
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
     from opentelemetry.trace import StatusCode
 
+    # Global provider and tracer initialization
+    _RESOURCE = Resource.create(
+        {
+            "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
+            "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+        }
+    )
+
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
@@ -44,7 +52,8 @@ def setup_tracer_provider() -> Any:
     return _tracer_provider
 
 
-def get_memory_exporter() -> Any:
+def get_memory_exporter() -> InMemorySpanExporter:
+    """Returns active in-memory span exporter for verification."""
     global _memory_exporter
     if _memory_exporter is None:
         setup_tracer_provider()

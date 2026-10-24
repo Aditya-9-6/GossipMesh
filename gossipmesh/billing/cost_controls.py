@@ -18,8 +18,8 @@ from gossipmesh.models.runtime import Budget, Job, Workflow
 
 class BudgetAlertLevel(str, Enum):
     NORMAL = "normal"
-    WARNING = "warning"
-    EXCEEDED = "exceeded"
+    WARNING = "warning"  # >= 80%
+    EXCEEDED = "exceeded"  # >= 100%
 
 
 @dataclass

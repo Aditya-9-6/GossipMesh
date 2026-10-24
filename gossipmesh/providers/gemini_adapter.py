@@ -16,7 +16,7 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
-        if GENAI_AVAILABLE and genai:
+        if GENAI_AVAILABLE and genai is not None:
             genai.configure(api_key=self.api_key)
 
     @property
@@ -31,9 +31,8 @@ class GeminiProvider(BaseProvider):
         return converted
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
-        if not GENAI_AVAILABLE or not genai:
+        if not GENAI_AVAILABLE or genai is None:
             raise RuntimeError("google.generativeai package is not installed.")
-
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -63,9 +62,8 @@ class GeminiProvider(BaseProvider):
         )
 
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
-        if not GENAI_AVAILABLE or not genai:
+        if not GENAI_AVAILABLE or genai is None:
             raise RuntimeError("google.generativeai package is not installed.")
-
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -85,7 +83,7 @@ class GeminiProvider(BaseProvider):
 
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()
-        if not GENAI_AVAILABLE or not genai:
+        if not GENAI_AVAILABLE or genai is None:
             return ProviderHealth(is_healthy=False, error="google.generativeai not installed")
         try:
             model = genai.GenerativeModel("gemini-1.5-flash")
@@ -96,7 +94,7 @@ class GeminiProvider(BaseProvider):
             return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
-        if not GENAI_AVAILABLE or not genai:
+        if not GENAI_AVAILABLE or genai is None:
             return int(len(text.split()) * 1.3)
         model = genai.GenerativeModel("gemini-1.5-flash")
         try:
