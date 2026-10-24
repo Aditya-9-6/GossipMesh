@@ -66,6 +66,9 @@ class SecurityFinding(BaseModel):
     usage: Optional[UsageSchema] = None
     paths: Optional[List[str]] = None
     lines: Optional[List[int]] = None
+    category: Optional[str] = None
+    rule_id: Optional[str] = None
+    sources: Optional[List[str]] = None
 
 
 class ReviewResponse(BaseModel):
@@ -78,7 +81,11 @@ class ReviewTestResult(BaseModel):
     status: str
 
 
-class TestResult(BaseModel):
+class TestResultRecord(BaseModel):
     status: str
     name: Optional[str] = None
     message: Optional[str] = None
+
+
+# Alias for compatibility imports
+TestResult = TestResultRecord
