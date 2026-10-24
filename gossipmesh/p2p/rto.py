@@ -16,6 +16,7 @@ class RTOEstimator:
             self.srtt = rtt
             self.rttvar = rtt / 2.0
         else:
+            assert self.srtt is not None
             if self.rttvar is None:
                 self.rttvar = rtt / 2.0
             else:

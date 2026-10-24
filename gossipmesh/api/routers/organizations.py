@@ -2,6 +2,7 @@ from typing import Any, List
 import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation, OrganizationRole
@@ -49,7 +50,7 @@ def require_org_admin(org_id: int, db: Session, current_user: User):
         .filter(
             UserOrganization.organization_id == org_id,
             UserOrganization.user_id == current_user.id,
-            UserOrganization.role.in_([OrganizationRole.admin, OrganizationRole.owner]),
+            or_(UserOrganization.role == OrganizationRole.admin, UserOrganization.role == OrganizationRole.owner),
             UserOrganization.is_suspended == False,
         )
         .first()
@@ -110,7 +111,11 @@ def create_invitation(
     )
     db.add(invitation)
     log_audit_event(
-        db, "invitation.created", current_user.id, org_id, {"email": invitation_in.email, "role": invitation_in.role}
+        db,
+        "invitation.created",
+        current_user.id,
+        org_id,
+        {"email": invitation_in.email, "role": invitation_in.role.value},
     )
     db.commit()
     return {"message": "Invitation created successfully", "token": token}
@@ -161,7 +166,9 @@ def assign_role(
     if not user_org:
         raise HTTPException(status_code=404, detail="User not found in organization.")
     user_org.role = role_in.role
-    log_audit_event(db, "member.role_updated", current_user.id, org_id, {"user_id": user_id, "new_role": role_in.role})
+    log_audit_event(
+        db, "member.role_updated", current_user.id, org_id, {"user_id": user_id, "new_role": role_in.role.value}
+    )
     db.commit()
     return {"message": "Role updated."}
 
