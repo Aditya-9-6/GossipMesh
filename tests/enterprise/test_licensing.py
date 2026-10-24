@@ -22,8 +22,7 @@ from scripts.issue_license import issue_license, load_private_key
 @pytest.fixture
 def private_key():
     """Load test private key."""
-    key_path = Path(__file__).resolve().parent.parent.parent / "enterprise" / "test_private_key.pem"
-    return load_private_key(str(key_path))
+    return load_private_key("enterprise/test_private_key.pem")
 
 
 @pytest.fixture

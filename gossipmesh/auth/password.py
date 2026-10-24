@@ -21,7 +21,7 @@ def validate_password_strength(password: str) -> bool:
     return has_upper and has_lower and has_digit
 
 
-def invalidate_user_sessions(user_id: str) -> bool:
+def invalidate_user_sessions(user_id: str | int) -> bool:
     """Invalidate all active sessions for a given user."""
     # Stub implementation to satisfy imports and security requirements
     return True

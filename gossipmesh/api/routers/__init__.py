@@ -1,3 +1,21 @@
-from . import auth, organizations, providers, repositories, billing, approvals, webhooks
+from gossipmesh.api.routers import (
+    approvals,
+    auth,
+    billing,
+    organizations,
+    projects,
+    providers,
+    repositories,
+    webhooks,
+)
 
-__all__ = ["auth", "organizations", "providers", "repositories", "billing", "approvals", "webhooks"]
+__all__ = [
+    "approvals",
+    "auth",
+    "billing",
+    "organizations",
+    "projects",
+    "providers",
+    "repositories",
+    "webhooks",
+]

@@ -80,7 +80,7 @@ class GossipNode:
         public_key: Optional[str] = None,
         pow_difficulty: int = 0,
         pow_nonce: Optional[int] = None,
-        base_scatter: Optional[int] = 4,
+        base_scatter: Optional[int] = None,
     ):
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
@@ -93,9 +93,11 @@ class GossipNode:
         self.recent_messages: deque = deque(maxlen=200)
         self._load_seen_history()
         if base_scatter is not None:
+            from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
+
             self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
         else:
-            self.scatter_governor = None
+            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=4)
 
     def _load_seen_history(self):
         """Loads message IDs previously witnessed to prevent duplicate processing."""
