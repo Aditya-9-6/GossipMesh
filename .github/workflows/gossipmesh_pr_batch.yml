@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 30  # safety timeout; each run should finish well within this
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
