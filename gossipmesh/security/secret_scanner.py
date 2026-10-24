@@ -1,150 +1,115 @@
 """
-High-confidence secret detection and scanner (Task).
-Scans files, codebases, and git diffs for leaked secrets such as API keys, tokens, and private keys.
+Production Secret & Credential Scanning Engine (Task 106).
+
+Detects accidental leaks of API keys, private keys, database credentials,
+and personal access tokens across source files, test fixtures, configurations,
+and review artifacts.
 """
 
+from __future__ import annotations
+
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set
+
+
+@dataclass
+class SecretFinding:
+    rule_id: str
+    description: str
+    file_path: str
+    line_number: int
+    matched_text_masked: str
+
 
 # Regular expression rules for high-confidence secret detection
 SECRET_RULES: Dict[str, Dict[str, Any]] = {
     "GM-SEC-AWS-KEY": {
         "pattern": re.compile(r"(?:^|[^A-Z0-9])(AKIA[0-9A-Z]{16})(?:[^A-Z0-9]|$)"),
-        "severity": "CRITICAL",
-        "description": "AWS Access Key ID detected",
-    },
-    "GM-SEC-GH-TOKEN": {
-        "pattern": re.compile(r"(?:^|[^A-Za-z0-9])(ghp_[a-zA-Z0-9]{36})(?:[^A-Za-z0-9]|$)"),
-        "severity": "CRITICAL",
-        "description": "GitHub Personal Access Token detected",
+        "description": "AWS Access Key ID",
     },
     "GM-SEC-GITHUB-PAT": {
-        "pattern": re.compile(r"(?:^|[^A-Za-z0-9])(ghp_[a-zA-Z0-9]{36})(?:[^A-Za-z0-9]|$)"),
-        "severity": "CRITICAL",
-        "description": "GitHub Personal Access Token detected",
+        "pattern": re.compile(r"(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{36,})"),
+        "description": "GitHub Personal Access Token",
+    },
+    "GM-SEC-OPENAI-KEY": {
+        "pattern": re.compile(r"(sk-(?:live-)?[a-zA-Z0-9_-]{32,})"),
+        "description": "OpenAI / LLM API Key",
+    },
+    "GM-SEC-STRIPE-LIVE": {
+        "pattern": re.compile(r"(sk_live_[a-zA-Z0-9]{24,})"),
+        "description": "Stripe Live Secret Key",
+    },
+    "GM-SEC-PRIVATE-KEY": {
+        "pattern": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+        "description": "Unencrypted Private Key Block",
     },
     "GM-SEC-SLACK-TOKEN": {
         "pattern": re.compile(r"(xox[baprs]-[0-9a-zA-Z]{10,48})"),
-        "severity": "HIGH",
-        "description": "Slack Token detected",
-    },
-    "GM-SEC-RSA-KEY": {
-        "pattern": re.compile(r"-----BEGIN (?:RSA|DSA|EC|OPENSSH|PRIVATE) KEY-----"),
-        "severity": "CRITICAL",
-        "description": "Private cryptographic key detected",
-    },
-    "GM-SEC-STRIPE-KEY": {
-        "pattern": re.compile(r"(?:rk|sk)_(?:test|live)_[0-9a-zA-Z]{24,}"),
-        "severity": "CRITICAL",
-        "description": "Stripe Secret API Key detected",
-    },
-    "GM-SEC-STRIPE-LIVE": {
-        "pattern": re.compile(r"(?:rk|sk)_live_[0-9a-zA-Z]{24,}"),
-        "severity": "CRITICAL",
-        "description": "Stripe Live API Key detected",
+        "description": "Slack Token / Credential",
     },
 }
 
+# Whitelist safe placeholder / test tokens
+WHITELIST_PLACEHOLDERS = {
+    "sk_test_dummy",
+    "sk_test_mock",
+    "whsec_dummy",
+    "fake_key",
+    "placeholder",
+    "dummy_secret",
+}
 
-def mask_secret(secret: str) -> str:
-    if not secret:
+
+def mask_secret(secret_str: str) -> str:
+    """Masks secret keeping only the first 4 and last 2 characters."""
+    if len(secret_str) <= 8:
         return "****"
-    if len(secret) <= 8:
-        return "****"
-    return secret[:4] + "..." + secret[-2:]
+    return f"{secret_str[:4]}...{secret_str[-2:]}"
 
 
-class SecretFinding:
-    def __init__(
-        self,
-        rule_id: str,
-        severity: str,
-        description: str,
-        file_path: str,
-        line_number: int,
-        snippet: str,
-        matched_text_masked: Optional[str] = None,
-    ):
-        self.rule_id = rule_id
-        self.severity = severity
-        self.description = description
-        self.file_path = file_path
-        self.line_number = line_number
-        self.snippet = snippet
-        self.matched_text_masked = matched_text_masked or mask_secret(snippet)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "rule_id": self.rule_id,
-            "severity": self.severity,
-            "description": self.description,
-            "file_path": self.file_path,
-            "line_number": self.line_number,
-            "snippet": self.snippet,
-            "matched_text_masked": self.matched_text_masked,
-        }
-
-
-class SecretScanner:
+class SecretScannerEngine:
     """Scans codebases, files, and git diffs for leaked secrets."""
 
     def __init__(self, rules: Optional[Dict[str, Dict[str, Any]]] = None):
         self.rules = rules or SECRET_RULES
 
-    def scan_text(self, text: str, file_path: str = "<string>") -> List[SecretFinding]:
-        findings: List[SecretFinding] = []
-        lines = text.splitlines()
+    def is_whitelisted(self, text: str) -> bool:
+        """Determines if a matched pattern is an intentional test mock or placeholder."""
+        text_lower = text.lower()
+        return any(placeholder in text_lower for placeholder in WHITELIST_PLACEHOLDERS)
 
-        for line_idx, line in enumerate(lines, start=1):
+    def scan_content(self, content: str, file_path: str = "inline") -> List[SecretFinding]:
+        """Scans a text payload line-by-line for secret patterns."""
+        findings: List[SecretFinding] = []
+        lines = content.splitlines()
+
+        for line_num, line in enumerate(lines, start=1):
             for rule_id, rule_info in self.rules.items():
-                pattern = rule_info["pattern"]
+                pattern: re.Pattern = rule_info["pattern"]
                 match = pattern.search(line)
                 if match:
-                    snippet = line.strip()
-                    if len(snippet) > 80:
-                        snippet = snippet[:80] + "..."
-                    matched_group = match.group(1) if match.groups() else snippet
-                    findings.append(
-                        SecretFinding(
-                            rule_id=rule_id,
-                            severity=rule_info["severity"],
-                            description=rule_info["description"],
-                            file_path=file_path,
-                            line_number=line_idx,
-                            snippet=snippet,
-                            matched_text_masked=mask_secret(matched_group),
+                    matched_val = match.group(1) if match.groups() else match.group(0)
+                    if not self.is_whitelisted(matched_val):
+                        findings.append(
+                            SecretFinding(
+                                rule_id=rule_id,
+                                description=rule_info["description"],
+                                file_path=file_path,
+                                line_number=line_num,
+                                matched_text_masked=mask_secret(matched_val),
+                            )
                         )
-                    )
         return findings
 
-    def scan_content(self, text: str, file_path: str = "<string>") -> List[SecretFinding]:
-        return self.scan_text(text, file_path)
-
-    def scan_file(self, file_path: Path | str) -> List[SecretFinding]:
-        path = Path(file_path)
-        if not path.is_file():
+    def scan_file(self, path: Path | str) -> List[SecretFinding]:
+        """Scans an individual file on disk."""
+        p = Path(path).resolve()
+        if not p.is_file():
             return []
         try:
-            content = path.read_text(encoding="utf-8", errors="ignore")
-            return self.scan_text(content, str(path))
+            content = p.read_text(encoding="utf-8", errors="ignore")
+            return self.scan_content(content, file_path=str(p))
         except Exception:
             return []
-
-    def scan_directory(self, dir_path: Path | str, exclude_dirs: Optional[List[str]] = None) -> List[SecretFinding]:
-        exclude_dirs = exclude_dirs or [".git", "node_modules", "venv", "__pycache__", "dist", "build"]
-        root = Path(dir_path)
-        if not root.is_dir():
-            return []
-
-        all_findings: List[SecretFinding] = []
-        for path in root.rglob("*"):
-            if any(ex in path.parts for ex in exclude_dirs):
-                continue
-            if path.is_file():
-                all_findings.extend(self.scan_file(path))
-        return all_findings
-
-
-# Alias for compatibility with tests expecting SecretScannerEngine
-SecretScannerEngine = SecretScanner

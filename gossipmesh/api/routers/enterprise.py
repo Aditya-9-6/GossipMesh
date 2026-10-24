@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
