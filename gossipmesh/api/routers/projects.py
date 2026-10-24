@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -16,19 +16,13 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------
-
-
 class RepositorySummary(BaseModel):
     id: int
     name: str
     full_name: str
     default_branch: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectResponse(BaseModel):
@@ -38,18 +32,12 @@ class ProjectResponse(BaseModel):
     description: Optional[str] = None
     repositories: List[RepositorySummary] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
-
-
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
@@ -98,18 +86,12 @@ def require_project_admin(project_id: int, db: Session, current_user: User) -> P
     return project
 
 
-# ---------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------
-
-
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(
     project_id: int,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Fetches project details along with its associated repositories."""
     project = require_project_member(project_id, db, current_user)
     return project
 
@@ -121,7 +103,6 @@ def update_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Updates project details."""
     project = require_project_admin(project_id, db, current_user)
     changes = {}
 
@@ -150,12 +131,10 @@ def delete_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Deletes a project and unlinks its associated repositories."""
     project = require_project_admin(project_id, db, current_user)
     org_id = project.organization_id
     project_name = project.name
 
-    # Unlink associated repositories
     for repo in project.repositories:
         repo.project_id = None
 
@@ -178,7 +157,6 @@ def link_repository_to_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Associates a repository with a project within the same organization."""
     project = require_project_admin(project_id, db, current_user)
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo:
@@ -210,7 +188,6 @@ def unlink_repository_from_project(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Unlinks a repository from a project."""
     project = require_project_admin(project_id, db, current_user)
     repo = db.query(Repository).filter(Repository.id == repo_id, Repository.project_id == project.id).first()
     if not repo:

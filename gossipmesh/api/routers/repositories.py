@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -15,11 +15,6 @@ from gossipmesh.core.exceptions import AuthorizationError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------
 
 
 class SyncRequest(BaseModel):
@@ -55,8 +50,7 @@ class RepositoryPolicyResponse(BaseModel):
     scan_frequency_hours: int
     custom_rules: Dict[str, Any]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RepositoryDetailResponse(BaseModel):
@@ -69,13 +63,7 @@ class RepositoryDetailResponse(BaseModel):
     default_branch: str
     policy: Optional[RepositoryPolicyResponse] = None
 
-    class Config:
-        from_attributes = True
-
-
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
+    model_config = ConfigDict(from_attributes=True)
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
@@ -148,11 +136,6 @@ def get_or_create_default_policy(repo: Repository, db: Session) -> RepositoryPol
     return policy
 
 
-# ---------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------
-
-
 @router.post("/sync", status_code=202)
 def sync_repository(
     request: SyncRequest,
@@ -160,7 +143,6 @@ def sync_repository(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Queues a background task to sync repository metadata from GitHub."""
     is_member = (
         db.query(UserOrganization)
         .filter(
@@ -189,7 +171,6 @@ def get_repository(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Fetches details for a connected repository and its policy."""
     repo, _ = get_user_repo_membership(repo_id, db, current_user)
     get_or_create_default_policy(repo, db)
     db.refresh(repo)
@@ -203,7 +184,6 @@ def select_branch(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Branch selection: updates the primary default branch for automation/reviews."""
     repo, _ = require_repo_writer(repo_id, db, current_user)
     old_branch = repo.default_branch
     repo.default_branch = body.default_branch
@@ -226,17 +206,13 @@ def remove_repository(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Repository removal: disconnects repository and deletes associated configuration."""
     repo, _ = require_repo_admin(repo_id, db, current_user)
     org_id = repo.organization_id
     repo_name = repo.name
     full_name = repo.full_name
 
-    # Remove index state if present
     db.query(IndexState).filter(IndexState.repository_id == repo.id).delete()
-    # Remove policy if present
     db.query(RepositoryPolicy).filter(RepositoryPolicy.repository_id == repo.id).delete()
-    # Delete repository
     db.delete(repo)
 
     log_audit_event(
@@ -256,7 +232,6 @@ def get_repository_policy(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Retrieves the policy configuration for a repository."""
     repo, _ = get_user_repo_membership(repo_id, db, current_user)
     policy = get_or_create_default_policy(repo, db)
     return policy
@@ -270,7 +245,6 @@ def update_repository_policy(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Updates repository automation policy (branch protection, approvals, auto-merge, ceilings)."""
     repo, _ = require_repo_admin(repo_id, db, current_user)
     policy = get_or_create_default_policy(repo, db)
 
