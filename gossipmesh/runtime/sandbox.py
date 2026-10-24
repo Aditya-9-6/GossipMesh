@@ -90,6 +90,7 @@ class CommandPolicyEngine:
         raw_binary = cmd_list[0]
         binary = cls.get_canonical_binary_name(raw_binary)
 
+        # Allow current python executable
         is_current_python = raw_binary == sys.executable or os.path.abspath(raw_binary) == os.path.abspath(
             sys.executable
         )

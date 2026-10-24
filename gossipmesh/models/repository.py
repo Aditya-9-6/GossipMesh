@@ -47,6 +47,7 @@ class RepositoryPolicy(Base):
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
     require_review: Mapped[bool] = mapped_column(Boolean, default=True)
     auto_merge_passing: Mapped[bool] = mapped_column(Boolean, default=False)
+    policy_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     repository = relationship("Repository")
 
