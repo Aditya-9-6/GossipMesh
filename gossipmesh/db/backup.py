@@ -111,7 +111,7 @@ class DatabaseBackupManager:
     ) -> Dict[str, Any]:
         from gossipmesh.models.organization import Organization
         from gossipmesh.models.repository import Repository
-        from gossipmesh.models.runtime import Workflow, Budget
+        from gossipmesh.models.runtime import Budget, Workflow
 
         tenant = db_session.query(Organization).filter(Organization.id == organization_id).first()
         if not tenant:
@@ -124,7 +124,7 @@ class DatabaseBackupManager:
         workflows = db_session.query(Workflow).filter(Workflow.repository_id.in_(repo_ids)).all() if repo_ids else []
         budget = db_session.query(Budget).filter(Budget.organization_id == organization_id).first()
 
-        tenant_slug = getattr(tenant, "slug", getattr(tenant, "name", ""))
+        tenant_slug = getattr(tenant, "slug", getattr(tenant, "name", "").lower())
         tenant_export = {
             "metadata": {
                 "organization_id": organization_id,
