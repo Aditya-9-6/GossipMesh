@@ -2,22 +2,14 @@ from typing import Dict, Any
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class VectorClockEntropy:
-    def __init__(self, node_id: str = "") -> None:
-        self.node_id = node_id
-
-    def update(self, peer_clock: Dict[str, int]) -> None:
-        pass
-
-
 class PeerSyncer:
     def __init__(self, node_id: str):
         self.node_id = node_id
         self.entropy = VectorClockEntropy()
-        self.entropy_tracker = VectorClockEntropy(node_id)
+        self.entropy_tracker = VectorClockEntropy()
 
     def sync_state(self, peer_clock: Dict[str, int]) -> bool:
-        self.entropy_tracker.update(peer_clock)
+        self.entropy_tracker.update(peer_clock) if hasattr(self.entropy_tracker, "update") else None
         return True
 
 
