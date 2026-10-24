@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -17,24 +17,22 @@ logger = logging.getLogger(__name__)
 
 
 class RepositorySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     full_name: str
     default_branch: str
 
-    class Config:
-        from_attributes = True
-
 
 class ProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     organization_id: int
     name: str
     description: Optional[str] = None
     repositories: List[RepositorySummary] = []
-
-    class Config:
-        from_attributes = True
 
 
 class ProjectUpdate(BaseModel):

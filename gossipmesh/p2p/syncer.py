@@ -2,4 +2,5 @@ from typing import Any
 
 
 class VectorClockEntropy:
-    pass
+    def __init__(self) -> None:
+        pass
