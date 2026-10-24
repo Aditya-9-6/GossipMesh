@@ -1,6 +1,5 @@
 import os
 import base64
-import sys
 
 os.environ["SECRET_KEY"] = "testsecretkey"
 os.environ["ENCRYPTION_KEY"] = base64.urlsafe_b64encode(b"A" * 32).decode("utf-8")
@@ -10,7 +9,7 @@ os.environ["POSTGRES_HOST"] = "test"
 os.environ["POSTGRES_PORT"] = "5432"
 os.environ["POSTGRES_DB"] = "test"
 
-from fastapi import FastAPI, Depends, APIRouter
+from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
@@ -20,11 +19,9 @@ import time
 from gossipmesh.models.base import Base
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import Organization, UserOrganization
-from gossipmesh.models.provider import ProviderCredential
 from gossipmesh.api.routers.providers import router as providers_router
 from gossipmesh.api.routers.organizations import router as organizations_router
 from gossipmesh.api import deps
-import logging
 
 engine = create_engine(
     "sqlite://",
