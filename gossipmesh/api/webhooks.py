@@ -10,7 +10,11 @@ from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
-from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
+
+try:
+    from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
+except ImportError:
+    process_webhook_event = None
 
 from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
@@ -28,7 +32,6 @@ def verify_github_signature(request: Request, payload: bytes) -> bool:
     """
     secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
     if not secret:
-        # If secret is not configured, we allow it for development only
         if os.environ.get("ENVIRONMENT") == "development":
             logger.warning("GITHUB_WEBHOOK_SECRET is not set, skipping signature verification in development")
             return True
@@ -59,7 +62,6 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
             job = PRReviewJob(pr_data)
             background_tasks.add_task(job.execute)
 
-    # Milestone 7: Issue Solver
     elif event == "issues":
         action = payload.get("action")
         if action == "opened":
@@ -67,7 +69,6 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
             workflow = IssueSolverWorkflow(issue_data)
             background_tasks.add_task(workflow.execute)
 
-    # Milestone 7: CI Fixer (Triggered by workflow_run completion)
     elif event == "workflow_run":
         action = payload.get("action")
         run_data = payload.get("workflow_run", {})
@@ -78,19 +79,13 @@ def dispatch_webhook(event: str, payload: dict, background_tasks: BackgroundTask
     elif event == "issue_comment":
         action = payload.get("action")
         if action == "created":
-            # Handle human approval workflow or explicit commands
             comment_body = payload.get("comment", {}).get("body", "")
             if "/approve" in comment_body:
                 logger.info("Human approval received via comment.")
-                # Trigger approval state transition logic here
 
 
 @router.post("/github")
 async def github_webhook(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(deps.get_db)):
-    """
-    Handle incoming GitHub webhooks for Milestone 6 and 7.
-    Supported events: pull_request, issues, issue_comment, workflow_run
-    """
     event = request.headers.get("X-GitHub-Event")
     if not event:
         raise ValidationError(message="Missing X-GitHub-Event header")
@@ -114,13 +109,11 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks, db
 
     logger.info(f"Received GitHub webhook event: {event} with delivery_id: {delivery_id}")
 
-    # Check for idempotency
     existing_event = db.query(WebhookEvent).filter(WebhookEvent.delivery_id == delivery_id).first()
     if existing_event:
         logger.info(f"Webhook {delivery_id} already processed. Skipping.")
         return {"status": "already_processed", "event": event}
 
-    # Store event
     webhook_record = WebhookEvent(delivery_id=delivery_id, event=event, payload=payload, status="pending")
     db.add(webhook_record)
     try:
@@ -149,9 +142,6 @@ async def replay_github_webhook(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
-    """
-    Administrator-only webhook replay mechanism.
-    """
     if not current_user.is_superuser:
         raise AuthorizationError(message="Administrator privileges required")
 
@@ -164,7 +154,6 @@ async def replay_github_webhook(
         event_record.replayed_at = func.now()
         event_record.replayed_by = current_user.id
 
-        # Log AuditEvent
         audit = AuditEvent(
             action="webhook.replayed",
             actor_id=current_user.id,
