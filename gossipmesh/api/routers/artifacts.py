@@ -59,7 +59,15 @@ def download_artifact(
     if download_func:
         artifact, content = download_func(artifact_id, current_user, db)
     else:
-        artifact = db.query(Artifact).filter(Artifact.id == artifact_id).first()
+        artifact = (
+            db.query(Artifact)
+            .join(Job)
+            .join(Workflow)
+            .filter(Artifact.id == artifact_id, Artifact.deleted_at.is_(None))
+            .first()
+        )
+        if not artifact:
+            raise AuthorizationError(message="Artifact not found")
         content = b""
     return Response(
         content=content,
