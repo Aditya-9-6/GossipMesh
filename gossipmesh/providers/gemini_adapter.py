@@ -1,41 +1,10 @@
 from typing import AsyncGenerator
 import time
-import sys
-from types import ModuleType
-
-
-class DummyGenai(ModuleType):
-    def configure(self, *args, **kwargs):
-        pass
-
-    class GenerativeModel:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def generate_content_async(self, *args, **kwargs):
-            class Res:
-                text = "mock response"
-                prompt_feedback = ""
-
-            return Res()
-
-        def count_tokens(self, *args, **kwargs):
-            class Count:
-                total_tokens = 10
-
-            return Count()
-
-    class types:
-        class GenerationConfig:
-            def __init__(self, *args, **kwargs):
-                pass
-
 
 try:
     import google.generativeai as genai
 except ImportError:
-    genai = DummyGenai("google.generativeai")
-    sys.modules["google.generativeai"] = genai
+    genai = None
 
 from gossipmesh.providers.base import BaseProvider
 from gossipmesh.providers.models import GenerationRequest, GenerationResponse, ProviderHealth, Usage
@@ -44,7 +13,8 @@ from gossipmesh.providers.models import GenerationRequest, GenerationResponse, P
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
-        genai.configure(api_key=self.api_key)
+        if genai is not None:
+            genai.configure(api_key=self.api_key)
 
     @property
     def provider_name(self) -> str:
@@ -58,6 +28,8 @@ class GeminiProvider(BaseProvider):
         return converted
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
+        if genai is None:
+            raise RuntimeError("google-generativeai package is not installed")
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -87,6 +59,8 @@ class GeminiProvider(BaseProvider):
         )
 
     async def generate_stream(self, request: GenerationRequest) -> AsyncGenerator[str, None]:  # type: ignore
+        if genai is None:
+            raise RuntimeError("google-generativeai package is not installed")
         model = genai.GenerativeModel(request.model)
         contents = self._convert_messages(request.messages)
 
@@ -106,6 +80,8 @@ class GeminiProvider(BaseProvider):
     async def check_health(self) -> ProviderHealth:
         start_time = time.time()
         try:
+            if genai is None:
+                return ProviderHealth(is_healthy=False, error="google-generativeai not installed")
             model = genai.GenerativeModel("gemini-1.5-flash")
             await model.generate_content_async("ping")
             latency = (time.time() - start_time) * 1000
@@ -114,6 +90,8 @@ class GeminiProvider(BaseProvider):
             return ProviderHealth(is_healthy=False, error=str(e))
 
     def count_tokens(self, text: str) -> int:
+        if genai is None:
+            return int(len(text.split()) * 1.3)
         model = genai.GenerativeModel("gemini-1.5-flash")
         try:
             return model.count_tokens(text).total_tokens
