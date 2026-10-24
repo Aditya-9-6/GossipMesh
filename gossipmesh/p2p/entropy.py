@@ -3,6 +3,27 @@ from collections import deque
 from typing import Dict, List, Tuple, Any
 
 
+class VectorClockEntropy:
+    """Vector clock entropy calculator."""
+
+    def __init__(self, vector_clock: Dict[str, int]) -> None:
+        self.vector_clock = vector_clock
+
+    def compute(self) -> float:
+        return compute_shannon_entropy(self.vector_clock)
+
+
+class AntiEntropyEntropy:
+    """Anti-entropy entropy tracking."""
+
+    def __init__(self, threshold: float = 1.5) -> None:
+        self.threshold = threshold
+
+    def evaluate(self, local_clock: Dict[str, int], peer_clock: Dict[str, int]) -> bool:
+        div = compute_divergence_vector(local_clock, peer_clock)
+        return compute_shannon_entropy(div) >= self.threshold
+
+
 class VectorClockRingBuffer:
     """Fixed-size bounded memory ring buffer for tracking peer vector clocks."""
 
