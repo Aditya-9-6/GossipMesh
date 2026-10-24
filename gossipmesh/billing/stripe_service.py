@@ -120,8 +120,8 @@ class StripeBillingService:
 
         session_obj = stripe.checkout.Session.create(
             customer=customer.stripe_customer_id,
-            payment_method_types=["card"],
-            line_items=[{"price": price_id, "quantity": quantity}],
+            payment_method_types=cast(Any, ["card"]),
+            line_items=cast(Any, [{"price": price_id, "quantity": quantity}]),
             mode="subscription",
             success_url=f"{s_url}?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=c_url,
