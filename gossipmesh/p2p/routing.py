@@ -64,7 +64,7 @@ class SkipList:
                 new_node.forward[i] = update[i].forward[i] if update[i] else None
                 if update[i]:
                     update[i].forward[i] = new_node
-            
+
             self.size += 1
             if self.size > self.capacity:
                 self._evict_worst()
@@ -119,7 +119,7 @@ class SkipList:
 
             while self.level > 1 and self.header.forward[self.level - 1] is None:
                 self.level -= 1
-            
+
             self.size -= 1
             return True
 

@@ -305,6 +305,12 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
                 credential.encrypted_access_token = encrypt_string(access_token)
             if refresh_token and hasattr(credential, "encrypted_refresh_token"):
                 credential.encrypted_refresh_token = encrypt_string(refresh_token)
+            if (
+                hasattr(credential, "encrypted_refresh_token")
+                and not credential.encrypted_refresh_token
+                and refresh_token
+            ):
+                credential.encrypted_refresh_token = encrypt_string(refresh_token)
 
         db.commit()
 

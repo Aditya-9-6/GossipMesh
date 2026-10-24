@@ -60,7 +60,7 @@ def download_artifact(
         artifact, content = res
     else:
         artifact, content = res, b""
-    
+
     if not artifact:
         raise AuthorizationError(message="Artifact not found")
 
