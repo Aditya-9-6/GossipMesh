@@ -1,65 +1,59 @@
 """
-Organization and related models.
+Organization Models.
 """
 
-import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from __future__ import annotations
+
+from sqlalchemy import Column, Integer, String, Boolean, Enum as SQLEnum
 from sqlalchemy.orm import relationship
-from gossipmesh.db.base_class import Base
+from gossipmesh.models.base import Base
+import enum
 
 
 class OrganizationRole(str, enum.Enum):
     owner = "owner"
     admin = "admin"
     developer = "developer"
-    member = "member"
-
-
-class Organization(Base):
-    __tablename__ = "organizations"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, index=True, nullable=False)
+    viewer = "viewer"
 
 
 class GithubAppInstallation(Base):
     __tablename__ = "github_app_installations"
 
     id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    installation_id = Column(String(255), unique=True, index=True, nullable=False)
-    account_name = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
+    organization_id = Column(Integer, index=True)
+    installation_id = Column(Integer, unique=True, index=True)
+    account_name = Column(String)
+    organization = relationship("Organization", back_populates="github_installations")
 
-    organization = relationship("Organization", backref="github_installations")
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    github_installations = relationship("GithubAppInstallation", back_populates="organization")
+    deleted_at = Column(Integer, nullable=True)
+    deleted_by = Column(Integer, nullable=True)
+    retention_days = Column(Integer, nullable=True, default=30)
 
 
 class UserOrganization(Base):
     __tablename__ = "user_organizations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    role = Column(String(50), nullable=False, default="member")
-    is_suspended = Column(Boolean, default=False, nullable=False)
-
-    organization = relationship("Organization", backref="user_memberships")
-
-
-class OrganizationMember(Base):
-    __tablename__ = "organization_members"
-
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role: str = Column(String(50), nullable=False, default="member")
+    user_id = Column(Integer, index=True)
+    organization_id = Column(Integer, index=True)
+    role: OrganizationRole = Column(SQLEnum(OrganizationRole), default=OrganizationRole.developer)  # type: ignore
+    is_suspended = Column(Boolean, default=False)
+    organization = relationship("Organization")
 
 
 class OrganizationInvitation(Base):
     __tablename__ = "organization_invitations"
 
     id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    email = Column(String(255), nullable=False)
-    role: str = Column(String(50), nullable=False, default="member")
-    token = Column(String(255), unique=True, index=True, nullable=True)
+    organization_id = Column(Integer, index=True)
+    email = Column(String, index=True)
+    token = Column(String, unique=True, index=True)
+    role: OrganizationRole = Column(SQLEnum(OrganizationRole), default=OrganizationRole.developer)  # type: ignore
