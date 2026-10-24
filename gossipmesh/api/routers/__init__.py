@@ -5,6 +5,7 @@ from gossipmesh.api.routers import (
     repositories,
     providers,
     billing,
+    enterprise,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "repositories",
     "providers",
     "billing",
+    "enterprise",
 ]
