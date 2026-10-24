@@ -4,7 +4,13 @@ from typing import Any, Dict, Tuple, List
 
 class LoginThrottler:
     def __init__(
-        self, rate_limit: int = 5, period: int = 300, max_attempts: int = 5, window_seconds: int = 300, limit: int = 5, window: int = 300
+        self,
+        rate_limit: int = 5,
+        period: int = 300,
+        max_attempts: int = 5,
+        window_seconds: int = 300,
+        limit: int = 5,
+        window: int = 300,
     ) -> None:
         self.rate_limit = rate_limit
         self.period = period
