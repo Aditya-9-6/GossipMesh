@@ -1,23 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-
-
-class VectorClockEntropy:
-    def __init__(self, node_id: str | None = None):
-        self.node_id = node_id or ""
-        self.clock: dict[str, int] = {}
-
-    def increment(self) -> None:
-        if self.node_id:
-            self.clock[self.node_id] = self.clock.get(self.node_id, 0) + 1
-
-    def sync(self, other_clock: dict[str, int]) -> None:
-        for k, v in other_clock.items():
-            self.clock[k] = max(self.clock.get(k, 0), v)
-
-    def update(self, other_clock: dict[str, int]) -> None:
-        self.sync(other_clock)
+from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
 class StateSyncer:
