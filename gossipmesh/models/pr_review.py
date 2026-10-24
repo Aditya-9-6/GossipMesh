@@ -82,6 +82,7 @@ class ReviewTestResult(BaseModel):
 
 
 class TestResultRecord(BaseModel):
+    __test__ = False
     status: str
     name: Optional[str] = None
     message: Optional[str] = None
