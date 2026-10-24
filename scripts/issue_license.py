@@ -47,19 +47,12 @@ def load_private_key(key_input: Optional[str] = None):
     """
     pem_bytes = None
 
-    search_paths = []
     if key_input:
-        search_paths.append(Path(key_input))
-
-    env_path = os.getenv("LICENSE_PRIVATE_KEY_PATH")
-    if env_path:
-        search_paths.append(Path(env_path))
-
-    search_paths.append(Path(__file__).resolve().parent.parent / "enterprise" / "test_private_key.pem")
-    search_paths.append(Path("enterprise/test_private_key.pem"))
-
-    if key_input and "BEGIN" in key_input:
-        pem_bytes = key_input.encode("utf-8")
+        p = Path(key_input)
+        if p.is_file():
+            pem_bytes = p.read_bytes()
+        elif "BEGIN" in key_input:
+            pem_bytes = key_input.encode("utf-8")
 
     if not pem_bytes:
         env_raw = os.getenv("LICENSE_PRIVATE_KEY")
@@ -67,10 +60,29 @@ def load_private_key(key_input: Optional[str] = None):
             pem_bytes = env_raw.encode("utf-8")
 
     if not pem_bytes:
-        for p in search_paths:
-            if p.is_file():
-                pem_bytes = p.read_bytes()
-                break
+        env_path = os.getenv("LICENSE_PRIVATE_KEY_PATH")
+        if env_path and Path(env_path).is_file():
+            pem_bytes = Path(env_path).read_bytes()
+
+    if not pem_bytes:
+        # Search for test_private_key.pem
+        current_file = Path(__file__).resolve()
+        # Look in workspace root (GossipMesh/enterprise/)
+        workspace_root = current_file.parent.parent
+        fallback = workspace_root / "enterprise" / "test_private_key.pem"
+
+        if fallback.is_file():
+            pem_bytes = fallback.read_bytes()
+        else:
+            # Maybe we are in another directory? Let's check cwd
+            cwd_fallback = Path.cwd() / "enterprise" / "test_private_key.pem"
+            if cwd_fallback.is_file():
+                pem_bytes = cwd_fallback.read_bytes()
+            else:
+                # Also try test_private_key.pem directly inside the same dir if somehow placed there
+                same_dir = Path("test_private_key.pem")
+                if same_dir.is_file():
+                    pem_bytes = same_dir.read_bytes()
 
     if not pem_bytes:
         raise ValueError(

@@ -77,7 +77,7 @@ def require_project_admin(project_id: int, db: Session, current_user: User) -> P
         )
         .first()
     )
-    if not user_org or user_org.role not in [OrganizationRole.owner, OrganizationRole.organization_admin]:
+    if not user_org or user_org.role not in [OrganizationRole.admin, OrganizationRole.owner]:
         raise HTTPException(status_code=403, detail="Admin permissions required for this project action.")
     return project
 
