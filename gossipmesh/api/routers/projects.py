@@ -16,6 +16,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------
+# Schemas
+# ---------------------------------------------------------
+
+
 class RepositorySummary(BaseModel):
     id: int
     name: str
@@ -38,6 +43,11 @@ class ProjectResponse(BaseModel):
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
+
+
+# ---------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
@@ -81,6 +91,11 @@ def require_project_admin(project_id: int, db: Session, current_user: User) -> P
     if not user_org or user_org.role not in [OrganizationRole.owner, OrganizationRole.organization_admin]:
         raise HTTPException(status_code=403, detail="Admin permissions required for this project action.")
     return project
+
+
+# ---------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

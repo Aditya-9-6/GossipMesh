@@ -1,3 +1,4 @@
+import time
 from typing import Optional
 
 
@@ -12,6 +13,12 @@ class RTOEstimator:
             self.srtt = rtt
             self.rttvar = rtt / 2.0
         else:
-            self.rttvar = 0.75 * self.rttvar + 0.25 * abs(self.srtt - rtt) if self.rttvar is not None else rtt / 2.0
-            self.srtt = 0.875 * self.srtt + 0.125 * rtt
+            alpha = 0.125
+            beta = 0.25
+            self.rttvar = (1 - beta) * (self.rttvar if self.rttvar is not None else rtt / 2.0) + beta * abs(self.srtt - rtt)
+            self.srtt = (1 - alpha) * self.srtt + alpha * rtt
+
         self.rto = self.srtt + max(0.01, 4.0 * (self.rttvar or 0.0))
+
+    def get_rto(self) -> float:
+        return self.rto
