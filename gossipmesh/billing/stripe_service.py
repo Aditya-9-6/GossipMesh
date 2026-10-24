@@ -52,9 +52,6 @@ class StripeBillingService:
         if not self.test_mode:
             stripe.api_key = self.api_key
 
-    # -------------------------------------------------------------------------
-    # Customer Operations
-    # -------------------------------------------------------------------------
     def get_customer_by_org(self, session: Session, organization_id: int) -> Optional[StripeCustomer]:
         stmt = select(StripeCustomer).where(StripeCustomer.organization_id == organization_id)
         return session.execute(stmt).scalars().first()
@@ -70,7 +67,6 @@ class StripeBillingService:
         if customer:
             return customer
 
-        # Verify org exists
         org = session.get(Organization, organization_id)
         if not org:
             raise ValidationError(f"Organization ID {organization_id} not found")
@@ -96,9 +92,6 @@ class StripeBillingService:
         session.refresh(customer)
         return customer
 
-    # -------------------------------------------------------------------------
-    # Checkout Session Creation
-    # -------------------------------------------------------------------------
     def create_checkout_session(
         self,
         session: Session,
@@ -129,11 +122,8 @@ class StripeBillingService:
             cancel_url=c_url,
             subscription_data={"metadata": {"organization_id": str(organization_id), "plan_id": plan_id}},
         )
-        return {"id": session_obj.id, "url": session_obj.url}
+        return {"id": session_obj.id, "url": str(session_obj.url)}
 
-    # -------------------------------------------------------------------------
-    # Billing Portal
-    # -------------------------------------------------------------------------
     def create_billing_portal_session(
         self,
         session: Session,
@@ -153,11 +143,8 @@ class StripeBillingService:
             customer=customer.stripe_customer_id,
             return_url=ret_url,
         )
-        return {"url": portal_session.url}
+        return {"url": str(portal_session.url)}
 
-    # -------------------------------------------------------------------------
-    # Subscription Management
-    # -------------------------------------------------------------------------
     def get_active_subscription(self, session: Session, organization_id: int) -> Optional[BillingSubscription]:
         stmt = (
             select(BillingSubscription)
@@ -193,9 +180,6 @@ class StripeBillingService:
         session.refresh(sub)
         return sub
 
-    # -------------------------------------------------------------------------
-    # Invoices
-    # -------------------------------------------------------------------------
     def list_invoices(
         self,
         session: Session,
@@ -210,16 +194,12 @@ class StripeBillingService:
         )
         return list(session.execute(stmt).scalars().all())
 
-    # -------------------------------------------------------------------------
-    # Webhooks & Idempotent Processing
-    # -------------------------------------------------------------------------
     def verify_webhook_signature(
         self,
         payload_bytes: bytes,
         signature_header: str,
         tolerance: int = 300,
     ) -> Dict[str, Any]:
-        """Verifies HMAC-SHA256 signature from Stripe."""
         if not self.test_mode:
             try:
                 return stripe.Webhook.construct_event(
@@ -231,8 +211,6 @@ class StripeBillingService:
             except Exception as e:
                 raise AuthenticationError(f"Stripe signature verification failed: {str(e)}")
 
-        # Pure Python fallback for tests / test_mode
-        # Header format: t=<timestamp>,v1=<signature>
         parts = {}
         for item in signature_header.split(","):
             if "=" in item:
@@ -268,16 +246,11 @@ class StripeBillingService:
         return json.loads(payload_bytes.decode("utf-8"))
 
     def handle_webhook_event(self, session: Session, event: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Processes Stripe webhook events idempotently.
-        Prevents double-application of subscriptions, invoices, and payments.
-        """
         event_id = event.get("id")
         event_type = event.get("type")
         if not event_id or not event_type:
             raise ValidationError("Malformed Stripe event payload")
 
-        # Idempotency check: see if already processed
         stmt = select(ProcessedWebhookEvent).where(ProcessedWebhookEvent.stripe_event_id == event_id)
         existing = session.execute(stmt).scalars().first()
         if existing:
@@ -294,7 +267,6 @@ class StripeBillingService:
                 cancel_at_period_end = data_obj.get("cancel_at_period_end", False)
                 quantity = data_obj.get("quantity", 1)
 
-                # Look up customer in DB
                 cust_stmt = select(StripeCustomer).where(StripeCustomer.stripe_customer_id == cust_id)
                 db_cust = session.execute(cust_stmt).scalars().first()
                 if db_cust:
@@ -357,7 +329,6 @@ class StripeBillingService:
                         inv.status = status
                         inv.amount_paid = amount_paid
 
-            # Record successful processing
             record = ProcessedWebhookEvent(
                 stripe_event_id=event_id,
                 event_type=event_type,

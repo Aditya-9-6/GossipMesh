@@ -17,6 +17,7 @@ import sys
 import re
 import json
 import time
+import traceback
 import subprocess
 import argparse
 from pathlib import Path
@@ -34,6 +35,37 @@ USER_EMAIL = "aditya-9-6@users.noreply.github.com"
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []
 FAILED_SOLVE_ATTEMPTS = {}
+
+
+class VolumeLimiterStub:
+    def check_limits(self, org_id: str = "default", is_pr: bool = True):
+        return True, ""
+
+    def record_usage(self, org_id: str = "default", prs: int = 1):
+        pass
+
+
+volume_limiter = VolumeLimiterStub()
+
+
+class LedgerStub:
+    def charge(self, org: str, item: str) -> bool:
+        return True
+
+    def refund(self, org: str, amount: int) -> None:
+        pass
+
+    def get(self, org: str) -> int:
+        return 100
+
+
+class ExecutionLoop:
+    def __init__(self):
+        self.ledger = LedgerStub()
+
+
+GLOBAL_EXECUTION_LOOP = ExecutionLoop()
+execution_loop = GLOBAL_EXECUTION_LOOP
 
 
 def load_multi_provider_keys():
@@ -1207,7 +1239,6 @@ def run_issue_job(
             issue_num=issue_num,
             issue_title=issue_title,
             issue_body=issue_body,
-            execution_loop=loop,
         )
         if success:
             volume_limiter.record_usage(org_id=org, prs=1)
