@@ -26,13 +26,19 @@ def recover_stuck_webhooks():
             .all()
         )
 
+        # First loop: update status and commit to avoid race conditions with celery workers
         for event in stuck_events:
             logger.info(f"Recovering stuck webhook event {event.id}")
             event.status = "pending"
-            db.commit()
+
+        db.commit()
+
+        # Second loop: dispatch tasks after transaction is safely committed
+        for event in stuck_events:
             process_webhook_event.apply_async(args=[event.id])
 
     except Exception as e:
         logger.error(f"Failed to recover stuck webhooks: {e}")
+        db.rollback()
     finally:
         db.close()
