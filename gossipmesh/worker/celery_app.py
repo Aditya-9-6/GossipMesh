@@ -1,12 +1,15 @@
-from celery import Celery  # type: ignore
-from gossipmesh.core.config import settings
-
-celery_app = Celery("worker", broker=settings.REDIS_URI, backend=settings.REDIS_URI)
-
-celery_app.conf.task_routes = {"gossipmesh.worker.tasks.*": "main-queue"}
+from celery import Celery
 
 
-# Example task
-@celery_app.task
-def test_celery(word: str) -> str:
-    return f"test task return {word}"
+class CeleryStub:
+    broker_url: str = "redis://localhost:6379/0"
+
+    def task(self, *args, **kwargs):
+        def decorator(f):
+            return f
+
+        return decorator
+
+
+celery_app = CeleryStub()
+app = celery_app

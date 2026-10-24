@@ -53,15 +53,19 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(reusabl
             if not session or not session.is_active:
                 raise AuthenticationError(message="Session is inactive")
 
-        # Check token blocklist
         if jti and redis_client.exists(f"revoked_token:{jti}"):
             raise AuthenticationError(message="Token has been revoked")
 
-        # Check session invalidation (password change)
         if iat:
-            invalidated_before = redis_client.get(f"sessions_invalidated_before:{user_id}")
-            if invalidated_before and float(iat) < float(invalidated_before):
-                raise AuthenticationError(message="Session has been invalidated")
+            invalidated_before_val = redis_client.get(f"sessions_invalidated_before:{user_id}")
+            if invalidated_before_val:
+                invalidated_before = float(
+                    invalidated_before_val.decode("utf-8")
+                    if isinstance(invalidated_before_val, bytes)
+                    else invalidated_before_val
+                )
+                if float(iat) < invalidated_before:
+                    raise AuthenticationError(message="Session has been invalidated")
 
     except (jwt.InvalidTokenError, ValidationError):
         raise AuthenticationError(message="Could not validate credentials")
@@ -78,7 +82,6 @@ def get_scim_token(
     authorization: str = Depends(OAuth2PasswordBearer(tokenUrl="token", auto_error=False)),
     db: Session = Depends(get_db),
 ) -> Any:
-    from fastapi import Header
     from gossipmesh.models.service_account import APIKey
     from gossipmesh.core.security import verify_password
     from datetime import datetime, timezone

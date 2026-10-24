@@ -21,8 +21,8 @@ from gossipmesh.models.runtime import Budget, Job, Workflow
 
 class BudgetAlertLevel(str, Enum):
     NORMAL = "normal"
-    WARNING = "warning"
-    EXCEEDED = "exceeded"
+    WARNING = "warning"  # >= 80%
+    EXCEEDED = "exceeded"  # >= 100%
 
 
 @dataclass
@@ -45,6 +45,10 @@ class CostControlsEngine:
         session: Session,
         organization_id: int,
     ) -> Tuple[BudgetAlertLevel, Dict[str, Any]]:
+        """
+        Evaluates current organization spend against monthly budget cap.
+        Emits an immutable AuditEvent if thresholds are breached.
+        """
         stmt = select(Budget).where(Budget.organization_id == organization_id)
         budget = session.execute(stmt).scalars().first()
 
@@ -91,6 +95,10 @@ class CostControlsEngine:
         historical_spends: List[float],
         current_spend: float,
     ) -> Tuple[bool, str]:
+        """
+        Detects sudden cost spikes using rolling statistical variance.
+        Flags as anomaly if spend exceeds baseline by configured multiplier standard deviations.
+        """
         if not historical_spends or len(historical_spends) < 3:
             return False, "Insufficient historical data for anomaly baseline"
 
@@ -119,6 +127,11 @@ class CostControlsEngine:
         reason: str,
         actor: str = "cost_controls_watchdog",
     ) -> int:
+        """
+        Immediately pauses and cancels all running and pending workflows and jobs
+        for the given organization to prevent uncontrolled runaway spend.
+        Emits high-severity audit record.
+        """
         wf_stmt = (
             update(Workflow)
             .where(
@@ -128,6 +141,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         wf_result = session.execute(wf_stmt)
+        session.commit()
         workflows_stopped = int(getattr(wf_result, "rowcount", 0) or 0)
 
         job_stmt = (
@@ -139,6 +153,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         session.execute(job_stmt)
+        session.commit()
 
         audit = AuditEvent(
             action="billing.emergency_shutdown_triggered",
@@ -160,6 +175,7 @@ class CostControlsEngine:
         current_spend_usd: float,
         limit_usd: float,
     ) -> Optional[Dict[str, Any]]:
+        """Checks provider-level consumption against configured limit threshold."""
         if limit_usd <= 0:
             return None
 

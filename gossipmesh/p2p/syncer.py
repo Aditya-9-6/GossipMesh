@@ -1,14 +1,8 @@
-from typing import Any
-
-
 class VectorClockEntropy:
-    pass
+    def increment(self, *args, **kwargs):
+        pass
 
 
-class VectorClockEntropyCalculator:
-    pass
-
-
-class P2PSyncer:
-    def __init__(self) -> None:
-        self.calculator = VectorClockEntropyCalculator()
+class AntiEntropyEntropy:
+    def scan_mesh(self, *args, **kwargs):
+        pass

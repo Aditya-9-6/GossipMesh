@@ -57,4 +57,5 @@ venv/
 .env
 .env.*
 
+.pyssip_mesh/
 venv_test/

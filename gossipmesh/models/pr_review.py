@@ -1,6 +1,6 @@
 from enum import Enum
-from typing import List, Literal, Optional, Union
-from pydantic import BaseModel, Field
+from typing import List, Optional, Union
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class Verdict(str, Enum):
@@ -82,11 +82,12 @@ class ReviewTestResult(BaseModel):
 
 
 class TestResultRecord(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
+    __test__ = False
     status: str
     name: Optional[str] = None
     message: Optional[str] = None
+    _is_test_class: bool = PrivateAttr(default=False)
 
 
-Test = TestResultRecord
-TestResult = ReviewTestResult
+# Alias for compatibility imports
+TestResult = TestResultRecord
