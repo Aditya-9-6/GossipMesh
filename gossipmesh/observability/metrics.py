@@ -37,6 +37,7 @@ except ImportError:
     def generate_latest(*args: Any, **kwargs: Any) -> bytes:
         return b"# prometheus_client not installed\n"
 
+
 # Define standard metrics
 REQUEST_COUNT = Counter("gossipmesh_http_requests_total", "Total HTTP requests", ["method", "endpoint", "status_code"])
 REQUEST_LATENCY = Histogram("gossipmesh_http_request_duration_seconds", "HTTP request latency", ["method", "endpoint"])
