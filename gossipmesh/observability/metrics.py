@@ -110,8 +110,8 @@ def record_sandbox_failure(failure_reason: str, exit_code: int) -> None:
     SANDBOX_FAILURES.labels(failure_reason=failure_reason, exit_code=str(exit_code)).inc()
 
 
-def record_billing_metric(metric_type: str, units: float, tenant_id: str) -> None:
-    BILLING_USAGE.labels(metric_type=metric_type, tenant_id=tenant_id).inc(units)
+def record_billing_metric(metric_type: str, units: int | float, tenant_id: str) -> None:
+    BILLING_USAGE.labels(metric_type=metric_type, tenant_id=tenant_id).inc(float(units))
 
 
 def generate_latest_metrics() -> bytes:

@@ -10,7 +10,7 @@ class RTOEstimator:
         self.rttvar: Optional[float] = None
         self.rto: float = initial_rto
 
-    def update(self, rtt: float) -> None:
+    def update(self, rtt: float) -> float:
         if self.srtt is None:
             self.srtt = rtt
             self.rttvar = rtt / 2.0
@@ -21,6 +21,7 @@ class RTOEstimator:
         assert self.srtt is not None
         assert self.rttvar is not None
         self.rto = self.srtt + max(0.01, 4.0 * self.rttvar)
+        return self.rto
 
     def get_rto(self) -> float:
         return self.rto

@@ -93,8 +93,6 @@ class GossipNode:
         self.recent_messages: deque[GossipMessage] = deque(maxlen=1000)
         self._load_seen_history()
         if base_scatter is not None:
-            from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
-
             self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
         else:
             self.scatter_governor = AdaptiveScatterGovernor(base_scatter=4)
@@ -179,3 +177,9 @@ class GossipNode:
                 handler(msg)
             except Exception as e:
                 print(f"Error in subscriber handler: {e}")
+
+
+class P2PNode(GossipNode):
+    """Alias/Compat wrapper for GossipNode."""
+
+    pass

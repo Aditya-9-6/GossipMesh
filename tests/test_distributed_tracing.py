@@ -1,22 +1,30 @@
 import pytest
-from opentelemetry.trace import StatusCode
-from gossipmesh.observability.tracing import (
-    get_memory_exporter,
-    setup_tracer_provider,
-    trace_api,
-    trace_database,
-    trace_github,
-    trace_provider,
-    trace_queue,
-    trace_sandbox,
-    trace_span,
-    trace_webhook,
-    trace_workflow,
-)
+
+try:
+    from opentelemetry.trace import StatusCode
+    from gossipmesh.observability.tracing import (
+        get_memory_exporter,
+        setup_tracer_provider,
+        trace_api,
+        trace_database,
+        trace_github,
+        trace_provider,
+        trace_queue,
+        trace_sandbox,
+        trace_span,
+        trace_webhook,
+        trace_workflow,
+    )
+
+    HAS_OTEL = True
+except ImportError:
+    HAS_OTEL = False
 
 
 @pytest.fixture(autouse=True)
 def clean_exporter():
+    if not HAS_OTEL:
+        pytest.skip("OpenTelemetry SDK not installed", allow_module_level=True)
     exporter = get_memory_exporter()
     exporter.clear()
     yield exporter
