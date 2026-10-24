@@ -56,12 +56,23 @@ def download_artifact(
     db: Session = Depends(deps.get_db),
 ) -> Response:
     """Delivers verified, scanned artifact content with full audit logging."""
+    artifact = (
+        db.query(Artifact)
+        .join(Job)
+        .join(Workflow)
+        .filter(Artifact.id == artifact_id, Artifact.deleted_at.is_(None))
+        .first()
+    )
+    if not artifact:
+        raise AuthorizationError(message="Artifact not found")
+
     manager = ArtifactQuarantineManager()
     if not hasattr(manager, "authorize_and_download"):
         raise AuthorizationError(message="Download authorization method not available")
     artifact, content = manager.authorize_and_download(artifact_id, current_user, db)
+
     return Response(
         content=content,
         media_type=artifact.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{artifact.name}"'},
+        headers={"Content-Disposition": f'attachment; filename="{artifact.name}"_'},
     )

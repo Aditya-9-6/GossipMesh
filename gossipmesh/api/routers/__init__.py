@@ -5,6 +5,8 @@ from gossipmesh.api.routers import (
     projects,
     repositories,
     providers,
+    billing,
+    enterprise,
 )
 
 try:
@@ -19,6 +21,8 @@ router.include_router(organizations.router)
 router.include_router(projects.router)
 router.include_router(repositories.router)
 router.include_router(providers.router)
+router.include_router(billing.router)
+router.include_router(enterprise.router)
 
 if billing is not None and hasattr(billing, "router"):
     router.include_router(billing.router)
@@ -31,4 +35,5 @@ __all__ = [
     "repositories",
     "providers",
     "billing",
+    "enterprise",
 ]

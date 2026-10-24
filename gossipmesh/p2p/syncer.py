@@ -13,3 +13,12 @@ class VectorClockSyncer:
 
     def sync(self, peer_clock: Dict[str, int]) -> Dict[str, Any]:
         return {"status": "synced", "node_id": self.node_id}
+
+
+class Syncer:
+    def __init__(self, node_id: str):
+        self.node_id = node_id
+        self.entropy = VectorClockEntropy()
+
+    def sync(self, peer_data: Any) -> None:
+        pass
