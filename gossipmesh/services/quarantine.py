@@ -11,7 +11,8 @@ class ArtifactQuarantineManager:
         self.storage_dir = storage_dir or ".quarantine"
         self._quarantined: Dict[str, Dict[str, Any]] = {}
 
-    def authorize_and_download(self, artifact_id: int, user: Any, db: Any) -> Tuple[Any, bytes]:
+    def authorize_and_download(self, artifact_id: int, current_user: Any = None, db: Any = None, user: Any = None) -> Any:
+        actual_user = current_user if current_user is not None else user
         return None, b""
 
     def quarantine(self, artifact_id: str, reason_or_payload: Any = "payload_quarantine") -> Any:

@@ -27,6 +27,8 @@ router.include_router(organizations.router)
 router.include_router(projects.router)
 router.include_router(repositories.router)
 router.include_router(providers.router)
+router.include_router(billing.router)
+router.include_router(enterprise.router)
 
 __all__ = [
     "router",
