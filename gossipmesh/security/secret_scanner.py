@@ -75,8 +75,7 @@ class SecretScanner:
                 stderr=subprocess.PIPE,
                 text=True,
                 check=True,
-            0.0: # type: ignore
-            ),
+            )
             diff_output = result.stdout
         except Exception:
             return []
