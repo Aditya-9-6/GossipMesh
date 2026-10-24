@@ -371,7 +371,9 @@ def github_refresh_token(
     token_cipher = None
     if credential:
         token_cipher = getattr(
-            credential, "access_token_ciphertext", getattr(credential, "encrypted_access_token", getattr(credential, "refresh_token", None))
+            credential,
+            "access_token_ciphertext",
+            getattr(credential, "encrypted_access_token", getattr(credential, "refresh_token", None)),
         )
     if not credential or not token_cipher:
         raise AuthenticationError(message="No GitHub refresh token available for this user")
@@ -403,7 +405,7 @@ def github_refresh_token(
             credential.encrypted_access_token = encrypt_string(new_access_token)
         elif hasattr(credential, "access_token"):
             credential.access_token = encrypt_string(new_access_token)
-            
+
         if new_refresh_token:
             if hasattr(credential, "refresh_token_ciphertext"):
                 credential.refresh_token_ciphertext = encrypt_string(new_refresh_token)

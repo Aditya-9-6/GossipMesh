@@ -95,7 +95,6 @@ class ConcurrentSkipListRoutingTable:
             self.size -= 1
             return True
 
-    
     def range_query(self, start_key: str, end_key: str) -> List[Any]:
         with self._global_lock:
             res: List[Any] = []

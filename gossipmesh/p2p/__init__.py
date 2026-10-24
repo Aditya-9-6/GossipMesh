@@ -1,4 +1,5 @@
-from gossipmesh.p2p.syncer import Syncer, P2PSyncer
+from __future__ import annotations
 from gossipmesh.p2p.entropy import VectorClockEntropy
+from gossipmesh.p2p.syncer import Syncer
 
-__all__ = ["Syncer", "P2PSyncer", "VectorClockEntropy"]
+__all__ = ["VectorClockEntropy", "Syncer"]
