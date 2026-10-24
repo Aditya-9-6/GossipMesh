@@ -1,4 +1,4 @@
-from typing import Any, List, Literal
+from typing import Any, List
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -68,7 +68,6 @@ def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, detail
 def create_organization(
     org_in: OrganizationCreate, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    # Check if org exists
     existing_org = db.query(Organization).filter(Organization.name == org_in.name).first()
     if existing_org:
         raise HTTPException(status_code=400, detail="Organization name already exists.")
@@ -91,19 +90,13 @@ def create_organization(
 def read_organizations_me(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    return (
-        db.query(Organization)
-        .join(UserOrganization, Organization.id == UserOrganization.organization_id)
-        .filter(UserOrganization.user_id == current_user.id)
-        .all()
-    )
     user_orgs = (
         db.query(UserOrganization)
         .options(joinedload(UserOrganization.organization))
         .filter(UserOrganization.user_id == current_user.id)
         .all()
     )
-    return [org.organization for org in user_orgs]
+    return [org.organization for org in user_orgs if org.organization is not None]
 
 
 @router.post("/{org_id}/invitations")
@@ -136,7 +129,6 @@ def accept_invitation(
     if not invitation:
         raise HTTPException(status_code=404, detail="Invitation not found or invalid.")
 
-    # Check if user already in org
     existing_member = (
         db.query(UserOrganization)
         .filter(
@@ -213,7 +205,6 @@ def connect_repository(
 ) -> Any:
     require_org_admin(org_id, db, current_user)
 
-    # Check if repo already exists globally or in org
     existing_repo = db.query(Repository).filter(Repository.github_id == repo_in.github_id).first()
     if existing_repo:
         raise HTTPException(status_code=400, detail="Repository already connected.")

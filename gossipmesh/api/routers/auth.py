@@ -79,7 +79,6 @@ def login_access_token(
 
     login_throttler.record_success(form_data.username)
 
-    # Create session
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
@@ -279,7 +278,7 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if not primary_email:
             raise AuthenticationError(message="No verified primary email found on GitHub account")
 
-        github_id = github_user_data["id"]
+        github_user_id = github_user_data["id"]
 
         user = db.query(User).filter(User.email == primary_email).first()
         if not user:
@@ -292,16 +291,16 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
-                github_id=github_id,
-                encrypted_access_token=encrypt_string(access_token),
-                encrypted_refresh_token=encrypt_string(refresh_token) if refresh_token else None,
+                github_user_id=github_user_id,
+                access_token=encrypt_string(access_token),
+                refresh_token=encrypt_string(refresh_token) if refresh_token else None,
             )
             db.add(credential)
         else:
-            credential.github_id = github_id
-            credential.encrypted_access_token = encrypt_string(access_token)
+            credential.github_user_id = github_user_id
+            credential.access_token = encrypt_string(access_token)
             if refresh_token:
-                credential.encrypted_refresh_token = encrypt_string(refresh_token)
+                credential.refresh_token = encrypt_string(refresh_token)
 
         db.commit()
 
@@ -353,7 +352,11 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         audit_event = AuditEvent(
             action="github_login",
             actor_id=user.id,
-            details={"github_id": github_id, "organizations": org_names, "installations_count": installations_count},
+            details={
+                "github_id": github_user_id,
+                "organizations": org_names,
+                "installations_count": installations_count,
+            },
         )
         db.add(audit_event)
         db.commit()
@@ -370,10 +373,10 @@ def github_refresh_token(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
-    if not credential or not credential.encrypted_refresh_token:
+    if not credential or not credential.refresh_token:
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
-    refresh_token = decrypt_string(credential.encrypted_refresh_token)
+    refresh_token = decrypt_string(credential.refresh_token)
 
     with httpx.Client() as client:
         token_response = client.post(
@@ -393,9 +396,9 @@ def github_refresh_token(
         new_access_token = token_data["access_token"]
         new_refresh_token = token_data.get("refresh_token")
 
-        credential.encrypted_access_token = encrypt_string(new_access_token)
+        credential.access_token = encrypt_string(new_access_token)
         if new_refresh_token:
-            credential.encrypted_refresh_token = encrypt_string(new_refresh_token)
+            credential.refresh_token = encrypt_string(new_refresh_token)
 
         db.commit()
 
@@ -403,7 +406,7 @@ def github_refresh_token(
             action="github_token_refresh",
             actor_id=current_user.id,
             details={
-                "github_id": credential.github_id,
+                "github_id": credential.github_user_id,
             },
         )
         db.add(audit_event)
@@ -645,6 +648,7 @@ def request_password_reset(
     return {"message": "Password reset token generated.", "reset_token": token}
 
 
+@router.post("/{password/reset-confirm}")
 @router.post("/password/reset-confirm")
 def confirm_password_reset(
     body: PasswordResetConfirm,

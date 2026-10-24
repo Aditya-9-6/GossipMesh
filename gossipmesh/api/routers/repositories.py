@@ -100,10 +100,8 @@ def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[R
 
     role_val = getattr(user_org, "role", None)
     allowed_admin_roles = [
-        OrganizationRole.OWNER,
-        OrganizationRole.ADMIN,
-        OrganizationRole.owner,
         OrganizationRole.organization_admin,
+        OrganizationRole.owner,
         "owner",
         "admin",
     ]
@@ -119,11 +117,8 @@ def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[
 
     role_val = getattr(user_org, "role", None)
     allowed_writer_roles = [
-        OrganizationRole.OWNER,
-        OrganizationRole.ADMIN,
-        OrganizationRole.DEVELOPER,
-        OrganizationRole.owner,
         OrganizationRole.organization_admin,
+        OrganizationRole.owner,
         OrganizationRole.developer,
         "owner",
         "admin",
