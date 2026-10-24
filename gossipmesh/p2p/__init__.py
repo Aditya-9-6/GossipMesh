@@ -1,3 +1,3 @@
-from gossipmesh.p2p.node import P2PNode, GossipNode, GossipMessage, GossipTopic
+__all__ = ["P2PSyncer"]
 
-__all__ = ["P2PNode", "GossipNode", "GossipMessage", "GossipTopic"]
+from gossipmesh.p2p.syncer import P2PSyncer
