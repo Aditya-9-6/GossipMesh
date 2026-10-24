@@ -9,6 +9,7 @@ if TYPE_CHECKING:
         repositories,
         providers,
         billing,
+        enterprise,
     )
 
 router = APIRouter()
@@ -55,6 +56,13 @@ try:
 except ImportError:
     billing = None  # type: ignore
 
+try:
+    from gossipmesh.api.routers import enterprise
+
+    router.include_router(enterprise.router)
+except ImportError:
+    enterprise = None  # type: ignore
+
 __all__ = [
     "router",
     "auth",
@@ -63,4 +71,5 @@ __all__ = [
     "repositories",
     "providers",
     "billing",
+    "enterprise",
 ]
