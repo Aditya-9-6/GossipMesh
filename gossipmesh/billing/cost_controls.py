@@ -100,7 +100,6 @@ class CostControlsEngine:
         Flags as anomaly if spend exceeds baseline by configured multiplier standard deviations.
         """
         if not historical_spends or len(historical_spends) < 3:
-            # Need at least 3 historical points for statistical baseline
             return False, "Insufficient historical data for anomaly baseline"
 
         valid_spends = [s for s in historical_spends if s >= 0]
@@ -110,7 +109,6 @@ class CostControlsEngine:
         variance = sum((x - mean) ** 2 for x in valid_spends) / n
         std_dev = math.sqrt(variance)
 
-        # Baseline upper limit
         threshold = mean + (self.config.anomaly_multiplier * max(std_dev, 1.0))
 
         if current_spend > threshold and current_spend >= self.config.min_anomaly_threshold_usd:
@@ -134,7 +132,6 @@ class CostControlsEngine:
         for the given organization to prevent uncontrolled runaway spend.
         Emits high-severity audit record.
         """
-        # Cancel all active workflows
         wf_stmt = (
             update(Workflow)
             .where(
@@ -144,9 +141,9 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         wf_result = session.execute(wf_stmt)
-        workflows_stopped = int(wf_result.rowcount) if hasattr(wf_result, "rowcount") else 0
+        session.commit()
+        workflows_stopped = int(getattr(wf_result, "rowcount", 0) or 0)
 
-        # Cancel associated jobs
         job_stmt = (
             update(Job)
             .where(
@@ -158,7 +155,6 @@ class CostControlsEngine:
         session.execute(job_stmt)
         session.commit()
 
-        # Record high-severity audit event
         audit = AuditEvent(
             action="billing.emergency_shutdown_triggered",
             organization_id=organization_id,
