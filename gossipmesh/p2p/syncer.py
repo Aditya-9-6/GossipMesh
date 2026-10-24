@@ -1,5 +1,4 @@
-from typing import Any, Dict
-from gossipmesh.p2p.entropy import VectorClockEntropy
+from typing import Dict
 
 
 class VectorClockEntropy:
