@@ -219,7 +219,7 @@ class WeightedPriorityQueue:
             if not bucket:
                 continue
 
-            retained = collections.deque()
+            retained: collections.deque[PrioritizedMessage] = collections.deque()
             target_level = level - 1
 
             while bucket:

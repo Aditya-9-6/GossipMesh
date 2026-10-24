@@ -144,7 +144,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         wf_result = session.execute(wf_stmt)
-        workflows_stopped = wf_result.rowcount
+        workflows_stopped = wf_result.rowcount if hasattr(wf_result, "rowcount") else 0
 
         # Cancel associated jobs
         job_stmt = (

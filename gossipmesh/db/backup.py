@@ -149,7 +149,7 @@ class DatabaseBackupManager:
             "organization": {
                 "id": tenant.id,
                 "name": tenant.name,
-                "slug": tenant.slug,
+                "slug": getattr(tenant, "slug", getattr(tenant, "name", "").lower()),
                 "created_at": str(tenant.created_at) if hasattr(tenant, "created_at") else None,
             },
             "users": [
