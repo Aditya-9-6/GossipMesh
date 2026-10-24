@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import random
 import threading
@@ -122,19 +124,6 @@ class SkipList:
             self.size -= 1
             return True
 
-    def range_query(self, start_key: str, end_key: str) -> List[Any]:
-        res: List[Any] = []
-        current = self.header
-        for i in range(self.level - 1, -1, -1):
-            while current.forward[i] and current.forward[i].key < start_key:
-                current = current.forward[i]
-
-        current = current.forward[0]
-        while current and current.key <= end_key:
-            res.append(current.value)
-            current = current.forward[0]
-        return res
-
     def get_top_peers(self, limit: int = 10) -> List[Dict[str, Any]]:
         res: List[Dict[str, Any]] = []
         curr = self.header.forward[0]
@@ -142,3 +131,66 @@ class SkipList:
             res.append({"key": curr.key, "score": curr.score, "latency": curr.latency, "value": curr.value})
             curr = curr.forward[0]
         return res
+
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
+        res: List[Tuple[str, Any]] = []
+        current = self.header.forward[0]
+        while current:
+            if start_key <= current.key <= end_key:
+                res.append((current.key, current.value))
+            elif current.key > end_key:
+                break
+            current = current.forward[0]
+        return res
+
+
+class SkipListRoutingTable(SkipList):
+    """Alias or subclass of SkipList for backward compatibility with routing table naming."""
+
+    pass
+
+
+class ConcurrentSkipListRoutingTable:
+    """Thread-safe routing table wrapping SkipList with capacity and extra compatibility methods."""
+
+    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
+        self.capacity = capacity
+        self.table = SkipList(max_level=max_level, p=p, capacity=capacity)
+        self._size = 0
+        self._lock = threading.Lock()
+
+    @property
+    def size(self) -> int:
+        with self._lock:
+            return self._size
+
+    def insert(self, key: str, *args: Any) -> None:
+        if len(args) == 1:
+            val = args[0]
+        elif len(args) > 1:
+            val = args
+        else:
+            val = None
+
+        with self._lock:
+            existing = self.table.search(key)
+            if existing is None:
+                self._size += 1
+            self.table.insert(key, val)
+
+    def search(self, key: str) -> Any:
+        with self._lock:
+            return self.table.search(key)
+
+    def delete(self, key: str) -> bool:
+        with self._lock:
+            existing = self.table.search(key)
+            if existing is not None:
+                self.table.delete(key)
+                self._size = max(0, self._size - 1)
+                return True
+            return False
+
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
+        with self._lock:
+            return self.table.range_query(start_key, end_key)

@@ -140,6 +140,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         wf_result = session.execute(wf_stmt)
+        session.commit()
         workflows_stopped = int(getattr(wf_result, "rowcount", 0) or 0)
 
         job_stmt = (
@@ -151,6 +152,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         session.execute(job_stmt)
+        session.commit()
 
         audit = AuditEvent(
             action="billing.emergency_shutdown_triggered",

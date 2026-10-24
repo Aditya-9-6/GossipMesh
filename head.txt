@@ -1,0 +1,9 @@
+"""
+Production Secret & Credential Scanning Engine (Task 106).
+
+Detects accidental leaks of API keys, private keys, database credentials,
+and personal access tokens across source files, test fixtures, configurations,
+and review artifacts.
+"""
+
+from __future__ import annotations

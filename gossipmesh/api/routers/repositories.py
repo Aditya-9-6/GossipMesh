@@ -165,9 +165,7 @@ MIIBOQIBAAJAVY6qupT3
 
 @router.get("/{repo_id}", response_model=RepositoryDetailResponse)
 def get_repository(
-    repo_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    repo_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     repo, _ = get_user_repo_membership(repo_id, db, current_user)
     get_or_create_default_policy(repo, db)
@@ -199,9 +197,7 @@ def select_branch(
 
 @router.delete("/{repo_id}", status_code=status.HTTP_200_OK)
 def remove_repository(
-    repo_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    repo_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     repo, _ = require_repo_admin(repo_id, db, current_user)
     org_id = repo.organization_id
@@ -224,9 +220,7 @@ def remove_repository(
 
 @router.get("/{repo_id}/policy", response_model=RepositoryPolicyResponse)
 def get_repository_policy(
-    repo_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    repo_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     repo, _ = get_user_repo_membership(repo_id, db, current_user)
     policy = get_or_create_default_policy(repo, db)
