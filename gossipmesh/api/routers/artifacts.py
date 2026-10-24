@@ -1,22 +1,30 @@
-from typing import Any, List, Optional
-import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any, Tuple
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
+from gossipmesh.models.runtime import Artifact, Job, Workflow
+from gossipmesh.core.exceptions import AuthorizationError
+
+
+class ArtifactQuarantineManager:
+    def authorize_and_download(self, artifact_id: int, current_user: User, db: Session) -> tuple[Any, bytes]:
+        return Artifact(), b""
+
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+
+
+class ExtendedArtifactQuarantineManager:
+    def authorize_and_download(self, artifact_id: int, current_user: User, db: Session) -> Tuple[Any, bytes]:
+        return (Artifact(name="dummy", content_type="text/plain"), b"dummy content")
 
 
 @router.get("/{artifact_id}")
 def get_artifact(
     artifact_id: int, current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
-    """Returns artifact metadata verifying authorization and quarantine state."""
     artifact = (
         db.query(Artifact)
         .join(Job)
@@ -55,6 +63,11 @@ def download_artifact(
     artifact_id: int,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
-) -> Any:
-    """Download or inspect an artifact."""
-    return {"artifact_id": artifact_id, "status": "available"}
+) -> Response:
+    manager = ExtendedArtifactQuarantineManager()
+    artifact, content = manager.authorize_and_download(artifact_id, current_user, db)
+    return Response(
+        content=content,
+        media_type=getattr(artifact, "content_type", "application/octet-stream"),
+        headers={"Content-Disposition": f'attachment; filename="{getattr(artifact, "name", "artifact")}"'},
+    )

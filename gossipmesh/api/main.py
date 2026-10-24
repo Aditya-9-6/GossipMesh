@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     import os
 
-    if os.getenv("TESTING", "").lower() in ("true", "1") or "sqlite" in str(settings.DATABASE_URI):
+    if os.getenv("TESTING", "").lower() in ("true", "1") or "sqlite" in str(settings.DATABASE_URL):
         yield
         return
 
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     alembic_cfg = Config("alembic.ini")
     script = ScriptDirectory.from_config(alembic_cfg)
 
-    engine = create_engine(str(settings.DATABASE_URI))
+    engine = create_engine(str(settings.DATABASE_URL))
     try:
         with engine.connect() as connection:
             context = MigrationContext.configure(connection)

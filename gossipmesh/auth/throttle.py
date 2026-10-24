@@ -1,41 +1,35 @@
-from typing import Dict, Tuple, Optional, List
 import time
+from typing import Any, Dict, Tuple, List
 
 
 class LoginThrottler:
-    """Throttles login attempts based on IP or username to prevent brute-force attacks."""
-
     def __init__(
         self,
+        rate_limit: int = 5,
+        period: int = 300,
+        max_attempts: int = 5,
+        window_seconds: int = 300,
         limit: int = 5,
         window: int = 300,
-        max_attempts: Optional[int] = None,
-        window_seconds: Optional[int] = None,
     ) -> None:
-        self.limit = limit if max_attempts is None else max_attempts
-        self.window = window if window_seconds is None else window_seconds
-        self.max_attempts = self.limit
-        self.window_seconds = self.window
-        self._attempts: Dict[str, Tuple[int, float]] = {}
+        self.rate_limit = rate_limit
+        self.period = period
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self.limit = limit
+        self.window = window
         self.attempts: Dict[str, List[float]] = {}
         self.attempts_tuple: Dict[str, Tuple[int, float]] = {}
-
-    def check_rate_limit(self, key: str, current_time: Optional[float] = None) -> bool:
-        now = current_time if current_time is not None else time.time()
-        if key not in self._attempts:
-            return True
-        count, first_attempt = self._attempts[key]
-        if now - first_attempt > self.window_seconds:
-            del self._attempts[key]
-            return True
-        return count < self.max_attempts
+        self.lockouts: Dict[str, float] = {}
 
     def check(self, key: str) -> bool:
         now = time.time()
         history = self.attempts.get(key, [])
         history = [t for t in history if now - t < self.window]
         self.attempts[key] = history
-        return len(history) < self.limit
+        if len(history) >= self.limit:
+            return False
+        return not self.is_rate_limited(key)
 
     def record(self, key: str) -> None:
         now = time.time()
@@ -44,43 +38,68 @@ class LoginThrottler:
         self.attempts[key].append(now)
         self.record_attempt(key)
 
+    def record_failure(self, key: str) -> Tuple[bool, int, int]:
+        now = time.time()
+        self.record(key)
+        attempts, first_time = self.attempts_tuple.get(key, (0, now))
+        if attempts >= self.max_attempts:
+            self.lockouts[key] = now + self.window_seconds
+            return True, self.window_seconds, 0
+        return False, 0, 0
+
+    def record_success(self, key: str) -> None:
+        self.attempts.pop(key, None)
+        self.attempts_tuple.pop(key, None)
+        self.lockouts.pop(key, None)
+
+    def check_lockout(self, key: str) -> Tuple[bool, int]:
+        now = time.time()
+        lock_until = self.lockouts.get(key, 0)
+        if now < lock_until:
+            return True, int(lock_until - now)
+        return False, 0
+
+    def clear(self, key: str) -> None:
+        self.reset(key)
+
     def is_rate_limited(self, key: str) -> bool:
         now = time.time()
         if key not in self.attempts_tuple:
             return not self.check(key)
         count, window_start = self.attempts_tuple[key]
         if now - window_start > self.window_seconds:
+            self.attempts.pop(key, None)
             return False
         return count >= self.max_attempts or not self.check(key)
 
-    def record_attempt(self, key: str, success: bool = False, current_time: Optional[float] = None) -> None:
-        now = current_time if current_time is not None else time.time()
-        if success:
-            self._attempts.pop(key, None)
-            self.attempts_tuple.pop(key, None)
-            return
-        if key not in self._attempts:
-            self._attempts[key] = (1, now)
-        else:
-            count, first_attempt = self._attempts[key]
-            if now - first_attempt > self.window_seconds:
-                self._attempts[key] = (1, now)
-            else:
-                self._attempts[key] = (count + 1, first_attempt)
-
+    def record_attempt(self, key: str) -> None:
+        now = time.time()
         if key not in self.attempts_tuple:
             self.attempts_tuple[key] = (1, now)
             return
-        count_t, window_start = self.attempts_tuple[key]
+        count, window_start = self.attempts_tuple[key]
         if now - window_start > self.window_seconds:
             self.attempts_tuple[key] = (1, now)
         else:
-            self.attempts_tuple[key] = (count_t + 1, window_start)
+            self.attempts_tuple[key] = (count + 1, window_start)
 
     def reset(self, key: str) -> None:
-        self._attempts.pop(key, None)
         self.attempts.pop(key, None)
         self.attempts_tuple.pop(key, None)
+        self.lockouts.pop(key, None)
+
+    def check_lockout(self, username: str) -> Tuple[bool, int]:
+        limited = self.is_rate_limited(username)
+        remaining = 0 if not limited else self.window_seconds
+        return limited, remaining
+
+    def record_failure(self, username: str) -> Tuple[bool, int, float]:
+        self.record(username)
+        limited = self.is_rate_limited(username)
+        return limited, self.max_attempts, float(self.window_seconds)
+
+    def record_success(self, username: str) -> None:
+        self.reset(username)
 
 
 login_throttler = LoginThrottler()
