@@ -33,6 +33,8 @@ classifiers = [
 ]
 
 dependencies = [
+    "stripe",
+    "prometheus_client",
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
     "sqlalchemy>=2.0.29",
