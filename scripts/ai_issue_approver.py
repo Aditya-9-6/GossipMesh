@@ -171,7 +171,14 @@ def call_ai_model(prompt: str) -> dict:
 
 def run_cmd(cmd: list[str], cwd: Path = Path(".")) -> tuple[int, str, str]:
     repo = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY")
-    if repo and cmd and cmd[0] == "gh" and "--repo" not in cmd and len(cmd) > 1 and cmd[1] in ("issue", "pr", "workflow", "api"):
+    if (
+        repo
+        and cmd
+        and cmd[0] == "gh"
+        and "--repo" not in cmd
+        and len(cmd) > 1
+        and cmd[1] in ("issue", "pr", "workflow", "api")
+    ):
         cmd = [cmd[0], cmd[1], "--repo", repo] + cmd[2:]
     res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return res.returncode, res.stdout.strip(), res.stderr.strip()

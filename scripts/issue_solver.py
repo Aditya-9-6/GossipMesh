@@ -12,7 +12,7 @@ The script:
    * Commits and pushes the branch.
    * Opens a PR targeting ``main`` with a standard title and body.
    * Labels the PR with ``reviewed`` and ``score-0`` (initial score).
-The script is intended to be run in a CI job (GitHub Actions) after the
+The script is intended to be run in a CI job (GitHub Actions after the
 PR‑review step.
 """
 

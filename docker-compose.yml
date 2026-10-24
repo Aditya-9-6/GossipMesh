@@ -22,16 +22,17 @@ services:
   # 2. Redis Cache & Queue
   redis:
     image: redis:7-alpine
+    container_name: gossipmesh_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 3s
       retries: 5
+    volumes:
+      - redis_data:/data
 
   # 3. Object Storage (MinIO S3 Compatible)
   minio:
@@ -102,6 +103,20 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
+
+  # 5b. Agent Worker (Feature Branch)
+  agent_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: gossipmesh_agent_worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    profiles:
+      - full
 
   # 6. Plan Scheduler
   scheduler:

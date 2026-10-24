@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from gossipmesh.api import deps
 from gossipmesh.models.user import User
@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 # Schemas
 # ---------------------------------------------------------
 
+
 class RepositorySummary(BaseModel):
     id: int
     name: str
     full_name: str
     default_branch: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectResponse(BaseModel):
@@ -37,8 +37,7 @@ class ProjectResponse(BaseModel):
     description: Optional[str] = None
     repositories: List[RepositorySummary] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectUpdate(BaseModel):
@@ -49,6 +48,7 @@ class ProjectUpdate(BaseModel):
 # ---------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------
+
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
     event = AuditEvent(action=action, actor_id=actor_id, organization_id=org_id, details=details)
@@ -99,6 +99,7 @@ def require_project_admin(project_id: int, db: Session, current_user: User) -> P
 # ---------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------
+
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(
