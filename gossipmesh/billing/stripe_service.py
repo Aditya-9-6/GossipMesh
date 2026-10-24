@@ -1,8 +1,5 @@
 """
 Production Stripe Billing Service (Task 87).
-
-Implements real Stripe customer management, checkout sessions, billing portal,
-subscription lifecycle, invoices, signature-verified webhooks, and idempotent processing.
 """
 
 from __future__ import annotations
@@ -36,8 +33,6 @@ from gossipmesh.models.organization import Organization
 
 
 class StripeBillingService:
-    """Enterprise Stripe billing integration service."""
-
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -248,7 +243,7 @@ class StripeBillingService:
 
         import json
 
-        return json.loads(payload_bytes.decode("utf-8"))
+        return cast(Dict[str, Any], json.loads(payload_bytes.decode("utf-8")))
 
     def handle_webhook_event(self, session: Session, event: Dict[str, Any]) -> Dict[str, Any]:
         event_id = event.get("id")
@@ -354,3 +349,6 @@ class StripeBillingService:
             session.add(record)
             session.commit()
             raise GossipMeshException(f"Failed to handle Stripe webhook event {event_id}: {str(e)}")
+
+
+__all__ = ["StripeBillingService"]
