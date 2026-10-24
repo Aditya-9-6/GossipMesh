@@ -13,3 +13,7 @@ class P2PSyncer:
 
     def sync(self) -> None:
         pass
+
+
+class Syncer:
+    pass
