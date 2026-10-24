@@ -1,6 +1,7 @@
-from sqlalchemy import String, Integer, Boolean, ForeignKey, DateTime, JSON
+from sqlalchemy import String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from sqlalchemy import JSON
 from gossipmesh.models.base import Base
 
 
@@ -37,27 +38,16 @@ class Repository(Base):
 
     organization = relationship("Organization")
     project = relationship("Project", back_populates="repositories")
-    policy = relationship("RepositoryPolicy", back_populates="repository", uselist=False, cascade="all, delete-orphan")
 
 
 class RepositoryPolicy(Base):
     __tablename__ = "repository_policies"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    repository_id: Mapped[int] = mapped_column(
-        ForeignKey("repositories.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
-    )
-    branch_protection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    auto_merge_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    require_review_approval: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    min_approvals: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    allowed_target_branches: Mapped[list] = mapped_column(JSON, default=lambda: ["main", "master"], nullable=False)
-    max_diff_lines: Mapped[int] = mapped_column(Integer, default=500, nullable=False)
-    scan_frequency_hours: Mapped[int] = mapped_column(Integer, default=24, nullable=False)
-    custom_rules: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, nullable=False)
+    policy_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
-    repository = relationship("Repository", back_populates="policy")
-
+    repository = relationship("Repository")
 
 class IndexState(Base):
     __tablename__ = "index_states"

@@ -1,4 +1,5 @@
-"""Facade re-exporting gossipmesh.services.key_pool_router.
+# services/key_pool_router.py
+"""Key‑Pool router & error‑rate telemetry.
 
 Provides:
 * `load_keys()` – reads Gemini and auxiliary provider keys from the environment
