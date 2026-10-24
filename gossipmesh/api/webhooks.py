@@ -10,7 +10,6 @@ from gossipmesh.api import deps
 from gossipmesh.models.user import User
 from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.models.audit import AuditEvent
-from gossipmesh.worker.tasks.webhook_dispatch import process_webhook_event
 
 from gossipmesh.jobs.pr_review import PRReviewJob
 from gossipmesh.workflows.issue_solver import IssueSolverWorkflow

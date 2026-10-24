@@ -1,7 +1,8 @@
-from typing import Any
-from gossipmesh.p2p.entropy import StateEntropy, VectorClockEntropy
+class VectorClockEntropy:
+    def increment(self, *args, **kwargs):
+        pass
 
 
-class Syncer:
-    def __init__(self) -> None:
-        self.entropy = VectorClockEntropy()
+class AntiEntropyEntropy:
+    def scan_mesh(self, *args, **kwargs):
+        pass

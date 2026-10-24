@@ -1,4 +1,9 @@
-from gossipmesh.p2p.entropy import StateEntropy, VectorClockEntropy
-from gossipmesh.p2p.syncer import Syncer
-
-__all__ = ["StateEntropy", "VectorClockEntropy", "Syncer"]
+from gossipmesh.p2p.entropy import (  # noqa: F401
+    VectorClockEntropy,
+    AntiEntropyEntropy,
+    VectorClockRingBuffer,
+    AntiEntropyScraper,
+    AntiEntropyEngine,
+    compute_divergence_vector,
+    compute_shannon_entropy,
+)

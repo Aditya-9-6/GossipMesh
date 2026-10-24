@@ -1,9 +1,15 @@
+from enum import Enum
 from typing import Optional, List, Dict, Any
-from datetime import datetime
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean, Table, Text, JSON, Column
+from sqlalchemy import String, Integer, ForeignKey, DateTime, JSON, Boolean, Column, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from gossipmesh.models.base import Base
+
+
+class IndexStateEnum(str, Enum):
+    PENDING = "pending"
+    INDEXED = "indexed"
 
 
 class RepositoryPolicy(Base):
@@ -68,8 +74,6 @@ class IndexState(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     repository_id: Mapped[int] = mapped_column(ForeignKey("repositories.id"), unique=True, index=True, nullable=False)
-    branch: Mapped[str] = mapped_column(String, default="main", nullable=False)
-    last_indexed_sha: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="pending", nullable=False)
     commit_sha: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     last_indexed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
