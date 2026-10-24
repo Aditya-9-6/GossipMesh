@@ -87,7 +87,7 @@ class GossipNode:
         self.pow_nonce = pow_nonce
         self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
         self.seen_messages: Set[str] = set()
-        self.recent_messages: deque = deque(maxlen=200)
+        self.recent_messages: deque[GossipMessage] = deque(maxlen=1000)
         self._load_seen_history()
         self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
 
@@ -144,6 +144,8 @@ class GossipNode:
         return msg
 
     def sync(self) -> List[GossipMessage]:
+        """Runs anti-entropy synchronization: scans the shared ledger for newly
+        arrived gossip messages from other peer nodes."""
         new_messages: List[GossipMessage] = []
         if not self.mesh_dir.exists():
             return new_messages

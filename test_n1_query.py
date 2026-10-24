@@ -98,12 +98,12 @@ client = TestClient(app)
 # Warmup
 try:
     client.get("/organizations/me")
-except Exception as e:
+except Exception:
     pass
 
 try:
     client.get("/providers/health?organization_id=1")
-except Exception as e:
+except Exception:
     pass
 
 
@@ -119,7 +119,7 @@ def run_benchmark(endpoint, num_iterations=10):
 
         try:
             client.get(endpoint)
-        except Exception as e:
+        except Exception:
             pass
 
         end = time.time()
