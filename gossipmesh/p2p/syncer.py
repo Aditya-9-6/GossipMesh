@@ -1,6 +1,6 @@
-from gossipmesh.p2p.entropy import VectorClockEntropy
+from typing import Any
 
 
-class PeerSyncer:
+class VectorClockEntropy:
     def __init__(self) -> None:
-        self.entropy = VectorClockEntropy()
+        pass

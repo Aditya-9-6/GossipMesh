@@ -2,21 +2,16 @@ from typing import Optional
 
 
 class RTOEstimator:
-    def __init__(self, initial_rto: float = 1.0, alpha: float = 0.125, beta: float = 0.25) -> None:
-        self.rto: Optional[float] = initial_rto
-        self.srtt: Optional[float] = None
-        self.rttvar: Optional[float] = None
-        self.alpha = alpha
-        self.beta = beta
+    def __init__(self, initial_rto: float = 1.0) -> None:
+        self.rto = initial_rto
 
-    def update(self, rtt: float) -> float:
-        if self.srtt is None:
-            self.srtt = rtt
-            self.rttvar = rtt / 2.0
-        else:
-            self.rttvar = (1 - self.beta) * self.rttvar + self.beta * abs(self.srtt - rtt)
-            self.srtt = (1 - self.alpha) * self.srtt + self.alpha * rtt
-        assert self.srtt is not None
-        assert self.rttvar is not None
-        self.rto = self.srtt + max(0.01, 4.0 * self.rttvar)
+    def update(self, rtt: float) -> None:
+        self.rto = (self.rto * 0.8) + (rtt * 0.2)
+
+    def get_rto(self) -> float:
         return self.rto
+
+
+def calculate_rto(srtt: Optional[float], rttvar: float, rtt: float) -> float:
+    base_srtt = srtt if srtt is not None else rtt
+    return base_srtt + 4.0 * rttvar
