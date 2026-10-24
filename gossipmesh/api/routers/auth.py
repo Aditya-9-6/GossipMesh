@@ -305,12 +305,12 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
                 credential.github_user_id = github_user_id
             elif hasattr(credential, "github_id"):
                 setattr(credential, "github_id", github_user_id)
-            
+
             if hasattr(credential, "access_token_ciphertext"):
                 credential.access_token_ciphertext = enc_access
             if hasattr(credential, "encrypted_access_token"):
                 credential.encrypted_access_token = enc_access
-                
+
             if refresh_token:
                 if hasattr(credential, "refresh_token_ciphertext"):
                     credential.refresh_token_ciphertext = enc_refresh
