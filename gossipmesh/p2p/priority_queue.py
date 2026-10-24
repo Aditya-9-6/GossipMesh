@@ -217,4 +217,3 @@ class WeightedPriorityQueue:
                 self._levels[lvl].extend(promoted_deque)
 
         return promotions_count
-"
