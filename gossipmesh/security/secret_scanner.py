@@ -140,11 +140,7 @@ class SecretScannerEngine:
             for rule_id, rule_info in self.rules.items():
                 pattern = rule_info["pattern"]
                 for match in pattern.finditer(line):
-                    matched_val = (
-                        match.group(1)
-                        if match.groups() and match.group(1) is not None
-                        else match.group(0)
-                    )
+                    matched_val = match.group(1) if match.groups() and match.group(1) is not None else match.group(0)
                     if not self.is_whitelisted(matched_val):
                         findings.append(
                             {
