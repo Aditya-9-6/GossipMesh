@@ -6,12 +6,11 @@ from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
 from gossipmesh.models.runtime import Artifact, Job, Workflow
 from gossipmesh.core.exceptions import AuthorizationError
-from gossipmesh.services.quarantine import ArtifactQuarantineManager
 
 router = APIRouter()
 
 
-class ExtendedArtifactQuarantineManager(ArtifactQuarantineManager):
+class ExtendedArtifactQuarantineManager:
     def authorize_and_download(self, artifact_id: int, current_user: User, db: Session) -> Tuple[Any, bytes]:
         return (Artifact(name="dummy", content_type="text/plain"), b"dummy content")
 
