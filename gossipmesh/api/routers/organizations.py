@@ -49,7 +49,7 @@ def require_org_admin(org_id: int, db: Session, current_user: User):
         .filter(
             UserOrganization.organization_id == org_id,
             UserOrganization.user_id == current_user.id,
-            UserOrganization.role.in_([OrganizationRole.organization_admin, OrganizationRole.owner]),
+            UserOrganization.role.in_([OrganizationRole.admin, OrganizationRole.owner]),
             UserOrganization.is_suspended == False,
         )
         .first()
