@@ -290,3 +290,9 @@ class KeyPoolRouter:
 # ---------------------------------------------------------------------------
 router = KeyPoolRouter.get_instance()
 track_error_rate = router.track_error_rate
+
+# Re-export gossipmesh services if available
+try:
+    from gossipmesh.services.key_pool_router import *  # noqa: F401, F403
+except ImportError:
+    pass
