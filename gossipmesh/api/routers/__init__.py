@@ -1,13 +1,11 @@
 from fastapi import APIRouter
-from gossipmesh.api.routers import (
-    auth,
-    organizations,
-    projects,
-    repositories,
-    providers,
-    billing,
-    enterprise,
-)
+from gossipmesh.api.routers import auth
+from gossipmesh.api.routers import organizations
+from gossipmesh.api.routers import projects
+from gossipmesh.api.routers import repositories
+from gossipmesh.api.routers import providers
+from gossipmesh.api.routers import billing
+from gossipmesh.api.routers import enterprise
 
 router = APIRouter()
 
