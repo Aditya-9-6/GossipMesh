@@ -1,10 +1,15 @@
+from enum import Enum
 from typing import Optional, List, Dict, Any
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean
+from sqlalchemy import String, Integer, ForeignKey, DateTime, JSON, Boolean, Column, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, Text, DateTime, JSON
 from pydantic import BaseModel, ConfigDict
 from gossipmesh.models.base import Base
+
+
+class IndexStateEnum(str, Enum):
+    PENDING = "pending"
+    INDEXED = "indexed"
 
 
 class RepositoryPolicy(Base):
