@@ -1,20 +1,20 @@
 # services/execution_loop.py
-"""Execution engine wrapping the core Issue→PR pipeline and package facade.
+"""Execution engine wrapping the core Issue\u2192PR pipeline and package facade.
 
 The original pipeline lives in ``scripts/autonomous_loop.py`` (functions such as
 ``process_issue`` / ``process_pr``).  This module implements the five operational
 loops described in the mission brief while keeping the core logic untouched.
 
 Loops:
-1. **Hardware & Queue Autoscaler** – probes CPU cores (via ``psutil``) and the
-   in‑memory work queue every 5 seconds and adjusts a global ``MAX_WORKERS``
+1. **Hardware & Queue Autoscaler** \u2013 probes CPU cores (via ``psutil``) and the
+   in\u2011memory work queue every 5\u202fseconds and adjusts a global ``MAX_WORKERS``
    semaphore.
-2. **Credit Gatekeeper** – deducts credits up‑front based on the job type.
-3. **LLM Router** – uses the ``key_pool_router`` singleton to perform LLM calls
-   with fail‑over.
-4. **Self‑Healing CI Sandbox** – applies the generated patch in a temporary
+2. **Credit Gatekeeper** \u2013 deducts credits up\u2011front based on the job type.
+3. **LLM Router** \u2013 uses the ``key_pool_router`` singleton to perform LLM calls
+   with fail\u2011over.
+4. **Self\u2011Healing CI Sandbox** \u2013 applies the generated patch in a temporary
    directory, runs the repo's CI command, and retries up to three times.
-5. **Watchdog & Auto‑Refund** – catches unexpected exceptions or total key
+5. **Watchdog & Auto\u2011Refund** \u2013 catches unexpected exceptions or total key
    exhaustion and refunds the appropriate credit amount.
 """
 
@@ -30,18 +30,18 @@ import shutil
 from pathlib import Path
 from typing import Any, Callable, Dict, Tuple
 
-# Local imports – the core pipeline functions are defined in ``scripts.autonomous_loop``
+# Local imports \u2013 the core pipeline functions are defined in ``scripts.autonomous_loop``
 # but we import lazily inside the ``run_task`` function to avoid circular imports.
 
 # ---------------------------------------------------------------------------
-# Credit ledger (very simple in‑memory implementation for demo purposes)
+# Credit ledger (very simple in\u2011memory implementation for demo purposes)
 # ---------------------------------------------------------------------------
 
 
 class CreditLedger:
     """Tracks credits per organization (identified by ``org_id``).
 
-    In production this would be persisted; for the test suite an in‑memory dict
+    In production this would be persisted; for the test suite an in\u2011memory dict
     is sufficient.
     """
 
@@ -72,7 +72,7 @@ class CreditLedger:
 credit_ledger = CreditLedger()
 
 # ---------------------------------------------------------------------------
-# Helper – sandbox CI execution
+# Helper \u2013 sandbox CI execution
 # ---------------------------------------------------------------------------
 
 
@@ -93,7 +93,7 @@ def _run_ci_in_sandbox(workspace: Path, patch_path: Path) -> Tuple[int, str]:
             subprocess.run(apply_cmd, cwd=repo_path, capture_output=True, text=True, check=True, timeout=30)
         except subprocess.CalledProcessError as e:
             return 1, f"Patch apply failed: {e.stderr}\n{e.stdout}"
-        # Run the CI command defined by the repository – we fall back to ``pytest``.
+        # Run the CI command defined by the repository \u2013 we fall back to ``pytest``.
         ci_cmd = os.getenv("CI_COMMAND", "pytest")
         try:
             result = subprocess.run(
@@ -119,7 +119,7 @@ class ExecutionLoop:
         self.workspace = workspace
         self.org_id = org_id
         self.cancelled = threading.Event()
-        # Semaphore limits concurrent workers – start with 1, autoscaler may raise.
+        # Semaphore limits concurrent workers \u2013 start with 1, autoscaler may raise.
         self._worker_sem = threading.Semaphore(1)
         # Metrics for autoscaling.
         self._last_scale_check = 0.0
@@ -127,7 +127,7 @@ class ExecutionLoop:
         self._max_workers = 5
 
     # ---------------------------------------------------------------------
-    # Loop 1 – Autoscaler
+    # Loop 1 \u2013 Autoscaler
     # ---------------------------------------------------------------------
     def _autoscale(self) -> None:
         now = time.time()
@@ -146,11 +146,11 @@ class ExecutionLoop:
             for _ in range(self._max_workers - self._worker_sem._value):  # pylint: disable=protected-access
                 self._worker_sem.release()
         else:
-            # scale down after idle – omitted for brevity.
+            # scale down after idle \u2013 omitted for brevity.
             pass
 
     # ---------------------------------------------------------------------
-    # Loop 2 – Credit gatekeeper
+    # Loop 2 \u2013 Credit gatekeeper
     # ---------------------------------------------------------------------
     def _deduct_credits(self, kind: str) -> bool:
         cost_map = {"issue": 2, "pr_review": 2, "combo": 3, "upgrade": 1}
@@ -161,7 +161,7 @@ class ExecutionLoop:
         return success
 
     # ---------------------------------------------------------------------
-    # Loop 3 – LLM routing (delegated to key_pool_router)
+    # Loop 3 \u2013 LLM routing (delegated to key_pool_router)
     # ---------------------------------------------------------------------
     def _run_llm(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         from services.key_pool_router import router
@@ -170,7 +170,7 @@ class ExecutionLoop:
         return wrapped(*args, **kwargs)
 
     # ---------------------------------------------------------------------
-    # Loop 4 – Self‑healing CI sandbox
+    # Loop 4 \u2013 Self\u2011healing CI sandbox
     # ---------------------------------------------------------------------
     def _self_heal_and_apply(self, generate_patch_fn: Callable[[], Path]) -> Tuple[bool, str]:
         """Generate a patch, attempt CI verification up to 3 times.
@@ -184,7 +184,7 @@ class ExecutionLoop:
             attempts += 1
             rc, out = _run_ci_in_sandbox(self.workspace, patch_path)
             if rc == 0:
-                # Success – open PR via existing core function (import lazily).
+                # Success \u2013 open PR via existing core function (import lazily).
                 from scripts.autonomous_loop import open_pr_from_patch
 
                 pr_url = open_pr_from_patch(patch_path)
@@ -193,7 +193,7 @@ class ExecutionLoop:
                 print(f"[CI] Attempt {attempts} failed (rc={rc}). Retrying...", file=sys.stderr)
                 # In a real implementation we would feed ``out`` back to the LLM.
                 continue
-        # All attempts failed – refund 1 credit if this was a combo job.
+        # All attempts failed \u2013 refund 1 credit if this was a combo job.
         credit_ledger.refund(self.org_id, 1)
         comment = f"""Patch failed CI after 3 attempts. Draft patch attached.
 ```
@@ -202,20 +202,20 @@ class ExecutionLoop:
         return False, comment
 
     # ---------------------------------------------------------------------
-    # Loop 5 – Watchdog & auto‑refund
+    # Loop 5 \u2013 Watchdog & auto\u2011refund
     # ---------------------------------------------------------------------
     def _watchdog(self, exc: Exception | None, credit_kind: str) -> None:
         if exc is None:
             return
-        # Detect key exhaustion – the router raises RuntimeError for that.
+        # Detect key exhaustion \u2013 the router raises RuntimeError for that.
         if isinstance(exc, RuntimeError) and "All provider keys exhausted" in str(exc):
             refund_amount = 2 if credit_kind in {"issue", "pr_review"} else 3
             credit_ledger.refund(self.org_id, refund_amount)
-            print(f"[Watchdog] Key pool exhausted – refunded {refund_amount} credits.")
+            print(f"[Watchdog] Key pool exhausted \u2013 refunded {refund_amount} credits.")
         else:
             refund_amount = 2 if credit_kind in {"issue", "pr_review"} else 3
             credit_ledger.refund(self.org_id, refund_amount)
-            print(f"[Watchdog] System error ({exc!r}) – refunded {refund_amount} credits.")
+            print(f"[Watchdog] System error ({exc!r}) \u2013 refunded {refund_amount} credits.")
 
     # ---------------------------------------------------------------------
     # Public entry point used by the daemon
@@ -233,13 +233,13 @@ class ExecutionLoop:
             if self.cancelled.is_set():
                 print("[Loop] Cancelled before LLM call", file=sys.stderr)
                 return
-            # LLM generation is encapsulated in ``generate_patch_fn`` – the router
+            # LLM generation is encapsulated in ``generate_patch_fn`` \u2013 the router
             # will be applied automatically when that function makes provider calls.
             success, message = self._self_heal_and_apply(generate_patch_fn)
             if success:
                 print(f"[Result] PR opened: {message}")
             else:
-                print(f"[Result] CI failed – posted draft comment: {message}")
+                print(f"[Result] CI failed \u2013 posted draft comment: {message}")
         except Exception as exc:  # pylint: disable=broad-except
             self._watchdog(exc, job_type)
         finally:

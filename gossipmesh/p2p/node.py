@@ -58,12 +58,12 @@ class GossipMessage:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
         return cls(
-            topic=data.get("topic", GossipTopic.CUSTOM),
-            origin_node=data.get("origin_node", "unknown"),
-            payload=data.get("payload", {}),
+            topic=data["topic"],
+            origin_node=data["origin_node"],
+            payload=data["payload"],
             repo=data.get("repo", "global"),
             message_id=data.get("message_id"),
-            vector_clock=data.get("vector_clock", {}),
+            vector_clock=data.get("vector_clock"),
             timestamp=data.get("timestamp"),
             ttl=data.get("ttl", 10),
         )
@@ -86,18 +86,9 @@ class GossipNode:
         self.node_id = node_id
         self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
         self.mesh_dir.mkdir(parents=True, exist_ok=True)
-        self.public_key = public_key or str(uuid.uuid4())
+        self.public_key = public_key
         self.pow_difficulty = pow_difficulty
-
-        if pow_nonce is not None:
-            self.pow_nonce = pow_nonce
-            if pow_difficulty > 0 and not verify_pow(self.public_key, self.pow_nonce, self.pow_difficulty):
-                raise ValueError("Provided PoW nonce is invalid for the given difficulty and public key")
-        elif pow_difficulty > 0:
-            self.pow_nonce, _ = mine_pow(self.public_key, pow_difficulty)
-        else:
-            self.pow_nonce = 0
-
+        self.pow_nonce = pow_nonce
         self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
         self.seen_messages: Set[str] = set()
         self.recent_messages: deque = deque(maxlen=1000)
@@ -106,7 +97,7 @@ class GossipNode:
         if base_scatter is not None:
             self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
         else:
-            self.scatter_governor = None
+            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=4)
 
     def _load_seen_history(self):
         """Loads message IDs previously witnessed to prevent duplicate processing."""
@@ -169,8 +160,6 @@ class GossipNode:
         if not self.mesh_dir.exists():
             return new_messages
         for file_path in self.mesh_dir.glob("*.json"):
-            if file_path.stem in self.seen_messages:
-                continue
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)

@@ -1,5 +1,3 @@
-"""Root-level services package facade for backward compatibility and clean importing."""
-
 # services package initialization
 
 # Export key components for easy imports

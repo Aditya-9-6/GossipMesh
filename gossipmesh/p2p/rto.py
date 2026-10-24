@@ -1,3 +1,4 @@
+import time
 from typing import Optional
 
 
@@ -20,4 +21,6 @@ class AdaptiveRTO:
         rttvar_val = self.rttvar if self.rttvar is not None else 0.0
         srtt_val = self.srtt if self.srtt is not None else measured_rtt
         self.rto = srtt_val + max(0.01, 4.0 * rttvar_val)
+
+    def get_rto(self) -> float:
         return self.rto
