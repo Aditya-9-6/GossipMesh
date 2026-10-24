@@ -6,13 +6,6 @@ from gossipmesh.models.user import User
 from gossipmesh.models.organization import UserOrganization
 from gossipmesh.models.runtime import Artifact, Job, Workflow
 from gossipmesh.core.exceptions import AuthorizationError
-from gossipmesh.services.quarantine import ArtifactQuarantineManager
-
-
-class ArtifactQuarantineManager:
-    def authorize_and_download(self, artifact_id: int, current_user: User, db: Session) -> tuple[Any, bytes]:
-        return Artifact(), b""
-
 
 router = APIRouter()
 
@@ -65,21 +58,13 @@ def download_artifact(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Response:
-    manager = ArtifactQuarantineManager()
-    if hasattr(manager, "authorize_and_download"):
-        artifact, content = manager.authorize_and_download(artifact_id, current_user, db)
-    else:
-        res = manager.download(artifact_id, current_user, db) if hasattr(manager, "download") else (None, b"")
-        if isinstance(res, tuple):
-            artifact, content = res
-        else:
-            artifact, content = res, b""
-
+    manager = ExtendedArtifactQuarantineManager()
+    artifact, content = manager.authorize_and_download(artifact_id, current_user, db)
     if not artifact:
         raise AuthorizationError(message="Artifact not found")
 
     return Response(
         content=content,
         media_type=getattr(artifact, "content_type", "application/octet-stream"),
-        headers={"Content-Disposition": f'attachment; filename="{getattr(artifact, "name", "artifact")}"'},
+        headers={"Content-Disposition": f'attachment; filename="{getattr(artifact, "name", "artifact")}"0'},
     )
