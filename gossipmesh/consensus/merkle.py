@@ -5,7 +5,7 @@ Merkle Tree implementation for state verification and synchronization.
 from __future__ import annotations
 
 import hashlib
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 
 def hash_data(data: str | bytes) -> str:
@@ -70,26 +70,3 @@ class MerkleTree:
 
     def get_root_hash(self) -> str:
         return self.root.hash_value if self.root else hash_data("")
-
-    def get_subtree_fingerprints(self) -> Dict[str, str]:
-        fingerprints: Dict[str, str] = {}
-        if not self.root:
-            return fingerprints
-        queue = [(self.root, "root")]
-        while queue:
-            node, path = queue.pop(0)
-            fingerprints[path] = node.hash_value
-            if node.left:
-                queue.append((node.left, f"{path}/left"))
-            if node.right:
-                queue.append((node.right, f"{path}/right"))
-        return fingerprints
-
-    def verify_proof(self, key: str, value: str, proof: List[Tuple[str, bool]]) -> bool:
-        current_hash = hash_data(key + value)
-        for sibling_hash, is_right in proof:
-            if is_right:
-                current_hash = hash_pair(current_hash, sibling_hash)
-            else:
-                current_hash = hash_pair(sibling_hash, current_hash)
-        return self.root is not None and current_hash == self.root.hash_value
