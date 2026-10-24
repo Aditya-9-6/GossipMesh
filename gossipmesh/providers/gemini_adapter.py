@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 import time
 
 try:
@@ -21,6 +21,7 @@ class GeminiProvider(BaseProvider):
 
     @property
     def provider_name(self) -> str:
+
         return "gemini"
 
     def _convert_messages(self, messages):
@@ -82,6 +83,8 @@ class GeminiProvider(BaseProvider):
                 yield chunk.text
 
     async def check_health(self) -> ProviderHealth:
+        if genai is None:
+            return ProviderHealth(is_healthy=False, error="google.generativeai package not installed")
         start_time = time.time()
         if not GENAI_AVAILABLE or genai is None:
             return ProviderHealth(is_healthy=False, error="google.generativeai not installed")

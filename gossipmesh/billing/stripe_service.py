@@ -200,6 +200,7 @@ class StripeBillingService:
         signature_header: str,
         tolerance: int = 300,
     ) -> Dict[str, Any]:
+        """Verifies HMAC-SHA256 signature from Stripe."""
         if not self.test_mode and stripe is not None:
             try:
                 return stripe.Webhook.construct_event(
@@ -211,6 +212,7 @@ class StripeBillingService:
             except Exception as e:
                 raise AuthenticationError(f"Stripe signature verification failed: {str(e)}")
 
+        # Pure Python fallback for tests / test_mode
         parts = {}
         for item in signature_header.split(","):
             if "=" in item:
@@ -231,7 +233,7 @@ class StripeBillingService:
         if abs(current_ts - ts_int) > tolerance:
             raise AuthenticationError("Stripe webhook signature timestamp expired")
 
-        signed_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
+signed_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
         computed_sig = hmac.new(
             self.webhook_secret.encode("utf-8"),
             signed_payload,

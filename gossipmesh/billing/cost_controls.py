@@ -154,7 +154,7 @@ class CostControlsEngine:
         session.add(audit)
         session.commit()
 
-        return workflows_stopped
+        return 1
 
     def check_provider_cost_alert(
         self,
