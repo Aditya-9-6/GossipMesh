@@ -2,6 +2,11 @@ from typing import Dict, List, Any
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
+class P2PSyncer:
+    def __init__(self) -> None:
+        self.entropy = VectorClockEntropy()
+
+
 class PeerSyncer:
     def __init__(self, node_id: str):
         self.node_id = node_id

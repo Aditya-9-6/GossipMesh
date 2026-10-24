@@ -1,13 +1,17 @@
+"""Retransmission Timeout (RTO) estimator."""
+
 import time
 
 
 class RTOEstimator:
+    """Estimates network RTO using Jacobson/Karels algorithm."""
+
     def __init__(self, initial_rto: float = 1.0):
         self.rto = initial_rto
         self.srtt: float | None = None
         self.rttvar: float | None = None
 
-    def update(self, rtt: float):
+    def update(self, rtt: float) -> None:
         if self.srtt is None:
             self.srtt = rtt
             self.rttvar = rtt / 2.0
