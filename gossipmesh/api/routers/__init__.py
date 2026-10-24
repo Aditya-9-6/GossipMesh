@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import Any, TYPE_CHECKING
 from fastapi import APIRouter
 
 if TYPE_CHECKING:
@@ -42,125 +42,162 @@ from gossipmesh.api.routers import (
     health,
 )
 
+
+class _RouterProxy:
+    def __getattr__(self, name: str) -> Any:
+        import importlib
+
+        try:
+            mod = importlib.import_module(f"gossipmesh.api.routers.{name}")
+            return mod
+        except ImportError:
+            return APIRouter()
+
+
+auth = _RouterProxy()
+organizations = _RouterProxy()
+projects = _RouterProxy()
+repositories = _RouterProxy()
+providers = _RouterProxy()
+billing = _RouterProxy()
+enterprise = _RouterProxy()
+
 router = APIRouter()
 
 try:
-    from gossipmesh.api.routers import auth
+    from gossipmesh.api.routers import auth as auth_mod
 
-    router.include_router(auth.router)
-except ImportError:
+    if hasattr(auth_mod, "router"):
+        router.include_router(auth_mod.router)
+except Exception:
     auth = None  # type: ignore
 
 try:
-    from gossipmesh.api.routers import organizations
+    from gossipmesh.api.routers import organizations as orgs_mod
 
-    router.include_router(organizations.router)
-except ImportError:
+    if hasattr(orgs_mod, "router"):
+        router.include_router(orgs_mod.router)
+except Exception:
     organizations = None  # type: ignore
 
 try:
-    from gossipmesh.api.routers import projects
+    from gossipmesh.api.routers import projects as proj_mod
 
-    router.include_router(projects.router)
-except ImportError:
+    if hasattr(proj_mod, "router"):
+        router.include_router(proj_mod.router)
+except Exception:
     projects = None  # type: ignore
 
 try:
-    from gossipmesh.api.routers import repositories
+    from gossipmesh.api.routers import repositories as repo_mod
 
-    router.include_router(repositories.router)
-except ImportError:
+    if hasattr(repo_mod, "router"):
+        router.include_router(repo_mod.router)
+except Exception:
     repositories = None  # type: ignore
 
 try:
-    from gossipmesh.api.routers import providers
+    from gossipmesh.api.routers import providers as prov_mod
 
-    router.include_router(providers.router)
-except ImportError:
+    if hasattr(prov_mod, "router"):
+        router.include_router(prov_mod.router)
+except Exception:
     providers = None  # type: ignore
 
 try:
-    from gossipmesh.api.routers import billing
+    from gossipmesh.api.routers import billing as bill_mod
 
-    router.include_router(billing.router)
-except ImportError:
+    if hasattr(bill_mod, "router"):
+        router.include_router(bill_mod.router)
+except Exception:
     billing = None  # type: ignore
 
 try:
-    from gossipmesh.api.routers import enterprise
+    from gossipmesh.api.routers import enterprise as ent_mod
 
-    router.include_router(enterprise.router)
-except ImportError:
+    if hasattr(ent_mod, "router"):
+        router.include_router(ent_mod.router)
+except Exception:
     enterprise = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import approvals
 
-    router.include_router(approvals.router)
-except ImportError:
+    if hasattr(approvals, "router"):
+        router.include_router(approvals.router)
+except Exception:
     approvals = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import users
 
-    router.include_router(users.router)
-except ImportError:
+    if hasattr(users, "router"):
+        router.include_router(users.router)
+except Exception:
     users = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import runtime
 
-    router.include_router(runtime.router)
-except ImportError:
+    if hasattr(runtime, "router"):
+        router.include_router(runtime.router)
+except Exception:
     runtime = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import artifacts
 
-    router.include_router(artifacts.router)
-except ImportError:
+    if hasattr(artifacts, "router"):
+        router.include_router(artifacts.router)
+except Exception:
     artifacts = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import vector_search
 
-    router.include_router(vector_search.router)
-except ImportError:
+    if hasattr(vector_search, "router"):
+        router.include_router(vector_search.router)
+except Exception:
     vector_search = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import service_accounts
 
-    router.include_router(service_accounts.router)
-except ImportError:
+    if hasattr(service_accounts, "router"):
+        router.include_router(service_accounts.router)
+except Exception:
     service_accounts = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import sso
 
-    router.include_router(sso.router)
-except ImportError:
+    if hasattr(sso, "router"):
+        router.include_router(sso.router)
+except Exception:
     sso = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import scim
 
-    router.include_router(scim.router)
-except ImportError:
+    if hasattr(scim, "router"):
+        router.include_router(scim.router)
+except Exception:
     scim = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import runs
 
-    router.include_router(runs.router)
-except ImportError:
+    if hasattr(runs, "router"):
+        router.include_router(runs.router)
+except Exception:
     runs = None  # type: ignore
 
 try:
     from gossipmesh.api.routers import health
 
-    router.include_router(health.router)
-except ImportError:
+    if hasattr(health, "router"):
+        router.include_router(health.router)
+except Exception:
     health = None  # type: ignore
 
 __all__ = [
