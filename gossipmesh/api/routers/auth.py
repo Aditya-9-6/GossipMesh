@@ -288,19 +288,27 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
             db.refresh(user)
 
         credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == user.id).first()
+        enc_access = encrypt_string(access_token)
+        enc_refresh = encrypt_string(refresh_token) if refresh_token else None
         if not credential:
             credential = UserGitHubCredential(
                 user_id=user.id,
                 github_user_id=github_user_id,
-                access_token_ciphertext=encrypt_string(access_token),
-                refresh_token_ciphertext=encrypt_string(refresh_token) if refresh_token else None,
+                access_token_ciphertext=enc_access,
+                refresh_token_ciphertext=enc_refresh,
             )
             db.add(credential)
         else:
             credential.github_user_id = github_user_id
-            credential.access_token_ciphertext = encrypt_string(access_token)
+            if hasattr(credential, "access_token_ciphertext"):
+                credential.access_token_ciphertext = enc_access
+            elif hasattr(credential, "encrypted_access_token"):
+                credential.encrypted_access_token = enc_access
             if refresh_token:
-                credential.refresh_token_ciphertext = encrypt_string(refresh_token)
+                if hasattr(credential, "refresh_token_ciphertext"):
+                    credential.refresh_token_ciphertext = enc_refresh
+                elif hasattr(credential, "encrypted_refresh_token"):
+                    credential.encrypted_refresh_token = enc_refresh
 
         db.commit()
 
@@ -373,7 +381,11 @@ def github_refresh_token(
     current_user: User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)
 ) -> Any:
     credential = db.query(UserGitHubCredential).filter(UserGitHubCredential.user_id == current_user.id).first()
-    token_cipher = getattr(credential, "access_token_ciphertext", getattr(credential, "encrypted_refresh_token", None))
+    token_cipher = None
+    if credential:
+        token_cipher = getattr(
+            credential, "access_token_ciphertext", getattr(credential, "encrypted_access_token", None)
+        )
     if not credential or not token_cipher:
         raise AuthenticationError(message="No GitHub refresh token available for this user")
 
