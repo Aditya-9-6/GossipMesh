@@ -1,6 +1,6 @@
-from typing import List, Optional, Any
-import threading
+from typing import List, Optional, Any, Tuple, Dict
 import random
+import threading
 
 
 class SkipListNode:
@@ -18,9 +18,9 @@ class ConcurrentSkipListRoutingTable:
         self.max_level = max_level
         self.p = p
         self.size = 0
-        self._global_lock = threading.Lock()
         self.header = SkipListNode("", None, max_level, float("-inf"), 0.0)
         self.level = 1
+        self._global_lock = threading.RLock()
 
     def _random_level(self) -> int:
         lvl = 1
@@ -36,10 +36,12 @@ class ConcurrentSkipListRoutingTable:
                     current = current.forward[i]
             current = current.forward[0]
             if current and current.key == key:
+                if current.score != 0.0 or current.latency != 0.0:
+                    return (current.score, current.latency)
                 return current.value
             return None
 
-    def insert(self, key: str, value: Any, score: float = 0.0, latency: float = 0.0) -> None:
+    def insert(self, key: str, value: Any = None, score: float = 0.0, latency: float = 0.0) -> None:
         with self._global_lock:
             update: List[Optional[SkipListNode]] = [None] * self.max_level
             curr: Optional[SkipListNode] = self.header
@@ -62,14 +64,14 @@ class ConcurrentSkipListRoutingTable:
             node = SkipListNode(key, value, lvl, score, latency)
             for i in range(lvl):
                 up = update[i]
-                node.forward[i] = up.forward[i] if up else None
                 if up:
+                    node.forward[i] = up.forward[i]
                     up.forward[i] = node
             self.size += 1
             if self.size > self.capacity:
                 self._evict_worst()
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str) -> bool:
         with self._global_lock:
             update: List[Optional[SkipListNode]] = [None] * self.max_level
             current = self.header
@@ -79,17 +81,21 @@ class ConcurrentSkipListRoutingTable:
                 update[i] = current
 
             current = current.forward[0]
-            if current and current.key == key:
-                for i in range(self.level):
-                    if update[i] and update[i].forward[i] != current:
-                        break
-                    if update[i]:
-                        update[i].forward[i] = current.forward[i]
+            if not current or current.key != key:
+                return False
 
-                while self.level > 1 and self.header.forward[self.level - 1] is None:
-                    self.level -= 1
-                self.size -= 1
+            for i in range(self.level):
+                up = update[i]
+                if not up or up.forward[i] != current:
+                    break
+                up.forward[i] = current.forward[i]
 
+            while self.level > 1 and self.header.forward[self.level - 1] is None:
+                self.level -= 1
+            self.size -= 1
+            return True
+
+    
     def range_query(self, start_key: str, end_key: str) -> List[Any]:
         with self._global_lock:
             res: List[Any] = []
@@ -102,6 +108,15 @@ class ConcurrentSkipListRoutingTable:
             while current and current.key <= end_key:
                 res.append(current.value)
                 current = current.forward[0]
+            return res
+
+    def get_top_peers(self, limit: int = 10) -> List[Dict[str, Any]]:
+        with self._global_lock:
+            res: List[Dict[str, Any]] = []
+            curr = self.header.forward[0]
+            while curr and len(res) < limit:
+                res.append({"key": curr.key, "score": curr.score, "latency": curr.latency, "value": curr.value})
+                curr = curr.forward[0]
             return res
 
     def _evict_worst(self) -> None:
@@ -126,7 +141,11 @@ class ConcurrentSkipListRoutingTable:
             update[i] = curr
 
         for i in range(self.level):
-            up = update[i]
+            up = update[i] if i < len(update) else None
             if up and up.forward[i] == worst_node:
                 up.forward[i] = worst_node.forward[i]
+
+        while self.level > 1 and self.header.forward[self.level - 1] is None:
+            self.level -= 1
+
         self.size -= 1

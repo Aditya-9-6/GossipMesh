@@ -143,7 +143,8 @@ class CostControlsEngine:
             )
             .values(status="cancelled")
         )
-        session.execute(wf_stmt)
+        wf_result = session.execute(wf_stmt)
+        workflows_stopped = int(wf_result.rowcount) if hasattr(wf_result, "rowcount") else 0
 
         # Cancel associated jobs
         job_stmt = (
@@ -164,6 +165,7 @@ class CostControlsEngine:
             details={
                 "reason": reason,
                 "actor": actor,
+                "workflows_stopped": workflows_stopped,
             },
         )
         session.add(audit)

@@ -30,7 +30,9 @@ class BranchSelectRequest(BaseModel):
 class RepositoryPolicyUpdate(BaseModel):
     branch_protection_enabled: Optional[bool] = None
     auto_merge_enabled: Optional[bool] = None
+    auto_fix_enabled: Optional[bool] = None
     require_review_approval: Optional[bool] = None
+    require_review: Optional[bool] = None
     min_approvals: Optional[int] = Field(None, ge=1, le=10)
     allowed_target_branches: Optional[List[str]] = None
     max_diff_lines: Optional[int] = Field(None, ge=10, le=100000)
@@ -148,7 +150,9 @@ def sync_repository(
         raise AuthorizationError(message="Not authorized for this organization")
 
     def _sync_task(full_name: str, installation_id: int, org_id: int):
-        mock_rsa_key = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOQIBAAJAVY6qupT3\n-----END RSA PRIVATE KEY-----"
+        mock_rsa_key = """-----BEGIN RSA PRIVATE KEY-----
+MIIBOQIBAAJAVY6qupT3
+-----END RSA PRIVATE KEY-----"""
         github = GitHubIntegration(app_id="12345", private_key=mock_rsa_key)
         try:
             logger.info(f"Mock Syncing {full_name} for installation {installation_id}")
@@ -242,12 +246,18 @@ def update_repository_policy(
     if policy_in.branch_protection_enabled is not None:
         policy.branch_protection_enabled = policy_in.branch_protection_enabled
         changes["branch_protection_enabled"] = policy_in.branch_protection_enabled
-    if policy_in.auto_merge_enabled is not None:
-        policy.auto_merge_enabled = policy_in.auto_merge_enabled
-        changes["auto_merge_enabled"] = policy_in.auto_merge_enabled
-    if policy_in.require_review_approval is not None:
-        policy.require_review_approval = policy_in.require_review_approval
-        changes["require_review_approval"] = policy_in.require_review_approval
+    val_auto_merge = (
+        policy_in.auto_merge_enabled if policy_in.auto_merge_enabled is not None else policy_in.auto_fix_enabled
+    )
+    if val_auto_merge is not None:
+        policy.auto_merge_enabled = val_auto_merge
+        changes["auto_merge_enabled"] = val_auto_merge
+    val_review = (
+        policy_in.require_review_approval if policy_in.require_review_approval is not None else policy_in.require_review
+    )
+    if val_review is not None:
+        policy.require_review_approval = val_review
+        changes["require_review_approval"] = val_review
     if policy_in.min_approvals is not None:
         policy.min_approvals = policy_in.min_approvals
         changes["min_approvals"] = policy_in.min_approvals

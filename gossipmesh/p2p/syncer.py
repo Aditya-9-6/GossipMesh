@@ -2,9 +2,12 @@ from typing import Any
 from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
-class Syncer:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        pass
+class P2PSyncer:
+    def __init__(self, entropy: VectorClockEntropy | None = None, *args: Any, **kwargs: Any) -> None:
+        self.entropy = entropy or VectorClockEntropy()
+
+    def sync(self) -> Any:
+        return True
 
 
-P2PSyncer = Syncer
+Syncer = P2PSyncer
