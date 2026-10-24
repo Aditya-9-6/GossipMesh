@@ -58,4 +58,4 @@ venv/
 .env.*
 
 .pyssip_mesh/
-__pycache__/
+venv_test/

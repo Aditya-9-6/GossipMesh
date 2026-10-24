@@ -1,7 +1,27 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Dict, Generator, Optional
+from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import Span, StatusCode
+
+from gossipmesh.core.config import settings
+from gossipmesh.core.logging import redact_sensitive_data
+
+# Global provider and tracer initialization
+_RESOURCE = Resource.create(
+    {
+        "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
+        "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+    }
+)
+
+_PROVIDER: Optional[TracerProvider] = None
+_MEMORY_EXPORTER: Optional[InMemorySpanExporter] = None
 
 
 class MockStatusCode:
