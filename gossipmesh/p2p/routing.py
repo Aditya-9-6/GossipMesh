@@ -1,11 +1,12 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 import threading
 import random
 
 
 class SkipListNode:
-    def __init__(self, key: str, score: float, latency: float, level: int):
+    def __init__(self, key: str, value: Any, level: int, score: float = 0.0, latency: float = 0.0):
         self.key = key
+        self.value = value
         self.score = score
         self.latency = latency
         self.forward: List[Optional["SkipListNode"]] = [None] * level
@@ -16,10 +17,10 @@ class ConcurrentSkipListRoutingTable:
         self.capacity = capacity
         self.max_level = max_level
         self.p = p
-        self.head = SkipListNode("", float("-inf"), 0.0, max_level)
-        self.level = 1
         self.size = 0
         self._global_lock = threading.Lock()
+        self.header = SkipListNode("", None, max_level, float("-inf"), 0.0)
+        self.level = 1
 
     def _random_level(self) -> int:
         lvl = 1
@@ -27,16 +28,28 @@ class ConcurrentSkipListRoutingTable:
             lvl += 1
         return lvl
 
-    def insert(self, key: str, score: float, latency: float) -> None:
+    def search(self, key: str) -> Any:
+        with self._global_lock:
+            current = self.header
+            for i in range(self.level - 1, -1, -1):
+                while current.forward[i] and current.forward[i].key < key:
+                    current = current.forward[i]
+            current = current.forward[0]
+            if current and current.key == key:
+                return current.value
+            return None
+
+    def insert(self, key: str, value: Any, score: float = 0.0, latency: float = 0.0) -> None:
         with self._global_lock:
             update: List[Optional[SkipListNode]] = [None] * self.max_level
-            curr: Optional[SkipListNode] = self.head
+            curr: Optional[SkipListNode] = self.header
             for i in range(self.level - 1, -1, -1):
                 while curr and curr.forward[i] and curr.forward[i].key < key:
                     curr = curr.forward[i]
                 update[i] = curr
             curr = curr.forward[0] if curr else None
             if curr and curr.key == key:
+                curr.value = value
                 curr.score = score
                 curr.latency = latency
                 return
@@ -44,9 +57,9 @@ class ConcurrentSkipListRoutingTable:
             lvl = self._random_level()
             if lvl > self.level:
                 for i in range(self.level, lvl):
-                    update[i] = self.head
+                    update[i] = self.header
                 self.level = lvl
-            node = SkipListNode(key, score, latency, lvl)
+            node = SkipListNode(key, value, lvl, score, latency)
             for i in range(lvl):
                 up = update[i]
                 node.forward[i] = up.forward[i] if up else None
@@ -56,8 +69,43 @@ class ConcurrentSkipListRoutingTable:
             if self.size > self.capacity:
                 self._evict_worst()
 
+    def delete(self, key: str) -> None:
+        with self._global_lock:
+            update: List[Optional[SkipListNode]] = [None] * self.max_level
+            current = self.header
+            for i in range(self.level - 1, -1, -1):
+                while current.forward[i] and current.forward[i].key < key:
+                    current = current.forward[i]
+                update[i] = current
+
+            current = current.forward[0]
+            if current and current.key == key:
+                for i in range(self.level):
+                    if update[i] and update[i].forward[i] != current:
+                        break
+                    if update[i]:
+                        update[i].forward[i] = current.forward[i]
+
+                while self.level > 1 and self.header.forward[self.level - 1] is None:
+                    self.level -= 1
+                self.size -= 1
+
+    def range_query(self, start_key: str, end_key: str) -> List[Any]:
+        with self._global_lock:
+            res: List[Any] = []
+            current = self.header
+            for i in range(self.level - 1, -1, -1):
+                while current.forward[i] and current.forward[i].key < start_key:
+                    current = current.forward[i]
+
+            current = current.forward[0]
+            while current and current.key <= end_key:
+                res.append(current.value)
+                current = current.forward[0]
+            return res
+
     def _evict_worst(self) -> None:
-        curr: Optional[SkipListNode] = self.head
+        curr: Optional[SkipListNode] = self.header
         worst_node = None
         worst_score = float("-inf")
         while curr and curr.forward[0]:
@@ -71,7 +119,7 @@ class ConcurrentSkipListRoutingTable:
             return
 
         update: List[Optional[SkipListNode]] = [None] * self.max_level
-        curr = self.head
+        curr = self.header
         for i in range(self.level - 1, -1, -1):
             while curr and curr.forward[i] and curr.forward[i] != worst_node:
                 curr = curr.forward[i]
