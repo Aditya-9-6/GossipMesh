@@ -3,7 +3,7 @@ from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
 class P2PSyncer:
-    def __init__(self, node_id: Optional[str] = None, entropy: VectorClockEntropy | None = None) -> None:
+    def __init__(self, node_id: Optional[str] = None, entropy: Optional[VectorClockEntropy] = None) -> None:
         self.node_id = node_id
         self.entropy = entropy or VectorClockEntropy()
 
