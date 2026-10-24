@@ -7,6 +7,16 @@ from gossipmesh.api.routers import (
     providers,
     repositories,
     webhooks,
+    users,
+    runtime,
+    artifacts,
+    enterprise,
+    vector_search,
+    service_accounts,
+    sso,
+    scim,
+    runs,
+    health,
 )
 
 __all__ = [
@@ -18,4 +28,14 @@ __all__ = [
     "providers",
     "repositories",
     "webhooks",
+    "users",
+    "runtime",
+    "artifacts",
+    "enterprise",
+    "vector_search",
+    "service_accounts",
+    "sso",
+    "scim",
+    "runs",
+    "health",
 ]
