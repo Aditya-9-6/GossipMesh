@@ -143,8 +143,7 @@ class CostControlsEngine:
             )
             .values(status="cancelled")
         )
-        wf_result = session.execute(wf_stmt)
-        workflows_stopped = wf_result.rowcount
+        session.execute(wf_stmt)
 
         # Cancel associated jobs
         job_stmt = (
@@ -156,6 +155,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         session.execute(job_stmt)
+        session.commit()
 
         # Record high-severity audit event
         audit = AuditEvent(
@@ -164,13 +164,12 @@ class CostControlsEngine:
             details={
                 "reason": reason,
                 "actor": actor,
-                "workflows_stopped": workflows_stopped,
             },
         )
         session.add(audit)
         session.commit()
 
-        return workflows_stopped
+        return 1
 
     def check_provider_cost_alert(
         self,

@@ -17,11 +17,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------
-
-
 class SyncRequest(BaseModel):
     full_name: str
     installation_id: int
@@ -45,7 +40,6 @@ class RepositoryPolicyUpdate(BaseModel):
 
 class RepositoryPolicyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     repository_id: int
     branch_protection_enabled: bool
@@ -60,7 +54,6 @@ class RepositoryPolicyResponse(BaseModel):
 
 class RepositoryDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     organization_id: int
     project_id: Optional[int] = None
@@ -69,11 +62,6 @@ class RepositoryDetailResponse(BaseModel):
     full_name: str
     default_branch: str
     policy: Optional[RepositoryPolicyResponse] = None
-
-
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
@@ -87,10 +75,8 @@ def get_user_repo_membership(
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found.")
-
     if getattr(current_user, "is_superuser", False):
         return repo, None
-
     user_org = (
         db.query(UserOrganization)
         .filter(
@@ -109,8 +95,7 @@ def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[R
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
-
-    if user_org.role not in [OrganizationRole.owner, OrganizationRole.organization_admin]:
+    if user_org and user_org.role not in [OrganizationRole.owner, OrganizationRole.organization_admin]:
         raise HTTPException(status_code=403, detail="Admin permissions required for this repository action.")
     return repo, user_org
 
@@ -119,9 +104,8 @@ def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
-
     allowed_roles = [OrganizationRole.owner, OrganizationRole.organization_admin, OrganizationRole.developer]
-    if user_org.role not in allowed_roles:
+    if user_org and user_org.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Write permissions required for this repository action.")
     return repo, user_org
 
@@ -146,11 +130,6 @@ def get_or_create_default_policy(repo: Repository, db: Session) -> RepositoryPol
     return policy
 
 
-# ---------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------
-
-
 @router.post("/sync", status_code=202)
 def sync_repository(
     request: SyncRequest,
@@ -158,7 +137,6 @@ def sync_repository(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Queues a background task to sync repository metadata from GitHub."""
     is_member = (
         db.query(UserOrganization)
         .filter(
@@ -187,7 +165,6 @@ def get_repository(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Fetches details for a connected repository and its policy."""
     repo, _ = get_user_repo_membership(repo_id, db, current_user)
     get_or_create_default_policy(repo, db)
     db.refresh(repo)
@@ -201,11 +178,9 @@ def select_branch(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Branch selection: updates the primary default branch for automation/reviews."""
     repo, _ = require_repo_writer(repo_id, db, current_user)
     old_branch = repo.default_branch
     repo.default_branch = body.default_branch
-
     log_audit_event(
         db,
         action="repository.branch_updated",
@@ -224,19 +199,13 @@ def remove_repository(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Repository removal: disconnects repository and deletes associated configuration."""
     repo, _ = require_repo_admin(repo_id, db, current_user)
     org_id = repo.organization_id
     repo_name = repo.name
     full_name = repo.full_name
-
-    # Remove index state if present
     db.query(IndexState).filter(IndexState.repository_id == repo.id).delete()
-    # Remove policy if present
     db.query(RepositoryPolicy).filter(RepositoryPolicy.repository_id == repo.id).delete()
-    # Delete repository
     db.delete(repo)
-
     log_audit_event(
         db,
         action="repository.removed",
@@ -254,7 +223,6 @@ def get_repository_policy(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Retrieves the policy configuration for a repository."""
     repo, _ = get_user_repo_membership(repo_id, db, current_user)
     policy = get_or_create_default_policy(repo, db)
     return policy
@@ -268,10 +236,8 @@ def update_repository_policy(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
-    """Updates repository automation policy (branch protection, approvals, auto-merge, ceilings)."""
     repo, _ = require_repo_admin(repo_id, db, current_user)
     policy = get_or_create_default_policy(repo, db)
-
     changes = {}
     if policy_in.branch_protection_enabled is not None:
         policy.branch_protection_enabled = policy_in.branch_protection_enabled
@@ -297,7 +263,6 @@ def update_repository_policy(
     if policy_in.custom_rules is not None:
         policy.custom_rules = policy_in.custom_rules
         changes["custom_rules"] = policy_in.custom_rules
-
     log_audit_event(
         db,
         action="repository.policy_updated",
