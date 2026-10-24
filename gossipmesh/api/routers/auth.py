@@ -212,13 +212,15 @@ def github_callback(request: Request, code: str, state: str, db: Session = Depen
         raise AuthenticationError(message="Invalid or expired state parameter")
     redis_client.delete(redis_key)
     client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
+
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
                 "client_id": client_id,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_secret": client_secret,
                 "code": code,
                 "redirect_uri": f"{request.base_url}api/v1/auth/github/callback",
             },
@@ -365,13 +367,15 @@ def github_refresh_token(
 
     refresh_token = decrypt_string(token_cipher)
     client_id = getattr(settings, "GITHUB_CLIENT_ID", getattr(settings, "GITHUB_CLIENT_SECRET", ""))
+    client_secret = getattr(settings, "GITHUB_CLIENT_SECRET", "")
+
     with httpx.Client() as client:
         token_response = client.post(
             "https://github.com/login/oauth/access_token",
             headers={"Accept": "application/json"},
             data={
                 "client_id": client_id,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "client_secret": client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": refresh_token,
             },
