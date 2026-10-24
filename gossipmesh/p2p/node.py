@@ -208,3 +208,9 @@ class GossipNode:
                         file_path.unlink(missing_ok=True)
             except Exception:
                 continue
+
+
+class P2PNode(GossipNode):
+    """Alias/Compat wrapper for GossipNode."""
+
+    pass

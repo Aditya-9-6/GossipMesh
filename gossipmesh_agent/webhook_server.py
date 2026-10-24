@@ -1,11 +1,19 @@
+# webhook_server.py – Simple Flask server for GitHub App events
+"""Entry point that receives GitHub webhook payloads, validates the HMAC
+signature, transforms the event into a minimal job description and pushes it
+onto the Redis queue consumed by ``gossipmesh_agent.queue_worker``.
+
+The server is deliberately lightweight – it runs on Render (or any other
+container host) and does not need any privileged Docker access. All heavy
+lifting is delegated to the worker processes.
+"""
+
+import json
 import os
 import sys
-import json
-import hmac
-import hashlib
-import logging
 from pathlib import Path
-from flask import Flask, request, jsonify, abort
+
+from flask import Flask, request, abort
 
 # Import internal utilities – the package lives in the repository root.
 # The repository root is added to ``sys.path`` by the Flask runner.
@@ -16,24 +24,12 @@ if str(repo_root) not in sys.path:
 from gossipmesh_agent import utils, ingestion
 from gossipmesh_agent.queue_worker import REDIS_URL, redis_client, JOB_QUEUE, HEARTBEAT_PREFIX, CANCEL_PREFIX
 
-GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
-GITHUB_WEBHOOK_SECRET = GITHUB_SECRET
+GITHUB_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET") or os.getenv("GITHUB_SECRET") or ""
 
 app = Flask(__name__)
 
 # Load optional .env for local development (Render supplies env vars via its UI)
-if os.path.exists(".env"):
-    try:
-        from dotenv import load_dotenv
-
-        load_dotenv()
-    except ImportError:
-        pass
-
 utils.load_dotenv()
-
-logger = logging.getLogger("gossipmesh_agent.webhook")
-logging.basicConfig(level=logging.INFO)
 
 
 @app.route("/cancel/<job_id>", methods=["POST"])
@@ -42,6 +38,7 @@ def cancel_job(job_id: str):
     Sets the Redis cancel flag for the given job id.
     Returns 200 if flag set, 404 if job not found in Redis.
     """
+    # Simple existence check – if a heartbeat exists we consider it active.
     key = f"{HEARTBEAT_PREFIX}{job_id}"
     if not redis_client.exists(key):
         return {"status": "not_found", "job_id": job_id}, 404
@@ -53,53 +50,41 @@ def verify_signature(headers: dict, payload: bytes) -> bool:
     """Validate the ``X-Hub-Signature-256`` header using the shared secret.
     Returns ``True`` if the signature matches or the secret is missing (fallback for
     local debugging)."""
-    secret = GITHUB_SECRET or GITHUB_WEBHOOK_SECRET
-    if not secret:
+    if not GITHUB_SECRET:
         return True
     signature = headers.get("X-Hub-Signature-256")
     if not signature:
         return False
-    if "=" in signature:
-        _, sig_hash = signature.split("=", 1)
-    else:
-        sig_hash = signature
-    mac = hmac.new(secret.encode(), msg=payload, digestmod=hashlib.sha256)
-    return hmac.compare_digest(mac.hexdigest(), sig_hash)
+    import hmac, hashlib
 
-
-@app.route("/healthz", methods=["GET"])
-def healthz():
-    return jsonify({"status": "ok", "service": "gossipmesh-agent-webhook"}), 200
+    expected = "sha256=" + hmac.new(GITHUB_SECRET.encode(), payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
 
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # Raw body for HMAC verification
     raw_body = request.get_data()
     if not verify_signature(request.headers, raw_body):
         utils.logger.warning("Invalid webhook signature")
-        return jsonify({"error": "Invalid signature"}), 401
+        abort(400, "Invalid signature")
 
-    event_type = request.headers.get("X-GitHub-Event", "ping")
+    event = request.headers.get("X-GitHub-Event")
+    if not event:
+        abort(400, "Missing X-GitHub-Event header")
+
     payload = request.get_json(silent=True) or {}
-
-    try:
-        job = ingestion.handle_github_event(event_type, payload)
-        job_id = utils.slugify(json.dumps(job)[:80])
-        job["id"] = job_id
-
-        if redis_client:
-            redis_client.rpush(JOB_QUEUE, json.dumps(job))
-            utils.logger.info("Enqueued job %s of type %s to Redis queue %s", job_id, event_type, JOB_QUEUE)
-        else:
-            utils.logger.error("Redis client not configured; cannot enqueue job.")
-            return jsonify({"error": "Queue unavailable"}), 500
-    except Exception as e:
-        utils.logger.exception(f"Failed to enqueue webhook event: {e}")
-        return jsonify({"error": "Internal error enqueuing job"}), 500
-
-    return jsonify({"status": "queued", "job_id": job_id, "event": event_type}), 202
+    job = ingestion.handle_github_event(event, payload)
+    # Attach a simple ID for tracing – we reuse the slug function.
+    job_id = utils.slugify(json.dumps(job)[:80])
+    job["id"] = job_id
+    # Push onto Redis list (LPUSH for ordering, BLPOP in worker reads from the tail)
+    redis_client.rpush(JOB_QUEUE, json.dumps(job))
+    utils.logger.info("Enqueued job %s of type %s", job_id, job.get("type"))
+    return {"status": "queued", "job_id": job_id}, 202
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
+    # Render expects the server to bind to $PORT, default to 8080 for local dev.
+    port = int(os.getenv("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)

@@ -44,6 +44,8 @@ class RepositoryPolicyUpdate(BaseModel):
 
 
 class RepositoryPolicyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     repository_id: int
     branch_protection_enabled: bool
@@ -55,10 +57,10 @@ class RepositoryPolicyResponse(BaseModel):
     scan_frequency_hours: int
     custom_rules: Dict[str, Any]
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 class RepositoryDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     organization_id: int
     project_id: Optional[int] = None
@@ -67,8 +69,6 @@ class RepositoryDetailResponse(BaseModel):
     full_name: str
     default_branch: str
     policy: Optional[RepositoryPolicyResponse] = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------------------------------------------------
