@@ -17,11 +17,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------
-
-
 class SyncRequest(BaseModel):
     full_name: str
     installation_id: int
@@ -73,11 +68,6 @@ class RepositoryDetailResponse(BaseModel):
     full_name: str
     default_branch: str
     policy: Optional[RepositoryPolicyResponse] = None
-
-
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
 
 
 def log_audit_event(db: Session, action: str, actor_id: int, org_id: int, details: dict):
@@ -148,11 +138,6 @@ def get_or_create_default_policy(repo: Repository, db: Session) -> RepositoryPol
     return policy
 
 
-# ---------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------
-
-
 @router.post("/sync", status_code=202)
 def sync_repository(
     request: SyncRequest,
@@ -172,7 +157,7 @@ def sync_repository(
 
     def _sync_task(full_name: str, installation_id: int, org_id: int):
         mock_rsa_key = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOQIBAAJAVY6qupT3\n-----END RSA PRIVATE KEY-----"
-        github = GitHubIntegration(app_id="12345", private_key=mock_rsa_key)
+        GitHubIntegration(app_id="12345", private_key=mock_rsa_key)
         try:
             logger.info(f"Mock Syncing {full_name} for installation {installation_id}")
         except Exception as e:
@@ -265,32 +250,34 @@ def update_repository_policy(
     if policy_in.branch_protection_enabled is not None:
         policy.branch_protection_enabled = policy_in.branch_protection_enabled
         changes["branch_protection_enabled"] = policy_in.branch_protection_enabled
-    if policy_in.auto_fix_enabled is not None and hasattr(policy, "auto_fix_enabled"):
-        policy.auto_fix_enabled = policy_in.auto_fix_enabled
+    if hasattr(policy, "branch_protection_enabled") and policy_in.branch_protection_enabled is not None:
+        setattr(policy, "branch_protection_enabled", policy_in.branch_protection_enabled)
+    if policy_in.auto_fix_enabled is not None:
+        setattr(policy, "auto_fix_enabled", policy_in.auto_fix_enabled)
         changes["auto_fix_enabled"] = policy_in.auto_fix_enabled
     if policy_in.auto_merge_enabled is not None:
-        policy.auto_merge_enabled = policy_in.auto_merge_enabled
+        setattr(policy, "auto_merge_enabled", policy_in.auto_merge_enabled)
         changes["auto_merge_enabled"] = policy_in.auto_merge_enabled
-    if policy_in.require_review is not None and hasattr(policy, "require_review"):
-        policy.require_review = policy_in.require_review
+    if policy_in.require_review is not None:
+        setattr(policy, "require_review", policy_in.require_review)
         changes["require_review"] = policy_in.require_review
     if policy_in.require_review_approval is not None:
-        policy.require_review_approval = policy_in.require_review_approval
+        setattr(policy, "require_review_approval", policy_in.require_review_approval)
         changes["require_review_approval"] = policy_in.require_review_approval
     if policy_in.min_approvals is not None:
-        policy.min_approvals = policy_in.min_approvals
+        setattr(policy, "min_approvals", policy_in.min_approvals)
         changes["min_approvals"] = policy_in.min_approvals
     if policy_in.allowed_target_branches is not None:
-        policy.allowed_target_branches = policy_in.allowed_target_branches
+        setattr(policy, "allowed_target_branches", policy_in.allowed_target_branches)
         changes["allowed_target_branches"] = policy_in.allowed_target_branches
     if policy_in.max_diff_lines is not None:
-        policy.max_diff_lines = policy_in.max_diff_lines
+        setattr(policy, "max_diff_lines", policy_in.max_diff_lines)
         changes["max_diff_lines"] = policy_in.max_diff_lines
     if policy_in.scan_frequency_hours is not None:
-        policy.scan_frequency_hours = policy_in.scan_frequency_hours
+        setattr(policy, "scan_frequency_hours", policy_in.scan_frequency_hours)
         changes["scan_frequency_hours"] = policy_in.scan_frequency_hours
     if policy_in.custom_rules is not None:
-        policy.custom_rules = policy_in.custom_rules
+        setattr(policy, "custom_rules", policy_in.custom_rules)
         changes["custom_rules"] = policy_in.custom_rules
     log_audit_event(
         db,

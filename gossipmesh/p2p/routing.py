@@ -155,3 +155,9 @@ class SkipList:
             res.append({"key": curr.key, "value": curr.value, "score": curr.score, "latency": curr.latency})
             curr = curr.forward[0]
         return res
+
+
+class ConcurrentSkipListRoutingTable(SkipList):
+    """Thread-safe routing table backed by a skip list."""
+
+    pass

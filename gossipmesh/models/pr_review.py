@@ -82,10 +82,11 @@ class ReviewTestResult(BaseModel):
 
 
 class TestResultRecord(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
     status: str
     name: Optional[str] = None
     message: Optional[str] = None
 
 
-# Alias for compatibility imports
-TestResult = TestResultRecord
+Test = TestResultRecord
+TestResult = ReviewTestResult
