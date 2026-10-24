@@ -22,6 +22,18 @@ class Organization(Base):
     name = Column(String(255), unique=True, index=True, nullable=False)
 
 
+class GithubAppInstallation(Base):
+    __tablename__ = "github_app_installations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    installation_id = Column(String(255), unique=True, index=True, nullable=False)
+    account_name = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    organization = relationship("Organization", backref="github_installations")
+
+
 class UserOrganization(Base):
     __tablename__ = "user_organizations"
 
