@@ -5,9 +5,15 @@ from gossipmesh.p2p.entropy import VectorClockEntropy
 
 
 class StateSyncer:
-    def __init__(self, node_id: str):
+    def __init__(self, node_id: str, entropy: VectorClockEntropy | None = None) -> None:
         self.node_id = node_id
-        self.entropy = VectorClockEntropy()
+        self.entropy = entropy or VectorClockEntropy()
 
-    def sync(self, peer_state: Dict[str, Any]) -> Dict[str, Any]:
+    def sync(self, peer_state: Dict[str, Any] | None = None) -> Dict[str, Any] | Any:
+        if peer_state is None:
+            return True
         return {"status": "synced", "peer": self.node_id}
+
+
+P2PSyncer = StateSyncer
+Syncer = StateSyncer

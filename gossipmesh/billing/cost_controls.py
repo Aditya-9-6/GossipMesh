@@ -123,7 +123,7 @@ class CostControlsEngine:
             .values(status="cancelled")
         )
         wf_result = session.execute(wf_stmt)
-        workflows_stopped = wf_result.rowcount if hasattr(wf_result, "rowcount") else 0
+        workflows_stopped = int(wf_result.rowcount) if hasattr(wf_result, "rowcount") else 0
 
         job_stmt = (
             update(Job)

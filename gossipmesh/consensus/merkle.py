@@ -13,10 +13,11 @@ def hash_data(data: bytes) -> str:
 
 
 class MerkleNode:
-    def __init__(self, hash_value: str, left: Optional[MerkleNode] = None, right: Optional[MerkleNode] = None):
+    def __init__(self, hash_value: str, left: Optional[MerkleNode] = None, right: Optional[MerkleNode] = None, key: Optional[str] = None):
         self.hash_value = hash_value
         self.left = left
         self.right = right
+        self.key = key
 
 
 class MerkleTree:
@@ -56,4 +57,20 @@ class MerkleTree:
                 _traverse(node.right, prefix + "1")
 
         _traverse(self.root, "")
+        return fingerprints
+
+    def get_subtree_fingerprints(self) -> Dict[str, str]:
+        """Returns all subtree keys and their respective fingerprints."""
+        fingerprints: Dict[str, str] = {}
+        if not self.root:
+            return fingerprints
+        queue = [(self.root, "root")]
+        while queue:
+            node, path = queue.pop(0)
+            if getattr(node, "key", None):
+                fingerprints[node.key] = node.hash_value
+            if node.left:
+                queue.append((node.left, path + "0"))
+            if node.right:
+                queue.append((node.right, path + "1"))
         return fingerprints

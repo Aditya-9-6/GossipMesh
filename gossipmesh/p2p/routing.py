@@ -1,96 +1,137 @@
+from typing import List, Optional, Any, Tuple, Dict
 import random
 import threading
-from typing import Any, Dict, List, Optional
 
 
 class SkipListNode:
-    def __init__(self, key: str, value: Any, levels: int):
+    def __init__(self, key: str, value: Any, level: int, score: float = 0.0, latency: float = 0.0):
         self.key = key
         self.value = value
-        self.forward: List[Optional["SkipListNode"]] = [None] * levels
+        self.score = score
+        self.latency = latency
+        self.forward: List[Optional["SkipListNode"]] = [None] * level
 
 
-class P2PRoutingTable:
-    """Probabilistic Skip List based routing table for peer discovery and key-value indexing."""
-
-    def __init__(self, max_levels: int = 16, p: float = 0.5):
-        self.max_levels = max_levels
+class SkipList:
+    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
+        self.max_level = max_level
         self.p = p
-        self.head = SkipListNode("", None, max_levels)
+        self.capacity = capacity
+        self.size = 0
+        self.header = SkipListNode("", None, max_level)
         self.level = 1
+        self._global_lock = threading.RLock()
 
     def _random_level(self) -> int:
         lvl = 1
-        while random.random() < self.p and lvl < self.max_levels:
+        while random.random() < self.p and lvl < self.max_level:
             lvl += 1
         return lvl
 
-    def insert(self, key: str, value: Any):
-        update: List[Optional[SkipListNode]] = [None] * self.max_levels
-        curr = self.head
+    def insert(self, key: str, value: Any = None, score: float = 0.0, latency: float = 0.0) -> None:
+        with self._global_lock:
+            update: List[Optional[SkipListNode]] = [None] * self.max_level
+            curr: Optional[SkipListNode] = self.header
+            for i in range(self.level - 1, -1, -1):
+                while curr and curr.forward[i] and curr.forward[i].key < key:
+                    curr = curr.forward[i]
+                update[i] = curr
+            curr = curr.forward[0] if curr else None
+            if curr and curr.key == key:
+                curr.value = value
+                curr.score = score
+                curr.latency = latency
+                return
+            lvl = self._random_level()
+            if lvl > self.level:
+                for i in range(self.level, lvl):
+                    update[i] = self.header
+                self.level = lvl
+            node = SkipListNode(key, value, lvl, score, latency)
+            for i in range(lvl):
+                up_node = update[i]
+                if up_node:
+                    node.forward[i] = up_node.forward[i]
+                    up_node.forward[i] = node
+            self.size += 1
+            if self.size > self.capacity:
+                self._evict_worst()
 
-        for i in range(self.level - 1, -1, -1):
-            while curr.forward[i] is not None and curr.forward[i].key < key:
-                curr = curr.forward[i]  # type: ignore
-            update[i] = curr
+    def _evict_worst(self) -> None:
+        curr: Optional[SkipListNode] = self.header
+        worst_node = None
+        worst_score = float("-inf")
+        while curr and curr.forward[0]:
+            nxt = curr.forward[0]
+            if nxt and nxt.score > worst_score:
+                worst_score = nxt.score
+                worst_node = nxt
+            curr = nxt
 
-        curr = curr.forward[0]  # type: ignore
-
-        if curr is not None and curr.key == key:
-            curr.value = value
+        if not worst_node:
             return
 
-        lvl = self._random_level()
-        if lvl > self.level:
-            for i in range(self.level, lvl):
-                update[i] = self.head
-            self.level = lvl
-
-        new_node = SkipListNode(key, value, lvl)
-        for i in range(lvl):
-            nxt = update[i].forward[i] if update[i] is not None else None
-            new_node.forward[i] = nxt
-            if update[i] is not None:
-                update[i].forward[i] = new_node  # type: ignore
-
-    def search(self, key: str) -> Optional[Any]:
-        curr = self.head
+        update: List[Optional[SkipListNode]] = [None] * self.max_level
+        curr = self.header
         for i in range(self.level - 1, -1, -1):
-            while curr.forward[i] is not None and curr.forward[i].key < key:
-                curr = curr.forward[i]  # type: ignore
+            while curr and curr.forward[i] and curr.forward[i] != worst_node:
+                curr = curr.forward[i]
+            update[i] = curr
 
-        curr = curr.forward[0]  # type: ignore
-        if curr is not None and curr.key == key:
+        for i in range(len(worst_node.forward)):
+            up_node = update[i] if i < len(update) else None
+            if up_node and up_node.forward[i] == worst_node:
+                up_node.forward[i] = worst_node.forward[i]
+
+        while self.level > 1 and self.header.forward[self.level - 1] is None:
+            self.level -= 1
+
+        self.size -= 1
+
+    def search(self, key: str) -> Any:
+        curr: Optional[SkipListNode] = self.header
+        for i in range(self.level - 1, -1, -1):
+            while curr and curr.forward[i] and curr.forward[i].key < key:
+                curr = curr.forward[i]
+        curr = curr.forward[0] if curr else None
+        if curr and curr.key == key:
+            if curr.score != 0.0 or curr.latency != 0.0:
+                return (curr.score, curr.latency)
             return curr.value
         return None
 
     def delete(self, key: str) -> bool:
-        update: List[Optional[SkipListNode]] = [None] * self.max_levels
-        curr = self.head
+        with self._global_lock:
+            update: List[Optional[SkipListNode]] = [None] * self.max_level
+            curr: Optional[SkipListNode] = self.header
+            for i in range(self.level - 1, -1, -1):
+                while curr and curr.forward[i] and curr.forward[i].key < key:
+                    curr = curr.forward[i]
+                update[i] = curr
+            curr = curr.forward[0] if curr else None
+            if not curr or curr.key != key:
+                return False
+            for i in range(self.level):
+                up_node = update[i]
+                if not up_node or up_node.forward[i] != curr:
+                    break
+                up_node.forward[i] = curr.forward[i]
+            while self.level > 1 and self.header.forward[self.level - 1] is None:
+                self.level -= 1
+            self.size -= 1
+            return True
 
-        for i in range(self.level - 1, -1, -1):
-            while curr.forward[i] is not None and curr.forward[i].key < key:
-                curr = curr.forward[i]  # type: ignore
-            update[i] = curr
-
-        curr = curr.forward[0]  # type: ignore
-
-        if curr is None or curr.key != key:
-            return False
-
-        for i in range(self.level):
-            if update[i].forward[i] != curr:
-                break
-            update[i].forward[i] = curr.forward[i]  # type: ignore
-
-        while self.level > 1 and self.head.forward[self.level - 1] is None:
-            self.level -= 1
-
-        return True
+    def get_top_peers(self, limit: int = 10) -> List[Dict[str, Any]]:
+        res: List[Dict[str, Any]] = []
+        curr = self.header.forward[0]
+        while curr and len(res) < limit:
+            res.append({"key": curr.key, "score": curr.score, "latency": curr.latency, "value": curr.value})
+            curr = curr.forward[0]
+        return res
 
     def range_query(self, start_key: str, end_key: str) -> List[Dict[str, Any]]:
         res: List[Dict[str, Any]] = []
-        curr = self.head
+        curr = self.header
         for i in range(self.level - 1, -1, -1):
             while curr.forward[i] is not None and curr.forward[i].key < start_key:
                 curr = curr.forward[i]  # type: ignore
@@ -103,16 +144,23 @@ class P2PRoutingTable:
         return res
 
 
+class P2PRoutingTable(SkipList):
+    """Probabilistic Skip List based routing table for peer discovery and key-value indexing."""
+
+    def __init__(self, max_levels: int = 16, p: float = 0.5):
+        super().__init__(max_level=max_levels, p=p)
+
+
 class ConcurrentSkipListRoutingTable(P2PRoutingTable):
     """Thread-safe extension of P2PRoutingTable with capacity constraints supporting test_routing.py."""
 
     def __init__(self, max_levels: int = 16, p: float = 0.5, capacity: Optional[int] = None):
         super().__init__(max_levels=max_levels, p=p)
-        self.capacity = capacity
-        self.size = 0
+        if capacity is not None:
+            self.capacity = capacity
         self._lock = threading.Lock()
 
-    def insert(self, key: str, *args: Any):
+    def insert(self, key: str, *args: Any) -> None:
         with self._lock:
             val = args[0] if len(args) == 1 else args
             exists = self.search(key) is not None
@@ -120,8 +168,7 @@ class ConcurrentSkipListRoutingTable(P2PRoutingTable):
             if not exists:
                 self.size += 1
                 if self.capacity is not None and self.size > self.capacity:
-                    # Evict last element if over capacity
-                    curr = self.head.forward[0]
+                    curr = self.header.forward[0]
                     last_key = None
                     while curr is not None:
                         last_key = curr.key
