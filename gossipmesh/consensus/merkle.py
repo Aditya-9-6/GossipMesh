@@ -1,84 +1,59 @@
+"""
+Merkle Tree implementation for state verification and synchronization.
+"""
+
+from __future__ import annotations
+
 import hashlib
 from typing import Dict, List, Optional, Tuple
 
 
-def hash_data(data: str) -> str:
-    """Computes SHA-256 hash for a given string."""
-    return hashlib.sha256(data.encode("utf-8")).hexdigest()
-
-
-def hash_pair(left: str, right: str) -> str:
-    """Computes parent hash from left and right child hashes."""
-    combined = left + right
-    return hashlib.sha256(combined.encode("utf-8")).hexdigest()
+def hash_data(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 class MerkleNode:
-    """Represents a node in the Merkle tree."""
-
-    def __init__(self, key: Optional[str] = None, value_hash: Optional[str] = None):
-        self.key = key
-        self.value_hash = value_hash
-        self.left: Optional[MerkleNode] = None
-        self.right: Optional[MerkleNode] = None
-        self.hash = value_hash if value_hash else ""
+    def __init__(self, hash_value: str, left: Optional[MerkleNode] = None, right: Optional[MerkleNode] = None):
+        self.hash_value = hash_value
+        self.left = left
+        self.right = right
 
 
 class MerkleTree:
-    """Hierarchical Merkle tree for state partitions and anti-entropy sync."""
+    def __init__(self, items: List[bytes]):
+        self.items = items
+        self.root = self.build_tree(items)
 
-    def __init__(self, items: Optional[Dict[str, str]] = None):
-        self.root: Optional[MerkleNode] = None
-        self.items: Dict[str, str] = {}
-        if items:
-            for k, v in items.items():
-                self.insert(k, v)
+    def build_tree(self, items: List[bytes]) -> Optional[MerkleNode]:
+        if not items:
+            return None
 
-    def insert(self, key: str, value: str) -> None:
-        """Inserts or updates a key-value pair and recomputes the tree."""
-        self.items[key] = value
-        self._rebuild()
+        nodes = [MerkleNode(hash_data(item)) for item in items]
+        while len(nodes) > 1:
+            next_level: List[MerkleNode] = []
+            for i in range(0, len(nodes), 2):
+                left = nodes[i]
+                right = nodes[i + 1] if i + 1 < len(nodes) else left
+                combined_hash = hash_data((left.hash_value + right.hash_value).encode("utf-8"))
+                next_level.append(MerkleNode(combined_hash, left, right))
+            nodes = next_level
 
-    def _rebuild(self) -> None:
-        """Rebuilds the Merkle tree from sorted items."""
-        sorted_keys = sorted(self.items.keys())
-        if not sorted_keys:
-            self.root = None
-            return
-        nodes = [MerkleNode(key=k, value_hash=hash_data(self.items[k])) for k in sorted_keys]
-        self.root = self._build_level(nodes)
+        return nodes[0]
 
-    def _build_level(self, nodes: List[MerkleNode]) -> MerkleNode:
-        """Recursively builds tree levels from node lists (<60 LOC)."""
-        if len(nodes) == 1:
-            return nodes[0]
-        next_level = []
-        for i in range(0, len(nodes), 2):
-            left = nodes[i]
-            right = nodes[i + 1] if i + 1 < len(nodes) else nodes[i]
-            parent = MerkleNode()
-            parent.left = left
-            parent.right = right
-            parent.hash = hash_pair(left.hash, right.hash)
-            next_level.append(parent)
-        return self._build_level(next_level)
+    def get_root_hash(self) -> Optional[str]:
+        return self.root.hash_value if self.root else None
 
-    def get_root_hash(self) -> str:
-        """Returns root fingerprint of the Merkle tree."""
-        return self.root.hash if self.root else hash_data("")
+    def get_fingerprints(self) -> Dict[str, str]:
+        fingerprints: Dict[str, str] = {}
 
-    def get_subtree_fingerprints(self) -> Dict[str, str]:
-        """Returns all subtree keys and their respective fingerprints."""
-        fingerprints = {}
-        if not self.root:
-            return fingerprints
-        queue = [(self.root, "root")]
-        while queue:
-            node, path = queue.pop(0)
-            if node.key:
-                fingerprints[node.key] = node.hash
+        def _traverse(node: Optional[MerkleNode], prefix: str):
+            if not node:
+                return
+            fingerprints[prefix] = node.hash_value
             if node.left:
-                queue.append((node.left, path + ".left"))
-            if node.right and node.right != node.left:
-                queue.append((node.right, path + ".right"))
+                _traverse(node.left, prefix + "0")
+            if node.right:
+                _traverse(node.right, prefix + "1")
+
+        _traverse(self.root, "")
         return fingerprints
