@@ -233,7 +233,7 @@ class StripeBillingService:
         if abs(current_ts - ts_int) > tolerance:
             raise AuthenticationError("Stripe webhook signature timestamp expired")
 
-signed_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
+        signed_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
         computed_sig = hmac.new(
             self.webhook_secret.encode("utf-8"),
             signed_payload,

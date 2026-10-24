@@ -1,11 +1,8 @@
-try:
-    from gossipmesh.models.base import Base
-except ImportError:
-    from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base
 
-    Base = declarative_base()
+Base = declarative_base()
 
-# Import all models to ensure they are registered with Base.metadata
+# Import all models in correct order after Base is defined to prevent circular imports
 from gossipmesh.models.user import User, UserGitHubCredential, UserOIDCCredential
 from gossipmesh.models.organization import Organization, UserOrganization, OrganizationInvitation
 from gossipmesh.models.project import Project
