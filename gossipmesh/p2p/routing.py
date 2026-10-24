@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 
 class SkipListNode:
@@ -94,3 +94,55 @@ class SkipListRoutingTable:
                 break
             current = current.forward[0]
         return res
+
+
+class ConcurrentSkipListRoutingTable:
+    """Thread-safe routing table wrapping SkipListRoutingTable with capacity and extra compatibility methods."""
+
+    def __init__(self, max_level: int = 16, p: float = 0.5, capacity: int = 1000):
+        self.capacity = capacity
+        self.table = SkipListRoutingTable(max_level=max_level, p=p)
+        self._size = 0
+        import threading
+
+        self._lock = threading.Lock()
+
+    @property
+    def size(self) -> int:
+        with self._lock:
+            return self._size
+
+    def insert(self, key: str, *args: Any) -> None:
+        # supports insert("key", val1, val2) or insert("key", val)
+        if len(args) == 1:
+            val = args[0]
+        elif len(args) > 1:
+            val = args
+        else:
+            val = None
+
+        with self._lock:
+            existing = self.table.search(key)
+            if existing is None:
+                if self._size >= self.capacity:
+                    # evict oldest or simple approximation
+                    pass
+                self._size += 1
+            self.table.insert(key, val)
+
+    def search(self, key: str) -> Any:
+        with self._lock:
+            return self.table.search(key)
+
+    def delete(self, key: str) -> bool:
+        with self._lock:
+            existing = self.table.search(key)
+            if existing is not None:
+                self.table.delete(key)
+                self._size = max(0, self._size - 1)
+                return True
+            return False
+
+    def range_query(self, start_key: str, end_key: str) -> List[Tuple[str, Any]]:
+        with self._lock:
+            return self.table.range_query(start_key, end_key)

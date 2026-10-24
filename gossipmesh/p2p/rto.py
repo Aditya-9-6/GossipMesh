@@ -9,18 +9,19 @@ class RTOEstimator:
         self.alpha = alpha
         self.beta = beta
 
-    def update_rtt(self, rtt: float) -> None:
+    def update(self, rtt: float) -> float:
         if self.srtt is None:
             self.srtt = rtt
             self.rttvar = rtt / 2.0
         else:
-            self.rttvar = (1 - self.beta) * self.rttvar + self.beta * abs(self.srtt - rtt)
+            self.rttvar = (
+                (1 - self.beta) * self.rttvar + self.beta * abs(self.srtt - rtt)
+                if self.rttvar is not None
+                else rtt / 2.0
+            )
             self.srtt = (1 - self.alpha) * self.srtt + self.alpha * rtt
-        assert self.srtt is not None
-        assert self.rttvar is not None
-        self.rto = self.srtt + max(0.01, 4.0 * self.rttvar)
 
-    def backoff(self) -> None:
-        self.rto = min(60.0, self.rto * 2.0)
-
-    get_rto = lambda self: self.rto
+        rttvar_val = self.rttvar if self.rttvar is not None else 0.0
+        srtt_val = self.srtt if self.srtt is not None else rtt
+        self.rto = srtt_val + max(0.01, 4.0 * rttvar_val)
+        return self.rto
