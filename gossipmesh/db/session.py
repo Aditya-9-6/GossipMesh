@@ -16,7 +16,7 @@ if os.environ.get("ENVIRONMENT") == "test":
     from gossipmesh.models.project import Project
     from gossipmesh.models.audit import AuditEvent
     from gossipmesh.models.provider import ProviderCredential
-    from gossipmesh.models.repository import Repository, IndexState
+    from gossipmesh.models.repository import Repository, RepositoryPolicy, IndexState
     from gossipmesh.models.runtime import Workflow, Job, Budget, Artifact
     from gossipmesh.models.service_account import ServiceAccount, APIKey
     from gossipmesh.models.finding import Finding
@@ -32,3 +32,5 @@ else:
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+from gossipmesh.db.base import Base
