@@ -3,6 +3,6 @@ from fastapi import APIRouter
 router = APIRouter()
 
 
-@router.get("/billing")
-def get_billing():
+@router.get("/")
+def get_billing() -> dict:
     return {"status": "active"}

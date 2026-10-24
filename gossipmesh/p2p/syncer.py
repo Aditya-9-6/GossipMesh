@@ -6,6 +6,10 @@ except ImportError:
     from gossipmesh.consensus import ByzantineConsensusEngine as VectorClockEntropy  # type: ignore
 
 
+class Syncer:
+    pass
+
+
 class EntropySyncer:
     def __init__(self, entropy: Optional[VectorClockEntropy] = None):
         self.entropy = entropy or VectorClockEntropy()
