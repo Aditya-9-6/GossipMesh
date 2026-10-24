@@ -1,3 +1,3 @@
-__all__ = ["P2PSyncer"]
+from .entropy import VectorClockEntropy
 
-from gossipmesh.p2p.syncer import P2PSyncer
+__all__ = ["VectorClockEntropy"]
