@@ -145,6 +145,7 @@ class SkipList:
 
 class SkipListRoutingTable(SkipList):
     """Alias or subclass of SkipList for backward compatibility with routing table naming."""
+
     pass
 
 
