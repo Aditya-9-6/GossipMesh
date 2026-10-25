@@ -123,7 +123,6 @@ class AstAnalyzer:
 
     def _analyze_directory(self, repo_path: Path, diff_text: str) -> str:
         modified_files = self._parse_diff(diff_text)
-
         modified_functions = []
 
         all_rust_files = list(repo_path.rglob("*.rs"))
@@ -200,7 +199,7 @@ class AstAnalyzer:
         for func_info in modified_functions:
             key_seq: Sequence[str] = [func_info["name"]]
             func_name_str = str(func_info["name"])
-            dep_list = dependencies.get(func_name_str, [])
+            dep_list = dependencies.get(func_name_str) or []
             report.append(
                 {
                     "modified_file": func_info["file"],

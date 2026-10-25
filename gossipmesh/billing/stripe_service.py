@@ -76,12 +76,13 @@ class StripeBillingService:
         if not org:
             raise ValidationError(f"Organization ID {organization_id} not found")
 
+        cust_name = name or org.name or ""
         if self.test_mode or stripe is None:
             stripe_cust_id = f"cus_test_{organization_id}_{int(time.time())}"
         else:
             res = stripe.Customer.create(
                 email=email,
-                name=name or org.name,
+                name=cust_name,
                 metadata={"organization_id": str(organization_id)},
             )
             stripe_cust_id = res.id
@@ -90,7 +91,7 @@ class StripeBillingService:
             organization_id=organization_id,
             stripe_customer_id=stripe_cust_id,
             email=email,
-            name=name or org.name,
+            name=cust_name,
         )
         session.add(customer)
         session.commit()
@@ -205,7 +206,6 @@ class StripeBillingService:
         signature_header: str,
         tolerance: int = 300,
     ) -> Dict[str, Any]:
-        """Verifies HMAC-SHA256 signature from Stripe."""
         if not self.test_mode and stripe is not None:
             try:
                 return stripe.Webhook.construct_event(
@@ -217,8 +217,7 @@ class StripeBillingService:
             except Exception as e:
                 raise AuthenticationError(f"Stripe signature verification failed: {str(e)}")
 
-        # Pure Python fallback for tests / test_mode
-        parts = {}
+        parts: Dict[str, str] = {}
         for item in signature_header.split(","):
             if "=" in item:
                 k, v = item.split("=", 1)
@@ -270,7 +269,7 @@ class StripeBillingService:
                 sub_id = data_obj.get("id")
                 cust_id = data_obj.get("customer")
                 plan_id = data_obj.get("plan", {}).get("id") or "pro"
-                status = data_obj.get("status", "active")
+                status_val = data_obj.get("status", "active")
                 cancel_at_period_end = data_obj.get("cancel_at_period_end", False)
                 quantity = data_obj.get("quantity", 1)
 
@@ -285,13 +284,13 @@ class StripeBillingService:
                             stripe_subscription_id=sub_id,
                             stripe_customer_id=cust_id,
                             plan_id=plan_id,
-                            status=status,
+                            status=status_val,
                             quantity=quantity,
                             cancel_at_period_end=cancel_at_period_end,
                         )
                         session.add(sub)
                     else:
-                        sub.status = status
+                        sub.status = status_val
                         sub.plan_id = plan_id
                         sub.quantity = quantity
                         sub.cancel_at_period_end = cancel_at_period_end
@@ -310,7 +309,7 @@ class StripeBillingService:
                 amount_due = data_obj.get("amount_due", 0)
                 amount_paid = data_obj.get("amount_paid", 0)
                 currency = data_obj.get("currency", "usd")
-                status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
+                inv_status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
                 invoice_url = data_obj.get("hosted_invoice_url")
                 invoice_pdf = data_obj.get("invoice_pdf")
 
@@ -327,13 +326,13 @@ class StripeBillingService:
                             amount_due=amount_due,
                             amount_paid=amount_paid,
                             currency=currency,
-                            status=status,
+                            status=inv_status,
                             hosted_invoice_url=invoice_url or "",
                             invoice_pdf=invoice_pdf or "",
                         )
                         session.add(inv)
                     else:
-                        inv.status = status
+                        inv.status = inv_status
                         inv.amount_paid = amount_paid
 
             record = ProcessedWebhookEvent(

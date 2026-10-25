@@ -49,6 +49,11 @@ def load_private_key(key_input: Optional[str] = None):
 
     if key_input:
         p = Path(key_input)
+        if not p.is_file():
+            # Try relative to repo root if not absolute/relative to cwd
+            repo_fallback = Path(__file__).resolve().parent.parent / key_input
+            if repo_fallback.is_file():
+                p = repo_fallback
         if p.is_file():
             pem_bytes = p.read_bytes()
         elif "BEGIN" in key_input:

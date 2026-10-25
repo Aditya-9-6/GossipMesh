@@ -1,8 +1,5 @@
 """
 Enterprise Cost Controls & Anomaly Detection Engine (Task 92).
-
-Provides provider cost alerts, organization budget alerts, emergency shutdown,
-and cost anomaly detection.
 """
 
 from __future__ import annotations
@@ -35,8 +32,6 @@ class CostControlConfig:
 
 
 class CostControlsEngine:
-    """Enterprise cost controls, budget alerts, anomaly detection, and emergency shutdown."""
-
     def __init__(self, config: Optional[CostControlConfig] = None):
         self.config = config or CostControlConfig()
 
@@ -45,10 +40,6 @@ class CostControlsEngine:
         session: Session,
         organization_id: int,
     ) -> Tuple[BudgetAlertLevel, Dict[str, Any]]:
-        """
-        Evaluates current organization spend against monthly budget cap.
-        Emits an immutable AuditEvent if thresholds are breached.
-        """
         stmt = select(Budget).where(Budget.organization_id == organization_id)
         budget = session.execute(stmt).scalars().first()
 
@@ -95,10 +86,6 @@ class CostControlsEngine:
         historical_spends: List[float],
         current_spend: float,
     ) -> Tuple[bool, str]:
-        """
-        Detects sudden cost spikes using rolling statistical variance.
-        Flags as anomaly if spend exceeds baseline by configured multiplier standard deviations.
-        """
         if not historical_spends or len(historical_spends) < 3:
             return False, "Insufficient historical data for anomaly baseline"
 
@@ -175,7 +162,6 @@ class CostControlsEngine:
         current_spend_usd: float,
         limit_usd: float,
     ) -> Optional[Dict[str, Any]]:
-        """Checks provider-level consumption against configured limit threshold."""
         if limit_usd <= 0:
             return None
 
