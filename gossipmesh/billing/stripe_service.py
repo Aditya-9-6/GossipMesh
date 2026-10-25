@@ -128,7 +128,7 @@ class StripeBillingService:
             cancel_url=c_url,
             subscription_data={"metadata": {"organization_id": str(organization_id), "plan_id": plan_id}},
         )
-        return {"id": session_obj.id, "url": session_obj.url}
+        return {"id": session_obj.id, "url": str(session_obj.url)}
 
     def create_billing_portal_session(
         self,
@@ -149,7 +149,7 @@ class StripeBillingService:
             customer=customer.stripe_customer_id,
             return_url=ret_url,
         )
-        return {"url": portal_session.url}
+        return {"url": str(portal_session.url)}
 
     def get_active_subscription(self, session: Session, organization_id: int) -> Optional[BillingSubscription]:
         stmt = (

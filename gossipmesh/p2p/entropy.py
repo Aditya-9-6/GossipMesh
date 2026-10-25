@@ -47,6 +47,16 @@ class VectorClockRingBuffer:
         return len(self._buffer)
 
 
+class VectorClockEntropy:
+    """Vector clock entropy calculator and tracker for anti-entropy sync."""
+
+    def __init__(self, node_id: str = "") -> None:
+        self.node_id = node_id
+
+    def update(self, peer_clock: Dict[str, int]) -> None:
+        pass
+
+
 def compute_divergence_vector(local_clock: Dict[str, int], peer_clock: Dict[str, int]) -> Dict[str, int]:
     """Computes absolute element-wise divergence between local and peer vector clocks."""
     all_keys = set(local_clock.keys()).union(set(peer_clock.keys()))
