@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple, List
 
 
 class LoginThrottler:
@@ -44,17 +44,18 @@ class LoginThrottler:
         attempts, _ = self.attempts_tuple.get(key, (0, now))
         if attempts >= self.max_attempts:
             self.lockouts[key] = now + self.window_seconds
-            return True, self.max_attempts, float(self.window_seconds)
-        limited = self.is_rate_limited(key)
-        return limited, self.max_attempts, float(self.window_seconds)
+            return True, self.window_seconds, float(self.window_seconds)
+        return False, 0, 0.0
 
     def record_success(self, key: str) -> None:
         self.reset(key)
 
-    def check_lockout(self, username: str) -> Tuple[bool, int]:
-        limited = self.is_rate_limited(username)
-        remaining = 0 if not limited else self.window_seconds
-        return limited, remaining
+    def check_lockout(self, key: str) -> Tuple[bool, int]:
+        now = time.time()
+        lock_until = self.lockouts.get(key, 0)
+        if now < lock_until:
+            return True, int(lock_until - now)
+        return False, 0
 
     def clear(self, key: str) -> None:
         self.reset(key)
