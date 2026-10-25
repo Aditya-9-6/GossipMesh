@@ -118,10 +118,10 @@ class GossipNode:
                                 if mid:
                                     self.seen_messages.add(mid)
                                     self._message_cache.append(GossipMessage.from_dict(data))
-                            except Exception:
-                                pass
-            except Exception:
-                pass
+                            except Exception as e:
+                                print(f"[{self.node_id}] Error parsing ledger history line: {e}")
+            except Exception as e:
+                print(f"[{self.node_id}] Error reading ledger history: {e}")
 
     def subscribe(self, topic: GossipTopic, handler: Callable[[GossipMessage], None]):
         """Registers a reactive listener callback for a gossip topic."""
@@ -193,8 +193,8 @@ class GossipNode:
                                         handler(msg)
                                     except Exception as e:
                                         print(f"[{self.node_id}] Gossip dispatch error: {e}")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[{self.node_id}] Error parsing sync line: {e}")
         except Exception as e:
             print(f"[{self.node_id}] Sync error: {e}")
 
@@ -206,7 +206,8 @@ class GossipNode:
         if self.heartbeats_file.exists():
             try:
                 hb = json.loads(self.heartbeats_file.read_text(encoding="utf-8"))
-            except Exception:
+            except Exception as e:
+                print(f"[{self.node_id}] Error reading heartbeats: {e}")
                 hb = {}
 
         hb[self.node_id] = {
@@ -215,8 +216,8 @@ class GossipNode:
         }
         try:
             self.heartbeats_file.write_text(json.dumps(hb, indent=2), encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[{self.node_id}] Error writing heartbeats: {e}")
 
     def get_recent_messages(self, topic: Optional[GossipTopic] = None, limit: int = 50) -> List[GossipMessage]:
         """Fetches the latest gossip messages from the in-memory cache."""
@@ -252,8 +253,8 @@ class GossipNode:
                         # Retain if not expired (ttl is in hours)
                         if msg_time + (msg_ttl * 3600) >= now:
                             valid_lines.append(line_str)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[{self.node_id}] Error parsing cleanup line: {e}")
 
             # Rewrite ledger with valid lines
             with open(self.log_file, "w", encoding="utf-8") as f:
@@ -266,7 +267,7 @@ class GossipNode:
                 try:
                     data = json.loads(line_str)
                     self._message_cache.append(GossipMessage.from_dict(data))
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[{self.node_id}] Error reloading cache line: {e}")
         except Exception as e:
             print(f"[{self.node_id}] Ledger cleanup error: {e}")

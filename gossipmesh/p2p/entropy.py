@@ -99,6 +99,12 @@ class AntiEntropyScraper:
         return sync_peers
 
 
+class VectorClockEntropy(AntiEntropyScraper):
+    """Compatibility alias/class for VectorClockEntropy referenced by syncer."""
+
+    pass
+
+
 class AntiEntropyEngine:
     """Engine supporting both scraper-based divergence and state reconciliation tests."""
 

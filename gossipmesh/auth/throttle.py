@@ -44,7 +44,7 @@ class LoginThrottler:
         attempts, _ = self.attempts_tuple.get(key, (0, now))
         if attempts >= self.max_attempts:
             self.lockouts[key] = now + self.window_seconds
-            return True, self.window_seconds, 0.0
+            return True, self.window_seconds, float(self.window_seconds)
         return False, 0, 0.0
 
     def record_success(self, key: str) -> None:
