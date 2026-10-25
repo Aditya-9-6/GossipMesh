@@ -1,8 +1,8 @@
+"""P2P Syncer module."""
+
+
 class VectorClockEntropy:
-    def increment(self, *args, **kwargs):
-        pass
+    pass
 
 
-class AntiEntropyEntropy:
-    def scan_mesh(self, *args, **kwargs):
-        pass
+__all__ = ["VectorClockEntropy"]

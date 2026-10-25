@@ -13,7 +13,7 @@ from gossipmesh.repository.github import GitHubIntegration
 from gossipmesh.core.exceptions import AuthorizationError
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = logging
 
 
 class SyncRequest(BaseModel):
@@ -91,15 +91,20 @@ def get_user_repo_membership(
         raise HTTPException(status_code=403, detail="Not authorized for this repository's organization.")
     return repo, user_org
 
-
 def require_repo_admin(repo_id: int, db: Session, current_user: User) -> Tuple[Repository, Optional[UserOrganization]]:
     repo, user_org = get_user_repo_membership(repo_id, db, current_user)
     if getattr(current_user, "is_superuser", False):
         return repo, user_org
     role_val = getattr(user_org, "role", None)
     allowed_admin_roles = [
-        OrganizationRole.admin,
-        OrganizationRole.owner,
+        role
+        for role in (
+            getattr(OrganizationRole, "ADMIN", None),
+            getattr(OrganizationRole, "OWNER", None),
+            getattr(OrganizationRole, "admin", None),
+            getattr(OrganizationRole, "owner", None),
+        )
+        if role is not None
     ]
     if role_val not in allowed_admin_roles:
         raise HTTPException(status_code=403, detail="Admin permissions required for this repository action.")
@@ -112,9 +117,16 @@ def require_repo_writer(repo_id: int, db: Session, current_user: User) -> Tuple[
         return repo, user_org
     role_val = getattr(user_org, "role", None)
     allowed_writer_roles = [
-        OrganizationRole.admin,
-        OrganizationRole.owner,
-        OrganizationRole.developer,
+        role
+        for role in (
+            getattr(OrganizationRole, "ADMIN", None),
+            getattr(OrganizationRole, "OWNER", None),
+            getattr(OrganizationRole, "DEVELOPER", None),
+            getattr(OrganizationRole, "admin", None),
+            getattr(OrganizationRole, "owner", None),
+            getattr(OrganizationRole, "developer", None),
+        )
+        if role is not None
     ]
     if role_val not in allowed_writer_roles:
         raise HTTPException(status_code=403, detail="Write permissions required for this repository action.")

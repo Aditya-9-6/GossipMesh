@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 from typing import Any
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
-Base: Any = declarative_base()
 
-from gossipmesh.models.organization import Organization
-from gossipmesh.models.webhook_event import WebhookEvent
-from gossipmesh.models.user import User
+class Base(DeclarativeBase, MappedAsDataclass):
+    pass
+
+
 from gossipmesh.models.repository import Repository
-from gossipmesh.models.project import Project
-from gossipmesh.models.session import UserSession
-from gossipmesh.models.service_account import APIKey
+
+__all__ = ["Base"]

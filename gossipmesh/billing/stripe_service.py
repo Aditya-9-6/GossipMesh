@@ -38,7 +38,7 @@ from gossipmesh.models.organization import Organization
 class StripeBillingService:
     """Enterprise Stripe billing integration service."""
 
-    def __init__(
+    def __init__( precedent=None,
         self,
         api_key: Optional[str] = None,
         webhook_secret: Optional[str] = None,
@@ -57,9 +57,6 @@ class StripeBillingService:
         if not self.test_mode and stripe is not None:
             stripe.api_key = self.api_key
 
-    # -------------------------------------------------------------------------
-    # Customer Operations
-    # -------------------------------------------------------------------------
     def get_customer_by_org(self, session: Session, organization_id: int) -> Optional[StripeCustomer]:
         stmt = select(StripeCustomer).where(StripeCustomer.organization_id == organization_id)
         return session.execute(stmt).scalars().first()
@@ -79,12 +76,13 @@ class StripeBillingService:
         if not org:
             raise ValidationError(f"Organization ID {organization_id} not found")
 
+        cust_name = name or org.name or ""
         if self.test_mode or stripe is None:
             stripe_cust_id = f"cus_test_{organization_id}_{int(time.time())}"
         else:
             res = stripe.Customer.create(
                 email=email,
-                name=name or org.name,
+                name=cust_name,
                 metadata={"organization_id": str(organization_id)},
             )
             stripe_cust_id = res.id
@@ -93,16 +91,13 @@ class StripeBillingService:
             organization_id=organization_id,
             stripe_customer_id=stripe_cust_id,
             email=email,
-            name=name or org.name,
+            name=cust_name,
         )
         session.add(customer)
         session.commit()
         session.refresh(customer)
         return customer
 
-    # -------------------------------------------------------------------------
-    # Checkout Session Creation
-    # -------------------------------------------------------------------------
     def create_checkout_session(
         self,
         session: Session,
@@ -135,9 +130,6 @@ class StripeBillingService:
         )
         return {"id": session_obj.id, "url": session_obj.url}
 
-    # -------------------------------------------------------------------------
-    # Billing Portal
-    # -------------------------------------------------------------------------
     def create_billing_portal_session(
         self,
         session: Session,
@@ -159,9 +151,6 @@ class StripeBillingService:
         )
         return {"url": portal_session.url}
 
-    # -------------------------------------------------------------------------
-    # Subscription Management
-    # -------------------------------------------------------------------------
     def get_active_subscription(self, session: Session, organization_id: int) -> Optional[BillingSubscription]:
         stmt = (
             select(BillingSubscription)
@@ -197,9 +186,6 @@ class StripeBillingService:
         session.refresh(sub)
         return sub
 
-    # -------------------------------------------------------------------------
-    # Invoices
-    # -------------------------------------------------------------------------
     def list_invoices(
         self,
         session: Session,
@@ -214,9 +200,6 @@ class StripeBillingService:
         )
         return list(session.execute(stmt).scalars().all())
 
-    # -------------------------------------------------------------------------
-    # Webhooks & Idempotent Processing
-    # -------------------------------------------------------------------------
     def verify_webhook_signature(
         self,
         payload_bytes: bytes,
@@ -235,7 +218,7 @@ class StripeBillingService:
             except Exception as e:
                 raise AuthenticationError(f"Stripe signature verification failed: {str(e)}")
 
-        parts = {}
+        parts: Dict[str, str] = {}
         for item in signature_header.split(","):
             if "=" in item:
                 k, v = item.split("=", 1)
@@ -287,7 +270,7 @@ class StripeBillingService:
                 sub_id = data_obj.get("id")
                 cust_id = data_obj.get("customer")
                 plan_id = data_obj.get("plan", {}).get("id") or "pro"
-                status = data_obj.get("status", "active")
+                status_val = data_obj.get("status", "active")
                 cancel_at_period_end = data_obj.get("cancel_at_period_end", False)
                 quantity = data_obj.get("quantity", 1)
 
@@ -302,13 +285,13 @@ class StripeBillingService:
                             stripe_subscription_id=sub_id,
                             stripe_customer_id=cust_id,
                             plan_id=plan_id,
-                            status=status,
+                            status=status_val,
                             quantity=quantity,
                             cancel_at_period_end=cancel_at_period_end,
                         )
                         session.add(sub)
                     else:
-                        sub.status = status
+                        sub.status = status_val
                         sub.plan_id = plan_id
                         sub.quantity = quantity
                         sub.cancel_at_period_end = cancel_at_period_end
@@ -327,7 +310,7 @@ class StripeBillingService:
                 amount_due = data_obj.get("amount_due", 0)
                 amount_paid = data_obj.get("amount_paid", 0)
                 currency = data_obj.get("currency", "usd")
-                status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
+                inv_status = data_obj.get("status", "paid" if event_type == "invoice.paid" else "open")
                 invoice_url = data_obj.get("hosted_invoice_url")
                 invoice_pdf = data_obj.get("invoice_pdf")
 
@@ -344,13 +327,13 @@ class StripeBillingService:
                             amount_due=amount_due,
                             amount_paid=amount_paid,
                             currency=currency,
-                            status=status,
+                            status=inv_status,
                             hosted_invoice_url=invoice_url or "",
                             invoice_pdf=invoice_pdf or "",
                         )
                         session.add(inv)
                     else:
-                        inv.status = status
+                        inv.status = inv_status
                         inv.amount_paid = amount_paid
 
             record = ProcessedWebhookEvent(
