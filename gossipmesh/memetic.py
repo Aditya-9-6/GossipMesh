@@ -4,6 +4,7 @@ Treats architectural patterns as evolving "Memes" with dynamic fitness scores.
 Survivors of evolutionary natural selection are injected into LLM system prompts.
 """
 
+import os
 import json
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -74,7 +75,7 @@ class MemeticKnowledgeBase:
     """Persistent ledger of evolving architectural memes."""
 
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or Path("G:/My Drive/.gossip_mesh/memes.json")
+        self.storage_path = storage_path or Path(os.environ.get("MEMETIC_STORAGE_PATH") or (Path.home() / ".gossip_mesh" / "memes.json"))
         self.memes: Dict[str, KnowledgeMeme] = {}
         self._load()
 

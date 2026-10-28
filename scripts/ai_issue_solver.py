@@ -219,7 +219,14 @@ def call_openrouter(prompt: str, system_prompt: str) -> dict:
     if not key:
         raise ValueError("Missing OPENROUTER_API_KEY")
     url = "https://openrouter.ai/api/v1/chat/completions"
-    models = ["google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
+    models = [
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "qwen/qwen-2.5-coder-32b-instruct:free",
+        "google/gemini-2.0-flash-exp:free",
+        "deepseek/deepseek-chat",
+        "meta-llama/llama-3.3-70b-instruct",
+        "google/gemini-2.5-flash",
+    ]
     for model in models:
         payload = {
             "model": model,
@@ -247,7 +254,12 @@ def call_nvidia(prompt: str, system_prompt: str) -> dict:
     if not key:
         raise ValueError("Missing NVIDIA_API_KEY")
     url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    models = ["nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"]
+    models = [
+        "meta/llama-3.3-70b-instruct",
+        "mistralai/mistral-large-2-instruct",
+        "meta/llama-3.2-3b-instruct",
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+    ]
     for model in models:
         payload = {
             "model": model,

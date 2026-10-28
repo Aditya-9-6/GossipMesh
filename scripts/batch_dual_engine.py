@@ -185,7 +185,7 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
             "--workspace",
             str(workspace),
         ]
-        solve_res = subprocess.run(solve_cmd, cwd=REPO_ROOT, capture_output=True, text=True, env=env, timeout=300)
+        solve_res = subprocess.run(solve_cmd, cwd=REPO_ROOT, capture_output=True, text=True, env=env, timeout=600)
         if solve_res.returncode != 0:
             run_cmd(["git", "checkout", "--", "."], cwd=workspace)
             run_cmd(["git", "clean", "-fd"], cwd=workspace)

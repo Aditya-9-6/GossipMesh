@@ -1199,9 +1199,9 @@ To complete the merge into `main`:
             print("[*] Committing and pushing fixes to PR branch...", flush=True)
             head_ref = pr_data.get("headRefName")
             if head_ref:
-                subprocess.run(["git", "add", "-u"], cwd=workspace)
+                subprocess.run(["git", "add", "-A"], cwd=workspace)
                 subprocess.run(
-                    ["git", "reset", "--", "ai_pr_review.md", "ai_review_status.json", "ci_fix_summary.md"],
+                    ["git", "reset", "--", "ai_pr_review.md", "ai_review_status.json", "ci_fix_summary.md", ".gossipmesh", ".gossip_mesh", "memes.json", "G:*"],
                     cwd=workspace,
                     check=False,
                 )
@@ -1210,7 +1210,18 @@ To complete the merge into `main`:
                 subprocess.run(
                     ["git", "commit", "-m", "fix(ai): autonomous ci and architectural review fixes"], cwd=workspace
                 )
-                subprocess.run(["git", "push", "origin", f"HEAD:{head_ref}"], cwd=workspace)
+                push_res = subprocess.run(["git", "push", "origin", f"HEAD:refs/heads/{head_ref}"], cwd=workspace)
+                if push_res.returncode != 0:
+                    subprocess.run(["git", "push", "origin", f"HEAD:refs/heads/{head_ref}", "--force"], cwd=workspace)
+    else:
+        # PR is approved! Attempt autonomous merge
+        print(f"[*] PR #{args.pr_number} is APPROVED ({score}/100). Attempting autonomous merge...", flush=True)
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from auto_merge_pr import auto_merge_pr
+            auto_merge_pr(str(args.pr_number), workspace)
+        except Exception as _me:
+            print(f"[*] auto_merge_pr note: {_me}", flush=True)
 
 
 if __name__ == "__main__":
