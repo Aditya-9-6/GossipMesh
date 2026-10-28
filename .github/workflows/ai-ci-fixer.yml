@@ -102,8 +102,8 @@ jobs:
         env:
           HEAD_REF: ${{ steps.meta.outputs.head_ref }}
         run: |
-          git config --global user.name "Aditya Dahale"
-          git config --global user.email "aditya-9-6@users.noreply.github.com"
+          git config --global user.name "Dahale Aditya Dnyaneshwar"
+          git config --global user.email "adityadahale96@gmail.com"
           git fetch origin main
           echo "Attempting merge with origin/main to test for conflicts..."
           if ! git merge origin/main --no-edit; then
@@ -160,8 +160,8 @@ jobs:
           PR_NUM: ${{ steps.meta.outputs.pr_num }}
           AUTH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name "Aditya Dahale"
-          git config --global user.email "aditya-9-6@users.noreply.github.com"
+          git config --global user.name "Dahale Aditya Dnyaneshwar"
+          git config --global user.email "adityadahale96@gmail.com"
 
           ORIGIN_SHA=$(git rev-parse "origin/$HEAD_REF" 2>/dev/null || echo "")
           CURRENT_SHA=$(git rev-parse HEAD)
@@ -175,7 +175,7 @@ jobs:
               git rm --cached -f ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true
               git add -A
               git reset -- ai_pr_*.md ai_review_*.json ci_fix_*.md 2>/dev/null || true
-              git commit -m "fix(ci): autonomous repair & conflict resolution for PR #${PR_NUM}" -m "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>" || true
+              git commit -m "fix(ci): autonomous repair & conflict resolution for PR #${PR_NUM}" -m "Co-authored-by: Aditya Dahale <adityadahale96@gmail.com>" || true
             fi
             # Push with App token first, fallback to GITHUB_TOKEN (with workflows: write)
             git remote set-url origin "https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }}.git"
