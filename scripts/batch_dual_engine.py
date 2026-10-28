@@ -84,7 +84,7 @@ def review_single_pr(pr_number: str, repo: str = None, workspace: str = None):
             capture_output=True,
             text=True,
             env=env,
-            timeout=300,
+            timeout=600,
         )
         status = "OK" if res.returncode == 0 else f"FAIL (exit {res.returncode})"
         return ("PR", pr_number, status, res.stderr[-200:] if res.stderr else "")
@@ -209,6 +209,9 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
         run_cmd(["git", "config", "user.email", "bot@gossipmesh.io"], cwd=workspace)
 
         run_cmd(["git", "add", "-A"], cwd=workspace)
+        for stray in [".gossipmesh", ".gossip_mesh", "memes.json", "ai_pr_*.md", "ai_review_*.json", "ci_fix_*.md", "*.log"]:
+            run_cmd(["git", "rm", "-r", "--cached", stray], cwd=workspace, check=False)
+            run_cmd(["git", "reset", "--", stray], cwd=workspace, check=False)
         commit_msg = f"feat(ai): resolve #{issue_num} - {title}"
         run_cmd(["git", "commit", "-m", commit_msg], cwd=workspace)
 
@@ -279,29 +282,43 @@ def main():
 
     print(f"[*] Discovered: {len(pr_numbers)} open PR(s), {len(open_issues)} open Issue(s).")
 
-    # 1. Run PR Reviews in Pool A concurrently
-    print(f"\n[*] Launching Pool A: {args.pr_workers} Concurrent PR Review Workers...")
-    with ThreadPoolExecutor(max_workers=max(1, args.pr_workers)) as pr_executor:
-        pr_futures = [pr_executor.submit(review_single_pr, pr, repo, args.workspace) for pr in pr_numbers[:8]]
-        for future in as_completed(pr_futures):
-            try:
-                task_type, item_id, status, details = future.result()
-                print(f"[{task_type}] #{item_id}: {status}")
-                if details:
-                    print(f"    Detail: {details.strip()[:150]}")
-            except Exception as exc:
-                print(f"[!] PR Worker exception: {exc}")
+    # 1. Run PR Reviews in Pool A (Sequential to prevent git collisions and API limits)
+    print(f"\n[*] Launching Pool A: PR Review Workers (Sequential)...\n")
+    for pr in pr_numbers[:4]:
+        try:
+            task_type, item_id, status, details = review_single_pr(pr, repo, args.workspace)
+            print(f"[{task_type}] #{item_id}: {status}")
+            if details:
+                print(f"    Detail: {details.strip()[:150]}")
+        except Exception as exc:
+            print(f"[!] PR Worker exception: {exc}")
 
     # 2. Run Issue Gatekeeper & Solution Synthesis in Pool B
-    print(f"\n[*] Launching Pool B: Issue Gatekeeper & Solver Workers...")
-    for issue in open_issues[:6]:
+    print(f"\n[*] Launching Pool B: Issue Gatekeeper & Solver Workers...\n")
+    solved_count = 0
+    for issue in open_issues:
+        if solved_count >= 3:
+            break
         try:
             task_type, item_id, status, details = process_single_issue(issue, repo, args.workspace)
             print(f"[{task_type}] #{item_id}: {status}")
             if details:
                 print(f"    Detail: {details.strip()[:150]}")
+            if status == "PR_CREATED":
+                solved_count += 1
         except Exception as exc:
             print(f"[!] Issue Worker exception: {exc}")
+
+    # 3. Autonomous Issue Generation if backlog is low
+    if len(open_issues) < 10:
+        print("[*] Issue backlog low. Triggering autonomous issue generation...", flush=True)
+        gen_script = REPO_ROOT / "scripts" / "generate_advancement_issue.py"
+        if gen_script.is_file():
+            gen_env = os.environ.copy()
+            if repo:
+                gen_env["GH_REPO"] = repo
+                gen_env["GITHUB_REPOSITORY"] = repo
+            subprocess.run([sys.executable, str(gen_script), "--force"], cwd=REPO_ROOT, env=gen_env)
 
     print("=" * 60)
     print("[✓] Dual-Pool 50/50 cycle finished successfully.")

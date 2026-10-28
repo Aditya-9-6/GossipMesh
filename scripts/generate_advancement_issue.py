@@ -20,6 +20,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
+TARGET_REPO = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY") or TARGET_REPO
 
 DEFAULT_MODEL = "gemini-flash-lite-latest"
 FALLBACK_MODELS = [
@@ -71,7 +72,7 @@ def get_existing_issues():
             "issue",
             "list",
             "--repo",
-            "Aditya-9-6/GossipMesh",
+            TARGET_REPO,
             "--state",
             "all",
             "--limit",
@@ -246,7 +247,7 @@ def create_issue(item):
     labels_list = [area, difficulty, "hacktoberfest", "advancement"]
     for lbl in labels_list:
         subprocess.run(
-            ["gh", "label", "create", lbl, "--repo", "Aditya-9-6/GossipMesh", "--force"], capture_output=True
+            ["gh", "label", "create", lbl, "--repo", TARGET_REPO, "--force"], capture_output=True
         )
 
     labels = f"{area},{difficulty},hacktoberfest,advancement"
@@ -255,7 +256,7 @@ def create_issue(item):
         "issue",
         "create",
         "--repo",
-        "Aditya-9-6/GossipMesh",
+        TARGET_REPO,
         "--title",
         title,
         "--body",

@@ -196,6 +196,9 @@ def call_openrouter(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMP
         raise ValueError("Missing OPENROUTER_API_KEY")
     url = "https://openrouter.ai/api/v1/chat/completions"
     models = [
+        "google/gemini-2.0-flash-exp:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "qwen/qwen-2.5-coder-32b-instruct:free",
         "deepseek/deepseek-chat",
         "meta-llama/llama-3.3-70b-instruct",
         "google/gemini-2.5-flash",
@@ -304,9 +307,11 @@ def call_nvidia_nim(api_key: str, prompt: str, system_prompt: str = SYSTEM_PROMP
         raise ValueError("Missing NVIDIA_API_KEY")
     url = "https://integrate.api.nvidia.com/v1/chat/completions"
     models = [
+        "meta/llama-3.3-70b-instruct",
+        "mistralai/mistral-large-2-instruct",
         "nvidia/llama-3.1-nemotron-70b-instruct",
-        "meta/llama-3.1-8b-instruct",
-        "meta/llama-3.1-70b-instruct",
+        "meta/llama-3.2-3b-instruct",
+        "meta/llama-3.2-1b-instruct",
         "deepseek-ai/deepseek-r1",
     ]
     last_err = None
@@ -786,7 +791,7 @@ def get_pr_diff(workspace: Path) -> str:
 
 
 def extract_instructions_from_pr(pr_number: str, workspace: Path) -> str:
-    """Extracts custom user instructions from the latest /fix comment on the PR."""
+    """Extracts custom user instructions or reviewer action items from PR comments."""
     try:
         res = subprocess.run(
             ["gh", "pr", "view", pr_number, "--json", "comments"],
@@ -798,12 +803,23 @@ def extract_instructions_from_pr(pr_number: str, workspace: Path) -> str:
         if res.returncode == 0 and res.stdout:
             data = json.loads(res.stdout)
             comments = data.get("comments", [])
+            # Priority 1: Direct /fix user command
             for c in reversed(comments):
                 body = c.get("body", "")
                 if "/fix" in body:
                     m = re.search(r"/fix[:\s-]*(.*)", body, re.DOTALL | re.IGNORECASE)
                     if m and m.group(1).strip():
                         return m.group(1).strip()
+            # Priority 2: Autonomous Architectural Reviewer action items
+            for c in reversed(comments):
+                body = c.get("body", "")
+                if "Autonomous Architectural Review" in body and "Required Refactoring & Action Items" in body:
+                    action_section = re.search(r"### 🛠️ Required Refactoring & Action Items(.*?)(?:---|\Z)", body, re.DOTALL)
+                    if action_section:
+                        items = action_section.group(1).strip()
+                        if items:
+                            print(f"[*] Extracted Autonomous Reviewer Action Items from PR #{pr_number}", flush=True)
+                            return f"Address the following architectural and code review action items:\n{items}"
     except Exception as e:
         print(f"[*] Warning: Could not extract comments from PR #{pr_number}: {e}", file=sys.stderr)
     return ""
