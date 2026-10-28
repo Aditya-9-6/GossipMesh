@@ -18,12 +18,12 @@ import time
 import re
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-2.0-flash"
 FALLBACK_MODELS = [
-    "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-flash-lite-latest",
-    "gemini-2.5-pro",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
 ]
 
 GO_SYSTEM_PROMPT = """You are a Principal Systems Engineer specializing in Go (Golang), high-throughput low-latency network proxies (DevProxy), zero-allocation memory pooling (sync.Pool), lock-free atomic primitives (sync/atomic), eBPF, and protocol implementations (HTTP/1.1, HTTP/2, HTTP/3, QUIC, TLS 1.3).
@@ -204,8 +204,10 @@ def call_gemini(api_key: str, prompt: str, system_prompt: str) -> dict:
                     if isinstance(res_dict, dict) and "files" in res_dict:
                         return res_dict
             except urllib.error.HTTPError as e:
-                last_err = e.read().decode("utf-8", errors="replace")
-                if e.code in (400, 401, 403, 429):
+                err_body = e.read().decode("utf-8", errors="replace")
+                print(f"[!] [Gemini] Model {model} HTTP {e.code}: {err_body[:120]}", file=sys.stderr)
+                last_err = err_body
+                if e.code in (401, 403):
                     break
                 continue
             except Exception as e:

@@ -78,9 +78,10 @@ def review_single_pr(pr_number: str, repo: str = None, workspace: str = None):
         env["GH_REPO"] = repo
         env["GITHUB_REPOSITORY"] = repo
     try:
+        target_ws = Path(workspace or ".").resolve()
         res = subprocess.run(
             cmd,
-            cwd=REPO_ROOT,
+            cwd=target_ws,
             capture_output=True,
             text=True,
             env=env,
@@ -145,7 +146,7 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
             "--workspace",
             str(workspace),
         ]
-        res = subprocess.run(eval_cmd, cwd=REPO_ROOT, capture_output=True, text=True, env=env, timeout=120)
+        res = subprocess.run(eval_cmd, cwd=workspace, capture_output=True, text=True, env=env, timeout=120)
         if res.returncode == 0:
             is_approved = True
         else:
@@ -185,7 +186,7 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
             "--workspace",
             str(workspace),
         ]
-        solve_res = subprocess.run(solve_cmd, cwd=REPO_ROOT, capture_output=True, text=True, env=env, timeout=600)
+        solve_res = subprocess.run(solve_cmd, cwd=workspace, capture_output=True, text=True, env=env, timeout=600)
         if solve_res.returncode != 0:
             run_cmd(["git", "checkout", "--", "."], cwd=workspace)
             run_cmd(["git", "clean", "-fd"], cwd=workspace)
@@ -318,7 +319,7 @@ def main():
             if repo:
                 gen_env["GH_REPO"] = repo
                 gen_env["GITHUB_REPOSITORY"] = repo
-            subprocess.run([sys.executable, str(gen_script), "--force"], cwd=REPO_ROOT, env=gen_env)
+            subprocess.run([sys.executable, str(gen_script), "--force"], cwd=workspace, env=gen_env)
 
     print("=" * 60)
     print("[✓] Dual-Pool 50/50 cycle finished successfully.")
