@@ -140,14 +140,14 @@ jobs:
           EXISTING_PR=$(gh pr list --head "$branch" --json url -q '.[0].url' || true)
           if [ -n "$EXISTING_PR" ]; then
             PR_URL="$EXISTING_PR"
-            gh pr edit "$PR_URL" --title "feat(ai): resolve #${ISSUE_NUM} - ${ISSUE_TITLE}" --body-file "$PR_BODY"
+            gh pr edit "$PR_URL" --title "feat: resolve #${ISSUE_NUM} - ${ISSUE_TITLE}" --body-file "$PR_BODY"
           else
             PR_URL=$(gh pr create \
               --head "$branch" \
               --base main \
-              --title "feat(ai): resolve #${ISSUE_NUM} - ${ISSUE_TITLE}" \
+              --title "feat: resolve #${ISSUE_NUM} - ${ISSUE_TITLE}" \
               --body-file "$PR_BODY" \
-              --label "ai-generated,advancement")
+              --label "advancement")
           fi
 
           echo "PR ready: $PR_URL"

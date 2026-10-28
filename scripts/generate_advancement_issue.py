@@ -216,7 +216,7 @@ def create_issue(item):
 ### 🎯 Subsystem & Domain
 - **Domain**: `{area}`
 - **Difficulty**: `{difficulty}`
-- **Initiative**: Hacktoberfest / Sovereign High-Performance GossipMesh Advancement
+- **Initiative**: Sovereign High-Performance Advancement
 
 ### 📂 Target Files & Modules
 {target_files_md}
@@ -244,13 +244,13 @@ def create_issue(item):
 3. When ready, open a PR. Comment `@gossipmesh-bot solve` or `/solve` to ask the AI assistant for scaffolding, or submit your solution for automated review!
 """
 
-    labels_list = [area, difficulty, "hacktoberfest", "advancement"]
+    labels_list = [area, difficulty, "advancement"]
     for lbl in labels_list:
         subprocess.run(
             ["gh", "label", "create", lbl, "--repo", TARGET_REPO, "--force"], capture_output=True
         )
 
-    labels = f"{area},{difficulty},hacktoberfest,advancement"
+    labels = f"{area},{difficulty},advancement"
     cmd = [
         "gh",
         "issue",

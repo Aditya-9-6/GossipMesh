@@ -509,11 +509,11 @@ def solve_issue(workspace: Path, issue_num: int, issue_title: str, issue_body: s
                     "--base",
                     "main",
                     "--title",
-                    f"feat(ai): resolve #{issue_num} - {issue_title}",
+                    f"feat: resolve #{issue_num} - {issue_title}",
                     "--body",
                     body_content,
                     "--label",
-                    "advancement,ai-generated",
+                    "advancement",
                 ],
                 cwd=workspace,
             )

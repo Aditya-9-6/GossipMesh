@@ -246,11 +246,11 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
             "--base",
             "main",
             "--title",
-            f"feat(ai): resolve #{issue_num} - {title}",
+            f"feat: resolve #{issue_num} - {title}",
             "--body",
             summary_body,
             "--label",
-            "advancement,ai-generated",
+            "advancement",
         ]
         if repo:
             pr_cmd.extend(["--repo", repo])

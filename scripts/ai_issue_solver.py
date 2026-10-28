@@ -411,7 +411,7 @@ Instructions:
     summary_file = workspace_root / "ai_pr_summary.md"
     file_changes_str = "\n".join(f"- `{f['path']}`" for f in files)
     lang_name = "Go" if is_go else "Python"
-    summary_content = f"""## 🤖 Automated Solution for Issue #{args.issue_number}
+    summary_content = f"""## 🚀 Solution for Issue #{args.issue_number}
 
 **Issue**: #{args.issue_number} - {args.issue_title}
 
