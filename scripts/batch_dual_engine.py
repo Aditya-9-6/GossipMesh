@@ -206,15 +206,19 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
         # 5. Create branch, commit, push, and open PR
         print(f"[*] Pre-flight passed! Staging changes on {branch_name}...", flush=True)
         run_cmd(["git", "checkout", "-B", branch_name], cwd=workspace)
-        run_cmd(["git", "config", "user.name", "GossipMesh Autonomous Engine"], cwd=workspace)
-        run_cmd(["git", "config", "user.email", "bot@gossipmesh.io"], cwd=workspace)
+        author_name = os.environ.get("GIT_AUTHOR_NAME") or "Dahale Aditya Dnyaneshwar"
+        author_email = os.environ.get("GIT_AUTHOR_EMAIL") or "adityadahale96@gmail.com"
+        run_cmd(["git", "config", "user.name", author_name], cwd=workspace)
+        run_cmd(["git", "config", "user.email", author_email], cwd=workspace)
 
         run_cmd(["git", "add", "-A"], cwd=workspace)
         for stray in [".gossipmesh", ".gossip_mesh", "memes.json", "ai_pr_*.md", "ai_review_*.json", "ci_fix_*.md", "*.log"]:
             run_cmd(["git", "rm", "-r", "--cached", stray], cwd=workspace, check=False)
             run_cmd(["git", "reset", "--", stray], cwd=workspace, check=False)
-        commit_msg = f"feat(ai): resolve #{issue_num} - {title}"
-        run_cmd(["git", "commit", "-m", commit_msg], cwd=workspace)
+        author_name = os.environ.get("GIT_AUTHOR_NAME") or "Dahale Aditya Dnyaneshwar"
+        author_email = os.environ.get("GIT_AUTHOR_EMAIL") or "adityadahale96@gmail.com"
+        commit_msg = f"feat(ai): resolve #{issue_num} - {title}\n\nCo-authored-by: {author_name} <{author_email}>"
+        run_cmd(["git", "commit", "-m", commit_msg, f"--author={author_name} <{author_email}>"], cwd=workspace)
 
         # Push branch
         print(f"[*] Pushing branch {branch_name} to remote...", flush=True)

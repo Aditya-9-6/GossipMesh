@@ -1205,10 +1205,13 @@ To complete the merge into `main`:
                     cwd=workspace,
                     check=False,
                 )
-                subprocess.run(["git", "config", "user.name", "Aditya Dahale"], cwd=workspace)
-                subprocess.run(["git", "config", "user.email", "aditya-9-6@users.noreply.github.com"], cwd=workspace)
+                author_name = os.environ.get("GIT_AUTHOR_NAME") or "Dahale Aditya Dnyaneshwar"
+                author_email = os.environ.get("GIT_AUTHOR_EMAIL") or "adityadahale96@gmail.com"
+                subprocess.run(["git", "config", "user.name", author_name], cwd=workspace)
+                subprocess.run(["git", "config", "user.email", author_email], cwd=workspace)
                 subprocess.run(
-                    ["git", "commit", "-m", "fix(ai): autonomous ci and architectural review fixes"], cwd=workspace
+                    ["git", "commit", "-m", f"fix(ai): autonomous ci and architectural review fixes\n\nCo-authored-by: {author_name} <{author_email}>", f"--author={author_name} <{author_email}>"],
+                    cwd=workspace
                 )
                 push_res = subprocess.run(["git", "push", "origin", f"HEAD:refs/heads/{head_ref}"], cwd=workspace)
                 if push_res.returncode != 0:
