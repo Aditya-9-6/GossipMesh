@@ -1201,7 +1201,18 @@ To complete the merge into `main`:
             if head_ref:
                 subprocess.run(["git", "add", "-A"], cwd=workspace)
                 subprocess.run(
-                    ["git", "reset", "--", "ai_pr_review.md", "ai_review_status.json", "ci_fix_summary.md", ".gossipmesh", ".gossip_mesh", "memes.json", "G:*"],
+                    [
+                        "git",
+                        "reset",
+                        "--",
+                        "ai_pr_review.md",
+                        "ai_review_status.json",
+                        "ci_fix_summary.md",
+                        ".gossipmesh",
+                        ".gossip_mesh",
+                        "memes.json",
+                        "G:*",
+                    ],
                     cwd=workspace,
                     check=False,
                 )
@@ -1210,8 +1221,14 @@ To complete the merge into `main`:
                 subprocess.run(["git", "config", "user.name", author_name], cwd=workspace)
                 subprocess.run(["git", "config", "user.email", author_email], cwd=workspace)
                 subprocess.run(
-                    ["git", "commit", "-m", f"fix(ai): autonomous ci and architectural review fixes\n\nCo-authored-by: {author_name} <{author_email}>", f"--author={author_name} <{author_email}>"],
-                    cwd=workspace
+                    [
+                        "git",
+                        "commit",
+                        "-m",
+                        f"fix(ai): autonomous ci and architectural review fixes\n\nCo-authored-by: {author_name} <{author_email}>",
+                        f"--author={author_name} <{author_email}>",
+                    ],
+                    cwd=workspace,
                 )
                 push_res = subprocess.run(["git", "push", "origin", f"HEAD:refs/heads/{head_ref}"], cwd=workspace)
                 if push_res.returncode != 0:
@@ -1222,6 +1239,7 @@ To complete the merge into `main`:
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             from auto_merge_pr import auto_merge_pr
+
             auto_merge_pr(str(args.pr_number), workspace)
         except Exception as _me:
             print(f"[*] auto_merge_pr note: {_me}", flush=True)

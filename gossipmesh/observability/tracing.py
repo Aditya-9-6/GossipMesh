@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional
+
+try:
+    from gossipmesh.core.config import settings
+except ImportError:
+    settings = None
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +20,20 @@ try:
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
     from opentelemetry.trace import StatusCode
 
-    # Global provider and tracer initialization
+    _PROJECT_NAME = (
+        getattr(settings, "PROJECT_NAME", os.environ.get("PROJECT_NAME", "gossipmesh"))
+        if settings
+        else os.environ.get("PROJECT_NAME", "gossipmesh")
+    )
+    _ENVIRONMENT = (
+        getattr(settings, "ENVIRONMENT", os.environ.get("ENVIRONMENT", "production"))
+        if settings
+        else os.environ.get("ENVIRONMENT", "production")
+    )
     _RESOURCE = Resource.create(
         {
-            "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
-            "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+            "service.name": _PROJECT_NAME,
+            "deployment.environment": _ENVIRONMENT,
         }
     )
 
@@ -94,7 +109,12 @@ def setup_tracer_provider() -> Any:
     if not OPENTELEMETRY_AVAILABLE:
         return None
     if _tracer_provider is None:
-        _tracer_provider = TracerProvider(resource=Resource.create({"service.name": "gossipmesh"}))
+        proj_name = (
+            getattr(settings, "PROJECT_NAME", os.environ.get("PROJECT_NAME", "gossipmesh"))
+            if settings
+            else os.environ.get("PROJECT_NAME", "gossipmesh")
+        )
+        _tracer_provider = TracerProvider(resource=Resource.create({"service.name": proj_name}))
         _memory_exporter = InMemorySpanExporter()
         _tracer_provider.add_span_processor(SimpleSpanProcessor(_memory_exporter))
         trace.set_tracer_provider(_tracer_provider)
@@ -102,7 +122,6 @@ def setup_tracer_provider() -> Any:
 
 
 def get_memory_exporter() -> Any:
-    """Returns active in-memory span exporter for verification."""
     global _memory_exporter
     if not OPENTELEMETRY_AVAILABLE:
         return _mock_exporter
@@ -141,12 +160,7 @@ def _redact_attributes(attributes: Dict[str, Any]) -> Dict[str, Any]:
     secret_keys = {"api_key", "github_token", "webhook_secret", "auth_header", "source_dump"}
     for k, v in attributes.items():
         if any(sk in k.lower() for sk in secret_keys):
-            if "token" in k.lower():
-                redacted[k] = "[REDACTED_TOKEN]"
-            elif "source" in k.lower():
-                redacted[k] = "[REDACTED_SOURCE_CODE]"
-            else:
-                redacted[k] = "[REDACTED_SECRET]"
+            redacted[k] = "[REDACTED_SECRET]"
         else:
             redacted[k] = v
     return redacted

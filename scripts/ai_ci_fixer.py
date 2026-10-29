@@ -814,7 +814,9 @@ def extract_instructions_from_pr(pr_number: str, workspace: Path) -> str:
             for c in reversed(comments):
                 body = c.get("body", "")
                 if "Autonomous Architectural Review" in body and "Required Refactoring & Action Items" in body:
-                    action_section = re.search(r"### 🛠️ Required Refactoring & Action Items(.*?)(?:---|\Z)", body, re.DOTALL)
+                    action_section = re.search(
+                        r"### 🛠️ Required Refactoring & Action Items(.*?)(?:---|\Z)", body, re.DOTALL
+                    )
                     if action_section:
                         items = action_section.group(1).strip()
                         if items:
