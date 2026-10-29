@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from llama_cpp import Llama
+
     LLAMA_CPP_AVAILABLE = True
 except ImportError:
     LLAMA_CPP_AVAILABLE = False
@@ -47,7 +48,7 @@ class LlamaCppProvider(BaseProvider):
 
     async def generate(self, request: GenerationRequest) -> GenerationResponse:
         model = self._load_model()
-        
+
         # Format messages into standard prompt format if chat format isn't directly used
         prompt_lines = []
         for msg in request.messages:
@@ -69,7 +70,7 @@ class LlamaCppProvider(BaseProvider):
         generation_time = time.time() - start_time
 
         text = output["choices"][0]["text"].strip()
-        
+
         prompt_tokens = output.get("usage", {}).get("prompt_tokens", self.count_tokens(prompt))
         completion_tokens = output.get("usage", {}).get("completion_tokens", self.count_tokens(text))
         total_tokens = prompt_tokens + completion_tokens

@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
-from gossipmesh.db.base import Base
+from gossipmesh.db.base_class import Base
 
 
 class User(Base):
@@ -16,8 +16,8 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_enabled: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
-    mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    mfa_recovery_codes: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    mfa_secret: Mapped[str | None] = mapped_column(String(255), default=None, nullable=True)
+    mfa_recovery_codes: Mapped[str | None] = mapped_column(String(1024), default=None, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

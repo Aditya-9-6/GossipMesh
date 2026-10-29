@@ -4,6 +4,8 @@ import logging
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional
 
+from gossipmesh.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -94,7 +96,9 @@ def setup_tracer_provider() -> Any:
     if not OPENTELEMETRY_AVAILABLE:
         return None
     if _tracer_provider is None:
-        _tracer_provider = TracerProvider(resource=Resource.create({"service.name": "gossipmesh"}))
+        _tracer_provider = TracerProvider(
+            resource=Resource.create({"service.name": getattr(settings, "PROJECT_NAME", "gossipmesh")})
+        )
         _memory_exporter = InMemorySpanExporter()
         _tracer_provider.add_span_processor(SimpleSpanProcessor(_memory_exporter))
         trace.set_tracer_provider(_tracer_provider)

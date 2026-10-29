@@ -20,6 +20,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
+
 TARGET_REPO = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY") or "Aditya-9-6/GossipMesh"
 
 DEFAULT_MODEL = "gemini-flash-lite-latest"
@@ -144,7 +145,9 @@ def generate_ai_advancement(existing_titles):
     elif "skelion" in repo_name:
         role_desc = "Skelion, an autonomous AI site reliability engineering agent mesh and incident management system written in Python"
     else:
-        role_desc = "GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python"
+        role_desc = (
+            "GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python"
+        )
 
     prompt = f"""You are the Principal Systems Software Architect of {role_desc}.
 
@@ -253,9 +256,7 @@ def create_issue(item):
 
     labels_list = [area, difficulty, "advancement"]
     for lbl in labels_list:
-        subprocess.run(
-            ["gh", "label", "create", lbl, "--repo", TARGET_REPO, "--force"], capture_output=True
-        )
+        subprocess.run(["gh", "label", "create", lbl, "--repo", TARGET_REPO, "--force"], capture_output=True)
 
     labels = f"{area},{difficulty},advancement"
     cmd = [

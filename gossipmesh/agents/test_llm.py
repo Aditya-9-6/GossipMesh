@@ -1,4 +1,4 @@
-"""Unit tests for GossipMesh local LLM fallback and Llama.cpp integration."""
+""Unit tests for GossipMesh local LLM fallback and Llama.cpp integration.""
 
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -43,12 +43,8 @@ class DummyProvider(BaseProvider):
 
 
 class TestLLMFallbackAndLlamaCpp(unittest.TestCase):
-
     def setUp(self):
-        self.request = GenerationRequest(
-            model="test-model",
-            messages=[Message(role="user", content="Hello local AI")]
-        )
+        self.request = GenerationRequest(model="test-model", messages=[Message(role="user", content="Hello local AI")])
 
     def test_fallback_orchestrator_success_primary(self):
         primary = DummyProvider("primary")
@@ -56,6 +52,7 @@ class TestLLMFallbackAndLlamaCpp(unittest.TestCase):
         orchestrator = FallbackOrchestratorProvider(primary, fallback)
 
         import asyncio
+
         response = asyncio.run(orchestrator.generate(self.request))
         self.assertEqual(response.content, "Response from primary")
 
@@ -65,6 +62,7 @@ class TestLLMFallbackAndLlamaCpp(unittest.TestCase):
         orchestrator = FallbackOrchestratorProvider(primary, fallback)
 
         import asyncio
+
         response = asyncio.run(orchestrator.generate(self.request))
         self.assertEqual(response.content, "Response from fallback")
 
@@ -74,6 +72,7 @@ class TestLLMFallbackAndLlamaCpp(unittest.TestCase):
         orchestrator = FallbackOrchestratorProvider(primary, fallback)
 
         import asyncio
+
         health = asyncio.run(orchestrator.check_health())
         self.assertTrue(health.is_healthy)
 
@@ -83,12 +82,13 @@ class TestLLMFallbackAndLlamaCpp(unittest.TestCase):
         mock_instance = MagicMock()
         mock_instance.return_value = {
             "choices": [{"text": "Local LLM generated response"}],
-            "usage": {"prompt_tokens": 5, "completion_tokens": 5}
+            "usage": {"prompt_tokens": 5, "completion_tokens": 5},
         }
         mock_llama_cls.return_value = mock_instance
 
         provider = LlamaCppProvider(model_path="/path/to/model.gguf")
         import asyncio
+
         response = asyncio.run(provider.generate(self.request))
 
         self.assertEqual(response.content, "Local LLM generated response")
@@ -99,6 +99,7 @@ class TestLLMFallbackAndLlamaCpp(unittest.TestCase):
     def test_llama_cpp_not_available(self):
         provider = LlamaCppProvider(model_path="/path/to/model.gguf")
         import asyncio
+
         with self.assertRaises(RuntimeError):
             asyncio.run(provider.generate(self.request))
 
