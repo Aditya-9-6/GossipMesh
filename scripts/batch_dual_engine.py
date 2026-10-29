@@ -267,6 +267,15 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
         if pr_res.returncode == 0:
             pr_url = pr_res.stdout.strip()
             print(f"[✓] Created Pull Request: {pr_url}", flush=True)
+            # Enable GitHub automated merge with squash & branch cleanup
+            try:
+                pr_num_str = pr_url.split("/")[-1]
+                auto_cmd = ["gh", "pr", "merge", pr_num_str, "--auto", "--squash", "--delete-branch"]
+                if repo:
+                    auto_cmd.extend(["--repo", repo])
+                run_cmd(auto_cmd, cwd=workspace)
+            except Exception:
+                pass
             return ("ISSUE", issue_num, "PR_CREATED", pr_url)
         else:
             return ("ISSUE", issue_num, "PR_CREATE_FAIL", pr_res.stderr[-200:])
@@ -308,7 +317,7 @@ def main():
     print(f"\n[*] Launching Pool B: Issue Gatekeeper & Solver Workers...\n")
     solved_count = 0
     for issue in open_issues:
-        if solved_count >= 3:
+        if solved_count >= 6:
             break
         try:
             task_type, item_id, status, details = process_single_issue(issue, repo, args.workspace)

@@ -25,11 +25,12 @@ import subprocess
 import time
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-flash-lite-latest"
+DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
     "gemini-flash-lite-latest",
     "gemini-3.8-flash",
-    "gemini-flash-latest",
 ]
 
 DEFAULT_KEYS = []

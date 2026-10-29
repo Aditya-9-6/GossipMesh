@@ -18,11 +18,11 @@ import time
 import re
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-flash-lite-latest"
+DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODELS = [
-    "gemini-flash-lite-latest",
     "gemini-2.5-flash",
     "gemini-2.5-pro",
+    "gemini-flash-lite-latest",
     "gemini-3.8-flash",
 ]
 
@@ -407,6 +407,43 @@ Instructions:
         target_path.parent.mkdir(parents=True, exist_ok=True)
         target_path.write_text(content, encoding="utf-8")
         print(f"    [+] Wrote: {rel_path}")
+
+    # Self-Healing Pre-flight Verification Gate
+    print("[*] Running local compile/vet verification before finalizing...", flush=True)
+    compile_err = ""
+    if is_go:
+        vet_res = subprocess.run(["go", "vet", "./..."], cwd=workspace_root, capture_output=True, text=True)
+        if vet_res.returncode != 0 and "go: command not found" not in vet_res.stderr:
+            compile_err = vet_res.stderr.strip()
+    else:
+        comp_res = subprocess.run([sys.executable, "-m", "compileall", "-q", "-x", r"(\.venv|\.git)", "."], cwd=workspace_root, capture_output=True, text=True)
+        if comp_res.returncode != 0:
+            compile_err = comp_res.stderr.strip()
+
+    if compile_err:
+        print(f"[!] Compiler/Vet error detected:\n{compile_err[:300]}\n[*] Triggering single-pass self-healing fix with Gemini 2.5 Flash...", flush=True)
+        fix_prompt = f"""The solution you generated produced the following compiler/vet error:
+
+{compile_err}
+
+Target Files modified:
+{file_changes_str}
+
+Please fix the syntax, type mismatches, missing imports, or package issues in these files and return the corrected files.
+Output ONLY valid JSON matching:
+{{"summary": "Fixed compiler errors", "files": [{{"path": "...", "content": "..."}}]}}
+"""
+        try:
+            fix_result = call_gemini(primary_gemini, fix_prompt, system_prompt)
+            if fix_result and isinstance(fix_result, dict) and "files" in fix_result:
+                for f in fix_result["files"]:
+                    tpath = workspace_root / f["path"]
+                    tpath.parent.mkdir(parents=True, exist_ok=True)
+                    tpath.write_text(f["content"], encoding="utf-8")
+                    print(f"    [+] Self-healed: {f['path']}")
+                print("[*] Re-verified after self-healing pass.", flush=True)
+        except Exception as fe:
+            print(f"[!] Self-healing attempt exception: {fe}", flush=True)
 
     summary_file = workspace_root / "ai_pr_summary.md"
     file_changes_str = "\n".join(f"- `{f['path']}`" for f in files)
