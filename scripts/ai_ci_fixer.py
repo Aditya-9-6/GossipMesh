@@ -496,7 +496,7 @@ CRITICAL INSTRUCTIONS:
                     "-m",
                     "fix(merge): resolve merge conflicts with origin/main",
                     "-m",
-                    "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>",
+                    "Co-authored-by: Dahale Aditya Dnyaneshwar <adityadahale96@gmail.com>",
                 ],
                 cwd=workspace,
             )

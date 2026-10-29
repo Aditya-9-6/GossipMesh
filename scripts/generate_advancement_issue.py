@@ -138,7 +138,15 @@ def generate_ai_advancement(existing_titles):
     if not api_key:
         return None
 
-    prompt = f"""You are the Principal Systems Software Architect of GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python.
+    repo_name = TARGET_REPO.split("/")[-1].lower()
+    if "devproxy" in repo_name:
+        role_desc = "DevProxy, a high-performance HTTP/2, HTTP/3, eBPF, and TLS reverse proxy written in Go"
+    elif "skelion" in repo_name:
+        role_desc = "Skelion, an autonomous AI site reliability engineering agent mesh and incident management system written in Python"
+    else:
+        role_desc = "GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python"
+
+    prompt = f"""You are the Principal Systems Software Architect of {role_desc}.
 
 Create a brand new, novel, high-impact systems engineering task for open-source contributors.
 

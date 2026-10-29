@@ -24,15 +24,21 @@ ISSUE_APPROVER_SCRIPT = REPO_ROOT / "scripts" / "ai_issue_approver.py"
 ISSUE_SOLVER_SCRIPT = REPO_ROOT / "scripts" / "ai_issue_solver.py"
 
 
-def run_cmd(cmd, cwd=None, env=None):
+def run_cmd(cmd, cwd=None, env=None, **kwargs):
+    capture_output = kwargs.pop("capture_output", True)
+    text = kwargs.pop("text", True)
+    encoding = kwargs.pop("encoding", "utf-8")
+    errors = kwargs.pop("errors", "replace")
+    cmd_env = env or os.environ.copy()
     return subprocess.run(
         cmd,
         cwd=cwd or REPO_ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env or os.environ.copy(),
+        capture_output=capture_output,
+        text=text,
+        encoding=encoding,
+        errors=errors,
+        env=cmd_env,
+        **kwargs,
     )
 
 
@@ -314,8 +320,8 @@ def main():
         except Exception as exc:
             print(f"[!] Issue Worker exception: {exc}")
 
-    # 3. Autonomous Issue Generation if backlog is low (for GossipMesh)
-    if "gossipmesh" in repo.lower() and len(open_issues) < 10:
+    # 3. Autonomous Issue Generation if backlog is low (for any target repository)
+    if len(open_issues) < 10:
         print("[*] Issue backlog low. Triggering autonomous issue generation...", flush=True)
         gen_script = REPO_ROOT / "scripts" / "generate_advancement_issue.py"
         if gen_script.is_file():

@@ -28,9 +28,9 @@ try:
 except Exception:
     pass
 
-REPO = "Aditya-9-6/GossipMesh"
-USER_NAME = "Aditya Dahale"
-USER_EMAIL = "aditya-9-6@users.noreply.github.com"
+REPO = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY") or "Aditya-9-6/GossipMesh"
+USER_NAME = os.environ.get("GIT_AUTHOR_NAME") or "Dahale Aditya Dnyaneshwar"
+USER_EMAIL = os.environ.get("GIT_AUTHOR_EMAIL") or "adityadahale96@gmail.com"
 
 # Base Key Pool - Dynamically loaded from GEMINI_KEY_POOL, individual env vars, or .gemini_keys
 DEFAULT_KEYS = []

@@ -58,7 +58,7 @@ def sanitize_branch(branch_name: str) -> str:
                 "-p",
                 head_sha,
                 "-m",
-                "fix(repo): strip carriage returns and G: drive from git tree objects\n\nCo-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>",
+                "fix(repo): strip carriage returns and G: drive from git tree objects\n\nCo-authored-by: Dahale Aditya Dnyaneshwar <adityadahale96@gmail.com>",
             ]
         )
         new_commit = commit_res.stdout.strip()
@@ -133,7 +133,7 @@ def merge_main_and_resolve_conflicts(pr_number: int) -> bool:
                 "-m",
                 f"merge origin/main into PR #{pr_number} [resolve conflicts]",
                 "-m",
-                "Co-authored-by: Aditya Dahale <aditya-9-6@users.noreply.github.com>",
+                "Co-authored-by: Dahale Aditya Dnyaneshwar <adityadahale96@gmail.com>",
             ]
         )
     return True
