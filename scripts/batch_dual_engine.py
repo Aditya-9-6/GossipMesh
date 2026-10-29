@@ -314,8 +314,8 @@ def main():
         except Exception as exc:
             print(f"[!] Issue Worker exception: {exc}")
 
-    # 3. Autonomous Issue Generation if backlog is low
-    if len(open_issues) < 10:
+    # 3. Autonomous Issue Generation if backlog is low (for GossipMesh)
+    if "gossipmesh" in repo.lower() and len(open_issues) < 10:
         print("[*] Issue backlog low. Triggering autonomous issue generation...", flush=True)
         gen_script = REPO_ROOT / "scripts" / "generate_advancement_issue.py"
         if gen_script.is_file():
@@ -323,7 +323,7 @@ def main():
             if repo:
                 gen_env["GH_REPO"] = repo
                 gen_env["GITHUB_REPOSITORY"] = repo
-            subprocess.run([sys.executable, str(gen_script), "--force"], cwd=workspace, env=gen_env)
+            subprocess.run([sys.executable, str(gen_script), "--force"], cwd=Path(args.workspace), env=gen_env)
 
     print("=" * 60)
     print("[✓] Dual-Pool 50/50 cycle finished successfully.")

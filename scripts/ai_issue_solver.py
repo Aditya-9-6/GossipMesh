@@ -18,12 +18,12 @@ import time
 import re
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-flash-lite-latest"
 FALLBACK_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-3.8-flash",
 ]
 
 GO_SYSTEM_PROMPT = """You are a Principal Systems Engineer specializing in Go (Golang), high-throughput low-latency network proxies (DevProxy), zero-allocation memory pooling (sync.Pool), lock-free atomic primitives (sync/atomic), eBPF, and protocol implementations (HTTP/1.1, HTTP/2, HTTP/3, QUIC, TLS 1.3).

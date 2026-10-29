@@ -20,14 +20,13 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
-TARGET_REPO = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY") or TARGET_REPO
+TARGET_REPO = os.environ.get("GH_REPO") or os.environ.get("GITHUB_REPOSITORY") or "Aditya-9-6/GossipMesh"
 
 DEFAULT_MODEL = "gemini-flash-lite-latest"
 FALLBACK_MODELS = [
     "gemini-flash-lite-latest",
     "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
+    "gemini-2.5-pro",
     "gemini-3.8-flash",
 ]
 
