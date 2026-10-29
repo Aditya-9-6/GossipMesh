@@ -1,5 +1,5 @@
 import threading
-from typing import Dict, Set, Optional, Tuple
+from typing import Dict, Set, Optional, Tuple, Generator
 
 
 class VectorClock:
@@ -23,6 +23,15 @@ class VectorClock:
             for node, timestamp in remote_clock.items():
                 self._clock[node] = max(self._clock.get(node, 0), timestamp)
 
+    def update_from_delta(self, delta_clock: Dict[str, int]) -> None:
+        """
+        Efficiently updates the vector clock using a delta encoding.
+        """
+        with self._lock:
+            for node, timestamp in delta_clock.items():
+                if timestamp > self._clock.get(node, 0):
+                    self._clock[node] = timestamp
+
     def get_time(self, node_id: str) -> int:
         with self._lock:
             return self._clock.get(node_id, 0)
@@ -42,6 +51,15 @@ class VectorClock:
                 if ts > known_clock.get(node, 0):
                     d[node] = ts
             return d
+
+    def iter_delta(self, known_clock: Dict[str, int]) -> Generator[Tuple[str, int], None, None]:
+        """
+        Generator version of delta for zero-allocation streaming across hot request paths.
+        """
+        with self._lock:
+            for node, ts in self._clock.items():
+                if ts > known_clock.get(node, 0):
+                    yield node, ts
 
     def compare(self, other_clock: Dict[str, int]) -> str:
         """
