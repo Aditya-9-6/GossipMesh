@@ -1,90 +1,59 @@
-import asyncio
+from __future__ import annotations
+
+import json
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
-from sqlalchemy.orm import Session
+import hmac
+import hashlib
+import httpx
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from gossipmesh.worker.celery_app import celery_app
-from gossipmesh.models.webhooks import WebhookEvent
 from gossipmesh.core.config import settings
-
-from gossipmesh.jobs.pr_review import PRReviewJob
-from gossipmesh.workflows.issue_solver import IssueSolverWorkflow
-from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
+from gossipmesh.models.base import Base
+from gossipmesh.models.billing import ProcessedWebhookEvent
+from gossipmesh.observability.tracing import trace_webhook
 
 logger = logging.getLogger(__name__)
 
-engine = create_engine(str(settings.DATABASE_URI))
+engine = create_engine(str(settings.DATABASE_URL))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-MAX_RETRIES = 5
 
-
-async def async_dispatch(event: str, payload: Dict[str, Any], db: Session | None = None):
-    if event == "pull_request":
-        action = payload.get("action")
-        if action in ["opened", "synchronize", "reopened"]:
-            pr_data = payload.get("pull_request", {})
-            job = PRReviewJob(pr_data, workflow_id=1, db=db)
-            await job.execute()
-
-    elif event == "issues":
-        action = payload.get("action")
-        if action == "opened":
-            issue_data = payload.get("issue", {})
-            workflow = IssueSolverWorkflow(issue_data)
-            await workflow.execute()
-
-    elif event == "workflow_run":
-        action = payload.get("action")
-        run_data = payload.get("workflow_run", {})
-        if action == "completed" and run_data.get("conclusion") == "failure":
-            ci_workflow = CIFixerWorkflow(run_data)
-            await ci_workflow.execute()
-
-    elif event == "issue_comment":
-        action = payload.get("action")
-        if action == "created":
-            comment_body = payload.get("comment", {}).get("body", "")
-            if "/approve" in comment_body:
-                logger.info("Human approval received via comment.")
-
-
-@celery_app.task(bind=True, max_retries=MAX_RETRIES)
-def process_webhook_event(self, webhook_event_id: int):
-    db: Session = SessionLocal()
-    try:
-        webhook_record = db.query(WebhookEvent).filter(WebhookEvent.id == webhook_event_id).first()
-        if not webhook_record:
-            logger.error(f"WebhookEvent {webhook_event_id} not found.")
-            return
-
-        webhook_record.status = "processing"
-        db.commit()
-
+def process_webhook_event(event_id: str, payload: dict, signature: str, secret: str, destination_url: str) -> bool:
+    with trace_webhook("stripe", payload.get("type", "unknown")):
+        session = SessionLocal()
         try:
-            asyncio.run(async_dispatch(webhook_record.event, webhook_record.payload, db=db))
+            existing = session.query(ProcessedWebhookEvent).filter_by(stripe_event_id=event_id).first()
+            if existing:
+                logger.info(f"Webhook event {event_id} already processed. Skipping.")
+                return True
 
-            webhook_record.status = "processed"
-            db.commit()
+            payload_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+            expected_sig = hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(expected_sig, signature):
+                logger.warning(f"Invalid webhook signature for event {event_id}")
+                return False
 
+            # Process webhook event logic...
+            record = ProcessedWebhookEvent(stripe_event_id=event_id, event_type=payload.get("type", "unknown"))
+            session.add(record)
+            session.commit()
+
+            if destination_url:
+                try:
+                    with httpx.Client(timeout=10.0) as client:
+                        client.post(
+                            destination_url,
+                            json=payload,
+                            headers={"Stripe-Signature": signature, "Content-Type": "application/json"},
+                        )
+                except Exception as ex:
+                    logger.error(f"Failed to dispatch webhook to destination URL: {ex}")
+
+            return True
         except Exception as e:
-            logger.error(f"Failed to process webhook {webhook_event_id}: {e}")
-
-            webhook_record.retries += 1
-            if webhook_record.retries >= MAX_RETRIES:
-                webhook_record.status = "dead_letter"
-            else:
-                webhook_record.status = "failed"
-                delay = 2**webhook_record.retries
-                webhook_record.next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=delay)
-
-            db.commit()
-
-            if webhook_record.retries < MAX_RETRIES:
-                raise self.retry(exc=e, countdown=delay * 60)
-
-    finally:
-        db.close()
+            session.rollback()
+            logger.error(f"Error processing webhook {event_id}: {e}")
+            return False
+        finally:
+            session.close()

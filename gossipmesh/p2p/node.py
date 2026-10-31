@@ -1,8 +1,16 @@
 import time
 import threading
+from enum import Enum
 from typing import Dict, Any, Optional, List, Tuple
 from gossipmesh.p2p.health import SlidingWindowPeerHealthScorecard, PeerHealthConfig
 from gossipmesh.p2p.dht import KademliaDHT
+
+
+class GossipTopic(str, Enum):
+    AGENT_EVENT = "agent_event"
+    CONSENSUS = "consensus"
+    HEARTBEAT = "heartbeat"
+    DHT = "dht"
 
 
 class PeerNode:
@@ -30,8 +38,52 @@ class PeerNode:
         }
 
 
+class GossipNode:
+    def __init__(
+        self,
+        node_id: str,
+        mesh_dir: Optional[str] = None,
+        public_key: Optional[str] = None,
+        pow_difficulty: int = 0,
+        pow_nonce: Optional[int] = None,
+        base_scatter: int = 4,
+    ) -> None:
+        self.node_id = node_id
+        self.mesh_dir = mesh_dir
+        self.public_key = public_key or "default_pubkey"
+        self.pow_difficulty = pow_difficulty
+        self.pow_nonce = pow_nonce
+        self.base_scatter = base_scatter
+        self._messages: Dict[GossipTopic, List[Any]] = {t: [] for t in GossipTopic}
+
+        if pow_difficulty > 0:
+            from gossipmesh.p2p.pow import mine_pow, verify_pow
+
+            if pow_nonce is not None:
+                if not verify_pow(self.public_key, pow_nonce, pow_difficulty):
+                    raise ValueError("Invalid PoW nonce for given difficulty")
+            else:
+                self.pow_nonce, _ = mine_pow(self.public_key, pow_difficulty)
+
+    def publish(self, topic: GossipTopic, payload: Dict[str, Any]) -> Any:
+        from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
+
+        governor = AdaptiveScatterGovernor(base_scatter=self.base_scatter)
+        scatter_val = governor.update()
+        enriched_payload = {**payload, "_adaptive_scatter": scatter_val}
+
+        msg = type("GossipMessage", (), {"topic": topic, "payload": enriched_payload})()
+        self._messages[topic].append(msg)
+        return msg
+
+    def get_recent_messages(self, topic: GossipTopic) -> List[Any]:
+        return self._messages.get(topic, [])
+
+
 class PeerManager:
-    def __init__(self, local_node_id: str, health_config: Optional[PeerHealthConfig] = None, k_bucket_size: int = 20) -> None:
+    def __init__(
+        self, local_node_id: str, health_config: Optional[PeerHealthConfig] = None, k_bucket_size: int = 20
+    ) -> None:
         self.local_node_id = local_node_id
         self._peers: Dict[str, PeerNode] = {}
         self.health_config = health_config
