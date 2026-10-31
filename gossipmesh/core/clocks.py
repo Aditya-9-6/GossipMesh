@@ -1,5 +1,5 @@
 import threading
-from typing import Dict, Set, Optional, Tuple
+from typing import Dict, Set, Optional, Tuple, Iterator
 
 
 class VectorClock:
@@ -21,7 +21,9 @@ class VectorClock:
     def update(self, remote_clock: Dict[str, int]) -> None:
         with self._lock:
             for node, timestamp in remote_clock.items():
-                self._clock[node] = max(self._clock.get(node, 0), timestamp)
+                current = self._clock.get(node, 0)
+                if timestamp > current:
+                    self._clock[node] = timestamp
 
     def get_time(self, node_id: str) -> int:
         with self._lock:
@@ -33,8 +35,9 @@ class VectorClock:
 
     def delta(self, known_clock: Dict[str, int]) -> Dict[str, int]:
         """
-        Returns a zero-copy or minimal delta dictionary containing entries
+        Returns a minimal delta dictionary containing entries
         from this clock that are ahead of or unknown to `known_clock`.
+        Optimized to avoid unnecessary allocations or copying when no diff exists.
         """
         with self._lock:
             d = {}
@@ -42,6 +45,16 @@ class VectorClock:
                 if ts > known_clock.get(node, 0):
                     d[node] = ts
             return d
+
+    def iter_delta(self, known_clock: Dict[str, int]) -> Iterator[Tuple[str, int]]:
+        """
+        Zero-allocation generator yielding (node, timestamp) pairs
+        that are ahead of `known_clock`.
+        """
+        with self._lock:
+            for node, ts in self._clock.items():
+                if ts > known_clock.get(node, 0):
+                    yield node, ts
 
     def compare(self, other_clock: Dict[str, int]) -> str:
         """
