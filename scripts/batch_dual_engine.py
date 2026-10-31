@@ -162,13 +162,40 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
     if not is_approved:
         return ("ISSUE", issue_num, "UNAPPROVED", "Issue did not meet necessity threshold.")
 
-    # 2. Check if a PR already exists for this issue
-    check_pr_cmd = ["gh", "pr", "list", "--state", "all", "--search", f"resolve #{issue_num}"]
+    # 2. Check if a valid/open or merged PR already exists for this issue
+    branch_name = f"ai/solve-issue-{issue_num}"
+    check_pr_cmd = [
+        "gh",
+        "pr",
+        "list",
+        "--head",
+        branch_name,
+        "--state",
+        "all",
+        "--json",
+        "number,state,mergedAt,title",
+    ]
     if repo:
         check_pr_cmd.extend(["--repo", repo])
     existing_prs = run_cmd(check_pr_cmd, cwd=workspace)
     if existing_prs.returncode == 0 and existing_prs.stdout.strip():
-        return ("ISSUE", issue_num, "PR_ALREADY_EXISTS", "A PR already exists for this issue.")
+        try:
+            prs_data = json.loads(existing_prs.stdout)
+            has_merged = any(p.get("state") == "MERGED" or p.get("mergedAt") for p in prs_data)
+            has_open = any(p.get("state") == "OPEN" for p in prs_data)
+            if has_merged:
+                print(f"[*] Issue #{issue_num} already merged in PR. Closing issue...", flush=True)
+                close_cmd = ["gh", "issue", "close", issue_num, "--comment", "Resolved by merged pull request."]
+                if repo:
+                    close_cmd.extend(["--repo", repo])
+                run_cmd(close_cmd, cwd=workspace)
+                return ("ISSUE", issue_num, "ALREADY_MERGED", "Merged PR exists; closed issue.")
+            if has_open:
+                return ("ISSUE", issue_num, "PR_OPEN", "Active open PR already exists.")
+            del_branch_cmd = ["git", "push", "origin", "--delete", branch_name]
+            run_cmd(del_branch_cmd, cwd=workspace)
+        except Exception as e:
+            print(f"[!] Warning parsing PR JSON for #{issue_num}: {e}", flush=True)
 
     # 3. Synthesize automated solution
     if ISSUE_SOLVER_SCRIPT.is_file():
