@@ -8,6 +8,7 @@ from gossipmesh.models.base import Base
 
 class StripeCustomer(Base):
     __tablename__ = "stripe_customers"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
@@ -28,6 +29,7 @@ class StripeCustomer(Base):
 
 class BillingSubscription(Base):
     __tablename__ = "billing_subscriptions"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
@@ -49,6 +51,7 @@ class BillingSubscription(Base):
 
 class BillingInvoice(Base):
     __tablename__ = "billing_invoices"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
@@ -69,6 +72,7 @@ class BillingInvoice(Base):
 
 class ProcessedWebhookEvent(Base):
     __tablename__ = "processed_webhook_events"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     stripe_event_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
@@ -86,6 +90,7 @@ class UsageRecord(Base):
     """
 
     __tablename__ = "usage_records"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
