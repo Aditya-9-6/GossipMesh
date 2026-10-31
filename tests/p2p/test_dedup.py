@@ -7,11 +7,11 @@ from gossipmesh.p2p.dedup import CountingBloomFilter, BoundedLRUGossipRingBuffer
 @pytest.mark.asyncio
 async def test_counting_bloom_filter():
     bloom = CountingBloomFilter(capacity=100, error_rate=0.01)
-    
+
     assert not ("msg_1" in bloom)
     await bloom.add("msg_1")
     assert "msg_1" in bloom
-    
+
     await bloom.remove("msg_1")
     # Due to possible false positives or collisions with small sizes, check behavior after removal
     # but with counting bloom filter, zeroing out hashes guarantees absence.
@@ -42,9 +42,7 @@ async def test_bounded_lru_gossip_ring_buffer():
     # Test LRU update order via get/re-add
     # Current order: m2, m3, m4. Access m2 to make it most recent.
     val = await buf.get("m2")
-    assert val == {
-        "data": 2
-    }
+    assert val == {"data": 2}
 
     # Adding m5 should now evict m3 instead of m2
     evicted = await buf.add("m5", {"data": 5})

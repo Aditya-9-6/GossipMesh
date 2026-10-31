@@ -140,4 +140,5 @@ class TransportTelemetry:
 
 class GossipTransport:
     """High-level P2P gossip transport integrating rate limiting, framing, and topic dispatch."""
+
     pass

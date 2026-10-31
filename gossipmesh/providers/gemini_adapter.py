@@ -21,7 +21,6 @@ class GeminiProvider(BaseProvider):
 
     @property
     def provider_name(self) -> str:
-
         return "gemini"
 
     def _convert_messages(self, messages):

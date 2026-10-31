@@ -12,7 +12,9 @@ class TestBFTQuorumEngine(unittest.TestCase):
         votes = [
             ModelVote(model_name="gpt-4", verdict="APPROVE", score=90, concerns=[], suggestions=["Looks good"]),
             ModelVote(model_name="claude-3", verdict="APPROVE", score=88, concerns=[], suggestions=[]),
-            ModelVote(model_name="deepseek", verdict="REJECT", score=40, concerns=["Security risk"], suggestions=["Fix auth"]),
+            ModelVote(
+                model_name="deepseek", verdict="REJECT", score=40, concerns=["Security risk"], suggestions=["Fix auth"]
+            ),
         ]
         # 2 out of 3 approvals = 66.67%, meeting standard 0.66 quorum threshold
         engine = BFTQuorumEngine(quorum_threshold=0.66, min_score_threshold=85)

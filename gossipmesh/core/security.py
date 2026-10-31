@@ -9,13 +9,19 @@ from gossipmesh.core.config import settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 import base64
 
+
 def _init_fernet() -> Fernet:
-    raw_key = settings.ENCRYPTION_KEY.encode() if isinstance(settings.ENCRYPTION_KEY, str) else (settings.ENCRYPTION_KEY or b"0" * 32)
+    raw_key = (
+        settings.ENCRYPTION_KEY.encode()
+        if isinstance(settings.ENCRYPTION_KEY, str)
+        else (settings.ENCRYPTION_KEY or b"0" * 32)
+    )
     try:
         return Fernet(raw_key)
     except Exception:
         padded = (raw_key + b"0" * 32)[:32]
         return Fernet(base64.urlsafe_b64encode(padded))
+
 
 fernet = _init_fernet()
 
