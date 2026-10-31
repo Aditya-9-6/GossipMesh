@@ -32,7 +32,7 @@ class TestConsensusBackoff(unittest.TestCase):
         self.state.record_failure()
         self.state.record_failure()
         self.assertEqual(self.state.consecutive_failures, 2)
-        
+
         interval = self.state.record_success(latency=0.05)
         self.assertEqual(self.state.consecutive_failures, 0)
         self.assertFalse(self.state.is_partitioned)
@@ -57,15 +57,15 @@ class TestConsensusBackoff(unittest.TestCase):
 
     def test_mesh_heartbeat_manager_integration(self):
         manager = MeshHeartbeatManager(config=self.config)
-        
+
         # Simulate failures leading to partition
         manager.register_heartbeat_timeout("node-beta")
         manager.register_heartbeat_timeout("node-beta")
         manager.register_heartbeat_timeout("node-beta")
-        
+
         self.assertTrue(manager.is_node_partitioned("node-beta"))
         self.assertIn("node-beta", manager.get_partitioned_nodes())
-        
+
         # Simulate mesh healing (ack received)
         manager.register_heartbeat_ack("node-beta", latency=0.02)
         self.assertFalse(manager.is_node_partitioned("node-beta"))
