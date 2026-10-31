@@ -46,6 +46,10 @@ class Settings(BaseSettings):
         return [k.strip() for k in raw.split(",") if k.strip()]
 
     @property
+    def DATABASE_URI(self) -> str:
+        return self.DATABASE_URL
+
+    @property
     def REDIS_URI(self) -> str:
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 

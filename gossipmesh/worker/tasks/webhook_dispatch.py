@@ -16,7 +16,8 @@ from gossipmesh.workflows.ci_fixer import CIFixerWorkflow
 
 logger = logging.getLogger(__name__)
 
-engine = create_engine(str(settings.DATABASE_URI))
+db_uri = getattr(settings, "DATABASE_URI", getattr(settings, "DATABASE_URL", "sqlite:///./test.db"))
+engine = create_engine(str(db_uri))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 MAX_RETRIES = 5
