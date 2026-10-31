@@ -1,185 +1,67 @@
-import os
-import json
 import time
-import uuid
-from collections import deque
-from enum import Enum
-from pathlib import Path
-from typing import Callable, Dict, List, Optional, Any, Set
-from gossipmesh.p2p.pow import mine_pow, verify_pow
-from gossipmesh.p2p.scatter import AdaptiveScatterGovernor
+import threading
+from typing import Dict, Any, Optional, List, Tuple
+from gossipmesh.p2p.health import SlidingWindowPeerHealthScorecard, PeerHealthConfig
+from gossipmesh.p2p.dht import KademliaDHT
 
 
-class GossipTopic(str, Enum):
-    AGENT_SPAWN = "agent:spawn"
-    AGENT_EVENT = "agent:event"
-    CODE_REVIEW = "code:review"
-    BUILD_STATUS = "build:status"
-    SECURITY_ALERT = "security:alert"
-    CONSENSUS = "consensus"
-    HEARTBEAT = "heartbeat"
-    TASK_BID = "task_bid"
+class PeerNode:
+    def __init__(self, peer_id: str, address: str, health_config: Optional[PeerHealthConfig] = None) -> None:
+        self.peer_id = peer_id
+        self.address = address
+        self.scorecard = SlidingWindowPeerHealthScorecard(health_config)
+        self.connected_at = time.time()
+        self._lock = threading.Lock()
 
+    def record_interaction(self, latency_ms: float, dropped: bool = False, violated: bool = False) -> float:
+        return self.scorecard.record_sample(latency_ms, dropped, violated)
 
-class GossipMessage:
-    def __init__(
-        self,
-        topic: str,
-        origin_node: str,
-        payload: Dict[str, Any],
-        repo: str = "global",
-        message_id: Optional[str] = None,
-        vector_clock: Optional[Dict[str, int]] = None,
-        timestamp: Optional[float] = None,
-        ttl: int = 10,
-    ):
-        self.topic = topic
-        self.origin_node = origin_node
-        self.payload = payload
-        self.repo = repo
-        self.message_id = message_id or str(uuid.uuid4())
-        self.vector_clock = vector_clock or {origin_node: 1}
-        self.timestamp = timestamp or time.time()
-        self.ttl = ttl
+    def is_healthy(self) -> bool:
+        metrics = self.scorecard.get_metrics()
+        return not metrics["is_quarantined"]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def get_status(self) -> Dict[str, Any]:
+        metrics = self.scorecard.get_metrics()
         return {
-            "topic": self.topic,
-            "origin_node": self.origin_node,
-            "payload": self.payload,
-            "repo": self.repo,
-            "message_id": self.message_id,
-            "vector_clock": self.vector_clock,
-            "timestamp": self.timestamp,
-            "ttl": self.ttl,
+            "peer_id": self.peer_id,
+            "address": self.address,
+            "connected_at": self.connected_at,
+            **metrics,
         }
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GossipMessage":
-        return cls(
-            topic=data["topic"],
-            origin_node=data["origin_node"],
-            payload=data["payload"],
-            repo=data.get("repo", "global"),
-            message_id=data.get("message_id"),
-            vector_clock=data.get("vector_clock"),
-            timestamp=data.get("timestamp"),
-            ttl=data.get("ttl", 10),
-        )
 
+class PeerManager:
+    def __init__(self, local_node_id: str, health_config: Optional[PeerHealthConfig] = None, k_bucket_size: int = 20) -> None:
+        self.local_node_id = local_node_id
+        self._peers: Dict[str, PeerNode] = {}
+        self.health_config = health_config
+        self.dht = KademliaDHT(local_node_id=local_node_id, k=k_bucket_size)
+        self._lock = threading.Lock()
 
-class GossipNode:
-    """Decentralized Gossip Peer Node with Proof-of-Work Sybil Deterrence
-    and Adaptive Scatter-Width CPU-Load Feedback Shaping.
-    Communicates via a shared ledger directory (file-backed mesh) or local bus."""
+    def add_peer(self, peer_id: str, address: str) -> PeerNode:
+        with self._lock:
+            if peer_id not in self._peers:
+                self._peers[peer_id] = PeerNode(peer_id, address, self.health_config)
+            self.dht.add_node(peer_id, address)
+            return self._peers[peer_id]
 
-    def __init__(
-        self,
-        node_id: str,
-        mesh_dir: str | None = None,
-        public_key: Optional[str] = None,
-        pow_difficulty: int = 0,
-        pow_nonce: Optional[int] = None,
-        base_scatter: Optional[int] = None,
-    ):
-        self.node_id = node_id
-        self.mesh_dir = Path(mesh_dir) if mesh_dir else Path(".gossip_mesh/ledger")
-        self.mesh_dir.mkdir(parents=True, exist_ok=True)
-        self.public_key = public_key
-        self.pow_difficulty = pow_difficulty
-        self.pow_nonce = pow_nonce
-        self.subscribers: Dict[str, List[Callable[[GossipMessage], None]]] = {}
-        self.seen_messages: Set[str] = set()
-        self.recent_messages: deque[GossipMessage] = deque(maxlen=1000)
-        self._load_seen_history()
-        if base_scatter is not None:
-            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=base_scatter)
-        else:
-            self.scatter_governor = AdaptiveScatterGovernor(base_scatter=4)
+    def remove_peer(self, peer_id: str) -> None:
+        with self._lock:
+            self._peers.pop(peer_id, None)
+            self.dht.remove_node(peer_id)
 
-    def _load_seen_history(self):
-        """Loads message IDs previously witnessed to prevent duplicate processing."""
-        if not self.mesh_dir.exists():
-            return
-        for file_path in self.mesh_dir.glob("*.json"):
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if "message_id" in data:
-                        self.seen_messages.add(data["message_id"])
-            except Exception:
-                continue
+    def get_peer(self, peer_id: str) -> Optional[PeerNode]:
+        with self._lock:
+            return self._peers.get(peer_id)
 
-    def subscribe(self, topic: GossipTopic, handler: Callable[[GossipMessage], None]):
-        """Registers a reactive listener callback for a gossip topic."""
-        topic_str = topic.value if isinstance(topic, GossipTopic) else topic
-        if topic_str not in self.subscribers:
-            self.subscribers[topic_str] = []
-        self.subscribers[topic_str].append(handler)
+    def get_active_peers(self) -> Dict[str, PeerNode]:
+        with self._lock:
+            return {pid: p for pid, p in self._peers.items() if p.is_healthy()}
 
-    def publish(
-        self, topic: GossipTopic, payload: Dict[str, Any], repo: str = "global", ttl: int = 10
-    ) -> GossipMessage:
-        """Broadcasts an epidemic gossip event across the mesh with adaptive scatter shaping."""
-        if getattr(self, "scatter_governor", None) is not None:
-            payload["_adaptive_scatter"] = self.scatter_governor.update()
+    def get_all_peer_statuses(self) -> Dict[str, Dict[str, Any]]:
+        with self._lock:
+            return {pid: p.get_status() for pid, p in self._peers.items()}
 
-        topic_str = topic.value if isinstance(topic, GossipTopic) else topic
-        msg = GossipMessage(
-            topic=topic_str,
-            origin_node=self.node_id,
-            payload=payload,
-            repo=repo,
-            ttl=ttl,
-        )
-
-        if self.pow_difficulty > 0:
-            nonce, _ = mine_pow(msg.message_id, self.pow_difficulty, self.pow_nonce)
-            msg.payload["pow_nonce"] = nonce
-
-        self.seen_messages.add(msg.message_id)
-        self.recent_messages.append(msg)
-
-        file_path = self.mesh_dir / f"{msg.message_id}.json"
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(msg.to_dict(), f)
-        except Exception as e:
-            print(f"Error writing gossip message to ledger: {e}")
-
-        self._dispatch_to_subscribers(msg)
-        return msg
-
-    def sync(self) -> List[GossipMessage]:
-        """Runs anti-entropy synchronization: scans the shared ledger for newly
-        arrived gossip messages from other peer nodes."""
-        new_messages: List[GossipMessage] = []
-        if not self.mesh_dir.exists():
-            return new_messages
-        for file_path in self.mesh_dir.glob("*.json"):
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    msg = GossipMessage.from_dict(data)
-                    if msg.message_id not in self.seen_messages:
-                        self.seen_messages.add(msg.message_id)
-                        self.recent_messages.append(msg)
-                        new_messages.append(msg)
-                        self._dispatch_to_subscribers(msg)
-            except Exception:
-                continue
-        return new_messages
-
-    def _dispatch_to_subscribers(self, msg: GossipMessage):
-        handlers = self.subscribers.get(msg.topic, [])
-        for handler in handlers:
-            try:
-                handler(msg)
-            except Exception as e:
-                print(f"Error in subscriber handler: {e}")
-
-
-class P2PNode(GossipNode):
-    """Alias/Compat wrapper for GossipNode."""
-
-    pass
+    def find_closest_peers(self, target_id: str, count: int = 20) -> List[Tuple[str, str]]:
+        """Find closest peers using the Kademlia DHT routing table."""
+        return self.dht.find_close_nodes(target_id, count)
