@@ -1,41 +1,51 @@
-import unittest
+import pytest
+import threading
 from gossipmesh.core.clocks import VectorClock
 
 
-class TestVectorClock(unittest.TestCase):
-    def test_initialization(self):
-        vc = VectorClock("node-A")
-        self.assertEqual(vc.snapshot(), {"node-A": 0})
-        self.assertEqual(vc.get_time("node-A"), 0)
-
-    def test_increment(self):
-        vc = VectorClock("node-A")
-        self.assertEqual(vc.increment(), 1)
-        self.assertEqual(vc.increment(), 2)
-        self.assertEqual(vc.snapshot(), {"node-A": 2})
-
-    def test_update_and_comparison(self):
-        vc1 = VectorClock("node-A", {"node-A": 2, "node-B": 1})
-        vc2 = VectorClock("node-B", {"node-A": 1, "node-B": 3})
-
-        self.assertEqual(vc1.compare(vc2.snapshot()), "CONCURRENT")
-
-        vc1.update({"node-B": 5})
-        self.assertEqual(vc1.compare(vc2.snapshot()), "GREATER_THAN")
-        self.assertEqual(vc2.compare(vc1.snapshot()), "LESS_THAN")
-
-    def test_delta(self):
-        vc = VectorClock("node-A", {"node-A": 5, "node-B": 3, "node-C": 2})
-        peer_clock = {"node-A": 3, "node-B": 3, "node-D": 1}
-
-        d = vc.delta(peer_clock)
-        self.assertEqual(d, {"node-A": 5, "node-C": 2})
-
-    def test_equal_comparison(self):
-        vc1 = VectorClock("node-A", {"node-A": 1, "node-B": 2})
-        vc2 = VectorClock("node-B", {"node-A": 1, "node-B": 2})
-        self.assertEqual(vc1.compare(vc2.snapshot()), "EQUAL")
+def test_vector_clock_basic():
+    vc = VectorClock("node-A")
+    assert vc.get_time("node-A") == 0
+    assert vc.increment() == 1
+    assert vc.get_time("node-A") == 1
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_vector_clock_update():
+    vc = VectorClock("node-A", {"node-A": 2, "node-B": 5})
+    vc.update({"node-B": 3, "node-C": 10})
+    snap = vc.snapshot()
+    assert snap["node-A"] == 2
+    assert snap["node-B"] == 5
+    assert snap["node-C"] == 10
+
+
+def test_vector_clock_delta_and_view():
+    vc = VectorClock("node-A", {"node-A": 5, "node-B": 3})
+    known = {"node-A": 3, "node-B": 3, "node-C": 1}
+    
+    d = vc.delta(known)
+    assert d == {"node-A": 5}
+
+    view_items = list(vc.delta_view(known))
+    assert view_items == [("node-A", 5)]
+
+
+def test_vector_clock_comparisons():
+    vc = VectorClock("node-A", {"node-A": 2, "node-B": 1})
+    
+    assert vc.compare({"node-A": 2, "node-B": 1}) == "EQUAL"
+    assert vc.compare({"node-A": 3, "node-B": 2}) == "LESS_THAN"
+    assert vc.compare({"node-A": 1, "node-B": 1}) == "GREATER_THAN"
+    assert vc.compare({"node-A": 2, "node-B": 0}) == "CONCURRENT"
+
+
+def test_vector_clock_concurrency():
+    vc = VectorClock("node-A")
+    threads = []
+    for _ in range(10):
+        t = threading.Thread(target=vc.increment)
+        threads.append(t)
+        t.start()
+    for t in threads:
+        t.join()
+    assert vc.get_time("node-A") == 10

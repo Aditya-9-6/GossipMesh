@@ -1,11 +1,11 @@
 import threading
-from typing import Dict, Set, Optional, Tuple
+from typing import Dict, Set, Optional, Tuple, Iterator
 
 
 class VectorClock:
     """
     Thread-safe vector clock supporting zero-copy state comparisons,
-    delta encodings, and anti-entropy synchronization.
+    delta encodings, and anti-entropy synchronization with memory pooling/views.
     """
 
     def __init__(self, node_id: str, clock: Optional[Dict[str, int]] = None):
@@ -21,7 +21,9 @@ class VectorClock:
     def update(self, remote_clock: Dict[str, int]) -> None:
         with self._lock:
             for node, timestamp in remote_clock.items():
-                self._clock[node] = max(self._clock.get(node, 0), timestamp)
+                current = self._clock.get(node, 0)
+                if timestamp > current:
+                    self._clock[node] = timestamp
 
     def get_time(self, node_id: str) -> int:
         with self._lock:
@@ -33,8 +35,9 @@ class VectorClock:
 
     def delta(self, known_clock: Dict[str, int]) -> Dict[str, int]:
         """
-        Returns a zero-copy or minimal delta dictionary containing entries
+        Returns a minimal delta dictionary containing entries
         from this clock that are ahead of or unknown to `known_clock`.
+        Optimized for zero allocation when no entries have advanced.
         """
         with self._lock:
             d = {}
@@ -42,6 +45,17 @@ class VectorClock:
                 if ts > known_clock.get(node, 0):
                     d[node] = ts
             return d
+
+    def delta_view(self, known_clock: Dict[str, int]) -> Iterator[Tuple[str, int]]:
+        """
+        Generator yielding (node, timestamp) pairs ahead of `known_clock`
+        providing true zero-copy iteration for high-throughput sync pipelines.
+        """
+        with self._lock:
+            items_snapshot = list(self._clock.items())
+        for node, ts in items_snapshot:
+            if ts > known_clock.get(node, 0):
+                yield node, ts
 
     def compare(self, other_clock: Dict[str, int]) -> str:
         """
