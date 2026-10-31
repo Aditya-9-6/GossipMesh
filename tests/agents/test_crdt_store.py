@@ -6,7 +6,7 @@ from gossipmesh.agents.tombstone_gc import TombstoneGarbageCollector
 
 def test_delta_orset_basic_add_remove():
     store1 = DeltaORSetStore(node_id="node-1")
-    
+
     # Add element
     elem, delta1 = store1.add("task_a:agent_1")
     assert elem == "task_a:agent_1"
@@ -25,9 +25,7 @@ def test_crdt_concurrent_merge_join_semilattice():
     # Node 1 claims task A
     _, delta1 = store1.add("task_a:agent_1")
     # Node 2 claims task B
-    _, delta2 = store2.add(
-        "task_b:agent_2"
-    )
+    _, delta2 = store2.add("task_b:agent_2")
 
     # Cross merge deltas
     store1.merge_delta(delta2)
@@ -45,7 +43,7 @@ def test_crdt_add_wins_concurrent_remove():
 
     # Node 1 adds task
     _, delta1 = store1.add("task_x:agent_x")
-    
+
     # Node 2 merges delta1 so both have task_x
     store2.merge_delta(delta1)
     assert "task_x:agent_x" in store2.read()
@@ -71,7 +69,7 @@ def test_task_allocator_and_gc():
 
     gc = TombstoneGarbageCollector(node_id="node-1")
     _, tombstones = allocator.release_task("task_100", "agent_alpha")
-    
+
     elements, current_tombstones = allocator.store.get_full_state()
     pruned = gc.gc_tombstones(current_tombstones, allocator.vector_clock.snapshot(), {"node-2": {"node-2": 5}})
     assert isinstance(pruned, dict)

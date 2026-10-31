@@ -4,7 +4,6 @@ from gossipmesh.p2p.transport import WindowedEMABandwidthThrottler
 
 
 class TestWindowedEMABandwidthThrottler(unittest.TestCase):
-
     def test_initial_state(self):
         throttler = WindowedEMABandwidthThrottler(max_bytes_per_sec=1000.0, alpha=0.5)
         self.assertEqual(throttler.get_current_rate(), 0.0)
@@ -19,7 +18,7 @@ class TestWindowedEMABandwidthThrottler(unittest.TestCase):
     def test_burst_throttling_boundary(self):
         # Capacity = 1000 * 1.5 = 1500 bytes
         throttler = WindowedEMABandwidthThrottler(max_bytes_per_sec=1000.0, alpha=0.2, burst_multiplier=1.5)
-        
+
         # Exhaust tokens beyond capacity
         allowed = throttler.update_and_check(2000)
         self.assertFalse(allowed)

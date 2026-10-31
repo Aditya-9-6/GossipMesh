@@ -59,15 +59,15 @@ class PeerConnectionTrampoline:
                 return False
             if state == ConnectionState.CONNECTING:
                 return False
-            
+
             next_time = self._next_attempt_time.get(peer_id, 0.0)
             if time.time() < next_time:
                 return False
-            
+
             attempts = self._attempts.get(peer_id, 0)
             if attempts >= self.max_retries:
                 return False
-            
+
             return True
 
     def calculate_backoff(self, attempt: int) -> float:

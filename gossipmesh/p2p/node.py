@@ -31,7 +31,9 @@ class PeerNode:
 
 
 class PeerManager:
-    def __init__(self, local_node_id: str, health_config: Optional[PeerHealthConfig] = None, k_bucket_size: int = 20) -> None:
+    def __init__(
+        self, local_node_id: str, health_config: Optional[PeerHealthConfig] = None, k_bucket_size: int = 20
+    ) -> None:
         self.local_node_id = local_node_id
         self._peers: Dict[str, PeerNode] = {}
         self.health_config = health_config

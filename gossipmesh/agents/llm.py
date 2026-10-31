@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from llama_cpp import Llama
+
     LLAMA_CPP_AVAILABLE = True
 except ImportError:
     LLAMA_CPP_AVAILABLE = False

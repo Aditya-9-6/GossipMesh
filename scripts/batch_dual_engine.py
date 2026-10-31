@@ -245,7 +245,15 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
         run_cmd(["git", "config", "user.email", author_email], cwd=workspace)
 
         run_cmd(["git", "add", "-A"], cwd=workspace)
-        for stray in [".gossipmesh", ".gossip_mesh", "memes.json", "ai_pr_*.md", "ai_review_*.json", "ci_fix_*.md", "*.log"]:
+        for stray in [
+            ".gossipmesh",
+            ".gossip_mesh",
+            "memes.json",
+            "ai_pr_*.md",
+            "ai_review_*.json",
+            "ci_fix_*.md",
+            "*.log",
+        ]:
             run_cmd(["git", "rm", "-r", "--cached", stray], cwd=workspace, check=False)
             run_cmd(["git", "reset", "--", stray], cwd=workspace, check=False)
         author_name = os.environ.get("GIT_AUTHOR_NAME") or "Dahale Aditya Dnyaneshwar"

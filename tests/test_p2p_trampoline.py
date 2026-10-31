@@ -8,7 +8,7 @@ from gossipmesh.p2p.trampoline import PeerConnectionTrampoline, ConnectionState
 async def test_trampoline_initial_state():
     trampoline = PeerConnectionTrampoline()
     peer_id = "peer-node-1"
-    
+
     state = await trampoline.get_state(peer_id)
     assert state == ConnectionState.IDLE
     assert await trampoline.can_dial(peer_id) is True
@@ -40,7 +40,7 @@ async def test_trampoline_backoff_flow():
     success = await trampoline.dial_with_trampoline(peer_id, mock_dial)
     assert success is False
     assert await trampoline.get_state(peer_id) == ConnectionState.BACKOFF
-    
+
     # Immediate redial should be rejected due to backoff delay
     assert await trampoline.can_dial(peer_id) is False
     success_retry = await trampoline.dial_with_trampoline(peer_id, mock_dial)
