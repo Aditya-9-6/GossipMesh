@@ -48,6 +48,7 @@ class Organization(Base):
     members = relationship("UserOrganization", back_populates="organization", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")
     repositories = relationship("Repository", back_populates="organization", cascade="all, delete-orphan")
+    saml_config = relationship("OrganizationSAMLConfig", back_populates="organization", uselist=False, cascade="all, delete-orphan")
     github_installations = relationship(
         "GithubAppInstallation", back_populates="organization", cascade="all, delete-orphan"
     )

@@ -408,6 +408,9 @@ Instructions:
         target_path.write_text(content, encoding="utf-8")
         print(f"    [+] Wrote: {rel_path}")
 
+    summary_file = workspace_root / "ai_pr_summary.md"
+    file_changes_str = "\n".join(f"- `{f['path']}`" for f in files)
+
     # Self-Healing Pre-flight Verification Gate
     print("[*] Running local compile/vet verification before finalizing...", flush=True)
     compile_err = ""
@@ -444,9 +447,6 @@ Output ONLY valid JSON matching:
                 print("[*] Re-verified after self-healing pass.", flush=True)
         except Exception as fe:
             print(f"[!] Self-healing attempt exception: {fe}", flush=True)
-
-    summary_file = workspace_root / "ai_pr_summary.md"
-    file_changes_str = "\n".join(f"- `{f['path']}`" for f in files)
     lang_name = "Go" if is_go else "Python"
     summary_content = f"""## 🚀 Solution for Issue #{args.issue_number}
 

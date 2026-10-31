@@ -34,19 +34,7 @@ class RepositoryPolicy(Base):
     repository: Mapped["Repository"] = relationship("Repository", back_populates="policy")
 
 
-class GithubAppInstallation(Base):
-    __tablename__ = "github_app_installations"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    organization_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
-    installation_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
-    account_name: Mapped[str] = mapped_column(String, nullable=False)
-    target_type: Mapped[str] = mapped_column(String, nullable=False)
-    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    repository_selection: Mapped[str] = mapped_column(String, nullable=False)
-    permissions: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
-    suspended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+from gossipmesh.models.organization import GithubAppInstallation
 
 
 class Repository(Base):
@@ -62,7 +50,7 @@ class Repository(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
 
-    organization = relationship("Organization")
+    organization = relationship("Organization", back_populates="repositories")
     project = relationship("Project", back_populates="repositories")
     policy: Mapped[Optional["RepositoryPolicy"]] = relationship(
         "RepositoryPolicy", back_populates="repository", uselist=False, cascade="all, delete-orphan"

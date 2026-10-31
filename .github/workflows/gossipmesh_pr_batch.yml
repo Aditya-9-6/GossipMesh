@@ -34,15 +34,10 @@ jobs:
             uv pip install -r requirements.txt || pip install -r requirements.txt
           fi
 
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-get update && sudo apt-get install -y gh
-
       - name: Authenticate GitHub CLI
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "$GITHUB_TOKEN" | gh auth login --with-token
           gh auth status
 
       - name: Export API keys for the agent
@@ -57,5 +52,6 @@ jobs:
       - name: Run optimized batch PR processor
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python scripts/batch_process_prs_optimized.py
