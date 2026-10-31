@@ -53,7 +53,9 @@ class DeltaORSetStore:
         with self._lock:
             return set(self._elements.keys())
 
-    def merge_delta(self, delta: Dict[str, Set[Tuple[str, str]]], tombstones: Optional[Dict[str, Set[Tuple[str, str]]]] = None) -> None:
+    def merge_delta(
+        self, delta: Dict[str, Set[Tuple[str, str]]], tombstones: Optional[Dict[str, Set[Tuple[str, str]]]] = None
+    ) -> None:
         """
         Merges incoming delta and tombstones satisfying join-semilattice properties.
         delta format: {element: set_of_tags}
@@ -61,7 +63,7 @@ class DeltaORSetStore:
         """
         with self._lock:
             tombstones = tombstones or {}
-            
+
             # First, update global tombstones with incoming tombstones
             for elem, incoming_t_tags in tombstones.items():
                 if elem not in self._tombstones:
@@ -78,7 +80,7 @@ class DeltaORSetStore:
                 # Filter out any tags already present in tombstones
                 current_tombstones = self._tombstones.get(elem, set())
                 valid_new_tags = incoming_tags - current_tombstones
-                
+
                 if valid_new_tags:
                     if elem not in self._elements:
                         self._elements[elem] = set()
@@ -87,7 +89,4 @@ class DeltaORSetStore:
     def get_full_state(self) -> Tuple[Dict[str, Set[Tuple[str, str]]], Dict[str, Set[Tuple[str, str]]]]:
         """Returns deep copy of current elements and tombstones for full state sync."""
         with self._lock:
-            return (
-                {k: set(v) for k, v in self._elements.items()},
-                {k: set(v) for k, v in self._tombstones.items()}
-            )
+            return ({k: set(v) for k, v in self._elements.items()}, {k: set(v) for k, v in self._tombstones.items()})

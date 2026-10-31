@@ -27,7 +27,7 @@ class TestVectorClock(unittest.TestCase):
     def test_delta_and_iter_delta(self):
         vc = VectorClock("node-A", {"node-A": 5, "node-B": 3, "node-C": 1})
         known = {"node-A": 3, "node-B": 3, "node-D": 1}
-        
+
         d = vc.delta(known)
         self.assertEqual(d, {"node-A": 5, "node-C": 1})
 
@@ -36,17 +36,17 @@ class TestVectorClock(unittest.TestCase):
 
     def test_compare_relations(self):
         vc1 = VectorClock("node-A", {"node-A": 2, "node-B": 1})
-        
+
         # EQUAL
         self.assertEqual(vc1.compare({"node-A": 2, "node-B": 1}), "EQUAL")
-        
+
         # GREATER_THAN
         self.assertEqual(vc1.compare({"node-A": 1, "node-B": 1}), "GREATER_THAN")
         self.assertEqual(vc1.compare({"node-A": 2, "node-B": 0}), "GREATER_THAN")
-        
+
         # LESS_THAN
         self.assertEqual(vc1.compare({"node-A": 3, "node-B": 2}), "LESS_THAN")
-        
+
         # CONCURRENT
         vc2 = VectorClock("node-B", {"node-A": 1, "node-B": 3})
         self.assertEqual(vc1.compare(vc2.snapshot()), "CONCURRENT")

@@ -75,7 +75,9 @@ class MemeticKnowledgeBase:
     """Persistent ledger of evolving architectural memes."""
 
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or Path(os.environ.get("MEMETIC_STORAGE_PATH") or (Path.home() / ".gossip_mesh" / "memes.json"))
+        self.storage_path = storage_path or Path(
+            os.environ.get("MEMETIC_STORAGE_PATH") or (Path.home() / ".gossip_mesh" / "memes.json")
+        )
         self.memes: Dict[str, KnowledgeMeme] = {}
         self._load()
 
