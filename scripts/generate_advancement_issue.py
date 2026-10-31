@@ -243,7 +243,9 @@ def generate_ai_advancement(existing_titles):
         tech_stack = "Python"
         target_dir = "skelion_agent/"
     else:
-        role_desc = "GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python"
+        role_desc = (
+            "GossipMesh, a Decentralized P2P Gossip Protocol Multi-Agent Autonomous Engineering Mesh written in Python"
+        )
         tech_stack = "Python"
         target_dir = "gossipmesh/"
 
@@ -298,13 +300,15 @@ Output ONLY valid JSON matching:
         try:
             req = urllib.request.Request(
                 "https://openrouter.ai/api/v1/chat/completions",
-                data=json.dumps({
-                    "model": "meta-llama/llama-3.3-70b-instruct",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "response_format": {"type": "json_object"}
-                }).encode("utf-8"),
+                data=json.dumps(
+                    {
+                        "model": "meta-llama/llama-3.3-70b-instruct",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "response_format": {"type": "json_object"},
+                    }
+                ).encode("utf-8"),
                 headers={"Authorization": f"Bearer {openrouter_key}", "Content-Type": "application/json"},
-                method="POST"
+                method="POST",
             )
             with urllib.request.urlopen(req, timeout=25) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
