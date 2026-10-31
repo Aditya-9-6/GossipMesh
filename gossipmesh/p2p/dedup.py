@@ -10,22 +10,22 @@ class CountingBloomFilter:
     def __init__(self, capacity: int = 10000, error_rate: float = 0.01):
         self.capacity = capacity
         self.error_rate = error_rate
-        
+
         # Optimal size m = - (n * ln(p)) / (ln(2)^2)
-        self.size = int(- (capacity * math.log(error_rate)) / (math.log(2) ** 2))
+        self.size = int(-(capacity * math.log(error_rate)) / (math.log(2) ** 2))
         self.size = max(self.size, 64)
-        
+
         # Optimal number of hash functions k = (m / n) * ln(2)
         self.hash_count = max(1, int((self.size / capacity) * math.log(2)))
-        
+
         self.table = [0] * self.size
         self._lock = asyncio.Lock()
 
     def _hashes(self, item: str) -> list[int]:
         # Use double hashing technique based on MD5 and SHA256
-        h1 = int(hashlib.md5(item.encode('utf-8')).hexdigest(), 16)
-        h2 = int(hashlib.sha256(item.encode('utf-8')).hexdigest(), 16)
-        
+        h1 = int(hashlib.md5(item.encode("utf-8")).hexdigest(), 16)
+        h2 = int(hashlib.sha256(item.encode("utf-8")).hexdigest(), 16)
+
         return [(h1 + i * h2) % self.size for i in range(self.hash_count)]
 
     async def add(self, item: str) -> None:
