@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 class P2PTransport:
     """High-throughput asynchronous P2P network transport with outbound rate limiting."""
 
-    def __init__(self, bind_address: str = "0.0.0.0", port: int = 9000, limiter_config: Optional[LeakyBucketConfig] = None):
+    def __init__(
+        self, bind_address: str = "0.0.0.0", port: int = 9000, limiter_config: Optional[LeakyBucketConfig] = None
+    ):
         self.bind_address = bind_address
         self.port = port
         self.limiter = LeakyBucketStreamLimiter(limiter_config)

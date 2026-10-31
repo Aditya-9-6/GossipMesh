@@ -1,18 +1,13 @@
-import threading
-from typing import Dict, Set, Tuple
-from gossipmesh.core.clocks import VectorClock
+"""
+Tombstone Garbage Collector for GossipMesh CRDT states.
+"""
+
+from typing import Any, Dict, Set, Tuple
 
 
 class TombstoneGarbageCollector:
-    """
-    Garbage collects tombstones based on a stable vector clock threshold.
-    Ensures O(k) memory footprint bounding while preserving causal safety.
-    """
-
-    def __init__(self, node_id: str, stability_threshold_ticks: int = 10):
-        self.node_id = node_id
-        self.stability_threshold_ticks = stability_threshold_ticks
-        self._lock = threading.Lock()
+    def __init__(self, ttl_ticks: int = 100) -> None:
+        self.ttl_ticks = ttl_ticks
 
     def gc_tombstones(
         self,
@@ -22,38 +17,28 @@ class TombstoneGarbageCollector:
     ) -> Dict[Any, Set[Tuple[str, str]]]:
         """
         Prunes tombstones that have been acknowledged by all active peers or whose node ticks
-        fall safely below the stable threshold across the mesh.
+        exceed the retention window.
         """
-        with self._lock:
-            if not peer_clocks:
-                return tombstones
+        pruned: Dict[Any, Set[Tuple[str, str]]] = {}
+        min_peer_clock = {}
 
-            # Calculate minimum vector clock across all peers and self
-            all_clocks = list(peer_clocks.values()) + [current_clock]
-            min_clock: Dict[str, int] = {}
-            if all_clocks:
-                first = all_clocks[0]
-                for node in first.keys():
-                    min_clock[node] = min(c.get(node, 0) for c in all_clocks)
+        for peer, clock_map in peer_clocks.items():
+            for node, tick in clock_map.items():
+                if node not in min_peer_clock or tick < min_peer_clock[node]:
+                    min_peer_clock[node] = tick
 
-            pruned_tombstones = {}
-            for elem, tags in tombstones.items():
-                retained_tags = set()
-                for tag_id, tag_node in tags:
-                    # Extract tick from tag_id if formatted as node-counter or check against min_clock
-                    node_stable_tick = min_clock.get(tag_node, 0)
-                    # If the stable clock across all peers has advanced past or equal to the generation mark,
-                    # or if older than stability threshold, we can garbage collect.
-                    # For safety, we keep tags whose originating node hasn't been acknowledged stably.
-                    try:
-                        counter = int(tag_id.split("-")[-1])
-                    except (ValueError, IndexError):
-                        counter = 0
+        for key, entry_set in tombstones.items():
+            active_entries: Set[Tuple[str, str]] = set()
+            for entry in entry_set:
+                node = entry[0]
+                node_tick = current_clock.get(node, 0)
+                acknowledged_tick = min_peer_clock.get(node, 0)
 
-                    if counter > node_stable_tick:
-                        retained_tags.add((tag_id, tag_node))
+                # If acknowledged by all peers or exceeds TTL, prune it
+                if node_tick - acknowledged_tick < self.ttl_ticks:
+                    active_entries.add(entry)
 
-                if retained_tags:
-                    pruned_tombstones[elem] = retained_tags
+            if active_entries:
+                pruned[key] = active_entries
 
-            return pruned_tombstones
+        return pruned
