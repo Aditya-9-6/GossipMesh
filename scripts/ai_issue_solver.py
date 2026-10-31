@@ -29,6 +29,11 @@ FALLBACK_MODELS = [
 GO_SYSTEM_PROMPT = """You are a Principal Systems Engineer specializing in Go (Golang), high-throughput low-latency network proxies (DevProxy), zero-allocation memory pooling (sync.Pool), lock-free atomic primitives (sync/atomic), eBPF, and protocol implementations (HTTP/1.1, HTTP/2, HTTP/3, QUIC, TLS 1.3).
 You are working on DevProxy, a high-performance developer-first reverse proxy written in Go.
 
+CRITICAL MODULE & IMPORT RULES:
+- The Go module path is strictly 'github.com/Aditya-9-6/DevProxy'.
+- All internal package imports MUST use 'github.com/Aditya-9-6/DevProxy/pkg/...' (NEVER use 'github.com/devproxy/devproxy' or any other fictitious path).
+- Do not add non-existent external dependencies; use Go standard library or packages already present in this repo.
+
 CORE ARCHITECTURE GUIDELINES:
 1. High throughput and zero allocation: prefer byte slices, stack allocation, and sync.Pool on hot request/response paths. No unnecessary heap allocations.
 2. Concurrency safety: data race freedom, proper mutexes or atomic operations, context cancellation propagation.
@@ -157,7 +162,7 @@ def extract_json_response(text: str) -> dict:
 def load_gemini_keys() -> list[str]:
     keys = []
     pool = os.environ.get("GEMINI_KEY_POOL", "")
-    for k in pool.split(","):
+    for k in re.split(r"[,\s]+", pool):
         if k.strip() and k.strip() not in keys:
             keys.append(k.strip())
     for var in ("GEMINI_SOLVER_KEY", "GEMINI_API_KEY", "GEMINI_REVIEWER_KEY"):
@@ -316,6 +321,42 @@ def call_cohere(prompt: str, system_prompt: str) -> dict:
             continue
     raise RuntimeError("Cohere failed.")
 
+def request_llm_solution(prompt: str, system_prompt: str) -> dict:
+    primary_gemini = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+    try:
+        print("[*] Requesting solution from Gemini AI...", flush=True)
+        res = call_gemini(primary_gemini, prompt, system_prompt)
+        if res and isinstance(res, dict) and "files" in res:
+            return res
+    except Exception as ge:
+        print(f"[!] Gemini failed: {ge}. Initiating multi-provider failover...", file=sys.stderr)
+
+    try:
+        print("[*] Requesting solution from OpenRouter...", flush=True)
+        res = call_openrouter(prompt, system_prompt)
+        if res and isinstance(res, dict) and "files" in res:
+            return res
+    except Exception as oe:
+        print(f"[!] OpenRouter failover failed: {oe}", file=sys.stderr)
+
+    try:
+        print("[*] Requesting solution from NVIDIA NIM...", flush=True)
+        res = call_nvidia(prompt, system_prompt)
+        if res and isinstance(res, dict) and "files" in res:
+            return res
+    except Exception as ne:
+        print(f"[!] NVIDIA failover failed: {ne}", file=sys.stderr)
+
+    try:
+        print("[*] Requesting solution from Cohere...", flush=True)
+        res = call_cohere(prompt, system_prompt)
+        if res and isinstance(res, dict) and "files" in res:
+            return res
+    except Exception as ce:
+        print(f"[!] Cohere failover failed: {ce}", file=sys.stderr)
+
+    return None
+
 
 def main():
     parser = argparse.ArgumentParser(description="AI Issue Solver")
@@ -358,34 +399,7 @@ Instructions:
    {{"summary": "...", "files": [{{"path": "...", "content": "..."}}]}}
 """
 
-    result = None
-    primary_gemini = os.environ.get("GEMINI_SOLVER_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
-    try:
-        print("[*] Requesting solution from Gemini AI...", flush=True)
-        result = call_gemini(primary_gemini, prompt, system_prompt)
-    except Exception as ge:
-        print(f"[!] Gemini failed: {ge}. Initiating multi-provider failover...", file=sys.stderr)
-
-    if not result:
-        try:
-            print("[*] Requesting solution from OpenRouter...", flush=True)
-            result = call_openrouter(prompt, system_prompt)
-        except Exception as oe:
-            print(f"[!] OpenRouter failover failed: {oe}", file=sys.stderr)
-
-    if not result:
-        try:
-            print("[*] Requesting solution from NVIDIA NIM...", flush=True)
-            result = call_nvidia(prompt, system_prompt)
-        except Exception as ne:
-            print(f"[!] NVIDIA failover failed: {ne}", file=sys.stderr)
-
-    if not result:
-        try:
-            print("[*] Requesting solution from Cohere...", flush=True)
-            result = call_cohere(prompt, system_prompt)
-        except Exception as ce:
-            print(f"[!] Cohere failover failed: {ce}", file=sys.stderr)
+    result = request_llm_solution(prompt, system_prompt)
 
     if not result or not isinstance(result, dict) or "files" not in result:
         print("[!] No file changes could be synthesized by any AI provider.", file=sys.stderr)
@@ -437,7 +451,7 @@ Output ONLY valid JSON matching:
 {{"summary": "Fixed compiler errors", "files": [{{"path": "...", "content": "..."}}]}}
 """
         try:
-            fix_result = call_gemini(primary_gemini, fix_prompt, system_prompt)
+            fix_result = request_llm_solution(fix_prompt, system_prompt)
             if fix_result and isinstance(fix_result, dict) and "files" in fix_result:
                 for f in fix_result["files"]:
                     tpath = workspace_root / f["path"]
