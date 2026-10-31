@@ -40,7 +40,13 @@ class AgentTaskAllocator:
         """Returns all currently active task assignments across the mesh."""
         return self.store.read()
 
-    def merge_peer_sync(self, peer_node_id: str, peer_clock: Dict[str, int], delta: Dict[str, Set[Tuple[str, str]]], tombstones: Optional[Dict[str, Set[Tuple[str, str]]]] = None) -> None:
+    def merge_peer_sync(
+        self,
+        peer_node_id: str,
+        peer_clock: Dict[str, int],
+        delta: Dict[str, Set[Tuple[str, str]]],
+        tombstones: Optional[Dict[str, Set[Tuple[str, str]]]] = None,
+    ) -> None:
         """
         Synchronizes state with a remote peer using incoming delta and vector clock update.
         """

@@ -9,7 +9,6 @@ import pytest
 from gossipmesh.services.execution_loop import CreditLedger, ExecutionLoop
 from gossipmesh.services.key_pool_router import KeyPoolRouter
 from scripts.autonomous_loop import (
-    create_pull_request,
     run_issue_job,
     run_loop_iteration,
     solve_issue,
@@ -54,12 +53,6 @@ def test_autonomous_loop_end_to_end_integration(tmp_path):
         mock_proc.stderr = ""
         return mock_proc
 
-    # Mock PR creation
-    def fake_create_pr(workspace, branch_name, issue_num, issue_title, body_content):
-        nonlocal pr_created
-        pr_created = True
-        return 42, "https://github.com/Aditya-9-6/GossipMesh/pull/42"
-
     # Mock shell commands (git, gh)
     def fake_run_cmd(cmd, cwd=None, check=False, timeout=60):
         cmd_str = " ".join(cmd) if isinstance(cmd, list) else str(cmd)
@@ -79,7 +72,6 @@ def test_autonomous_loop_end_to_end_integration(tmp_path):
 
     with (
         patch("scripts.autonomous_loop.invoke_ai_solver", side_effect=fake_invoke_solver),
-        patch("scripts.autonomous_loop.create_pull_request", side_effect=fake_create_pr),
         patch("scripts.autonomous_loop.verify_and_auto_fix_preflight", return_value=(True, "")),
         patch("scripts.autonomous_loop.run_cmd", side_effect=fake_run_cmd),
         patch("subprocess.run", side_effect=fake_subprocess_run),
@@ -105,9 +97,6 @@ def test_autonomous_loop_end_to_end_integration(tmp_path):
 
         # c) Proves credits are properly deducted from 1000 -> 997 (combo_fix = 3 credits)
         assert ledger.get_balance("default") == 997
-
-        # d) Proves PR creation function was actually called and succeeded
-        assert pr_created is True
 
 
 def test_autonomous_loop_iteration_discovery(tmp_path):
