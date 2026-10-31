@@ -52,7 +52,7 @@ class BFTQuorumEngine(ByzantineConsensusEngine):
             )
 
         total_nodes = len(votes)
-        
+
         # Optional Byzantine fault capacity check: N >= 3f + 1
         if self.max_faulty_nodes is not None:
             required_nodes = (3 * self.max_faulty_nodes) + 1
@@ -97,7 +97,7 @@ class BFTQuorumEngine(ByzantineConsensusEngine):
 
         approval_ratio = approvals_weight / total_weight if total_weight > 0 else 0.0
         is_approved = approval_ratio >= self.quorum_threshold
-        
+
         # Consensus score derived from weighted average score scaled by approval ratio
         avg_vote_score = sum(v.score for v in votes) / total_nodes if total_nodes > 0 else 0.0
         consensus_score = avg_vote_score * approval_ratio
