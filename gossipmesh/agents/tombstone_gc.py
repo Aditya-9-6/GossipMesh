@@ -15,10 +15,10 @@ class TombstoneGarbageCollector:
         self._lock = threading.Lock()
 
     def gc_tombstones(
-        self, 
-        tombstones: Dict[Any, Set[Tuple[str, str]]], 
+        self,
+        tombstones: Dict[Any, Set[Tuple[str, str]]],
         current_clock: Dict[str, int],
-        peer_clocks: Dict[str, Dict[str, int]]
+        peer_clocks: Dict[str, Dict[str, int]],
     ) -> Dict[Any, Set[Tuple[str, str]]]:
         """
         Prunes tombstones that have been acknowledged by all active peers or whose node ticks
@@ -46,13 +46,13 @@ class TombstoneGarbageCollector:
                     # or if older than stability threshold, we can garbage collect.
                     # For safety, we keep tags whose originating node hasn't been acknowledged stably.
                     try:
-                        counter = int(tag_id.split('-')[-1])
+                        counter = int(tag_id.split("-")[-1])
                     except (ValueError, IndexError):
                         counter = 0
-                    
+
                     if counter > node_stable_tick:
                         retained_tags.add((tag_id, tag_node))
-                
+
                 if retained_tags:
                     pruned_tombstones[elem] = retained_tags
 
