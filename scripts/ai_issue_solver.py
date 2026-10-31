@@ -419,12 +419,20 @@ Instructions:
         if vet_res.returncode != 0 and "go: command not found" not in vet_res.stderr:
             compile_err = vet_res.stderr.strip()
     else:
-        comp_res = subprocess.run([sys.executable, "-m", "compileall", "-q", "-x", r"(\.venv|\.git)", "."], cwd=workspace_root, capture_output=True, text=True)
+        comp_res = subprocess.run(
+            [sys.executable, "-m", "compileall", "-q", "-x", r"(\.venv|\.git)", "."],
+            cwd=workspace_root,
+            capture_output=True,
+            text=True,
+        )
         if comp_res.returncode != 0:
             compile_err = comp_res.stderr.strip()
 
     if compile_err:
-        print(f"[!] Compiler/Vet error detected:\n{compile_err[:300]}\n[*] Triggering single-pass self-healing fix with Gemini 2.5 Flash...", flush=True)
+        print(
+            f"[!] Compiler/Vet error detected:\n{compile_err[:300]}\n[*] Triggering single-pass self-healing fix with Gemini 2.5 Flash...",
+            flush=True,
+        )
         fix_prompt = f"""The solution you generated produced the following compiler/vet error:
 
 {compile_err}
