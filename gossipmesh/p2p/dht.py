@@ -35,11 +35,11 @@ class KBucket:
                     self.contacts.pop(i)
                     self.contacts.append((node_id, address))
                     return True
-            
+
             if len(self.contacts) < self.k:
                 self.contacts.append((node_id, address))
                 return True
-            
+
             # Bucket is full. In a full Kademlia implementation, we ping the head.
             # Here we drop new contacts if bucket is full and head is active (simplified safe eviction).
             return False
