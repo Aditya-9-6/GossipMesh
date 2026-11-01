@@ -100,56 +100,51 @@ class LeakyBucketStreamLimiter:
 
     def __init__(self, config: Optional[LeakyBucketConfig] = None):
         self.config = config or LeakyBucketConfig()
-        self._buckets: OrderedDict[str, Tuple[float, float]] = OrderedDict()
+        self._buckets: OrderedDict[str, TokenBucket] = OrderedDict()
         self._lock = asyncio.Lock()
         self.metrics = RateLimitMetrics()
 
-    async def _evict_lru(self) -> None:
-        while len(self._buckets) >= self.config.max_tracked_peers:
+    async def _evict_lru_if_needed(self) -> None:
+        if len(self._buckets) >= self.config.max_tracked_peers:
             self._buckets.popitem(last=False)
 
-    async def acquire(
-        self,
-        peer_id: str,
-        tokens: float = 1.0,
-        outbound_buffer_utilization: float = 0.0,
-        peer_health_score: float = 1.0,
-    ) -> Tuple[bool, bool]:
+    async def acquire(self, peer_id: str, tokens: float = 1.0, payload_bytes: int = 0) -> bool:
         """
-        Acquire tokens for outbound transmission, factoring in network congestion
-        and peer health scores. Returns (allowed, backpressure_signaled).
-
-        If outbound_buffer_utilization > 0.85, low-priority or degraded peer frames
-        are subject to backpressure drops.
+        Attempt to acquire tokens for outbound gossip to a peer.
+        Supports dynamic burst absorption up to bucket capacity.
         """
-        now = time.monotonic()
-        backpressure = outbound_buffer_utilization > 0.85
-
-        # If backpressure is active and peer health is mediocre, apply strict dropping
-        if backpressure and peer_health_score < 0.7 and tokens > 0:
-            self.metrics.record_dropped(int(tokens))
-            return False, True
-
         async with self._lock:
-            if peer_id not in self._buckets:
-                await self._evict_lru()
-                self._buckets[peer_id] = (self.config.capacity, now)
+            now = time.monotonic()
+            bucket = self._buckets.get(peer_id)
+            if bucket is None:
+                await self._evict_lru_if_needed()
+                bucket = TokenBucket(
+                    capacity=self.config.capacity,
+                    refill_rate=self.config.leak_rate,
+                )
+                self._buckets[peer_id] = bucket
             else:
                 self._buckets.move_to_end(peer_id)
 
-            current_tokens, last_update = self._buckets[peer_id]
-            delta = max(0.0, now - last_update)
-            
-            # Adaptive refill rate bound to peer health score
-            effective_refill = self.config.leak_rate * max(0.1, peer_health_score)
-            current_tokens = min(self.config.capacity, current_tokens + delta * effective_refill)
-
-            if current_tokens >= tokens:
-                current_tokens -= tokens
-                self._buckets[peer_id] = (current_tokens, now)
-                self.metrics.record_allowed(int(tokens))
-                return True, backpressure
+            allowed = bucket.consume(tokens, now)
+            if allowed:
+                self.metrics.record_allowed(payload_bytes)
             else:
-                self._buckets[peer_id] = (current_tokens, now)
-                self.metrics.record_dropped(int(tokens))
-                return False, backpressure
+                self.metrics.record_dropped(payload_bytes)
+            return allowed
+
+    async def check(self, peer_id: str, tokens: float = 1.0) -> bool:
+        """Check if tokens can be acquired without consuming them."""
+        async with self._lock:
+            now = time.monotonic()
+            bucket = self._buckets.get(peer_id)
+            if bucket is None:
+                return self.config.capacity >= tokens
+            return bucket.can_consume(tokens, now)
+
+    async def get_stats(self) -> Dict[str, Any]:
+        async with self._lock:
+            return {
+                "tracked_peers": len(self._buckets),
+                **self.metrics.to_dict(),
+            }
