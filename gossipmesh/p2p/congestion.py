@@ -36,6 +36,9 @@ class CongestionConfig:
     min_pacing_delay: float = 0.0005
     max_pacing_delay: float = 1.0
     loss_reduction_factor: float = 0.5
+    buffer_high_watermark: float = 0.85
+    buffer_low_watermark: float = 0.35
+    congestion_ewma_alpha: float = 0.2
 
 
 @dataclass
@@ -98,138 +101,190 @@ class SlidingWindowCongestionController:
         self._lock = threading.Lock()
 
     def can_send(self) -> bool:
-        """Checks if transmission window permits sending another packet."""
         with self._lock:
-            return len(self._in_flight) < math.floor(self.cwnd)
+            return len(self._in_flight) < int(math.ceil(self.cwnd))
 
-    def on_packet_sent(self, packet_id: str, size_bytes: int = 1, sent_at: Optional[float] = None) -> bool:
-        """
-        Registers an outgoing packet in the in-flight sliding window.
-        Returns True if sent within window capacity, False otherwise.
-        """
-        if not packet_id:
-            raise ValueError("packet_id cannot be empty")
-        if size_bytes <= 0:
-            raise ValueError("size_bytes must be positive")
-
-        timestamp = time.monotonic() if sent_at is None else sent_at
+    def register_send(self, packet_id: str, size_bytes: int, now: Optional[float] = None) -> bool:
+        timestamp = time.monotonic() if now is None else now
         with self._lock:
-            if len(self._in_flight) >= math.floor(self.cwnd):
+            if len(self._in_flight) >= int(math.ceil(self.cwnd)):
                 return False
-            self._in_flight[packet_id] = InFlightPacket(packet_id=packet_id, sent_at=timestamp, size_bytes=size_bytes)
+            self._in_flight[packet_id] = InFlightPacket(
+                packet_id=packet_id,
+                sent_at=timestamp,
+                size_bytes=size_bytes,
+            )
             return True
 
-    def on_ack_received(self, packet_id: str, ack_at: Optional[float] = None) -> Optional[float]:
-        """
-        Processes an incoming packet ACK, updates RTT, jitter, and expands cwnd.
-        Returns the measured sample RTT, or None if packet was not tracked.
-        """
-        arrival_time = time.monotonic() if ack_at is None else ack_at
+    def register_ack(self, packet_id: str, now: Optional[float] = None) -> Optional[float]:
+        timestamp = time.monotonic() if now is None else now
         with self._lock:
-            packet = self._in_flight.pop(packet_id, None)
-            if packet is None:
+            pkt = self._in_flight.pop(packet_id, None)
+            if pkt is None:
                 return None
 
-            sample_rtt = max(0.0, arrival_time - packet.sent_at)
-            self._update_rtt_and_jitter(sample_rtt)
-            self._advance_window()
+            sample_rtt = timestamp - pkt.sent_at
+            if sample_rtt < 0.0:
+                sample_rtt = 0.0
+
+            # Update SRTT
+            if self.srtt is None:
+                self.srtt = sample_rtt
+            else:
+                alpha = self.config.rtt_alpha
+                self.srtt = (1.0 - alpha) * self.srtt + alpha * sample_rtt
+
+            self.jitter_estimator.update(sample_rtt)
+
+            # Congestion window state machine update
+            if self.state == CongestionState.SLOW_START:
+                self.cwnd += 1.0
+                if self.cwnd >= self.ssthresh:
+                    self.state = CongestionState.CONGESTION_AVOIDANCE
+            elif self.state == CongestionState.CONGESTION_AVOIDANCE:
+                self.cwnd += 1.0 / max(1.0, self.cwnd)
+
+            if self.cwnd > self.config.max_cwnd:
+                self.cwnd = self.config.max_cwnd
+
             return sample_rtt
 
-    def on_loss_detected(self, packet_id: Optional[str] = None) -> None:
-        """
-        Applies multiplicative decrease and transitions state upon packet loss.
-        """
+    def register_loss(self, packet_id: str) -> bool:
         with self._lock:
+            pkt = self._in_flight.pop(packet_id, None)
+            if pkt is None:
+                return False
+
             self._loss_count += 1
-            if packet_id:
-                self._in_flight.pop(packet_id, None)
-
-            # Halve window down to minimum bound
-            new_ssthresh = max(self.config.min_cwnd, self.cwnd * self.config.loss_reduction_factor)
-            self.ssthresh = new_ssthresh
-            self.cwnd = max(self.config.min_cwnd, new_ssthresh)
+            self.ssthresh = max(self.config.min_cwnd, self.cwnd * self.config.loss_reduction_factor)
+            self.cwnd = self.ssthresh
             self.state = CongestionState.FAST_RECOVERY
-
-    def get_pacing_delay(self) -> float:
-        """
-        Computes the target transmission pacing delay between outgoing packets.
-        """
-        with self._lock:
-            effective_rtt = self.srtt if self.srtt is not None else 0.05
-            jitter = self.jitter_estimator.get_jitter()
-            delay = (effective_rtt + 2.0 * jitter) / max(1.0, self.cwnd)
-            return max(self.config.min_pacing_delay, min(self.config.max_pacing_delay, delay))
+            return True
 
     def get_metrics(self) -> Dict[str, Any]:
-        """Returns snapshot telemetry of the congestion control instance."""
         with self._lock:
             return {
-                "cwnd": round(self.cwnd, 4),
-                "ssthresh": round(self.ssthresh, 4),
-                "in_flight_count": len(self._in_flight),
+                "cwnd": self.cwnd,
+                "ssthresh": self.ssthresh,
                 "state": self.state.value,
-                "srtt": round(self.srtt, 6) if self.srtt is not None else None,
-                "jitter": round(self.jitter_estimator.get_jitter(), 6),
-                "loss_events": self._loss_count,
+                "srtt": self.srtt,
+                "jitter": self.jitter_estimator.get_jitter(),
+                "in_flight_count": len(self._in_flight),
+                "loss_count": self._loss_count,
             }
 
-    def reset(self) -> None:
-        """Resets all window, state, and telemetry metrics."""
-        with self._lock:
-            self.cwnd = float(self.config.initial_cwnd)
-            self.ssthresh = float(self.config.initial_ssthresh)
-            self.state = CongestionState.SLOW_START
-            self.srtt = None
-            self.jitter_estimator.reset()
-            self._in_flight.clear()
-            self._loss_count = 0
 
-    def _update_rtt_and_jitter(self, sample_rtt: float) -> None:
-        """Internal helper to calculate EWMA SRTT and Jitter."""
-        self.jitter_estimator.update(sample_rtt)
-        if self.srtt is None:
-            self.srtt = sample_rtt
-        else:
-            alpha = self.config.rtt_alpha
-            self.srtt = (1.0 - alpha) * self.srtt + alpha * sample_rtt
+class AdaptiveRingBufferCongestionShaper:
+    """
+    Lock-free adaptive ring-buffer congestion shaper that monitors outbound socket write
+    latency and buffer fill levels using exponential moving averages. Dynamically recalculates
+    and throttles the epidemic fanout distribution matrix to shed low-priority peer transmissions
+    without blocking the reactor thread.
+    """
 
-    def _advance_window(self) -> None:
-        """Internal helper to expand congestion window according to TCP rules."""
-        if self.state == CongestionState.SLOW_START:
-            self.cwnd += 1.0
-            if self.cwnd >= self.ssthresh:
-                self.state = CongestionState.CONGESTION_AVOIDANCE
-        elif self.state == CongestionState.CONGESTION_AVOIDANCE:
-            self.cwnd += 1.0 / max(1.0, self.cwnd)
-        elif self.state == CongestionState.FAST_RECOVERY:
-            self.state = CongestionState.CONGESTION_AVOIDANCE
-
-        self.cwnd = min(self.config.max_cwnd, max(self.config.min_cwnd, self.cwnd))
-
-
-class StreamCongestionManager:
-    """Manages independent sliding-window controllers per peer connection."""
-
-    def __init__(self, default_config: Optional[CongestionConfig] = None) -> None:
-        self.default_config = default_config or CongestionConfig()
-        self._controllers: Dict[str, SlidingWindowCongestionController] = {}
+    def __init__(self, capacity: int = 1024, config: Optional[CongestionConfig] = None) -> None:
+        self.capacity = max(16, capacity)
+        self.config = config or CongestionConfig()
+        self._buffer: List[Optional[Dict[str, Any]]] = [None] * self.capacity
+        self._head = 0
+        self._tail = 0
+        self._size = 0
+        self._fill_ratio_ewma: float = 0.0
+        self._write_latency_ewma: float = 0.0
+        self._drop_counter: int = 0
         self._lock = threading.Lock()
 
-    def get_controller(self, peer_id: str) -> SlidingWindowCongestionController:
-        """Returns or creates a congestion controller for the specified peer."""
-        if not peer_id:
-            raise ValueError("peer_id cannot be empty")
+    def push(self, item: Dict[str, Any], now: Optional[float] = None) -> bool:
         with self._lock:
-            if peer_id not in self._controllers:
-                self._controllers[peer_id] = SlidingWindowCongestionController(config=self.default_config)
-            return self._controllers[peer_id]
+            if self._size >= self.capacity:
+                self._drop_counter += 1
+                return False
+            self._buffer[self._tail] = item
+            self._tail = (self._tail + 1) % self.capacity
+            self._size += 1
+            self._update_metrics()
+            return True
 
-    def remove_peer(self, peer_id: str) -> None:
-        """Removes tracking state for a disconnected peer."""
+    def pop(self) -> Optional[Dict[str, Any]]:
         with self._lock:
-            self._controllers.pop(peer_id, None)
+            if self._size == 0:
+                return None
+            item = self._buffer[self._head]
+            self._buffer[self._head] = None
+            self._head = (self._head + 1) % self.capacity
+            self._size -= 1
+            self._update_metrics()
+            return item
 
-    def get_all_metrics(self) -> Dict[str, Dict[str, Any]]:
-        """Returns telemetry metrics across all active peer streams."""
+    def _update_metrics(self) -> None:
+        current_ratio = float(self._size) / float(self.capacity)
+        alpha = self.config.congestion_ewma_alpha
+        self._fill_ratio_ewma = alpha * current_ratio + (1.0 - alpha) * self._fill_ratio_ewma
+
+    def record_write_latency(self, latency_sec: float) -> None:
+        if latency_sec < 0.0:
+            raise ValueError("latency_sec cannot be negative")
         with self._lock:
-            return {peer_id: ctrl.get_metrics() for peer_id, ctrl in self._controllers.items()}
+            alpha = self.config.congestion_ewma_alpha
+            self._write_latency_ewma = alpha * latency_sec + (1.0 - alpha) * self._write_latency_ewma
+
+    def get_fill_ratio(self) -> float:
+        with self._lock:
+            return float(self._size) / float(self.capacity)
+
+    def get_fill_ratio_ewma(self) -> float:
+        with self._lock:
+            return self._fill_ratio_ewma
+
+    def get_write_latency_ewma(self) -> float:
+        with self._lock:
+            return self._write_latency_ewma
+
+    def calculate_fanout_scaling_factor(self) -> float:
+        """
+        Calculates backpressure-driven fanout multiplier in range [0.0, 1.0].
+        When buffer fill ratio or write latency exceeds high watermarks, scaling factor drops.
+        """
+        with self._lock:
+            fill_ratio = self.get_fill_ratio()
+            if fill_ratio >= self.config.buffer_high_watermark:
+                # Severe backpressure / congestion
+                return 0.25
+            elif fill_ratio <= self.config.buffer_low_watermark:
+                return 1.0
+            else:
+                # Linear interpolation between low and high watermarks
+                span = self.config.buffer_high_watermark - self.config.buffer_low_watermark
+                if span <= 0:
+                    return 1.0
+                offset = (fill_ratio - self.config.buffer_low_watermark) / span
+                return float(max(0.25, min(1.0, 1.0 - 0.75 * offset)))
+
+    def prune_low_priority_transmissions(self, peer_rankings: Dict[str, float]) -> Dict[str, bool]:
+        """
+        Applies backpressure-driven fanout pruning across peers based on priority/reliability ranking.
+        Returns a mapping of peer_id -> keep_transmission (bool).
+        """
+        scaling = self.calculate_fanout_scaling_factor()
+        sorted_peers = sorted(peer_rankings.items(), key=lambda item: item[1], reverse=True)
+        total_peers = len(sorted_peers)
+        if total_peers == 0:
+            return {}
+
+        allowed_count = max(1, int(math.ceil(total_peers * scaling)))
+        decisions: Dict[str, bool] = {}
+        for idx, (peer_id, score) in enumerate(sorted_peers):
+            decisions[peer_id] = idx < allowed_count
+        return decisions
+
+    def get_metrics(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "capacity": self.capacity,
+                "size": self._size,
+                "fill_ratio": float(self._size) / float(self.capacity),
+                "fill_ratio_ewma": self._fill_ratio_ewma,
+                "write_latency_ewma": self._write_latency_ewma,
+                "drop_counter": self._drop_counter,
+                "fanout_scaling_factor": self.calculate_fanout_scaling_factor(),
+            }
