@@ -27,6 +27,7 @@ class RateLimitConfig:
 @dataclass(frozen=True)
 class LeakyBucketConfig:
     """Configuration parameters for outbound gossip leaky-bucket streaming."""
+
     capacity: float = 50.0
     leak_rate: float = 25.0  # tokens per second leaked
     max_tracked_peers: int = 5000

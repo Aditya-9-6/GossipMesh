@@ -3,5 +3,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-EXPOSE 8000
-ENTRYPOINT ["python", "-m", "enterprise.packaging"]
+RUN useradd -u 10001 gossipuser && chown -R gossipuser:gossipuser /app
+USER gossipuser
+CMD ["python", "scripts/autonomous_loop.py"]
