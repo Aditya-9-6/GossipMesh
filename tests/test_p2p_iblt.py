@@ -1,6 +1,7 @@
 import pytest
 from gossipmesh.p2p.iblt import InvertibleBloomLookupTable
 
+
 def test_iblt_basic_insertion_and_lookup():
     iblt = InvertibleBloomLookupTable(size=64, hash_functions=4)
     keys = {10, 20, 30, 40, 50}
@@ -10,6 +11,7 @@ def test_iblt_basic_insertion_and_lookup():
     pos, neg = iblt.list_entries()
     assert pos == keys
     assert len(neg) == 0
+
 
 def test_iblt_set_reconciliation_difference():
     iblt1 = InvertibleBloomLookupTable(size=128, hash_functions=4)
@@ -33,11 +35,11 @@ def test_iblt_set_reconciliation_difference():
     assert pos == set1_exclusive
     assert neg == set2_exclusive
 
+
 def test_iblt_insufficient_capacity_raises():
     iblt = InvertibleBloomLookupTable(size=4, hash_functions=2)
     for k in range(50):
         iblt.insert(k)
 
     with pytest.raises(ValueError):
-
         iblt.list_entries()
