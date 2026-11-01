@@ -1,37 +1,32 @@
-"""
-Scalable Bloom Routing Table for P2P network topologies.
-"""
-
-from __future__ import annotations
-
 import math
-import threading
-from typing import List, Optional
+
+try:
+    import mmh3
+except ImportError:
+    mmh3 = None
 
 
 class BloomFilterLayer:
-    def __init__(self, capacity: int = 1000, error_rate: float = 0.01):
+    def __init__(self, capacity: int, error_rate: float):
         self.capacity = capacity
         self.error_rate = error_rate
-        self._bits = 1024
-        self._bit_array = bytearray(self._bits // 8)
-        self._count = 0
+        self.bits = [False] * (capacity * 8)
 
-    def _hash(self, item: str) -> int:
-        return abs(hash(item)) % self._bits
+    def _hashes(self, item: str):
+        if mmh3:
+            h1 = mmh3.hash(item, 42)
+            h2 = mmh3.hash(item, 24)
+        else:
+            h1 = hash(item)
+            h2 = hash(item[::-1])
+        return [abs(h1 + i * h2) % len(self.bits) for i in range(3)]
 
     def add(self, item: str) -> None:
-        idx = self._hash(item)
-        byte_idx = idx // 8
-        bit_idx = idx % 8
-        self._bit_array[byte_idx] |= 1 << bit_idx
-        self._count += 1
+        for h in self._hashes(item):
+            self.bits[h] = True
 
     def __contains__(self, item: str) -> bool:
-        idx = self._hash(item)
-        byte_idx = idx // 8
-        bit_idx = idx % 8
-        return bool(self._bit_array[byte_idx] & (1 << bit_idx))
+        return all(self.bits[h] for h in self._hashes(item))
 
 
 class ScalableBloomRoutingTable:
@@ -39,33 +34,21 @@ class ScalableBloomRoutingTable:
         self.initial_capacity = initial_capacity
         self.error_rate = error_rate
         self.scaling_factor = scaling_factor
-        self.layers: List[BloomFilterLayer] = [BloomFilterLayer(initial_capacity, error_rate)]
-        self._lock = threading.Lock()
-        self._total_nodes = 0
+        self.layers = [BloomFilterLayer(initial_capacity, error_rate)]
+        self.total_nodes = 0
 
-    def add(self, node_id: str) -> None:
-        with self._lock:
-            current_layer = self.layers[-1]
-            if current_layer._count >= current_layer.capacity:
-                new_capacity = current_layer.capacity * self.scaling_factor
-                current_layer = BloomFilterLayer(new_capacity, self.error_rate)
-                self.layers.append(current_layer)
-            current_layer.add(node_id)
-            self._total_nodes += 1
+    def add(self, item: str) -> None:
+        if item in self:
+            return
+        self.layers[-1].add(item)
+        self.total_nodes += 1
+        if self.total_nodes >= self.layers[-1].capacity:
+            new_cap = self.layers[-1].capacity * self.scaling_factor
+            self.layers.append(BloomFilterLayer(new_cap, self.error_rate * 0.5))
 
-    def __contains__(self, node_id: str) -> bool:
-        with self._lock:
-            for layer in reversed(self.layers):
-                if node_id in layer:
-                    return True
-            return False
+    def __contains__(self, item: str) -> bool:
+        return any(item in layer for layer in self.layers)
 
     @property
     def layer_count(self) -> int:
-        with self._lock:
-            return len(self.layers)
-
-    @property
-    def total_nodes(self) -> int:
-        with self._lock:
-            return self._total_nodes
+        return len(self.layers)
