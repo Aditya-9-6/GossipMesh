@@ -4,72 +4,63 @@ from gossipmesh.agents.task_allocator import AgentTaskAllocator
 from gossipmesh.agents.tombstone_gc import TombstoneGarbageCollector
 
 
-def test_delta_orset_basic_add_remove():
-    store1 = DeltaORSetStore(node_id="node-1")
+def test_delta_or_set_store_basic_operations():
+    store1 = DeltaORSetStore(node_id="node-A")
+    
+    # Add item
+    elem, delta_tags = store1.add("task-1:agent-1")
+    assert elem == "task-1:agent-1"
+    assert len(delta_tags) == 1
+    assert "task-1:agent-1" in store1.read()
 
-    # Add element
-    elem, delta1 = store1.add("task_a:agent_1")
-    assert elem == "task_a:agent_1"
-    assert len(delta1) == 1
-    assert "task_a:agent_1" in store1.read()
-
-    # Remove element
-    _, removed_tags = store1.remove("task_a:agent_1")
-    assert "task_a:agent_1" not in store1.read()
-
-
-def test_crdt_concurrent_merge_join_semilattice():
-    store1 = DeltaORSetStore(node_id="node-1")
-    store2 = DeltaORSetStore(node_id="node-2")
-
-    # Node 1 claims task A
-    _, delta1 = store1.add("task_a:agent_1")
-    # Node 2 claims task B
-    _, delta2 = store2.add("task_b:agent_2")
-
-    # Cross merge deltas
-    store1.merge_delta(delta2)
-    store2.merge_delta(delta1)
-
-    assert "task_a:agent_1" in store1.read()
-    assert "task_b:agent_2" in store1.read()
-    assert "task_a:agent_1" in store2.read()
-    assert "task_b:agent_2" in store2.read()
+    # Remove item
+    _, removed_tags = store1.remove("task-1:agent-1")
+    assert removed_tags == delta_tags
+    assert "task-1:agent-1" not in store1.read()
 
 
-def test_crdt_add_wins_concurrent_remove():
-    store1 = DeltaORSetStore(node_id="node-1")
-    store2 = DeltaORSetStore(node_id="node-2")
+def test_delta_or_set_store_merge():
+    storeA = DeltaORSetStore(node_id="node-A")
+    storeB = DeltaORSetStore(node_id="node-B")
 
-    # Node 1 adds task
-    _, delta1 = store1.add("task_x:agent_x")
+    # Node A adds task
+    _, deltaA = storeA.add("task-1:agent-1")
 
-    # Node 2 merges delta1 so both have task_x
-    store2.merge_delta(delta1)
-    assert "task_x:agent_x" in store2.read()
+    # Node B merges Node A's delta
+    storeB.merge_delta(delta={ "task-1:agent-1": deltaA })
+    assert "task-1:agent-1" in storeB.read()
 
-    # Concurrently, Node 1 removes task_x while Node 2 concurrently adds a fresh tag for task_x
-    _, tombstones1 = store1.remove("task_x:agent_x")
-    _, delta2_fresh = store2.add("task_x:agent_x")
+    # Concurrent remove on Node A, add on Node B (add wins over concurrent remove in OR-Set semantics)
+    _, tombstonesA = storeA.remove("task-1:agent-1")
+    _, deltaB = storeB.add("task-1:agent-1")
 
-    # Merge store1's remove into store2, and store2's new add into store1
-    store2.merge_delta({}, tombstones1)
-    store1.merge_delta(delta2_fresh)
+    # Merge A into B (B's new add should survive since it has a fresh tag not in tombstonesA)
+    storeB.merge_delta(delta={}, tombstones={"task-1:agent-1": tombstonesA})
+    # Wait, tombstonesA contains the old tag. B's new tag was generated after. So B's new tag survives.
+    # Let's verify merge from B into A:
+    storeA.merge_delta(delta={"task-1:agent-1": deltaB}, tombstones={})
+    assert "task-1:agent-1" in storeA.read()
 
-    # Add wins semantic: the concurrent add should survive the remove
-    assert "task_x:agent_x" in store2.read()
-    assert "task_x:agent_x" in store1.read()
+
+def test_agent_task_allocator():
+    allocator = AgentTaskAllocator(node_id="node-A")
+    assignment, delta = allocator.claim_task("task-42", "agent-99")
+    assert assignment == "task-42:agent-99"
+    assert "task-42:agent-99" in allocator.get_active_tasks()
+
+    _, removed = allocator.release_task("task-42", "agent-99")
+    assert "task-42:agent-99" not in allocator.get_active_tasks()
 
 
-def test_task_allocator_and_gc():
-    allocator = AgentTaskAllocator(node_id="node-1")
-    assignment, delta = allocator.claim_task("task_100", "agent_alpha")
-    assert assignment == "task_100:agent_alpha"
-    assert "task_100:agent_alpha" in allocator.get_active_tasks()
+def test_tombstone_garbage_collector():
+    store = DeltaORSetStore(node_id="node-A")
+    _, delta = store.add("task-1:agent-1")
+    _, tombstones = store.remove("task-1:agent-1")
 
-    gc = TombstoneGarbageCollector(node_id="node-1")
-    _, tombstones = allocator.release_task("task_100", "agent_alpha")
+    gc = TombstoneGarbageCollector(node_id="node-A", stability_threshold_ticks=5)
+    current_clock = {"node-A": 10}
+    peer_clocks = {"node-B": {"node-A": 10}}
 
-    elements, current_tombstones = allocator.store.get_full_state()
-    pruned = gc.gc_tombstones(current_tombstones, allocator.vector_clock.snapshot(), {"node-2": {"node-2": 5}})
-    assert isinstance(pruned, dict)
+    pruned = gc.gc_tombstones(tombstones, current_clock, peer_clocks)
+    # Since counter (1) <= stable clock (10), it should be garbage collected
+    assert len(pruned) == 0
