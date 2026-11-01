@@ -3,6 +3,7 @@ import asyncio
 from typing import Dict, Any, List, Set, Tuple
 from gossipmesh.sync.vector_clock import VectorClock
 
+
 class DeltaSyncEngine:
     def __init__(self, node_id: str, max_causal_entries: int = 100) -> None:
         self.node_id = node_id
@@ -26,10 +27,7 @@ class DeltaSyncEngine:
             for key, (val, val_vc) in self.state_store.items():
                 comp = val_vc.compare(remote_vc)
                 if comp in ("AFTER", "CONCURRENT"):
-                    delta[key] = {
-                        "value": val,
-                        "vector_clock": val_vc.to_dict()
-                    }
+                    delta[key] = {"value": val, "vector_clock": val_vc.to_dict()}
         return delta
 
     async def merge_delta(self, remote_delta: Dict[str, Dict[str, Any]]) -> List[str]:
@@ -38,7 +36,7 @@ class DeltaSyncEngine:
             for key, entry in remote_delta.items():
                 remote_val = entry.get("value")
                 remote_vc = VectorClock.from_dict(entry.get("vector_clock", {}))
-                
+
                 if key not in self.state_store:
                     self.state_store[key] = (remote_val, remote_vc)
                     merged_keys.append(key)
@@ -52,7 +50,7 @@ class DeltaSyncEngine:
                         # Last-write-wins fallback or deterministic merge strategy
                         self.state_store[key] = (remote_val, remote_vc)
                         merged_keys.append(key)
-                
+
                 # Merge clocks
                 for k, v in remote_vc.clock.items():
                     self.local_clock.clock[k] = max(self.local_clock.clock.get(k, 0), v)
