@@ -12,13 +12,13 @@ def blake3_hex(data: bytes) -> str:
 
 def hash_leaf(key: str, value: Any) -> str:
     """Computes cryptographic hash of a single key-value state leaf using blake3."""
-    raw = f"{key}:{json.dumps(value, sort_keys=True, default=str)}".encode('utf-8')
+    raw = f"{key}:{json.dumps(value, sort_keys=True, default=str)}".encode("utf-8")
     return blake3_hex(raw)
 
 
 def hash_nodes(left_hash: str, right_hash: str) -> str:
     """Computes cryptographic hash of an internal Merkle node from child hashes using blake3."""
-    combined = (left_hash + right_hash).encode('utf-8')
+    combined = (left_hash + right_hash).encode("utf-8")
     return blake3_hex(combined)
 
 
@@ -29,8 +29,8 @@ class MerkleNode:
         self,
         key: Optional[str] = None,
         value: Any = None,
-        left: Optional['MerkleNode'] = None,
-        right: Optional['MerkleNode'] = None,
+        left: Optional["MerkleNode"] = None,
+        right: Optional["MerkleNode"] = None,
         hash_val: Optional[str] = None,
     ):
         self.key = key
@@ -69,7 +69,7 @@ class MerkleDAG:
             return MerkleNode(hash_val=blake3_hex(b"empty"))
 
         nodes = [MerkleNode(key=k, value=v) for k, v in items]
-        
+
         while len(nodes) > 1:
             next_level = []
             for i in range(0, len(nodes), 2):
@@ -94,7 +94,9 @@ class MerkleDAG:
         self._compare_nodes(self.root, remote_root, divergent_keys)
         return sorted(list(set(divergent_keys)))
 
-    def _compare_nodes(self, local: Optional[MerkleNode], remote: Optional[MerkleNode], divergent_keys: List[str]) -> None:
+    def _compare_nodes(
+        self, local: Optional[MerkleNode], remote: Optional[MerkleNode], divergent_keys: List[str]
+    ) -> None:
         if local is None or remote is None:
             return
         if local.hash == remote.hash:
