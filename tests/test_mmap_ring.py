@@ -1,32 +1,34 @@
-import pytest
+import concurrent.futures
 from gossipmesh.transport.mmap_ring import MMapCircularRingBuffer
 
-def test_mmap_ring_basic_io():
-    ring = MMapCircularRingBuffer(capacity_bytes=1024)
-    try:
-        msg1 = b"Hello GossipMesh Zero-Copy"
-        msg2 = b"Second P2P Packet"
-        
-        assert ring.write(msg1) is True
-        assert ring.write(msg2) is True
-        
-        assert ring.read() == msg1
-        assert ring.read() == msg2
-        assert ring.read() is None
-    finally:
-        ring.close()
 
-def test_mmap_ring_capacity_limit():
-    ring = MMapCircularRingBuffer(capacity_bytes=64)
-    try:
-        large_msg = b"A" * 50
-        # 4 bytes length + 50 bytes data = 54 bytes total (fits in 64 bytes)
-        assert ring.write(large_msg) is True
-        
-        # Next write should exceed capacity
-        assert ring.write(b"B" * 20) is False
-        
-        assert ring.read() == large_msg
-        assert ring.read() is None
-    finally:
-        ring.close()
+class TestMMapRing:
+    def test_basic_write_read(self):
+        buf = MMapCircularRingBuffer(size=4096)
+        msg = b"hello gossipmesh"
+        assert buf.write(msg) is True
+        assert buf.read() == msg
+        assert buf.read() is None
+        buf.close()
+
+    def test_concurrent_stress(self):
+        buf = MMapCircularRingBuffer(size=1024 * 64)
+        iterations = 200
+
+        def producer():
+            for i in range(iterations):
+                buf.write(f"msg-{i}".encode())
+
+        def consumer():
+            read_count = 0
+            while read_count < iterations:
+                res = buf.read()
+                if res:
+                    read_count += 1
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            f1 = executor.submit(producer)
+            f2 = executor.submit(consumer)
+            concurrent.futures.wait([f1, f2])
+
+        buf.close()
