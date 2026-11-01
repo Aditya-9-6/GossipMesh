@@ -372,6 +372,12 @@ def create_issue(item):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="GossipMesh Architecture Advancement Issue Generator Engine")
+    parser.add_argument("--count", type=int, default=int(os.environ.get("INPUT_COUNT", "2") or "2"), help="Number of issues to generate")
+    parser.add_argument("--force", "-f", action="store_true", help="Force issue creation")
+    args, _ = parser.parse_known_args()
+
     repo_name = TARGET_REPO.split("/")[-1].lower()
     if "devproxy" in repo_name:
         catalog = DEVPROXY_CATALOG
@@ -380,8 +386,8 @@ def main():
     else:
         catalog = GOSSIPMESH_CATALOG
 
-    count = int(os.environ.get("INPUT_COUNT", "2") or "2")
-    force = ("--force" in sys.argv) or ("-f" in sys.argv)
+    count = args.count
+    force = args.force
 
     existing_issues = get_existing_issues()
     existing_titles = {i["title"].strip() for i in existing_issues if "title" in i}
