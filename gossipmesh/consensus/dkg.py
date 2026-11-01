@@ -18,23 +18,24 @@ class DKGNode:
     """
     Represents a participant node in the Distributed Key Generation protocol.
     """
+
     def __init__(self, node_id: str, node_index: int, total_nodes: int, threshold: int):
         self.node_id = node_id
         self.node_index = node_index
         self.total_nodes = total_nodes
         self.threshold = threshold
         self.vss = VSSScheme()
-        
+
         # Phase 1 state
         self.secret_polynomial: List[int] = []
         self.commitments: List[int] = []
         self.my_secret_share: int = 0
-        
+
         # Collected shares and commitments from peers
         self.received_shares: Dict[int, int] = {}
         self.received_commitments: Dict[int, List[int]] = {}
         self.verified_shares: List[Tuple[int, int]] = []
-        
+
         # Final DKG output
         self.collective_public_key: Optional[int] = None
         self.node_private_share: Optional[int] = None
@@ -64,9 +65,7 @@ class DKGNode:
         # Handled in distributed coordinator or peer method below
         pass
 
-    def process_peer_contribution(
-        self, sender_index: int, share_y: int, commitments: List[int]
-    ) -> bool:
+    def process_peer_contribution(self, sender_index: int, share_y: int, commitments: List[int]) -> bool:
         """
         Validates a peer's share against their broadcast commitments using VSS.
         """
@@ -74,7 +73,9 @@ class DKGNode:
             self.received_shares[sender_index] = share_y
             self.received_commitments[sender_index] = commitments
             return True
-        logger.warning(f"Node {self.node_id} rejected share from sender {sender_index} due to VSS verification failure.")
+        logger.warning(
+            f"Node {self.node_id} rejected share from sender {sender_index} due to VSS verification failure."
+        )
         return False
 
     def finalize_dkg(self) -> int:
@@ -83,7 +84,9 @@ class DKGNode:
         Computes the node's private share of the collective key and the joint public key.
         """
         if len(self.received_shares) < self.threshold:
-            raise ValueError(f"Insufficient valid shares collected: {len(self.received_shares)} < threshold {self.threshold}")
+            raise ValueError(
+                f"Insufficient valid shares collected: {len(self.received_shares)} < threshold {self.threshold}"
+            )
 
         # Sum up all received shares destined for this node to form our private key share
         total_private_share = sum(self.received_shares.values()) % self.vss.order
@@ -102,6 +105,7 @@ class DistributedKeyGenerationProtocol:
     """
     Coordinates the dealerless DKG setup across all nodes maintaining O(n^2) message complexity.
     """
+
     def __init__(self, nodes: List[DKGNode], threshold: int):
         self.nodes = nodes
         self.threshold = threshold

@@ -2,9 +2,10 @@ import time
 import threading
 from typing import Dict, Any, Optional
 
+
 class ReputationConfig:
     def __init__(
-        self, 
+        self,
         half_life_seconds: float = 300.0,
         initial_score: float = 100.0,
         min_score: float = 0.0,
@@ -14,7 +15,7 @@ class ReputationConfig:
         integrity_weight: float = 0.4,
         contribution_weight: float = 0.3,
         violation_penalty: float = 25.0,
-        drop_penalty: float = 10.0
+        drop_penalty: float = 10.0,
     ) -> None:
         self.half_life_seconds = half_life_seconds
         self.initial_score = initial_score
@@ -50,13 +51,13 @@ class AdaptivePeerReputationEngine:
         return score
 
     def record_interaction(
-        self, 
-        peer_id: str, 
-        latency_ms: float, 
-        payload_valid: bool = True, 
+        self,
+        peer_id: str,
+        latency_ms: float,
+        payload_valid: bool = True,
         gossip_contributed: bool = False,
         violated: bool = False,
-        dropped: bool = False
+        dropped: bool = False,
     ) -> float:
         now = time.time()
         with self._lock:
