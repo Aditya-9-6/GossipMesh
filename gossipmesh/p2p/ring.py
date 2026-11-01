@@ -43,7 +43,6 @@ class ConsistentHashRing:
             for i in range(self.vnodes_per_peer):
                 vnode_key = f"{peer_id}#vnode#{i}"
                 h = self._hash(vnode_key)
-                # Handle rare hash collisions by probing or overriding
                 while h in self._vnode_map:
                     h = (h + 1) & 0xFFFFFFFF
                 bisect.insort(self._ring, h)
@@ -100,37 +99,6 @@ class ConsistentHashRing:
                 if peer_id and peer_id not in seen_peers:
                     seen_peers.add(peer_id)
                     replicas.append(peer_id)
-                    if len(replicas) >= count or len(seen_peers) >= len(self._peers):
+                    if len(replicas) >= count:
                         break
             return replicas
-
-    def rebalance_load(self, keys: List[str], max_migration_ratio: float = 0.25) -> Tuple[Dict[str, List[str]], int]:
-        """
-        Executes a bounded load-rebalancing algorithm that partitions keys across current
-        peers while respecting a max_migration_ratio boundary to prevent cascading thundering herds.
-        Returns (peer_to_keys_mapping, total_migrated_count).
-        """
-        with self._lock:
-            if not self._peers or not keys:
-                return {p: [] for p in self._peers}, 0
-
-            target_allocation: Dict[str, List[str]] = {p: [] for p in self._peers}
-            migrated_count = 0
-            max_allowed_migrations = int(len(keys) * max_migration_ratio)
-
-            for key in keys:
-                peer = self.get_peer(key)
-                if peer:
-                    target_allocation[peer].append(key)
-
-            return target_allocation, migrated_count
-
-    @property
-    def peer_count(self) -> int:
-        with self._lock:
-            return len(self._peers)
-
-    @property
-    def vnode_count(self) -> int:
-        with self._lock:
-            return len(self._ring)
