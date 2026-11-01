@@ -12,6 +12,7 @@ class PeerTopologyClustering:
     Clusters peer nodes in distributed gossip meshes using zero-copy MinHash sketches
     and threshold-based Jaccard similarity bounds without full payload exchange.
     """
+
     def __init__(self, similarity_threshold: float = 0.5, num_perm: int = 128) -> None:
         self.similarity_threshold = similarity_threshold
         self.num_perm = num_perm
@@ -63,7 +64,7 @@ class PeerTopologyClustering:
                     parent[root_i] = root_j
 
             sketches = [self._sketches[p] for p in peers]
-            
+
             # Compare all pairs (approximate clustering)
             for i in range(n):
                 for j in range(i + 1, n):

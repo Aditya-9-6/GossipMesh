@@ -31,7 +31,7 @@ class P2PTransport:
         frag = FountainFragment.deserialize(raw_fragment)
         if frag.session_id not in self.active_decoders:
             self.active_decoders[frag.session_id] = FountainDecoder(frag.total_chunks, self.config.chunk_size)
-        
+
         decoder = self.active_decoders[frag.session_id]
         is_complete = decoder.add_fragment(frag)
         if is_complete:

@@ -4,11 +4,9 @@ from gossipmesh.p2p.digest_sync import DynamicBloomDigestSync
 
 def test_dynamic_bloom_digest_sync_basic():
     sync_node = DynamicBloomDigestSync(initial_capacity=10, base_error_rate=0.01)
-    
+
     sync_node.add("agent_task_1")
-    sync_node.add(
-        "agent_task_2"
-    )
+    sync_node.add("agent_task_2")
 
     assert "agent_task_1" in sync_node
     assert "agent_task_2" in sync_node
@@ -18,7 +16,7 @@ def test_dynamic_bloom_digest_sync_basic():
 def test_dynamic_capacity_expansion():
     # Initialize with tiny capacity to force split/expansion
     sync_node = DynamicBloomDigestSync(initial_capacity=2, base_error_rate=0.01)
-    
+
     for i in range(15):
         sync_node.add(f"item_{i}")
 
@@ -29,7 +27,7 @@ def test_dynamic_capacity_expansion():
 def test_peer_population_tuning():
     sync_node = DynamicBloomDigestSync(initial_capacity=100, base_error_rate=0.01)
     sync_node.add("state_key_alpha")
-    
+
     # Tune for large peer swarm
     sync_node.tune_for_peer_population(5000)
     assert "state_key_alpha" in sync_node
