@@ -35,12 +35,13 @@ from gossipmesh.red_team import RedTeamAuditor
 from gossipmesh.consensus import ByzantineConsensusEngine, ModelVote
 from gossipmesh.semantic_cache import SemanticCache
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACK_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-flash-lite-latest",
     "gemini-3.8-flash",
+    "gemini-flash-lite-latest",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
+    "gemini-pro-latest",
 ]
 
 
