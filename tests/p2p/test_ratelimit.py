@@ -23,7 +23,9 @@ async def test_leaky_bucket_stream_limiter_happy_path():
 async def test_leaky_bucket_backpressure_signaling():
     limiter = LeakyBucketStreamLimiter(LeakyBucketConfig(capacity=10.0, leak_rate=5.0))
     # Utilization > 0.85 triggers backpressure flag
-    allowed, bp = await limiter.acquire("peer_unhealthy", tokens=2.0, outbound_buffer_utilization=0.90, peer_health_score=0.4)
+    allowed, bp = await limiter.acquire(
+        "peer_unhealthy", tokens=2.0, outbound_buffer_utilization=0.90, peer_health_score=0.4
+    )
     assert allowed is False
     assert bp is True
     assert limiter.metrics.dropped_messages == 1
@@ -33,7 +35,7 @@ async def test_leaky_bucket_backpressure_signaling():
 async def test_leaky_bucket_lru_eviction():
     config = LeakyBucketConfig(capacity=10.0, leak_rate=5.0, max_tracked_peers=2)
     limiter = LeakyBucketStreamLimiter(config)
-    
+
     await limiter.acquire("peer_a", tokens=1.0)
     await limiter.acquire("peer_b", tokens=1.0)
     assert len(limiter._buckets) == 2
