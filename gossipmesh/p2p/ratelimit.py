@@ -27,6 +27,7 @@ class RateLimitConfig:
 @dataclass(frozen=True)
 class LeakyBucketConfig:
     """Configuration parameters for outbound gossip leaky-bucket streaming."""
+
     capacity: float = 50.0
     leak_rate: float = 25.0  # tokens per second leaked
     max_tracked_peers: int = 5000
@@ -139,7 +140,7 @@ class LeakyBucketStreamLimiter:
 
             current_tokens, last_update = self._buckets[peer_id]
             delta = max(0.0, now - last_update)
-            
+
             # Adaptive refill rate bound to peer health score
             effective_refill = self.config.leak_rate * max(0.1, peer_health_score)
             current_tokens = min(self.config.capacity, current_tokens + delta * effective_refill)
