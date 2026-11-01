@@ -6,6 +6,7 @@ from gossipmesh.transport.mmap_ring import MMapCircularRingBuffer
 
 logger = logging.getLogger(__name__)
 
+
 class EpollEventLoop:
     """
     High-performance epoll-driven non-blocking event loop integrated with
@@ -19,7 +20,12 @@ class EpollEventLoop:
         self._callbacks: Dict[int, Callable[[socket.socket], None]] = {}
         self._running = False
 
-    def register_socket(self, sock: socket.socket, events: int = select.EPOLLIN, callback: Optional[Callable[[socket.socket], None]] = None) -> None:
+    def register_socket(
+        self,
+        sock: socket.socket,
+        events: int = select.EPOLLIN,
+        callback: Optional[Callable[[socket.socket], None]] = None,
+    ) -> None:
         sock.setblocking(False)
         fd = sock.fileno()
         self._sockets[fd] = sock

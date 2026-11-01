@@ -27,9 +27,7 @@ def test_replicas_allocation():
     for p in ["alpha", "beta", "gamma", "delta"]:
         ring.add_peer(p)
 
-    replicas = ring.get_replicas(
-        "distributed-workload-task", count=3
-    )
+    replicas = ring.get_replicas("distributed-workload-task", count=3)
     assert len(replicas) == 3
     assert len(set(replicas)) == 3
     for r in replicas:
