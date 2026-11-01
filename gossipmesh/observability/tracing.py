@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,8 @@ try:
     # Global provider and tracer initialization
     _RESOURCE = Resource.create(
         {
-            "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
-            "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+            "service.name": os.getenv("PROJECT_NAME", "gossipmesh"),
+            "deployment.environment": os.getenv("ENVIRONMENT", "production"),
         }
     )
 
