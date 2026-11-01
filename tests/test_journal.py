@@ -67,7 +67,7 @@ def test_journal_corruption_detection(tmp_path: Path):
     # Corrupt payload byte on disk
     with open(journal_path, "r+b") as f:
         f.seek(-5, 2)
-        f.write(b"\xFF\xFF\xFF\xFF\xFF")
+        f.write(b"\xff\xff\xff\xff\xff")
 
     with pytest.raises(JournalCorruptionError):
         JournalLog(journal_path)

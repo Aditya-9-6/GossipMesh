@@ -50,5 +50,5 @@ class TestPacketFragmentation(unittest.TestCase):
         self.assertTrue(success)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

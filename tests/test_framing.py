@@ -65,8 +65,8 @@ def test_protocol_error_magic():
     framer = PacketFramer(max_payload_size=1024)
     framed = bytearray(framer.pack_frame(b"test"))
     # Corrupt magic bytes
-    framed[0] = ord('X')
-    framed[1] = ord('Y')
+    framed[0] = ord("X")
+    framed[1] = ord("Y")
 
     with pytest.raises(ProtocolError):
         framer.deframe_bytes(framed)

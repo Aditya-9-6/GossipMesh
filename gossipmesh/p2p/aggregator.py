@@ -22,7 +22,7 @@ class AsyncLockFreeRingBufferPacketAggregator:
         # Each slot holds: [4 bytes length prefix][max_msg_size payload]
         self.slot_size = 4 + max_msg_size
         self.total_size = self.HEADER_SIZE + (self.capacity * self.slot_size)
-        
+
         self._shm: Optional[shared_memory.SharedMemory] = None
         self._is_creator = create
         self._lock = threading.Lock()  # Atomic guard for multi-threaded fast paths
@@ -45,7 +45,7 @@ class AsyncLockFreeRingBufferPacketAggregator:
     def _init_header(self) -> None:
         assert self._shm is not None
         header_data = struct.pack(self.HEADER_FORMAT, 0, 0, self.capacity, self.max_msg_size, 0)
-        self._shm.buf[:self.HEADER_SIZE] = header_data
+        self._shm.buf[: self.HEADER_SIZE] = header_data
 
     def _read_header(self) -> Tuple[int, int, int, int, int]:
         assert self._shm is not None
@@ -55,7 +55,7 @@ class AsyncLockFreeRingBufferPacketAggregator:
     def _write_header(self, head: int, tail: int, batch_count: int) -> None:
         assert self._shm is not None
         header_data = struct.pack(self.HEADER_FORMAT, head, tail, self.capacity, self.max_msg_size, batch_count)
-        self._shm.buf[:self.HEADER_SIZE] = header_data
+        self._shm.buf[: self.HEADER_SIZE] = header_data
 
     def push(self, data: bytes) -> bool:
         """
@@ -106,7 +106,7 @@ class AsyncLockFreeRingBufferPacketAggregator:
         with self._lock:
             head, tail, cap, _, batch_count = self._read_header()
             current_head = head
-            
+
             while current_head != tail and len(batch) < max_batch_size:
                 slot_offset = self.HEADER_SIZE + (current_head * self.slot_size)
                 msg_len = struct.unpack_from("=I", self._shm.buf, slot_offset)[0]
@@ -116,7 +116,7 @@ class AsyncLockFreeRingBufferPacketAggregator:
 
             new_batch_count = max(0, batch_count - len(batch))
             self._write_header(current_head, tail, new_batch_count)
-            
+
         return batch
 
     def close(self) -> None:

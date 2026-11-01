@@ -46,13 +46,13 @@ class FountainFragment:
         header_size = struct.calcsize(header_format)
         sid_len, symbol_id, degree, total_chunks, idx_count = struct.unpack_from(header_format, raw, 0)
         offset = header_size
-        session_id = raw[offset:offset + sid_len].decode("utf-8")
+        session_id = raw[offset : offset + sid_len].decode("utf-8")
         offset += sid_len
         indices = list(struct.unpack_from(f"{idx_count}I", raw, offset))
         offset += struct.calcsize(f"{idx_count}I")
         pay_len = struct.unpack_from("I", raw, offset)[0]
         offset += 4
-        payload = raw[offset:offset + pay_len]
+        payload = raw[offset : offset + pay_len]
         return cls(
             session_id=session_id,
             symbol_id=symbol_id,
@@ -74,7 +74,7 @@ class FountainEncoder:
         chunks = []
         cs = self.config.chunk_size
         for i in range(0, max(len(self.data), 1), cs):
-            chunk = self.data[i:i + cs]
+            chunk = self.data[i : i + cs]
             if len(chunk) < cs:
                 chunk = chunk + b"\x00" * (cs - len(chunk))
             chunks.append(chunk)
@@ -84,13 +84,13 @@ class FountainEncoder:
         rng = random.Random(symbol_id + hash(session_id))
         degree = rng.randint(1, min(self.config.max_degree, self.total_chunks))
         indices = sorted(rng.sample(range(self.total_chunks), degree))
-        
+
         buf = bytearray(self.config.chunk_size)
         for idx in indices:
             chunk = self.chunks[idx]
             for b_idx in range(len(buf)):
                 buf[b_idx] ^= chunk[b_idx]
-                
+
         return FountainFragment(
             session_id=session_id,
             symbol_id=symbol_id,
@@ -117,7 +117,7 @@ class FountainDecoder:
     def try_decode(self) -> bool:
         if len(self._decoded_chunks) >= self.total_chunks:
             return True
-            
+
         progress = True
         while progress:
             progress = False
