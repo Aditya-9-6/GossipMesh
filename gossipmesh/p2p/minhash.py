@@ -39,7 +39,6 @@ class MinHashSketch:
         # Linear combination hash simulation for all permutations (vectorized or looped inline)
         hash_vals = self._hash_values
         prime = self._mersenne_prime
-        max_h = self._max_hash
         
         for i in range(self.num_perm):
             # Simulating independent hash functions via linear probing
