@@ -13,6 +13,7 @@ from typing import List, Tuple, Optional
 
 class CurvePoint:
     """Simplified representation of an elliptic curve point or scalar for discrete-log assumptions."""
+
     def __init__(self, x: int, y: int, is_infinity: bool = False):
         self.x = x
         self.y = y
@@ -29,6 +30,7 @@ class VSSScheme:
     Feldman's Verifiable Secret Sharing implementation.
     Uses a generator point G and large prime order for polynomial evaluations and commitments.
     """
+
     def __init__(self, prime_order: int = 2**255 - 19, generator_base: int = 4):
         self.order = prime_order
         self.g = generator_base

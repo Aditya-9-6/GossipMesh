@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass(frozen=True)
-
 class FountainConfig:
     chunk_size: int = 1024  # Bytes per source chunk
     max_degree: int = 10
@@ -28,7 +27,6 @@ class FountainConfig:
 
 
 @dataclass
-
 class Droplet:
     session_id: str
     droplet_id: int
@@ -48,7 +46,7 @@ class Droplet:
         data_len = len(self.data)
         header_format = f"H Q H H H"
         header_size = struct.calcsize(header_format)
-        
+
         fmt = f"{header_size}s {sid_len}s {idx_count}I I {data_len}s"
         packed_header = struct.pack(
             "H Q H H H",
@@ -58,7 +56,14 @@ class Droplet:
             self.total_chunks,
             idx_count,
         )
-        return struct.pack(f"{len(packed_header)}s {sid_len}s {idx_count}I I {data_len}s", packed_header, sid_bytes, *self.indices, data_len, self.data)
+        return struct.pack(
+            f"{len(packed_header)}s {sid_len}s {idx_count}I I {data_len}s",
+            packed_header,
+            sid_bytes,
+            *self.indices,
+            data_len,
+            self.data,
+        )
 
     @classmethod
     def deserialize(cls, raw: bytes) -> Droplet:
@@ -66,8 +71,8 @@ class Droplet:
         header_size = struct.calcsize(header_format)
         sid_len, droplet_id, degree, total_chunks, idx_count = struct.unpack_from(header_format, raw, 0)
         offset = header_size
-        
-        sid_bytes = raw[offset:offset + sid_len]
+
+        sid_bytes = raw[offset : offset + sid_len]
         session_id = sid_bytes.decode("utf-8")
         offset += sid_len
 
@@ -79,7 +84,7 @@ class Droplet:
         data_len = struct.unpack_from("I", raw, offset)[0]
         offset += 4
 
-        data = raw[offset:offset + data_len]
+        data = raw[offset : offset + data_len]
         return cls(
             session_id=session_id,
             droplet_id=droplet_id,
@@ -105,7 +110,7 @@ class LubyTransformEncoder:
     def _split_into_chunks(self) -> List[bytes]:
         chunks = []
         for i in range(0, max(1, len(self.data)), self.chunk_size):
-            chunk = self.data[i:i + self.chunk_size]
+            chunk = self.data[i : i + self.chunk_size]
             # Pad last chunk if needed
             if len(chunk) < self.chunk_size:
                 chunk = chunk + b"\x00" * (self.chunk_size - len(chunk))
@@ -231,7 +236,6 @@ class LubyTransformDecoder:
 
 
 @dataclass
-
 class TreeNode:
     node_id: str
     parent: Optional[str] = None
@@ -260,7 +264,7 @@ class HierarchicalAggregationTree:
         while queue and peer_idx < len(all_nodes):
             curr_id = queue.pop(0)
             curr_node = self.tree[curr_id]
-            
+
             assigned = 0
             while assigned < self.fanout and peer_idx < len(all_nodes):
                 child_id = all_nodes[peer_idx]

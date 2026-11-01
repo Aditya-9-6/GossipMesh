@@ -21,9 +21,7 @@ def test_digest_arena_basic_operations():
 def test_digest_arena_vectorized_batch_filter():
     arena = GossipDigestArena(capacity=500, error_rate=0.01)
     arena.add("id_1")
-    arena.add(
-        "id_3"
-    )
+    arena.add("id_3")
 
     incoming = ["id_1", "id_2", "id_3", "id_4"]
     missing = arena.batch_filter_vectorized(incoming)
