@@ -2,8 +2,9 @@ import zlib
 import struct
 from typing import Set, Tuple, List, Optional
 
+
 class IBLTCell:
-    __slots__ = ('count', 'key_sum', 'key_hash_sum')
+    __slots__ = ("count", "key_sum", "key_hash_sum")
 
     def __init__(self, count: int = 0, key_sum: int = 0, key_hash_sum: int = 0):
         self.count = count
@@ -18,6 +19,7 @@ class IBLTCell:
             expected_hash = zlib.crc32(struct.pack("!Q", self.key_sum)) & 0xFFFFFFFF
             return expected_hash == self.key_hash_sum
         return False
+
 
 class InvertibleBloomLookupTable:
     def __init__(self, size: int = 64, hash_functions: int = 4):
@@ -80,7 +82,7 @@ class InvertibleBloomLookupTable:
 
         return positive_keys, negative_keys
 
-    def subtract(self, other: 'InvertibleBloomLookupTable') -> 'InvertibleBloomLookupTable':
+    def subtract(self, other: "InvertibleBloomLookupTable") -> "InvertibleBloomLookupTable":
         if self.size != other.size or self.hash_functions != other.hash_functions:
             raise ValueError("Cannot subtract IBLTs of differing sizes or hash counts")
         result = InvertibleBloomLookupTable(self.size, self.hash_functions)
@@ -90,6 +92,6 @@ class InvertibleBloomLookupTable:
             result.table[i] = IBLTCell(
                 count=c1.count - c2.count,
                 key_sum=c1.key_sum ^ c2.key_sum,
-                key_hash_sum=c1.key_hash_sum ^ c2.key_hash_sum
+                key_hash_sum=c1.key_hash_sum ^ c2.key_hash_sum,
             )
         return result

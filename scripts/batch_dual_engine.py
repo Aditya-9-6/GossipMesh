@@ -307,9 +307,13 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
                 pr_num_str = pr_url.split("/")[-1]
                 # 1. Immediate Pre-Flight Approval
                 approve_cmd = [
-                    "gh", "pr", "review", pr_num_str,
+                    "gh",
+                    "pr",
+                    "review",
+                    pr_num_str,
                     "--approve",
-                    "--body", "Autonomous pre-flight verification passed: clean syntax, unit tests verified."
+                    "--body",
+                    "Autonomous pre-flight verification passed: clean syntax, unit tests verified.",
                 ]
                 if repo:
                     approve_cmd.extend(["--repo", repo])
@@ -378,21 +382,15 @@ def main():
 
     if args.num_shards > 1:
         total_before = len(open_issues)
-        open_issues = [
-            issue
-            for issue in open_issues
-            if (issue.get("number", 0) % args.num_shards) == args.shard_id
-        ]
-        print(
-            f"[*] Shard {args.shard_id}/{args.num_shards} claimed {len(open_issues)} of {total_before} issue(s)."
-        )
+        open_issues = [issue for issue in open_issues if (issue.get("number", 0) % args.num_shards) == args.shard_id]
+        print(f"[*] Shard {args.shard_id}/{args.num_shards} claimed {len(open_issues)} of {total_before} issue(s).")
 
     print(f"[*] Discovered: {len(pr_numbers)} open PR(s), {len(open_issues)} open Issue(s).")
 
     # 1. Run PR Reviews in Pool A (Sequential to prevent git collisions and API limits)
     if args.mode in ("all", "pr-only"):
         print(f"\n[*] Launching Pool A: PR Review Workers (Sequential, max {args.max_prs})...\n")
-        for pr in pr_numbers[:args.max_prs]:
+        for pr in pr_numbers[: args.max_prs]:
             try:
                 task_type, item_id, status, details = review_single_pr(pr, repo, args.workspace)
                 print(f"[{task_type}] #{item_id}: {status}")
@@ -427,7 +425,9 @@ def main():
                 if repo:
                     gen_env["GH_REPO"] = repo
                     gen_env["GITHUB_REPOSITORY"] = repo
-                subprocess.run([sys.executable, str(gen_script), "--force", "--count", "3"], cwd=Path(args.workspace), env=gen_env)
+                subprocess.run(
+                    [sys.executable, str(gen_script), "--force", "--count", "3"], cwd=Path(args.workspace), env=gen_env
+                )
 
     print("=" * 60)
     print(f"[✓] Dual-Pool cycle ({args.mode}) finished successfully.")
