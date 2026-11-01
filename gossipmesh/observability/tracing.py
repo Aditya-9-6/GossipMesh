@@ -14,11 +14,16 @@ try:
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
     from opentelemetry.trace import StatusCode
 
+    try:
+        from gossipmesh.config import settings
+    except ImportError:
+        settings = None
+
     # Global provider and tracer initialization
     _RESOURCE = Resource.create(
         {
-            "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
-            "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+            "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh") if settings else "gossipmesh",
+            "deployment.environment": getattr(settings, "ENVIRONMENT", "production") if settings else "production",
         }
     )
 

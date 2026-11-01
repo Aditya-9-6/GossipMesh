@@ -21,7 +21,7 @@ class SharedMemoryRingBuffer:
         # Each slot holds: [4 bytes length prefix][max_msg_size payload]
         self.slot_size = 4 + max_msg_size
         self.total_size = self.HEADER_SIZE + (self.capacity * self.slot_size)
-        
+
         self._shm: Optional[shared_memory.SharedMemory] = None
         self._is_creator = create
         self._lock = threading.Lock()  # Process-safe synchronization can also leverage atomics/semaphores
@@ -46,7 +46,7 @@ class SharedMemoryRingBuffer:
         assert self._shm is not None
         # head=0, tail=0, capacity, max_msg_size
         header_data = struct.pack(self.HEADER_FORMAT, 0, 0, self.capacity, self.max_msg_size)
-        self._shm.buf[:self.HEADER_SIZE] = header_data
+        self._shm.buf[: self.HEADER_SIZE] = header_data
 
     def _read_header(self) -> Tuple[int, int, int, int]:
         assert self._shm is not None
@@ -56,7 +56,7 @@ class SharedMemoryRingBuffer:
     def _write_header(self, head: int, tail: int) -> None:
         assert self._shm is not None
         header_data = struct.pack(self.HEADER_FORMAT, head, tail, self.capacity, self.max_msg_size)
-        self._shm.buf[:self.HEADER_SIZE] = header_data
+        self._shm.buf[: self.HEADER_SIZE] = header_data
 
     def push(self, data: bytes) -> bool:
         """
@@ -75,7 +75,7 @@ class SharedMemoryRingBuffer:
 
             # Calculate slot offset
             slot_offset = self.HEADER_SIZE + (tail * self.slot_size)
-            
+
             # Write length prefix (4 bytes) and payload into shared memory buffer view
             msg_len = len(data)
             struct.pack_into("=I", self._shm.buf, slot_offset, msg_len)
@@ -97,10 +97,10 @@ class SharedMemoryRingBuffer:
 
             # Calculate slot offset
             slot_offset = self.HEADER_SIZE + (head * self.slot_size)
-            
+
             # Read length prefix
             msg_len = struct.unpack_from("=I", self._shm.buf, slot_offset)[0]
-            
+
             # Extract memoryview slice zero-copy
             payload = bytes(self._shm.buf[slot_offset + 4 : slot_offset + 4 + msg_len])
 

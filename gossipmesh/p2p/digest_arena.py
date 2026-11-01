@@ -20,22 +20,22 @@ class GossipDigestArena:
         self.capacity = max(1, capacity)
         self.error_rate = min(max(0.0001, error_rate), 0.5)
         self._size = 0
-        
+
         # Calculate optimal bit array size and number of hash functions
         self._bit_array_size = int(-self.capacity * math.log(self.error_rate) / (math.log(2) ** 2))
         self._bit_array_size = max(512, (self._bit_array_size + 63) // 64 * 64)
         self._num_hashes = int(max(1, round((self._bit_array_size / self.capacity) * math.log(2))))
-        
+
         # Number of 64-bit words
         self._num_words = self._bit_array_size // 64
-        
+
         # Allocate shared-memory arena via ctypes array of c_uint64
         self._WordArrayType = ctypes.c_uint64 * self._num_words
         self._arena_buffer = self._WordArrayType()
-        
+
         # Zero-copy memory view over ctypes buffer
-        self._memory_view = memoryview(self._arena_buffer).cast('Q')
-        
+        self._memory_view = memoryview(self._arena_buffer).cast("Q")
+
         # Concurrency primitives
         self._lock = threading.Lock()
         self._atomic_status = ctypes.c_int32(1)  # 1 = ACTIVE, 0 = REBUILDING / DIRTY
@@ -77,7 +77,7 @@ class GossipDigestArena:
         if self._atomic_status.value == 0:
             with self._lock:
                 pass
-                
+
         for h in hashes:
             word_idx = h >> 6
             bit_offset = h & 63
@@ -119,6 +119,7 @@ class GossipDigestArena:
         with self._lock:
             raw_bytes = bytes(self._arena_buffer)
             import base64
+
             encoded = base64.b64encode(raw_bytes).decode("utf-8")
             return {
                 "capacity": self.capacity,
@@ -136,11 +137,12 @@ class GossipDigestArena:
         instance._bit_array_size = data.get("bit_array_size", instance._bit_array_size)
         instance._num_hashes = data.get("num_hashes", instance._num_hashes)
         import base64
+
         decoded = base64.b64decode(data["buffer_base64"].encode("utf-8"))
-        
+
         # Copy into arena buffer
         for i in range(0, len(decoded), 8):
             word_idx = i // 8
             if word_idx < instance._num_words:
-                instance._arena_buffer[word_idx] = int.from_bytes(decoded[i:i+8], byteorder="big", signed=False)
+                instance._arena_buffer[word_idx] = int.from_bytes(decoded[i : i + 8], byteorder="big", signed=False)
         return instance
