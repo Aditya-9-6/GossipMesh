@@ -5,6 +5,7 @@ import threading
 from typing import Set, List, Dict, Any, Optional
 from gossipmesh.p2p.digest import BloomFilterDigest
 
+
 class HierarchicalBloomFilterDigest:
     """Hierarchical multi-tiered Bloom-filter digest synchronization tree for efficient P2P anti-entropy reconciliations."""
 
@@ -13,13 +14,13 @@ class HierarchicalBloomFilterDigest:
         self.error_rate = min(max(0.0001, error_rate), 0.5)
         self.levels = max(1, min(levels, 8))
         self._lock = threading.Lock()
-        
+
         # Construct generational tiers: level 0 is finest grain, higher levels aggregate broader scopes
         self.filters: List[BloomFilterDigest] = []
         curr_capacity = self.capacity
         for i in range(self.levels):
             # Each higher level scales capacity logarithmically or broadens acceptance
-            lvl_capacity = max(100, curr_capacity // (2 ** i))
+            lvl_capacity = max(100, curr_capacity // (2**i))
             self.filters.append(BloomFilterDigest(capacity=lvl_capacity, error_rate=self.error_rate))
 
     @property
@@ -66,9 +67,7 @@ class HierarchicalBloomFilterDigest:
     @classmethod
     def deserialize(cls, data: Dict[str, Any]) -> "HierarchicalBloomFilterDigest":
         instance = cls(
-            capacity=data.get("capacity", 10000),
-            error_rate=data.get("error_rate", 0.01),
-            levels=data.get("levels", 3)
+            capacity=data.get("capacity", 10000), error_rate=data.get("error_rate", 0.01), levels=data.get("levels", 3)
         )
         tiers_data = data.get("tiers", [])
         if tiers_data:

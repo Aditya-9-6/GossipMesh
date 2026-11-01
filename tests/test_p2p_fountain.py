@@ -30,9 +30,9 @@ class TestP2PFountain(unittest.TestCase):
         original_data = b"Hello GossipMesh! Resilient distributed AI agent mesh payload broadcast test."
         config = FountainFragmentConfig(chunk_size=16)
         encoder = FountainEncoder(original_data, config)
-        
+
         decoder = FountainDecoder(encoder.total_chunks, config.chunk_size)
-        
+
         # Generate more symbols than total chunks to simulate high loss resilience
         symbols_needed = int(encoder.total_chunks * 1.5) + 2
         success = False
@@ -41,7 +41,7 @@ class TestP2PFountain(unittest.TestCase):
             if decoder.add_fragment(sym):
                 success = True
                 break
-                
+
         self.assertTrue(success)
         reassembled = decoder.get_reassembled_data(len(original_data))
         self.assertEqual(reassembled, original_data)
@@ -50,9 +50,9 @@ class TestP2PFountain(unittest.TestCase):
         transport = P2PTransport("node-alpha")
         payload = b"Critical enterprise AI task deployment payload synchronization."
         fragments = transport.prepare_broadcast(payload, "session-xyz", 20)
-        
+
         self.assertGreater(len(fragments), 0)
-        
+
         completed = False
         result_data = None
         for raw_frag in fragments:
@@ -61,7 +61,7 @@ class TestP2PFountain(unittest.TestCase):
                 completed = True
                 result_data = data
                 break
-                
+
         self.assertTrue(completed)
         self.assertEqual(result_data, payload)
 

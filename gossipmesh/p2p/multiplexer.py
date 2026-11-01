@@ -15,7 +15,9 @@ class AtomicRingBufferMultiplexer:
     Uses atomic operations (via ctypes/threading/memory views) for SPSC frame passing.
     """
 
-    def __init__(self, capacity: int = 1024, max_payload_size: int = 4096, buffer_pool: Optional[ZeroCopyBufferPool] = None):
+    def __init__(
+        self, capacity: int = 1024, max_payload_size: int = 4096, buffer_pool: Optional[ZeroCopyBufferPool] = None
+    ):
         if capacity & (capacity - 1) != 0:
             # Ensure power of 2 for fast bitmask modulo
             raise ValueError("Capacity must be a power of 2")
@@ -23,7 +25,7 @@ class AtomicRingBufferMultiplexer:
         self.capacity = capacity
         self.max_payload_size = max_payload_size
         self.buffer_pool = buffer_pool or ZeroCopyBufferPool(slice_size=max_payload_size)
-        
+
         # Cell layout: priority (1) + timestamp (8) + length (4) + payload
         self.cell_size = 1 + 8 + 4 + max_payload_size
         self.total_size = 16 + (capacity * self.cell_size)  # head (8) + tail (8) + cells
@@ -100,12 +102,12 @@ class AtomicRingBufferMultiplexer:
             length = len(payload)
 
             self._buffer[cell_offset] = priority & 0xFF
-            self._buffer[cell_offset+1:cell_offset+9] = ts.to_bytes(8, byteorder="little", signed=False)
-            self._buffer[cell_offset+9:cell_offset+13] = length.to_bytes(4, byteorder="little", signed=False)
-            self._buffer[cell_offset+13:cell_offset+13+length] = payload
-            
+            self._buffer[cell_offset + 1 : cell_offset + 9] = ts.to_bytes(8, byteorder="little", signed=False)
+            self._buffer[cell_offset + 9 : cell_offset + 13] = length.to_bytes(4, byteorder="little", signed=False)
+            self._buffer[cell_offset + 13 : cell_offset + 13 + length] = payload
+
             if length < self.max_payload_size:
-                for i in range(cell_offset+13+length, cell_offset+self.cell_size):
+                for i in range(cell_offset + 13 + length, cell_offset + self.cell_size):
                     self._buffer[i] = 0
 
             self._set_head(head + 1)
@@ -127,11 +129,11 @@ class AtomicRingBufferMultiplexer:
             cell_offset = self._data_offset + (cell_idx * self.cell_size)
 
             priority = self._buffer[cell_offset]
-            ts = int.from_bytes(self._buffer[cell_offset+1:cell_offset+9], byteorder="little", signed=False)
-            length = int.from_bytes(self._buffer[cell_offset+9:cell_offset+13], byteorder="little", signed=False)
-            
+            ts = int.from_bytes(self._buffer[cell_offset + 1 : cell_offset + 9], byteorder="little", signed=False)
+            length = int.from_bytes(self._buffer[cell_offset + 9 : cell_offset + 13], byteorder="little", signed=False)
+
             # Zero-copy buffer slice acquisition
-            payload_slice = bytes(self._buffer[cell_offset+13:cell_offset+13+length])
+            payload_slice = bytes(self._buffer[cell_offset + 13 : cell_offset + 13 + length])
 
             self._set_tail(tail + 1)
             return (priority, ts, payload_slice)
