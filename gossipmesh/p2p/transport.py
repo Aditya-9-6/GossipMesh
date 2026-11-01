@@ -1,5 +1,4 @@
-"""P2P transport layer integrating compressed Bloom filter deduplication for gossip messages.
-"""
+"""P2P transport layer integrating compressed Bloom filter deduplication for gossip messages."""
 
 import logging
 from typing import Optional, Dict, Any
@@ -26,6 +25,6 @@ class GossipTransport:
         if is_duplicate:
             logger.debug(f"Node {self.node_id} dropped duplicate gossip message: {message_id}")
             return False
-        
+
         logger.debug(f"Node {self.node_id} accepted new gossip message: {message_id}")
         return True

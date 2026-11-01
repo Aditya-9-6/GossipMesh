@@ -10,6 +10,7 @@ class MinHashSketchRegistry:
     Thread-safe registry for managing peer MinHash sketches and conducting
     sub-millisecond distributed topology deduplication and similarity routing.
     """
+
     def __init__(self, num_perm: int = 128, max_capacity: int = 10000, similarity_threshold: float = 0.85):
         self.num_perm = num_perm
         self.max_capacity = max_capacity
@@ -27,7 +28,7 @@ class MinHashSketchRegistry:
                     self._enforce_memory_pressure_downsampling()
                 sketch = MinHashSketch(num_perm=self.num_perm)
                 self._sketches[peer_id] = sketch
-            
+
             if tokens:
                 sketch.update_batch(tokens)
             return sketch
@@ -52,7 +53,7 @@ class MinHashSketchRegistry:
             target_sketch = self._sketches.get(peer_id)
             if not target_sketch:
                 return []
-            
+
             duplicates = []
             for other_id, sketch in self._sketches.items():
                 if other_id == peer_id:

@@ -3,19 +3,22 @@ import threading
 import pytest
 from gossipmesh.p2p.reputation import AdaptivePeerReputationEngine, ReputationConfig
 
+
 def test_initial_reputation_score():
     engine = AdaptivePeerReputationEngine()
     score = engine.get_score("peer_1")
     assert score == 100.0
     assert not engine.is_quarantined("peer_1")
 
+
 def test_penalty_and_quarantine():
     config = ReputationConfig(quarantine_threshold=50.0, violation_penalty=60.0)
     engine = AdaptivePeerReputationEngine(config)
-    
+
     score = engine.record_interaction("peer_bad", latency_ms=100.0, violated=True)
     assert score <= 40.0
     assert engine.is_quarantined("peer_bad")
+
 
 def test_rewards_and_contributions():
     engine = AdaptivePeerReputationEngine()
@@ -24,6 +27,7 @@ def test_rewards_and_contributions():
     metrics = engine.get_metrics("peer_good")
     assert metrics["contribution_count"] == 1
     assert not metrics["is_quarantined"]
+
 
 def test_concurrency_safety():
     engine = AdaptivePeerReputationEngine()
