@@ -6,6 +6,14 @@ from typing import Any, Dict, Generator, Optional
 
 logger = logging.getLogger(__name__)
 
+
+class SettingsStub:
+    PROJECT_NAME: str = "gossipmesh"
+    ENVIRONMENT: str = "production"
+
+
+settings = SettingsStub()
+
 try:
     from opentelemetry import trace
     from opentelemetry.sdk.resources import Resource

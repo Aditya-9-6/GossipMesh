@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 from cryptography.hazmat.primitives.asymmetric import x25519
 from gossipmesh.crypto.keys import generate_x25519_keypair, hkdf_derive, x25519_dh
 
+
 @dataclass
 class RatchetMessage:
     ephemeral_public_bytes: bytes
@@ -10,6 +11,7 @@ class RatchetMessage:
     previous_chain_length: int
     ciphertext: bytes
     nonce: bytes
+
 
 class DoubleRatchetState:
     def __init__(self, shared_secret: bytes, is_initiator: bool, peer_public_bytes: Optional[bytes] = None):
@@ -21,7 +23,7 @@ class DoubleRatchetState:
         self.send_n = 0
         self.recv_n = 0
         self.pn = 0
-        
+
         if is_initiator and peer_public_bytes:
             dh_out = x25519_dh(self.dh_local, peer_public_bytes)
             derived = hkdf_derive(b"gossipmesh-ratchet-salt", dh_out, b"root-chain-init", 64)
@@ -38,7 +40,7 @@ class DoubleRatchetState:
                 self.send_chain_key = derived[32:]
             else:
                 self.send_chain_key = hkdf_derive(self.root_key, b"send-fallback", b"chain", 32)
-        
+
         derived_msg = hkdf_derive(self.send_chain_key, b"msg-key", b"gossipmesh", 64)
         self.send_chain_key = derived_msg[:32]
         message_key = derived_msg[32:]
@@ -55,7 +57,7 @@ class DoubleRatchetState:
             derived = hkdf_derive(self.root_key, dh_out, b"gossipmesh-recv-step", 64)
             self.root_key = derived[:32]
             self.recv_chain_key = derived[32:]
-        
+
         derived_msg = hkdf_derive(self.recv_chain_key, b"msg-key", b"gossipmesh", 64)
         self.recv_chain_key = derived_msg[:32]
         message_key = derived_msg[32:]
