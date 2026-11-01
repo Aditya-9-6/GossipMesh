@@ -6,9 +6,7 @@ from gossipmesh.p2p.ipc_ringbuffer import IPCSharedMemoryRingBuffer
 
 def test_ipc_ringbuffer_basic_push_pop():
     buffer_name = "test_gossip_ipc_basic"
-    ring = IPCSharedMemoryRingBuffer(
-        name=buffer_name, capacity=16, max_msg_size=256, create=True
-    )
+    ring = IPCSharedMemoryRingBuffer(name=buffer_name, capacity=16, max_msg_size=256, create=True)
     try:
         assert ring.is_empty()
         assert not ring.is_full()
@@ -35,9 +33,7 @@ def test_ipc_ringbuffer_basic_push_pop():
 def test_ipc_ringbuffer_capacity_overflow():
     buffer_name = "test_gossip_ipc_overflow"
     # Capacity 4 means max 3 items stored due to ring buffer invariant
-    ring = IPCSharedMemoryRingBuffer(
-        name=buffer_name, capacity=4, max_msg_size=64, create=True
-    )
+    ring = IPCSharedMemoryRingBuffer(name=buffer_name, capacity=4, max_msg_size=64, create=True)
     try:
         assert ring.push(b"msg-1") is True
         assert ring.push(b"msg-2") is True
@@ -77,18 +73,12 @@ def _consumer_worker(name, num_messages, output_queue):
 def test_ipc_ringbuffer_multiprocess_throughput():
     buffer_name = "test_gossip_ipc_mp"
     num_msgs = 500
-    ring = IPCSharedMemoryRingBuffer(
-        name=buffer_name, capacity=128, max_msg_size=256, create=True
-    )
+    ring = IPCSharedMemoryRingBuffer(name=buffer_name, capacity=128, max_msg_size=256, create=True)
     output_queue = multiprocessing.Queue()
 
     try:
-        producer = multiprocessing.Process(
-            target=_producer_worker, args=(buffer_name, num_msgs)
-        )
-        consumer = multiprocessing.Process(
-            target=_consumer_worker, args=(buffer_name, num_msgs, output_queue)
-        )
+        producer = multiprocessing.Process(target=_producer_worker, args=(buffer_name, num_msgs))
+        consumer = multiprocessing.Process(target=_consumer_worker, args=(buffer_name, num_msgs, output_queue))
 
         producer.start()
         consumer.start()
