@@ -17,7 +17,13 @@ logger = logging.getLogger(__name__)
 class P2PTransport:
     """High-throughput asynchronous P2P network transport with outbound rate limiting and packet fragmentation."""
 
-    def __init__(self, bind_address: str = "0.0.0.0", port: int = 9000, limiter_config: Optional[LeakyBucketConfig] = None, mtu: int = 1400):
+    def __init__(
+        self,
+        bind_address: str = "0.0.0.0",
+        port: int = 9000,
+        limiter_config: Optional[LeakyBucketConfig] = None,
+        mtu: int = 1400,
+    ):
         self.bind_address = bind_address
         self.port = port
         self.limiter = LeakyBucketStreamLimiter(limiter_config)
@@ -27,7 +33,9 @@ class P2PTransport:
 
     async def start(self) -> None:
         self._running = True
-        logger.info(f"P2PTransport started on {self.bind_address}:{self.port} with outbound leaky-bucket limiter and fragmentation.")
+        logger.info(
+            f"P2PTransport started on {self.bind_address}:{self.port} with outbound leaky-bucket limiter and fragmentation."
+        )
 
     async def stop(self) -> None:
         self._running = False
@@ -45,7 +53,9 @@ class P2PTransport:
             payload_size = len(raw_frag)
             allowed = await self.limiter.acquire(peer_id, tokens=1.0, payload_bytes=payload_size)
             if not allowed:
-                logger.warning(f"Outbound gossip stream rate-limited for peer {peer_id} at fragment {frag.index}/{frag.total}")
+                logger.warning(
+                    f"Outbound gossip stream rate-limited for peer {peer_id} at fragment {frag.index}/{frag.total}"
+                )
                 return False
         return True
 

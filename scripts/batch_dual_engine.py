@@ -348,7 +348,7 @@ def main():
     # 1. Run PR Reviews in Pool A (Sequential to prevent git collisions and API limits)
     if args.mode in ("all", "pr-only"):
         print(f"\n[*] Launching Pool A: PR Review Workers (Sequential, max {args.max_prs})...\n")
-        for pr in pr_numbers[:args.max_prs]:
+        for pr in pr_numbers[: args.max_prs]:
             try:
                 task_type, item_id, status, details = review_single_pr(pr, repo, args.workspace)
                 print(f"[{task_type}] #{item_id}: {status}")
