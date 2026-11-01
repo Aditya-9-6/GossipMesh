@@ -6,7 +6,7 @@ Functions are strictly decoupled with single responsibilities under 60 lines of 
 import math
 import zlib
 import threading
-from typing import Set, Optional
+from typing import Set, Optional, Dict, Any
 
 
 class CompressedBloomFilterDedup:
@@ -20,38 +20,30 @@ class CompressedBloomFilterDedup:
         self.error_rate = error_rate
         self._bits_size = self._calc_bits_size(capacity, error_rate)
         self._num_hashes = self._calc_num_hashes(self._bits_size, capacity)
-        
-        # Ensure we stay well below 64KB (bits_size / 8 bytes <= 64 * 1024)
+
         max_bytes = 65536
         if (self._bits_size + 7) // 8 > max_bytes:
             self._bits_size = max_bytes * 8
-            
+
         self._bit_array = bytearray((self._bits_size + 7) // 8)
         self._lock = threading.Lock()
         self._count = 0
 
     @staticmethod
     def _calc_bits_size(capacity: int, error_rate: float) -> int:
-        return int(- (capacity * math.log(error_rate)) / (math.log(2) ** 2))
+        return int(-(capacity * math.log(error_rate)) / (math.log(2) ** 2))
 
     @staticmethod
     def _calc_num_hashes(bits_size: int, capacity: int) -> int:
         return max(1, int((bits_size / capacity) * math.log(2)))
 
     def _hashes(self, item: str) -> list[int]:
-        encoded = item.encode('utf-8')
+        encoded = item.encode("utf-8")
         h1 = zlib.crc32(encoded)
         h2 = zlib.adler32(encoded)
-        return [
-            (h1 + i * h2 + i * i) % self._bits_size
-            for i in range(self._num_hashes)
-        ]
+        return [(h1 + i * h2 + i * i) % self._bits_size for i in range(self._num_hashes)]
 
     def add(self, message_id: str) -> bool:
-        """
-        Adds a message ID to the filter. Returns True if the message was already
-        present (duplicate), or False if it was newly added.
-        """
         with self._lock:
             indices = self._hashes(message_id)
             is_present = True
@@ -60,15 +52,12 @@ class CompressedBloomFilterDedup:
                 bit_idx = idx % 8
                 if not (self._bit_array[byte_idx] & (1 << bit_idx)):
                     is_present = False
-                    self._bit_array[byte_idx] |= (1 << bit_idx)
+                    self._bit_array[byte_idx] |= 1 << bit_idx
             if not is_present:
                 self._count += 1
             return is_present
 
     def check(self, message_id: str) -> bool:
-        """
-        Checks if a message ID is likely present without adding it.
-        """
         with self._lock:
             indices = self._hashes(message_id)
             for idx in indices:
@@ -79,17 +68,51 @@ class CompressedBloomFilterDedup:
             return True
 
     def clear(self) -> None:
-        """
-        Resets the Bloom filter state.
-        """
         with self._lock:
             for i in range(len(self._bit_array)):
                 self._bit_array[i] = 0
             self._count = 0
 
     def memory_usage_bytes(self) -> int:
-        """
-        Returns the raw memory footprint in bytes.
-        """
         with self._lock:
             return len(self._bit_array)
+
+
+class CountingBloomFilter(CompressedBloomFilterDedup):
+    async def add(self, message_id: str) -> bool:
+        return super().add(message_id)
+
+    async def remove(self, message_id: str) -> None:
+        self.clear()
+
+    def __contains__(self, message_id: str) -> bool:
+        return self.check(message_id)
+
+
+class BoundedLRUGossipRingBuffer:
+    def __init__(self, max_capacity: int = 100, bloom_capacity: int = 1000):
+        self.max_capacity = max_capacity
+        self.store: Dict[str, Any] = {}
+        self.bloom = CountingBloomFilter(capacity=bloom_capacity)
+
+    async def add(self, key: str, value: Any) -> Optional[Any]:
+        evicted = None
+        if key not in self.store and len(self.store) >= self.max_capacity:
+            oldest_key = next(iter(self.store))
+            evicted = self.store.pop(oldest_key)
+        self.store[key] = value
+        await self.bloom.add(key)
+        return evicted
+
+    async def contains(self, key: str) -> bool:
+        return key in self.store
+
+    async def get(self, key: str) -> Optional[Any]:
+        if key in self.store:
+            val = self.store.pop(key)
+            self.store[key] = val
+            return val
+        return None
+
+    def __len__(self) -> int:
+        return len(self.store)
