@@ -15,11 +15,11 @@ class ChurnDefenseConfig:
     """Configuration parameters for entropy-based churn defense and Sybil mitigation."""
 
     def __init__(
-        self, 
+        self,
         window_size: int = 50,
         entropy_variance_threshold: float = 0.2,
         max_allowed_ticks_variance_exceeded: int = 3,
-        quarantine_duration_sec: float = 300.0
+        quarantine_duration_sec: float = 300.0,
     ) -> None:
         self.window_size = window_size
         self.entropy_variance_threshold = entropy_variance_threshold
@@ -54,11 +54,11 @@ class PeerChurnTracker:
         with self._lock:
             if len(self._entropy_window) < 5:
                 return False, 0.0
-            
+
             values = list(self._entropy_window)
             mean = sum(values) / len(values)
             variance = sum((x - mean) ** 2 for x in values) / len(values)
-            
+
             if variance < self.config.entropy_variance_threshold:
                 self._ticks_exceeded += 1
                 if self._ticks_exceeded >= self.config.max_allowed_ticks_variance_exceeded:
@@ -68,7 +68,7 @@ class PeerChurnTracker:
                 # Reset or decay violations if entropy variance is normal
                 if self._ticks_exceeded > 0:
                     self._ticks_exceeded -= 1
-            
+
             return False, float(variance)
 
     def is_quarantined(self) -> bool:
