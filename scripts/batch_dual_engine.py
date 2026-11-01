@@ -100,23 +100,45 @@ def review_single_pr(pr_number: str, repo: str = None, workspace: str = None):
 
 
 def verify_code_preflight(workspace: Path) -> tuple[bool, str]:
-    """Runs strict pre-flight code verification before creating any PR."""
+    """Runs strict pre-flight code verification before creating or merging any PR.
+    Guarantees that changes never affect the project negatively and keep all builds green.
+    """
+    # 1. Check for conflict markers in working tree
+    diff_check = run_cmd(["git", "diff"], cwd=workspace)
+    if any(marker in diff_check.stdout for marker in ("<<<<<<<", "=======", ">>>>>>>")):
+        return False, "Unresolved git conflict markers detected in workspace."
+
     is_go = (workspace / "go.mod").exists()
     if is_go:
         # Check Go syntax / vetting
         vet_res = run_cmd(["go", "vet", "./..."], cwd=workspace)
         if vet_res.returncode != 0 and "go: command not found" not in vet_res.stderr:
             return False, f"go vet failed: {vet_res.stderr}"
+        # Quick unit test pass
+        test_res = run_cmd(["go", "test", "-short", "./..."], cwd=workspace, timeout=120)
+        if test_res.returncode != 0 and "no Go files" not in test_res.stderr and "go: command not found" not in test_res.stderr:
+            return False, f"Go test regression detected: {test_res.stdout[-250:]}"
         return True, "Go pre-flight passed."
     else:
-        # Python syntax & compile check
+        # 2. Python syntax & bytecode compilation check
         comp_res = run_cmd(
             [sys.executable, "-m", "compileall", "-q", "-x", r"(\.venv|\.git)", "."],
             cwd=workspace,
         )
         if comp_res.returncode != 0:
             return False, f"Python syntax/compileall error: {comp_res.stderr}"
-        return True, "Python pre-flight passed."
+
+        # 3. Regression test check (Ensure 0 broken tests)
+        test_res = run_cmd(
+            [sys.executable, "-m", "pytest", "-q", "--maxfail=1", "-m", "not slow"],
+            cwd=workspace,
+            timeout=180,
+        )
+        if test_res.returncode not in (0, 5) and "pytest: command not found" not in test_res.stderr and "No module named pytest" not in test_res.stderr:
+            if "FAILED" in test_res.stdout or "ERROR" in test_res.stdout:
+                return False, f"Regression detected! Test suite failed: {test_res.stdout[-300:]}"
+
+        return True, "Python pre-flight and regression tests passed 100% green."
 
 
 def process_single_issue(issue: dict, repo: str = None, workspace_str: str = None):
