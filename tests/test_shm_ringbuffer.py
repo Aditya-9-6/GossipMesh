@@ -15,9 +15,9 @@ def test_shm_ringbuffer_lifecycle():
     ring = SharedMemoryRingBuffer(name=buffer_name, capacity=4, max_msg_size=64, create=True)
     try:
         assert ring.qsize() == 0
-        
+
         # Push items
-        assert ring.is_full() if hasattr(ring, 'is_full') else True  # sanity
+        assert ring.is_full() if hasattr(ring, "is_full") else True  # sanity
         assert ring.push(b"agent-msg-1") is True
         assert ring.push(b"agent-msg-2") is True
         assert ring.qsize() == 2
