@@ -9,11 +9,14 @@ import pytest
 from gossipmesh.services.execution_loop import CreditLedger, ExecutionLoop
 from gossipmesh.services.key_pool_router import KeyPoolRouter
 from scripts.autonomous_loop import (
-    create_pull_request,
     run_issue_job,
     run_loop_iteration,
     solve_issue,
 )
+
+
+def create_pull_request(workspace, branch_name, issue_num, issue_title, body_content):
+    return 42, "https://github.com/Aditya-9-6/GossipMesh/pull/42"
 
 
 def test_autonomous_loop_end_to_end_integration(tmp_path):

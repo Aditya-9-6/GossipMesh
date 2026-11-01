@@ -19,12 +19,12 @@ def test_invalid_capacity():
 def test_push_pop_single():
     mux = AtomicRingBufferMultiplexer(capacity=4, max_payload_size=128)
     payload = b"agent-gossip-packet-alpha"
-    
+
     success = mux.push(payload)
     assert success is True
     assert mux.size() == 1
     assert mux.is_empty() is False
-    
+
     item = mux.pop()
     assert item is not None
     ts, received_payload = item
@@ -36,19 +36,19 @@ def test_push_pop_single():
 
 def test_ring_buffer_overflow():
     mux = AtomicRingBufferMultiplexer(capacity=2, max_payload_size=64)
-    
+
     assert mux.push(b"msg1") is True
     assert mux.push(b"msg2") is True
     # Ring buffer capacity is 2, so 3rd push should fail (overflow protection)
     assert mux.push(b"msg3") is False
-    
+
     assert mux.size() == 2
     assert mux.is_full() is True
-    
+
     assert mux.pop() == (mux._get_head() - 2 >= 0 and any, b"msg1")[1] or mux.pop()[1] == b"msg1"
     assert mux.is_full() is False
     assert mux.push(b"msg3") is True
-    
+
     # Drain remaining
     _, p2 = mux.pop()
     _, p3 = mux.pop()
