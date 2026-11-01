@@ -82,7 +82,7 @@ def test_adaptive_ring_buffer_congestion_shaper_saturation_and_recovery():
 
 def test_backpressure_driven_fanout_pruning():
     shaper = AdaptiveRingBufferCongestionShaper(capacity=10)
-    
+
     # Fill half the buffer to enter intermediate backpressure state
     for i in range(5):
         shaper.push({"id": f"msg-{i}"})
