@@ -97,7 +97,7 @@ class HyperLogLogDigest:
         self.m = 1 << self.precision
         self._registers = [0] * self.m
         self._lock = threading.Lock()
-        
+
         # Alpha constant determination
         if self.m == 16:
             self._alpha = 0.673
@@ -137,7 +137,7 @@ class HyperLogLogDigest:
         raw_sum = sum(2.0 ** (-r) for r in self._registers)
         if raw_sum == 0:
             return 0.0
-        estimate = self._alpha * (self.m ** 2) / raw_sum
+        estimate = self._alpha * (self.m**2) / raw_sum
 
         # Small range correction (LinearCounting)
         if estimate <= 2.5 * self.m:
@@ -146,8 +146,8 @@ class HyperLogLogDigest:
                 estimate = self.m * math.log(self.m / zeros)
 
         # Large range correction
-        elif estimate > (1.0 / 30.0) * (2.0 ** 32):
-            estimate = -(2.0 ** 32) * math.log(1.0 - estimate / (2.0 ** 32))
+        elif estimate > (1.0 / 30.0) * (2.0**32):
+            estimate = -(2.0**32) * math.log(1.0 - estimate / (2.0**32))
 
         return estimate
 

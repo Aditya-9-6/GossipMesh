@@ -4,6 +4,11 @@ import logging
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional
 
+try:
+    from gossipmesh.core.config import settings
+except ImportError:
+    settings = None
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -17,8 +22,8 @@ try:
     # Global provider and tracer initialization
     _RESOURCE = Resource.create(
         {
-            "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh"),
-            "deployment.environment": getattr(settings, "ENVIRONMENT", "production"),
+            "service.name": getattr(settings, "PROJECT_NAME", "gossipmesh") if settings else "gossipmesh",
+            "deployment.environment": getattr(settings, "ENVIRONMENT", "production") if settings else "production",
         }
     )
 
