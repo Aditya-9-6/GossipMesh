@@ -6,16 +6,19 @@ from typing import AsyncIterator, Optional, Tuple, List
 
 class FrameError(Exception):
     """Base exception for framing and deframing errors."""
+
     pass
 
 
 class ChecksumError(FrameError):
     """Raised when frame checksum verification fails."""
+
     pass
 
 
 class ProtocolError(FrameError):
     """Raised when frame magic bytes or structure is invalid."""
+
     pass
 
 
@@ -23,7 +26,7 @@ class PacketFramer:
     """
     High-performance zero-copy packet framer and deframer utilizing pre-allocated
     buffers, magic bytes, length prefixes, and CRC32 checksums for high-throughput gossip streams.
-    
+
     Wire Format:
     [ Magic: 2 bytes (0xGM) ] [ Flags: 1 byte ] [ Payload Length: 4 bytes (Big-Endian) ] [ CRC32: 4 bytes ] [ Payload: N bytes ]
     """
@@ -42,11 +45,11 @@ class PacketFramer:
         """
         if len(payload) > self.max_payload_size:
             raise ValueError(f"Payload size {len(payload)} exceeds max_payload_size {self.max_payload_size}")
-        
+
         payload_len = len(payload)
         # Compute CRC32 over payload for data integrity
         checksum = zlib.crc32(payload) & 0xFFFFFFFF
-        
+
         header = struct.pack(self.HEADER_FORMAT, self.MAGIC, flags, payload_len, checksum)
         return header + payload
 
@@ -62,7 +65,7 @@ class PacketFramer:
                 break
 
             magic, flags, payload_len, expected_checksum = struct.unpack(self.HEADER_FORMAT, header_buf)
-            
+
             if magic != self.MAGIC:
                 raise ProtocolError(f"Invalid framing magic bytes: {magic!r}. Expected {self.MAGIC!r}")
 
@@ -94,9 +97,7 @@ class PacketFramer:
         buf_len = len(buffer)
 
         while offset + self.HEADER_SIZE <= buf_len:
-            magic, flags, payload_len, expected_checksum = struct.unpack_from(
-                self.HEADER_FORMAT, buffer, offset
-            )
+            magic, flags, payload_len, expected_checksum = struct.unpack_from(self.HEADER_FORMAT, buffer, offset)
 
             if magic != self.MAGIC:
                 raise ProtocolError(f"Invalid framing magic bytes: {magic!r}")

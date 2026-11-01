@@ -14,23 +14,23 @@ class LockFreeDoubleBufferedRingBuffer:
             # While power of two is not strictly required, it's ideal for wrap-around masking.
             # We support any positive capacity using modulo or masking.
             pass
-            
+
         self.capacity = capacity
         self.max_msg_size = max_msg_size
-        
+
         # Double buffering mechanism: two backing storage arrays
         # Buffer 0 and Buffer 1
         self._slot_size = 4 + max_msg_size
         self._buffer_bytes = bytearray(2 * self.capacity * self._slot_size)
-        
+
         # Memory views for zero-copy slicing
         self._front_view = memoryview(self._buffer_bytes)[: self.capacity * self._slot_size]
         self._back_view = memoryview(self._buffer_bytes)[self.capacity * self._slot_size :]
-        
+
         # Atomic counters for producer and consumer indexing
         self._write_seq = 0
         self._read_seq = 0
-        
+
         # Spinlock-free CAS emulation using fast threading lock for atomic state transitions
         # while maintaining zero-allocation on data paths via direct memoryviews.
         self._producer_lock = threading.Lock()
@@ -47,19 +47,19 @@ class LockFreeDoubleBufferedRingBuffer:
         with self._producer_lock:
             w = self._write_seq
             r = self._read_seq
-            
+
             if (w - r) >= self.capacity:
                 return False
 
             idx = w % self.capacity
             offset = idx * self._slot_size
-            
+
             msg_len = len(data)
             # Write length prefix (4 bytes little endian)
-            self._front_view[offset : offset + 4] = msg_len.to_bytes(4, 'little', signed=False)
+            self._front_view[offset : offset + 4] = msg_len.to_bytes(4, "little", signed=False)
             # Write payload bytes
             self._front_view[offset + 4 : offset + 4 + msg_len] = data
-            
+
             # Advance write sequence atomically
             self._write_seq = w + 1
             return True
@@ -72,19 +72,19 @@ class LockFreeDoubleBufferedRingBuffer:
         with self._consumer_lock:
             w = self._write_seq
             r = self._read_seq
-            
+
             if r == w:
                 return None
 
             idx = r % self.capacity
             offset = idx * self._slot_size
-            
+
             # Read length prefix
-            msg_len = int.from_bytes(self._front_view[offset : offset + 4], 'little', signed=False)
-            
+            msg_len = int.from_bytes(self._front_view[offset : offset + 4], "little", signed=False)
+
             # Extract payload as bytes view (zero-copy slice conversion)
             payload = bytes(self._front_view[offset + 4 : offset + 4 + msg_len])
-            
+
             # Advance read sequence atomically
             self._read_seq = r + 1
             return payload
