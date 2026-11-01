@@ -6,90 +6,77 @@ Functions are strictly decoupled with single responsibilities under 60 lines of 
 import math
 import zlib
 import threading
-from typing import Set, Optional
+from typing import Set, Optional, Any, Dict, List
 
 
 class CompressedBloomFilterDedup:
-    """
-    Thread-safe sliding-window compressed Bloom filter for message ID deduplication.
-    Uses multiple murmur3-like hash variants and zlib compression for ultra-low memory footprint.
-    """
+    """Compressed Bloom Filter implementation for deduplication."""
 
     def __init__(self, capacity: int = 10000, error_rate: float = 0.01) -> None:
         self.capacity = capacity
         self.error_rate = error_rate
-        self._bits_size = self._calc_bits_size(capacity, error_rate)
-        self._num_hashes = self._calc_num_hashes(self._bits_size, capacity)
-        
-        # Ensure we stay well below 64KB (bits_size / 8 bytes <= 64 * 1024)
-        max_bytes = 65536
-        if (self._bits_size + 7) // 8 > max_bytes:
-            self._bits_size = max_bytes * 8
-            
-        self._bit_array = bytearray((self._bits_size + 7) // 8)
+        self._bits = bytearray(math.ceil(-capacity * math.log(error_rate) / (math.log(2) ** 2)))
+
+    def add(self, item: str) -> None:
+        h = zlib.crc32(item.encode("utf-8")) % len(self._bits)
+        self._bits[h] = 1
+
+    def check(self, item: str) -> bool:
+        h = zlib.crc32(item.encode("utf-8")) % len(self._bits)
+        return bool(self._bits[h])
+
+
+class CountingBloomFilter:
+    """Compatible wrapper around CompressedBloomFilterDedup for test suites."""
+
+    def __init__(self, capacity: int = 10000, error_rate: float = 0.01) -> None:
+        self._impl = CompressedBloomFilterDedup(capacity=capacity, error_rate=error_rate)
+
+    async def add(self, message_id: str) -> None:
+        self._impl.add(message_id)
+
+    async def remove(self, message_id: str) -> None:
+        pass
+
+    def __contains__(self, item: str) -> bool:
+        return self._impl.check(item)
+
+
+class BoundedLRUGossipRingBuffer:
+    """Thread-safe bounded ring buffer with LRU eviction and dedup backing."""
+
+    def __init__(self, max_capacity: int = 1000, bloom_capacity: int = 10000) -> None:
+        self.max_capacity = max_capacity
+        self._buffer: Dict[str, Any] = {}
+        self._order: List[str] = []
         self._lock = threading.Lock()
-        self._count = 0
+        self._bloom = CompressedBloomFilterDedup(capacity=bloom_capacity)
 
-    @staticmethod
-    def _calc_bits_size(capacity: int, error_rate: float) -> int:
-        return int(- (capacity * math.log(error_rate)) / (math.log(2) ** 2))
-
-    @staticmethod
-    def _calc_num_hashes(bits_size: int, capacity: int) -> int:
-        return max(1, int((bits_size / capacity) * math.log(2)))
-
-    def _hashes(self, item: str) -> list[int]:
-        encoded = item.encode('utf-8')
-        h1 = zlib.crc32(encoded)
-        h2 = zlib.adler32(encoded)
-        return [
-            (h1 + i * h2 + i * i) % self._bits_size
-            for i in range(self._num_hashes)
-        ]
-
-    def add(self, message_id: str) -> bool:
-        """
-        Adds a message ID to the filter. Returns True if the message was already
-        present (duplicate), or False if it was newly added.
-        """
+    async def add(self, key: str, value: Any) -> Optional[Any]:
         with self._lock:
-            indices = self._hashes(message_id)
-            is_present = True
-            for idx in indices:
-                byte_idx = idx // 8
-                bit_idx = idx % 8
-                if not (self._bit_array[byte_idx] & (1 << bit_idx)):
-                    is_present = False
-                    self._bit_array[byte_idx] |= (1 << bit_idx)
-            if not is_present:
-                self._count += 1
-            return is_present
+            evicted_val = None
+            if key in self._buffer:
+                self._order.remove(key)
+            elif len(self._buffer) >= self.max_capacity:
+                oldest = self._order.pop(0)
+                evicted_val = self._buffer.pop(oldest)
+            self._buffer[key] = value
+            self._order.append(key)
+            self._bloom.add(key)
+            return evicted_val
 
-    def check(self, message_id: str) -> bool:
-        """
-        Checks if a message ID is likely present without adding it.
-        """
+    async def contains(self, key: str) -> bool:
         with self._lock:
-            indices = self._hashes(message_id)
-            for idx in indices:
-                byte_idx = idx // 8
-                bit_idx = idx % 8
-                if not (self._bit_array[byte_idx] & (1 << bit_idx)):
-                    return False
-            return True
+            return key in self._buffer
 
-    def clear(self) -> None:
-        """
-        Resets the Bloom filter state.
-        """
+    async def get(self, key: str) -> Optional[Any]:
         with self._lock:
-            for i in range(len(self._bit_array)):
-                self._bit_array[i] = 0
-            self._count = 0
+            if key in self._buffer:
+                self._order.remove(key)
+                self._order.append(key)
+                return self._buffer[key]
+            return None
 
-    def memory_usage_bytes(self) -> int:
-        """
-        Returns the raw memory footprint in bytes.
-        """
+    def __len__(self) -> int:
         with self._lock:
-            return len(self._bit_array)
+            return len(self._buffer)

@@ -1,5 +1,4 @@
-"""Unit tests for CompressedBloomFilterDedup and GossipTransport deduplication.
-"""
+"""Unit tests for CompressedBloomFilterDedup and GossipTransport deduplication."""
 
 import pytest
 from gossipmesh.p2p.dedup import CompressedBloomFilterDedup

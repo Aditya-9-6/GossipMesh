@@ -2,6 +2,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 8000
-ENTRYPOINT ["python", "-m", "enterprise.packaging"]
+COPY .
+RUN useradd -u 1000 gossipuser && chown -R gossipuser:gossipuser /app
+USER 1000
+CMD ["python", "-m", "gossipmesh.main"]
