@@ -4,8 +4,15 @@ from typing import Dict, Any, Optional
 from gossipmesh.p2p.health import SlidingWindowPeerHealthScorecard, PeerHealthConfig
 from gossipmesh.p2p.liveness import PeerLivenessTracker, LivenessConfig
 
+
 class PeerNode:
-    def __init__(self, peer_id: str, address: str, health_config: Optional[PeerHealthConfig] = None, liveness_config: Optional[LivenessConfig] = None) -> None:
+    def __init__(
+        self,
+        peer_id: str,
+        address: str,
+        health_config: Optional[PeerHealthConfig] = None,
+        liveness_config: Optional[LivenessConfig] = None,
+    ) -> None:
         self.peer_id = peer_id
         self.address = address
         self.scorecard = SlidingWindowPeerHealthScorecard(health_config)
@@ -37,7 +44,9 @@ class PeerNode:
 
 
 class PeerManager:
-    def __init__(self, health_config: Optional[PeerHealthConfig] = None, liveness_config: Optional[LivenessConfig] = None) -> None:
+    def __init__(
+        self, health_config: Optional[PeerHealthConfig] = None, liveness_config: Optional[LivenessConfig] = None
+    ) -> None:
         self._peers: Dict[str, PeerNode] = {}
         self.health_config = health_config
         self.liveness_config = liveness_config
