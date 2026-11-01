@@ -13,7 +13,7 @@ def test_quic_datagram_serialization():
         datagram_id="test-id-12345678901234567890123456789",
         is_reliable=True,
         sequence_number=42,
-        payload=b"Hello QUIC Datagram"
+        payload=b"Hello QUIC Datagram",
     )
 
     serialized = datagram.serialize()
@@ -33,7 +33,7 @@ async def test_quic_transport_lifecycle_and_sending():
     assert transport._running is True
 
     transport.register_peer("peer-1", "127.0.0.1", 9200)
-    
+
     success = await transport.send_datagram("peer-1", b"Ping payload", is_reliable=False)
     assert success is True
 
@@ -47,7 +47,7 @@ def test_quic_incoming_datagram_handling():
         datagram_id="incoming-id-12345678901234567890123",
         is_reliable=False,
         sequence_number=1,
-        payload=b"Test incoming payload"
+        payload=b"Test incoming payload",
     )
     raw = datagram.serialize()
     payload = transport.handle_incoming_datagram(raw)

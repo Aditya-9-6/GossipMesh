@@ -56,7 +56,7 @@ class AdaptiveBackoffCalculator:
             )
         else:
             # Exponential backoff with failures
-            interval = self.base_interval * (self.backoff_multiplier ** consecutive_failures)
+            interval = self.base_interval * (self.backoff_multiplier**consecutive_failures)
             interval = min(self.max_interval, max(self.min_interval, interval))
 
         return float(interval)
