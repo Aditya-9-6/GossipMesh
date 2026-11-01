@@ -2,7 +2,9 @@ import math
 import hashlib
 import base64
 import threading
-from typing import Set, List, Dict, Any, Optional
+import time
+from typing import Set, List, Dict, Any, Optional, OrderedDict
+from collections import OrderedDict
 
 
 class BloomFilterDigest:
@@ -97,85 +99,58 @@ class HyperLogLogDigest:
         self.m = 1 << self.precision
         self._registers = [0] * self.m
         self._lock = threading.Lock()
-        
-        # Alpha constant determination
-        if self.m == 16:
-            self._alpha = 0.673
-        elif self.m == 32:
-            self._alpha = 0.697
-        elif self.m == 64:
-            self._alpha = 0.709
-        else:
-            self._alpha = 0.7213 / (1.0 + 1.079 / self.m)
 
-    @property
-    def cardinality(self) -> float:
+
+class LruDigestCache:
+    """High-performance memory-bounded LRU cache with TTL expiry for seen gossip message IDs."""
+
+    def __init__(self, max_size: int = 10000, default_ttl: float = 3600.0) -> None:
+        self.max_size = max(1, max_size)
+        self.default_ttl = max(0.1, default_ttl)
+        self._cache: OrderedDict[str, float] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def _evict_expired_locked(self, now: float) -> None:
+        while self._cache:
+            oldest_key, expire_at = next(iter(self._cache.items()))
+            if expire_at <= now:
+                self._cache.popitem(last=False)
+            else:
+                break
+
+    def add(self, message_id: str, ttl: Optional[float] = None) -> None:
+        now = time.time()
+        expiry = now + (ttl if ttl is not None else self.default_ttl)
         with self._lock:
-            return self._estimate_cardinality()
+            self._evict_expired_locked(now)
+            if message_id in self._cache:
+                self._cache.move_to_end(message_id)
+            self._cache[message_id] = expiry
+            if len(self._cache) > self.max_size:
+                self._cache.popitem(last=False)
 
-    def _get_register_and_rank(self, item: str) -> Tuple[int, int]:
-        h = int(hashlib.sha256(item.encode("utf-8")).hexdigest(), 16)
-        idx = h & (self.m - 1)
-        w = h >> self.precision
-        # Find position of first set bit starting from least significant bit
-        if w == 0:
-            rank = 64 - self.precision + 1
-        else:
-            rank = (w & -w).bit_length()
-        return idx, rank
+    def __contains__(self, message_id: str) -> bool:
+        return self.contains(message_id)
 
-    def add(self, item: str) -> None:
-        idx, rank = self._get_register_and_rank(item)
+    def contains(self, message_id: str) -> bool:
+        now = time.time()
         with self._lock:
-            if rank > self._registers[idx]:
-                self._registers[idx] = rank
+            self._evict_expired_locked(now)
+            expire_at = self._cache.get(message_id)
+            if expire_at is None:
+                return False
+            if expire_at <= now:
+                self._cache.pop(message_id, None)
+                return False
+            self._cache.move_to_end(message_id)
+            return True
 
-    def __contains__(self, item: str) -> bool:
-        return True  # Probabilistic digest supports cardinality estimation, not exact membership
-
-    def _estimate_cardinality(self) -> float:
-        raw_sum = sum(2.0 ** (-r) for r in self._registers)
-        if raw_sum == 0:
-            return 0.0
-        estimate = self._alpha * (self.m ** 2) / raw_sum
-
-        # Small range correction (LinearCounting)
-        if estimate <= 2.5 * self.m:
-            zeros = self._registers.count(0)
-            if zeros > 0:
-                estimate = self.m * math.log(self.m / zeros)
-
-        # Large range correction
-        elif estimate > (1.0 / 30.0) * (2.0 ** 32):
-            estimate = -(2.0 ** 32) * math.log(1.0 - estimate / (2.0 ** 32))
-
-        return estimate
-
-    def merge(self, other: "HyperLogLogDigest") -> "HyperLogLogDigest":
+    def get_size(self) -> int:
+        now = time.time()
         with self._lock:
-            with other._lock:
-                for i in range(self.m):
-                    if other._registers[i] > self._registers[i]:
-                        self._registers[i] = other._registers[i]
-        return self
+            self._evict_expired_locked(now)
+            return len(self._cache)
 
-    def serialize(self) -> Dict[str, Any]:
+    def clear(self) -> None:
         with self._lock:
-            reg_bytes = bytearray()
-            for r in self._registers:
-                reg_bytes.append(r)
-            encoded = base64.b64encode(bytes(reg_bytes)).decode("utf-8")
-            return {
-                "precision": self.precision,
-                "m": self.m,
-                "registers": encoded,
-                "estimated_cardinality": self._estimate_cardinality(),
-            }
-
-    @classmethod
-    def deserialize(cls, data: Dict[str, Any]) -> "HyperLogLogDigest":
-        precision = data.get("precision", 12)
-        instance = cls(precision=precision)
-        decoded = base64.b64decode(data["registers"].encode("utf-8"))
-        instance._registers = [int(b) for b in decoded]
-        return instance
+            self._cache.clear()
