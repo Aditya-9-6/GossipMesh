@@ -21,7 +21,7 @@ class KademliaNode:
             if len(node_id) != 32:
                 raise ValueError("Kademlia node ID must be exactly 32 bytes")
             self._bytes = node_id
-            
+
         self.node_id = self._bytes
         self.address = address
         self.last_seen = time.time()
@@ -106,6 +106,7 @@ class KademliaRoutingTable:
     High-performance Kademlia peer routing table featuring zero-copy byte slicing,
     SIMD-accelerated 256-bit XOR distance metrics, and dynamic bucket splitting.
     """
+
     def __init__(self, local_node_id: bytes | str, k: int = 20) -> None:
         if isinstance(local_node_id, str):
             self.local_node = KademliaNode(local_node_id, "local://self")
@@ -129,10 +130,10 @@ class KademliaRoutingTable:
         with self._lock:
             idx = self._get_bucket_index(node.node_id)
             bucket = self.buckets[idx]
-            
+
             # Attempt add
             evicted = bucket.add_node(node)
-            
+
             # If bucket overflow and can split (covers local node ID prefix)
             if len(bucket.nodes) > self.k and idx == len(self.buckets) - 1 and len(self.buckets) < 256:
                 self._split_bucket(idx)
@@ -141,15 +142,19 @@ class KademliaRoutingTable:
         old_bucket = self.buckets[idx]
         new_bucket_1 = KBucket(k=self.k, prefix_bit=idx)
         new_bucket_2 = KBucket(k=self.k, prefix_bit=idx + 1)
-        
+
         # Redistribute nodes
         all_nodes = old_bucket.nodes + old_bucket.replacement_cache
         for node in all_nodes:
             new_idx = self._get_bucket_index(node.node_id)
             if new_idx == idx:
-                new_bucket_1.nodes.append(node) if len(new_bucket_1.nodes) < self.k else new_bucket_1.replacement_cache.append(node)
+                new_bucket_1.nodes.append(node) if len(
+                    new_bucket_1.nodes
+                ) < self.k else new_bucket_1.replacement_cache.append(node)
             else:
-                new_bucket_2.nodes.append(node) if len(new_bucket_2.nodes) < self.k else new_bucket_2.replacement_cache.append(node)
+                new_bucket_2.nodes.append(node) if len(
+                    new_bucket_2.nodes
+                ) < self.k else new_bucket_2.replacement_cache.append(node)
 
         self.buckets[idx] = new_bucket_1
         self.buckets.append(new_bucket_2)

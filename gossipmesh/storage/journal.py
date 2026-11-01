@@ -20,13 +20,14 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 class JournalCorruptionError(Exception):
     """Raised when journal record checksum verification fails or magic bytes are invalid."""
+
     pass
 
 
 class JournalLog:
     """
     High-performance asynchronous memory-mapped journaling log.
-    
+
     Record binary layout:
     - Magic Header (4 bytes): b'GMSH'
     - Sequence Number (8 bytes, uint64)
@@ -34,7 +35,8 @@ class JournalLog:
     - SHA256 Checksum (32 bytes)
     - Payload Bytes (Variable length JSON UTF-8)
     """
-    MAGIC = b'GMSH'
+
+    MAGIC = b"GMSH"
     HEADER_FORMAT = "!4s Q I 32s"
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
@@ -52,7 +54,7 @@ class JournalLog:
     def _open_journal(self) -> None:
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         exists = self.filepath.exists()
-        
+
         if not exists or self.filepath.stat().st_size == 0:
             with open(self.filepath, "wb+") as f:
                 f.write(b"\x00" * self.initial_size)
@@ -62,7 +64,7 @@ class JournalLog:
 
         self._file = open(self.filepath, "rb+", buffering=0)
         self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_WRITE)
-        
+
         # Recover state by scanning existing records
         self._recover_state()
 
@@ -91,7 +93,7 @@ class JournalLog:
 
         while pos + self.HEADER_SIZE <= mmap_len:
             # Check if remaining buffer is padding (zeros)
-            header_chunk = self._mmap[pos:pos + self.HEADER_SIZE]
+            header_chunk = self._mmap[pos : pos + self.HEADER_SIZE]
             if len(header_chunk) < self.HEADER_SIZE or header_chunk == b"\x00" * self.HEADER_SIZE:
                 break
 
@@ -104,7 +106,7 @@ class JournalLog:
                 if payload_end > mmap_len:
                     break
 
-                payload = self._mmap[pos + self.HEADER_SIZE:payload_end]
+                payload = self._mmap[pos + self.HEADER_SIZE : payload_end]
                 computed_checksum = hashlib.sha256(payload).digest()
                 if computed_checksum != checksum:
                     raise JournalCorruptionError(f"Checksum mismatch at journal offset {pos}")
@@ -132,13 +134,16 @@ class JournalLog:
             seq = self._next_sequence
             self._next_sequence += 1
 
-            header = struct.pack(self.MAGIC, self.HEADER_FORMAT.split()[0], seq, length, checksum) if False else \
-                     struct.pack(self.HEADER_FORMAT, self.MAGIC, seq, length, checksum)
+            header = (
+                struct.pack(self.MAGIC, self.HEADER_FORMAT.split()[0], seq, length, checksum)
+                if False
+                else struct.pack(self.HEADER_FORMAT, self.MAGIC, seq, length, checksum)
+            )
 
-            self._mmap[self._write_offset:self._write_offset + self.HEADER_SIZE] = header
+            self._mmap[self._write_offset : self._write_offset + self.HEADER_SIZE] = header
             self._write_offset += self.HEADER_SIZE
 
-            self._mmap[self._write_offset:self._write_offset + length] = payload
+            self._mmap[self._write_offset : self._write_offset + length] = payload
             self._write_offset += length
 
             # Flush changes to disk asynchronously/safely
@@ -157,7 +162,7 @@ class JournalLog:
             pos = 0
             mmap_len = len(self._mmap)
             while pos + self.HEADER_SIZE <= mmap_len:
-                header_chunk = self._mmap[pos:pos + self.HEADER_SIZE]
+                header_chunk = self._mmap[pos : pos + self.HEADER_SIZE]
                 if len(header_chunk) < self.HEADER_SIZE or header_chunk == b"\x00" * self.HEADER_SIZE:
                     break
 
@@ -166,8 +171,8 @@ class JournalLog:
                     break
 
                 payload_end = pos + self.HEADER_SIZE + length
-                payload = self._mmap[pos + self.HEADER_SIZE:payload_end]
-                
+                payload = self._mmap[pos + self.HEADER_SIZE : payload_end]
+
                 if hashlib.sha256(payload).digest() != checksum:
                     raise JournalCorruptionError(f"Journal corruption detected at offset {pos}")
 
@@ -192,7 +197,7 @@ class JournalLog:
 
             # Write new compacted file
             temp_path = self.filepath.with_suffix(".compact")
-            
+
             # Create compacted file with just the latest state
             payload = json.dumps(latest_state, sort_keys=True).encode("utf-8")
             length = len(payload)
