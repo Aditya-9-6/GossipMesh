@@ -10,7 +10,7 @@ def test_kademlia_node_xor_distance():
     id1 = b"\x00" * 31 + b"\x01"
     id2 = b"\x00" * 31 + b"\x03"
     node1 = KademliaNode(id1, "127.0.0.1:8001")
-    
+
     dist = node1.xor_distance(id2)
     assert dist == 2
 
@@ -25,7 +25,7 @@ def test_k_bucket_operations():
     assert bucket.add_node(n1) is None
     assert bucket.add_node(n2) is None
     assert bucket.add_node(n3) is None
-    
+
     # 4th node should go to replacement cache since k=3
     assert bucket.add_node(n4) is None
     assert len(bucket.nodes) == 3
@@ -43,7 +43,7 @@ def test_kademlia_routing_table_routing_and_split():
 
     n1 = KademliaNode(b"\x80" + b"\x00" * 31, "127.0.0.1:8001")
     n2 = KademliaNode(b"\x40" + b"\x00" * 31, "127.0.0.1:8002")
-    n3 = KademliaNode(b"\xC0" + b"\x00" * 31, "127.0.0.1:8003")
+    n3 = KademliaNode(b"\xc0" + b"\x00" * 31, "127.0.0.1:8003")
 
     table.add_node(n1)
     table.add_node(n2)
@@ -57,7 +57,7 @@ def test_kademlia_routing_table_routing_and_split():
 
 
 def test_concurrency_safety():
-    local_id = b"\xAA" * 32
+    local_id = b"\xaa" * 32
     table = KademliaRoutingTable(local_id, k=10)
 
     def worker(prefix_byte: int):

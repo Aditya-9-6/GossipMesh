@@ -5,10 +5,6 @@ from typing import Dict, Any, Optional
 
 
 class CountingBloomFilter:
-    """
-    Counting Bloom Filter supporting add, check, and remove operations.
-    """
-
     def __init__(self, capacity: int = 100, error_rate: float = 0.01):
         self.capacity = capacity
         self.error_rate = error_rate
@@ -43,10 +39,6 @@ class CountingBloomFilter:
 
 
 class BoundedLRUGossipRingBuffer:
-    """
-    Bounded LRU ring buffer combined with Bloom filter deduplication for gossip messages.
-    """
-
     def __init__(self, max_capacity: int = 1000, bloom_capacity: int = 10000):
         self.max_capacity = max_capacity
         self.bloom = CountingBloomFilter(capacity=bloom_capacity)

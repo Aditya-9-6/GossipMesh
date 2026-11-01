@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class LeakyBucketStreamLimiter:
     """Simple leaky bucket rate limiter for stream control."""
+
     def __init__(self, capacity: int, rate: float) -> None:
         self.capacity = capacity
         self.rate = rate
@@ -28,11 +29,12 @@ class LeakyBucketStreamLimiter:
 
 class PacketFragmenter:
     """Utility for fragmenting and reassembling network packets."""
+
     def __init__(self, max_size: int = 1024) -> None:
         self.max_size = max_size
 
     def fragment(self, payload: bytes) -> List[bytes]:
-        return [payload[i:i + self.max_size] for i in range(0, len(payload), self.max_size)]
+        return [payload[i : i + self.max_size] for i in range(0, len(payload), self.max_size)]
 
 
 class P2PTransport:
@@ -83,7 +85,7 @@ class P2PTransport:
         frag = FountainFragment.deserialize(raw_fragment)
         if frag.session_id not in self.active_decoders:
             self.active_decoders[frag.session_id] = FountainDecoder(frag.total_chunks, self.config.chunk_size)
-        
+
         decoder = self.active_decoders[frag.session_id]
         is_complete = decoder.add_fragment(frag)
         if is_complete:
