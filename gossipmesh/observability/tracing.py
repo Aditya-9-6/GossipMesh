@@ -13,6 +13,7 @@ try:
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
     from opentelemetry.trace import StatusCode
+    from gossipmesh.config import settings
 
     # Global provider and tracer initialization
     _RESOURCE = Resource.create(
