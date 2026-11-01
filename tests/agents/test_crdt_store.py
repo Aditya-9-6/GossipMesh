@@ -6,7 +6,7 @@ from gossipmesh.agents.tombstone_gc import TombstoneGarbageCollector
 
 def test_delta_or_set_store_basic_operations():
     store1 = DeltaORSetStore(node_id="node-A")
-    
+
     # Add item
     elem, delta_tags = store1.add("task-1:agent-1")
     assert elem == "task-1:agent-1"
@@ -27,7 +27,7 @@ def test_delta_or_set_store_merge():
     _, deltaA = storeA.add("task-1:agent-1")
 
     # Node B merges Node A's delta
-    storeB.merge_delta(delta={ "task-1:agent-1": deltaA })
+    storeB.merge_delta(delta={"task-1:agent-1": deltaA})
     assert "task-1:agent-1" in storeB.read()
 
     # Concurrent remove on Node A, add on Node B (add wins over concurrent remove in OR-Set semantics)
