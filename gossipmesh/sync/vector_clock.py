@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Dict, Any, Set
 
+
 class VectorClock:
     def __init__(self, clock: Dict[str, int] = None) -> None:
         self.clock: Dict[str, int] = clock.copy() if clock else {}

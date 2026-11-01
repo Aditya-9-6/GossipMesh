@@ -46,7 +46,7 @@ class QUICDatagram:
         is_reliable = data[36] == 1
         sequence_number = struct.unpack(">Q", data[37:45])[0]
         payload_len = struct.unpack(">I", data[45:49])[0]
-        payload = data[49:49 + payload_len]
+        payload = data[49 : 49 + payload_len]
         return cls(datagram_id=datagram_id, is_reliable=is_reliable, sequence_number=sequence_number, payload=payload)
 
 
@@ -57,11 +57,11 @@ class QUICDatagramTransport:
     """
 
     def __init__(
-        self, 
-        bind_address: str = "0.0.0.0", 
-        port: int = 9100, 
+        self,
+        bind_address: str = "0.0.0.0",
+        port: int = 9100,
         congestion_config: Optional[CongestionConfig] = None,
-        mtu: int = 1200
+        mtu: int = 1200,
     ) -> None:
         self.bind_address = bind_address
         self.port = port
@@ -96,16 +96,11 @@ class QUICDatagramTransport:
         seq = self._sequence_counter
         datagram_id = str(uuid.uuid4())
 
-        datagram = QUICDatagram(
-            datagram_id=datagram_id,
-            is_reliable=is_reliable,
-            sequence_number=seq,
-            payload=payload
-        )
+        datagram = QUICDatagram(datagram_id=datagram_id, is_reliable=is_reliable, sequence_number=seq, payload=payload)
 
         raw_data = datagram.serialize()
         self.congestion_controller.on_packet_sent(datagram_id, len(raw_data))
-        
+
         # Simulate transmission success & immediate ACK feedback for demonstration & high-throughput loop
         self.congestion_controller.on_ack_received(datagram_id, rtt_sample=0.015)
         return True

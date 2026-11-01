@@ -15,7 +15,7 @@ def test_scalable_bloom_routing_table_resizing():
     table = ScalableBloomRoutingTable(initial_capacity=10, error_rate=0.01, scaling_factor=2)
     for i in range(50):
         table.add(f"node_{i}")
-    
+
     # Verify all inserted nodes are found (zero false negatives)
     for i in range(50):
         assert f"node_{i}" in table

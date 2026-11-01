@@ -13,7 +13,7 @@ class MatrixClock:
         self.node_id = node_id
         self._matrix: Dict[str, Dict[str, int]] = {}
         self._lock = threading.Lock()
-        
+
         # Initialize matrix with known nodes if provided
         initial_nodes = node_ids if node_ids is not None else [node_id]
         for n in initial_nodes:
@@ -32,7 +32,7 @@ class MatrixClock:
         with self._lock:
             if remote_node_id not in self._matrix:
                 self._matrix[remote_node_id] = {}
-            
+
             # Update our record of remote node's vector clock
             for k, v in remote_clock.items():
                 current = self._matrix[remote_node_id].get(k, 0)
@@ -63,7 +63,7 @@ class MatrixClock:
             sender_clock = self._matrix.get(sender_id, {})
             msg_seq = message_vector.get(sender_id, 0)
             recorded_seq = sender_clock.get(sender_id, 0)
-            
+
             if msg_seq > recorded_seq + 1:
                 return False  # Missing intermediate messages (out of order / causal gap)
 
@@ -91,7 +91,7 @@ class BoundedMatrixClockReconstructionEngine:
         self.max_buffer_size = max_buffer_size
         self.max_stale_window_sec = max_stale_window_sec
         self.matrix_clock = MatrixClock(node_id)
-        
+
         # Circular buffer implemented via fixed/bounded list with pointer tracking
         self._buffer: List[Optional[Tuple[float, str, Dict[str, int], Any]]] = [None] * max_buffer_size
         self._head = 0
@@ -107,20 +107,20 @@ class BoundedMatrixClockReconstructionEngine:
         """
         with self._lock:
             self._prune_stale_locked()
-            
+
             delivered: List[Any] = []
-            
+
             # Check if current payload is deliverable
             if self.matrix_clock.satisfies_causal_dependency(sender_id, message_vector):
                 self.matrix_clock.update(sender_id, message_vector)
                 delivered.append(payload)
-                
+
                 # Iteratively check buffered messages for newly satisfied causal dependencies
                 delivered.extend(self._drain_deliverable_locked())
             else:
                 # Buffer out-of-order payload
                 self._push_to_buffer_locked(sender_id, message_vector, payload)
-                
+
             return delivered
 
     def _push_to_buffer_locked(self, sender_id: str, message_vector: Dict[str, int], payload: Any) -> None:
@@ -137,7 +137,7 @@ class BoundedMatrixClockReconstructionEngine:
     def _drain_deliverable_locked(self) -> List[Any]:
         delivered = []
         remaining_items: List[Tuple[float, str, Dict[str, int], Any]] = []
-        
+
         # Collect all active items from circular buffer
         curr = self._head
         for _ in range(self._size):

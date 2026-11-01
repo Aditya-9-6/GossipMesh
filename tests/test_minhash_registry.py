@@ -17,7 +17,7 @@ def test_minhash_sketch_similarity():
 
     sim = sketch1.jaccard(sketch2)
     assert 0.0 <= sim <= 1.0
-    
+
     # Identical sketches should have Jaccard similarity of 1.0
     sketch3 = MinHashSketch(num_perm=64)
     sketch3.update_batch(tokens_a)
@@ -26,7 +26,7 @@ def test_minhash_sketch_similarity():
 
 def test_registry_deduplication():
     registry = MinHashSketchRegistry(num_perm=64, similarity_threshold=0.5)
-    
+
     registry.register_peer("peer_1", ["route_a", "route_b", "route_c", "route_shared"])
     registry.register_peer("peer_2", ["route_a", "route_b", "route_c", "route_shared"])
     registry.register_peer("peer_3", ["completely", "different", "routes"])
@@ -42,9 +42,9 @@ def test_memory_pressure_downsampling():
     registry = MinHashSketchRegistry(num_perm=128, max_capacity=2)
     registry.register_peer("peer_a", ["t1", "t2"])
     registry.register_peer("peer_b", ["t3", "t4"])
-    
+
     # Trigger capacity enforcement
     registry.register_peer("peer_c", ["t5", "t6"])
-    
+
     assert registry.size() == 3
     assert registry.num_perm == 64
