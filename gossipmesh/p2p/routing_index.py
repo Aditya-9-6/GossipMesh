@@ -4,6 +4,7 @@ import math
 import threading
 from typing import Dict, List, Optional, Tuple, Any
 
+
 class RoutingVectorIndex:
     """
     High-performance routing vector index utilizing bit-packed array representations
@@ -27,7 +28,7 @@ class RoutingVectorIndex:
         packed = 0
         for i, val in enumerate(vector):
             if val >= 0.0:
-                packed |= (1 << i)
+                packed |= 1 << i
         return packed
 
     @staticmethod
