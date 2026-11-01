@@ -12,7 +12,7 @@ import math
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 class CongestionState(str, enum.Enum):
@@ -172,6 +172,31 @@ class SlidingWindowCongestionController:
                 "in_flight_count": len(self._in_flight),
                 "loss_count": self._loss_count,
             }
+
+
+class StreamCongestionManager:
+    """Manages congestion controllers per peer stream."""
+
+    def __init__(self, config: Optional[CongestionConfig] = None) -> None:
+        self.config = config or CongestionConfig()
+        self._controllers: Dict[str, SlidingWindowCongestionController] = {}
+        self._lock = threading.Lock()
+
+    def get_controller(self, peer_id: str) -> SlidingWindowCongestionController:
+        if not peer_id:
+            raise ValueError("peer_id cannot be empty")
+        with self._lock:
+            if peer_id not in self._controllers:
+                self._controllers[peer_id] = SlidingWindowCongestionController(self.config)
+            return self._controllers[peer_id]
+
+    def remove_peer(self, peer_id: str) -> None:
+        with self._lock:
+            self._controllers.pop(peer_id, None)
+
+    def get_all_metrics(self) -> Dict[str, Dict[str, Any]]:
+        with self._lock:
+            return {pid: ctrl.get_metrics() for pid, ctrl in self._controllers.items()}
 
 
 class AdaptiveRingBufferCongestionShaper:

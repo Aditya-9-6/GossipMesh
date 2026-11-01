@@ -2,9 +2,16 @@
 
 import time
 import threading
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from gossipmesh.p2p.health import SlidingWindowPeerHealthScorecard, PeerHealthConfig
 from gossipmesh.p2p.churn import MeshChurnManager, ChurnDefenseConfig
+from gossipmesh.p2p.pow import mine_pow, verify_pow
+
+
+class GossipTopic:
+    def __init__(self, topic_name: str) -> None:
+        self.topic_name = topic_name
+        self.subscribers: Set[str] = set()
 
 
 class PeerNode:
@@ -62,9 +69,7 @@ class PeerManager:
         with self._lock:
             return self._peers.get(peer_id)
 
-    def record_peer_heartbeat(
-        self, peer_id: str, metadata_vector: Dict[str, int]
-    ) -> Tuple[bool, float] if False else Any:
+    def record_peer_heartbeat(self, peer_id: str, metadata_vector: Dict[str, int]) -> Tuple[bool, float]:
         """Ingests a heartbeat vector and evaluates entropy-based churn defense."""
         is_sybil, variance = self.churn_manager.process_heartbeat(peer_id, metadata_vector)
         if is_sybil:
@@ -89,3 +94,28 @@ class PeerManager:
                 status["sybil_quarantined"] = self.churn_manager.is_peer_quarantined(pid)
                 statuses[pid] = status
             return statuses
+
+
+class GossipNode:
+    def __init__(
+        self,
+        node_id: str,
+        mesh_dir: str,
+        public_key: str,
+        pow_difficulty: int = 1,
+        pow_nonce: Optional[int] = None,
+        health_config: Optional[PeerHealthConfig] = None,
+        churn_config: Optional[ChurnDefenseConfig] = None,
+    ) -> None:
+        self.node_id = node_id
+        self.mesh_dir = mesh_dir
+        self.public_key = public_key
+        self.pow_difficulty = pow_difficulty
+        if pow_nonce is not None:
+            if not verify_pow(public_key, pow_nonce, pow_difficulty):
+                raise ValueError("Invalid PoW nonce for given public key and difficulty")
+            self.pow_nonce = pow_nonce
+        else:
+            self.pow_nonce, _ = mine_pow(public_key, pow_difficulty)
+        self.peer_manager = PeerManager(health_config, churn_config)
+        self.topics: Dict[str, GossipTopic] = {}

@@ -8,6 +8,7 @@ from gossipmesh.models.base import Base
 
 class StripeCustomer(Base):
     __tablename__ = "stripe_customers"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
@@ -28,6 +29,7 @@ class StripeCustomer(Base):
 
 class BillingSubscription(Base):
     __tablename__ = "billing_subscriptions"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
@@ -36,7 +38,7 @@ class BillingSubscription(Base):
     stripe_subscription_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     stripe_customer_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     plan_id: Mapped[str] = mapped_column(String(100), nullable=False)
-    status: Mapped[str] = mapped_column(String(50), nullable=False)  # active, trialing, past_due, canceled
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     current_period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -49,6 +51,7 @@ class BillingSubscription(Base):
 
 class BillingInvoice(Base):
     __tablename__ = "billing_invoices"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
@@ -56,10 +59,10 @@ class BillingInvoice(Base):
     )
     stripe_invoice_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     stripe_customer_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    amount_due: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # cents
-    amount_paid: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # cents
+    amount_due: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    amount_paid: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), default="usd", nullable=False)
-    status: Mapped[str] = mapped_column(String(50), nullable=False)  # paid, open, void, uncollectible
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
     hosted_invoice_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     invoice_pdf: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -69,6 +72,7 @@ class BillingInvoice(Base):
 
 class ProcessedWebhookEvent(Base):
     __tablename__ = "processed_webhook_events"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     stripe_event_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
@@ -79,13 +83,8 @@ class ProcessedWebhookEvent(Base):
 
 
 class UsageRecord(Base):
-    """
-    Immutable, idempotent metered usage ledger record (Task 88).
-    Tracks reviewed PRs, changed lines, tokens, indexing, sandbox minutes,
-    seats, storage bytes, and premium scanners.
-    """
-
     __tablename__ = "usage_records"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(
