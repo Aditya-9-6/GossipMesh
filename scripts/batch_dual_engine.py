@@ -324,6 +324,14 @@ def main():
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--pr-workers", type=int, default=4, help="Number of PR review workers")
     parser.add_argument("--issue-workers", type=int, default=4, help="Number of Issue resolution workers")
+    parser.add_argument("--max-issues", type=int, default=12, help="Maximum number of issues to resolve per run")
+    parser.add_argument("--max-prs", type=int, default=8, help="Maximum number of PRs to review per run")
+    parser.add_argument(
+        "--mode",
+        choices=["all", "pr-only", "issue-only"],
+        default=os.environ.get("DUAL_POOL_MODE", "all"),
+        help="Execution mode: all (fallback dual-pool), pr-only (dedicated PR reviewer), or issue-only (dedicated issue solver)",
+    )
     args = parser.parse_args()
 
     repo = args.repo
@@ -338,45 +346,47 @@ def main():
     print(f"[*] Discovered: {len(pr_numbers)} open PR(s), {len(open_issues)} open Issue(s).")
 
     # 1. Run PR Reviews in Pool A (Sequential to prevent git collisions and API limits)
-    print(f"\n[*] Launching Pool A: PR Review Workers (Sequential)...\n")
-    for pr in pr_numbers[:4]:
-        try:
-            task_type, item_id, status, details = review_single_pr(pr, repo, args.workspace)
-            print(f"[{task_type}] #{item_id}: {status}")
-            if details:
-                print(f"    Detail: {details.strip()[:150]}")
-        except Exception as exc:
-            print(f"[!] PR Worker exception: {exc}")
+    if args.mode in ("all", "pr-only"):
+        print(f"\n[*] Launching Pool A: PR Review Workers (Sequential, max {args.max_prs})...\n")
+        for pr in pr_numbers[:args.max_prs]:
+            try:
+                task_type, item_id, status, details = review_single_pr(pr, repo, args.workspace)
+                print(f"[{task_type}] #{item_id}: {status}")
+                if details:
+                    print(f"    Detail: {details.strip()[:150]}")
+            except Exception as exc:
+                print(f"[!] PR Worker exception: {exc}")
 
     # 2. Run Issue Gatekeeper & Solution Synthesis in Pool B
-    print(f"\n[*] Launching Pool B: Issue Gatekeeper & Solver Workers...\n")
-    solved_count = 0
-    for issue in open_issues:
-        if solved_count >= 6:
-            break
-        try:
-            task_type, item_id, status, details = process_single_issue(issue, repo, args.workspace)
-            print(f"[{task_type}] #{item_id}: {status}")
-            if details:
-                print(f"    Detail: {details.strip()[:150]}")
-            if status == "PR_CREATED":
-                solved_count += 1
-        except Exception as exc:
-            print(f"[!] Issue Worker exception: {exc}")
+    if args.mode in ("all", "issue-only"):
+        print(f"\n[*] Launching Pool B: Issue Gatekeeper & Solver Workers (Sequential, max {args.max_issues})...\n")
+        solved_count = 0
+        for issue in open_issues:
+            if solved_count >= args.max_issues:
+                break
+            try:
+                task_type, item_id, status, details = process_single_issue(issue, repo, args.workspace)
+                print(f"[{task_type}] #{item_id}: {status}")
+                if details:
+                    print(f"    Detail: {details.strip()[:150]}")
+                if status == "PR_CREATED":
+                    solved_count += 1
+            except Exception as exc:
+                print(f"[!] Issue Worker exception: {exc}")
 
-    # 3. Autonomous Issue Generation if backlog is low (for any target repository)
-    if len(open_issues) < 10:
-        print("[*] Issue backlog low. Triggering autonomous issue generation...", flush=True)
-        gen_script = REPO_ROOT / "scripts" / "generate_advancement_issue.py"
-        if gen_script.is_file():
-            gen_env = os.environ.copy()
-            if repo:
-                gen_env["GH_REPO"] = repo
-                gen_env["GITHUB_REPOSITORY"] = repo
-            subprocess.run([sys.executable, str(gen_script), "--force"], cwd=Path(args.workspace), env=gen_env)
+        # 3. Autonomous Issue Generation if backlog is low (for any target repository)
+        if len(open_issues) < 10:
+            print("[*] Issue backlog low. Triggering autonomous issue generation...", flush=True)
+            gen_script = REPO_ROOT / "scripts" / "generate_advancement_issue.py"
+            if gen_script.is_file():
+                gen_env = os.environ.copy()
+                if repo:
+                    gen_env["GH_REPO"] = repo
+                    gen_env["GITHUB_REPOSITORY"] = repo
+                subprocess.run([sys.executable, str(gen_script), "--force"], cwd=Path(args.workspace), env=gen_env)
 
     print("=" * 60)
-    print("[✓] Dual-Pool 50/50 cycle finished successfully.")
+    print(f"[✓] Dual-Pool cycle ({args.mode}) finished successfully.")
     print("=" * 60)
 
 
