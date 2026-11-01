@@ -53,7 +53,7 @@ def test_luby_transform_codec():
     assert decoder.is_complete()
     reconstructed = decoder.get_reconstructed_state()
     assert reconstructed is not None
-    assert reconstructed[:len(original_data)] == original_data
+    assert reconstructed[: len(original_data)] == original_data
 
 
 def test_hierarchical_aggregation_tree():
@@ -94,4 +94,4 @@ def test_two_phase_gossip_aggregator():
     assert completed
     reconstructed = aggregator.get_reconstructed_state(session_id)
     assert reconstructed is not None
-    assert reconstructed[:len(local_state)] == local_state
+    assert reconstructed[: len(local_state)] == local_state

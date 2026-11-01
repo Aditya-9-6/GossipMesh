@@ -113,17 +113,17 @@ class HierarchicalAntiEntropySyncer:
         under strict asynchronous latency budgets.
         """
         start_time = asyncio.get_event_loop().time()
-        
+
         def _sync_task() -> List[str]:
             self.refresh_dag()
             return self.dag.find_divergences(remote_root)
 
         # Execute under cooperative async boundary to prevent blocking gossip loops
         divergent_keys = await asyncio.to_thread(_sync_task)
-        
+
         elapsed_ms = (asyncio.get_event_loop().time() - start_time) * 1000.0
         if elapsed_ms > self.latency_budget_ms:
             # Log or handle latency threshold violation if needed
             pass
-            
+
         return divergent_keys
