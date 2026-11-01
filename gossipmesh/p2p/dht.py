@@ -2,7 +2,16 @@
 
 import hashlib
 import threading
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
+
+
+class KademliaNode:
+    """Represents a remote Kademlia node in the DHT."""
+
+    def __init__(self, node_id: str, address: str, port: int) -> None:
+        self.node_id = node_id
+        self.address = address
+        self.port = port
 
 
 def id_to_int(node_id: str) -> int:
@@ -31,7 +40,6 @@ class KBucket:
         with self._lock:
             for i, (nid, _) in enumerate(self.contacts):
                 if nid == node_id:
-                    # Move to tail (most recently seen)
                     self.contacts.pop(i)
                     self.contacts.append((node_id, address))
                     return True
@@ -40,8 +48,6 @@ class KBucket:
                 self.contacts.append((node_id, address))
                 return True
 
-            # Bucket is full. In a full Kademlia implementation, we ping the head.
-            # Here we drop new contacts if bucket is full and head is active (simplified safe eviction).
             return False
 
     def remove(self, node_id: str) -> None:
@@ -61,17 +67,21 @@ class KademliaDHT:
         self.k = k
         self.bit_length = bit_length
         self.buckets: List[KBucket] = [KBucket(k) for _ in range(bit_length)]
+        self.storage: Dict[str, Any] = {}
         self._lock = threading.Lock()
 
     def _bucket_index(self, node_id: str) -> int:
         dist = xor_distance(self.local_node_id, node_id)
         if dist == 0:
             return 0
-        # Find highest bit set
         index = self.bit_length - dist.bit_length()
         return max(0, min(index, self.bit_length - 1))
 
-    def add_node(self, node_id: str, address: str) -> bool:
+    def add_node(self, node: KademliaNode | Tuple[str, str]) -> bool:
+        if isinstance(node, KademliaNode):
+            node_id, address = node.node_id, f"{node.address}:{node.port}"
+        else:
+            node_id, address = node
         if node_id == self.local_node_id:
             return False
         index = self._bucket_index(node_id)
@@ -83,21 +93,28 @@ class KademliaDHT:
         with self._lock:
             self.buckets[index].remove(node_id)
 
-    def find_close_nodes(self, target_id: str, count: int = 20) -> List[Tuple[str, str]]:
+    def find_close_nodes(self, target_id: str, count: int = 20) -> List[KademliaNode]:
         """Find the closest nodes to the target ID ordered by XOR distance."""
         all_contacts: List[Tuple[str, str]] = []
         with self._lock:
             for bucket in self.buckets:
                 all_contacts.extend(bucket.get_contacts())
 
-        # Remove duplicates while preserving
         seen = set()
         unique_contacts = []
         for nid, addr in all_contacts:
             if nid not in seen and nid != self.local_node_id:
                 seen.add(nid)
-                unique_contacts.append((nid, addr))
+                host, port_str = addr.split(":") if ":" in addr else (addr, "9000")
+                unique_contacts.append(KademliaNode(node_id=nid, address=host, port=int(port_str)))
 
-        # Sort by XOR distance to target_id
-        unique_contacts.sort(key=lambda item: xor_distance(item[0], target_id))
+        unique_contacts.sort(key=lambda item: xor_distance(item.node_id, target_id))
         return unique_contacts[:count]
+
+    def store(self, key: str, value: Any) -> None:
+        with self._lock:
+            self.storage[key] = value
+
+    def get(self, key: str) -> Any:
+        with self._lock:
+            return self.storage.get(key)

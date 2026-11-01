@@ -17,6 +17,7 @@ class TestGossipDigestCompactor(unittest.TestCase):
 
         # Verify payload size is strictly bounded (<1KB)
         import json
+
         payload_size = len(json.dumps(digest1))
         self.assertLess(payload_size, 2048)  # Well under compact budget
 
