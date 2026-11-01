@@ -3,6 +3,7 @@ from typing import Tuple
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from gossipmesh.crypto.ratchet import DoubleRatchetState, RatchetMessage
 
+
 class SecureMeshTransport:
     def __init__(self, shared_secret: bytes, is_initiator: bool, peer_public_bytes: bytes = None):
         self.ratchet = DoubleRatchetState(shared_secret, is_initiator, peer_public_bytes)
@@ -13,13 +14,13 @@ class SecureMeshTransport:
         nonce = os.urandom(12)
         aesgcm = AESGCM(msg_key)
         ciphertext = aesgcm.encrypt(nonce, plaintext, None)
-        
+
         return RatchetMessage(
             ephemeral_public_bytes=self.ratchet.dh_local_pub,
             message_index=self.ratchet.send_n,
             previous_chain_length=self.ratchet.pn,
             ciphertext=ciphertext,
-            nonce=nonce
+            nonce=nonce,
         )
 
     def decrypt(self, message: RatchetMessage) -> bytes:
