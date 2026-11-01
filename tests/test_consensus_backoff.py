@@ -8,7 +8,6 @@ from gossipmesh.consensus.heartbeat import AdaptiveHeartbeatManager, NodeHeartbe
 
 
 class TestConsensusBackoff(unittest.TestCase):
-
     def setUp(self):
         self.calculator = AdaptiveBackoffCalculator(
             base_interval=1.0,

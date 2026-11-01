@@ -13,7 +13,7 @@ class BloomFilterLayer:
         self.num_bits = int(-capacity * math.log(error_rate) / (math.log(2) ** 2))
         self.num_bits = max(64, (self.num_bits + 63) & ~63)  # Align to 64-bit blocks
         self.num_hashes = max(1, int((self.num_bits / capacity) * math.log(2)))
-        
+
         # Underlying bytearray backed by memoryview for zero-allocation performance
         self._byte_array = bytearray(self.num_bits // 8)
         self._view = memoryview(self._byte_array)
@@ -34,7 +34,7 @@ class BloomFilterLayer:
             for loc in locations:
                 byte_idx = loc >> 3
                 bit_idx = loc & 7
-                self._byte_array[byte_idx] |= (1 << bit_idx)
+                self._byte_array[byte_idx] |= 1 << bit_idx
             self._count += 1
 
     def __contains__(self, key: str) -> bool:
@@ -59,6 +59,7 @@ class ScalableBloomRoutingTable:
     maintaining O(1) membership lookups for millions of peer nodes across segmented
     counting layers with dynamic resizing and read-copy-update semantics.
     """
+
     def __init__(self, initial_capacity: int = 10000, error_rate: float = 0.001, scaling_factor: int = 2):
         self.initial_capacity = initial_capacity
         self.error_rate = error_rate
@@ -88,7 +89,6 @@ class ScalableBloomRoutingTable:
         return node_id in self
 
     @property
-
     def total_nodes(self) -> int:
         with self._global_lock:
             return sum(layer.count for layer in self.layers)
