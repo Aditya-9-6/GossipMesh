@@ -31,13 +31,13 @@ class IPCSharedMemoryRingBuffer:
 
         self._shm: Optional[shared_memory.SharedMemory] = None
         self._is_creator = create
-        self._lock = threading.Lock()  # Thread-safe for single process threads; cross-process uses atomic memory-mapped layout
+        self._lock = (
+            threading.Lock()
+        )  # Thread-safe for single process threads; cross-process uses atomic memory-mapped layout
 
         if create:
             try:
-                self._shm = shared_memory.SharedMemory(
-                    name=name, create=True, size=self.total_size
-                )
+                self._shm = shared_memory.SharedMemory(name=name, create=True, size=self.total_size)
                 self._init_header()
             except FileExistsError:
                 self._shm = shared_memory.SharedMemory(name=name, create=False)
@@ -52,23 +52,17 @@ class IPCSharedMemoryRingBuffer:
 
     def _init_header(self) -> None:
         assert self._shm is not None
-        header_data = struct.pack(
-            self.HEADER_FORMAT, 0, 0, self.capacity, self.max_msg_size
-        )
+        header_data = struct.pack(self.HEADER_FORMAT, 0, 0, self.capacity, self.max_msg_size)
         self._shm.buf[: self.HEADER_SIZE] = header_data
 
     def _read_header(self) -> Tuple[int, int, int, int]:
         assert self._shm is not None
-        head, tail, cap, max_sz = struct.unpack_from(
-            self.HEADER_FORMAT, self._shm.buf, 0
-        )
+        head, tail, cap, max_sz = struct.unpack_from(self.HEADER_FORMAT, self._shm.buf, 0)
         return head, tail, cap, max_sz
 
     def _write_header(self, head: int, tail: int) -> None:
         assert self._shm is not None
-        header_data = struct.pack(
-            self.HEADER_FORMAT, head, tail, self.capacity, self.max_msg_size
-        )
+        header_data = struct.pack(self.HEADER_FORMAT, head, tail, self.capacity, self.max_msg_size)
         self._shm.buf[: self.HEADER_SIZE] = header_data
 
     def push(self, data: bytes) -> bool:
@@ -77,9 +71,7 @@ class IPCSharedMemoryRingBuffer:
         Returns True if successful, False if the buffer is full.
         """
         if len(data) > self.max_msg_size:
-            raise ValueError(
-                f"Payload size {len(data)} exceeds max_msg_size {self.max_msg_size}"
-            )
+            raise ValueError(f"Payload size {len(data)} exceeds max_msg_size {self.max_msg_size}")
 
         with self._lock:
             head, tail, cap, _ = self._read_header()
@@ -107,11 +99,9 @@ class IPCSharedMemoryRingBuffer:
 
             slot_offset = self.HEADER_SIZE + (head * self.slot_size)
             msg_len = struct.unpack_from("=I", self._shm.buf, slot_offset)[0]
-            
+
             # Zero-copy memory view slicing
-            payload_view = memoryview(self._shm.buf)[
-                slot_offset + 4 : slot_offset + 4 + msg_len
-            ]
+            payload_view = memoryview(self._shm.buf)[slot_offset + 4 : slot_offset + 4 + msg_len]
             data = bytes(payload_view)
 
             next_head = (head + 1) % cap
