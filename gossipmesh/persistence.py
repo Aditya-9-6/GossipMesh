@@ -11,6 +11,7 @@ import mmap
 import os
 import struct
 import threading
+
 zlib_available = True
 try:
     import zlib
@@ -21,11 +22,11 @@ except ImportError:
 class JournalingLedger:
     """
     Memory-mapped journaling ledger for append-only crash-safe gossip state persistence.
-    
+
     Frame format:
     [magic: 4 bytes (0x47535048 'GSPH')] [length: 4 bytes uint32] [crc32c: 4 bytes uint32] [payload: N bytes]
     """
-    
+
     MAGIC = b"GSPH"
     HEADER_FORMAT = "!4sII"  # Magic, Length, CRC32C
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
@@ -39,34 +40,34 @@ class JournalingLedger:
         self._mmap_obj = None
         self._current_offset = 0
         self._capacity = initial_size
-        
+
         self._init_storage()
 
     def _init_storage(self) -> None:
         file_exists = os.path.exists(self.file_path)
         file_mode = "r+b" if file_exists else "w+b"
-        
+
         # Ensure directory exists
         dir_name = os.path.dirname(os.path.abspath(self.file_path))
         if dir_name and not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
-            
+
         self._file_obj = open(self.file_path, file_mode)
-        
+
         if not file_exists:
             self._file_obj.write(b"\x00" * self.initial_size)
             self._file_obj.flush()
-            
+
         self._file_obj.seek(0, os.SEEK_END)
         actual_size = self._file_obj.tell()
         if actual_size < self.initial_size:
             self._file_obj.write(b"\x00" * (self.initial_size - actual_size))
             self._file_obj.flush()
             actual_size = self.initial_size
-            
+
         self._capacity = actual_size
         self._mmap_obj = mmap.mmap(self._file_obj.fileno(), self._capacity, access=mmap.ACCESS_WRITE)
-        
+
         # Scan to find current write offset based on valid frames
         self._current_offset = self._scan_valid_offset()
 
@@ -74,46 +75,46 @@ class JournalingLedger:
         offset = 0
         m = self._mmap_obj
         length = self._capacity
-        
+
         while offset + self.HEADER_SIZE <= length:
-            header_bytes = m[offset:offset + self.HEADER_SIZE]
+            header_bytes = m[offset : offset + self.HEADER_SIZE]
             if len(header_bytes) < self.HEADER_SIZE:
                 break
             magic, payload_len, stored_crc = struct.unpack(self.HEADER_FORMAT, header_bytes)
-            
+
             if magic != self.MAGIC:
                 break
-                
+
             total_frame_size = self.HEADER_SIZE + payload_len
             if offset + total_frame_size > length:
                 break
-                
-            payload = m[offset + self.HEADER_SIZE:offset + total_frame_size]
+
+            payload = m[offset + self.HEADER_SIZE : offset + total_frame_size]
             if len(payload) < payload_len:
                 break
-                
+
             # Compute CRC32C
             calc_crc = zlib.crc32(payload) & 0xFFFFFFFF
             if calc_crc != stored_crc:
                 # Corruption or partial write encountered; truncate here
                 break
-                
+
             offset += total_frame_size
-            
+
         return offset
 
     def _ensure_capacity(self, needed_bytes: int) -> None:
         if self._current_offset + needed_bytes <= self._capacity:
             return
-            
+
         # Double capacity or fit required size
         new_capacity = max(self._capacity * 2, self._current_offset + needed_bytes)
         self._mmap_obj.close()
-        
+
         self._file_obj.seek(new_capacity)
         self._file_obj.write(b"\x00" * (new_capacity - self._capacity))
         self._file_obj.flush()
-        
+
         self._capacity = new_capacity
         self._mmap_obj = mmap.mmap(self._file_obj.fileno(), self._capacity, access=mmap.ACCESS_WRITE)
 
@@ -130,7 +131,7 @@ class JournalingLedger:
         with self._lock:
             self._ensure_capacity(total_size)
             write_pos = self._current_offset
-            self._mmap_obj[write_pos:write_pos + total_size] = header + payload
+            self._mmap_obj[write_pos : write_pos + total_size] = header + payload
             self._mmap_obj.flush()
             self._current_offset += total_size
             return write_pos
@@ -146,20 +147,20 @@ class JournalingLedger:
             length = self._current_offset
 
             while offset + self.HEADER_SIZE <= length:
-                header_bytes = m[offset:offset + self.HEADER_SIZE]
+                header_bytes = m[offset : offset + self.HEADER_SIZE]
                 magic, payload_len, stored_crc = struct.unpack(self.HEADER_FORMAT, header_bytes)
-                
+
                 if magic != self.MAGIC:
                     break
-                    
+
                 total_frame_size = self.HEADER_SIZE + payload_len
-                payload_slice = memoryview(m)[offset + self.HEADER_SIZE:offset + total_frame_size]
+                payload_slice = memoryview(m)[offset + self.HEADER_SIZE : offset + total_frame_size]
                 payload_bytes = bytes(payload_slice)
-                
+
                 calc_crc = zlib.crc32(payload_bytes) & 0xFFFFFFFF
                 if calc_crc != stored_crc:
                     break
-                    
+
                 payloads.append(payload_bytes)
                 offset += total_frame_size
 
