@@ -3,7 +3,7 @@ Decentralized Token-Bucket Rate Limiter for GossipMesh P2P Subsystem.
 
 Provides O(1) per-peer bandwidth and message frequency tracking with
 sliding window token buckets, burst capacity, and bounded-memory LRU eviction.
-Plus Dynamic Leaky-Bucket Rate Limiter for outbound gossip streams.
+Plus Dynamic Leaky-Bucket Rate Limiter for outbound gossip streams with backpressure signaling.
 """
 
 import time
@@ -101,105 +101,51 @@ class LeakyBucketStreamLimiter:
 
     def __init__(self, config: Optional[LeakyBucketConfig] = None):
         self.config = config or LeakyBucketConfig()
-        self._buckets: OrderedDict[str, Tuple[float, float]] = OrderedDict()
+        self._buckets: OrderedDict[str, TokenBucket] = OrderedDict()
         self._lock = asyncio.Lock()
         self.metrics = RateLimitMetrics()
 
-    async def _evict_lru(self) -> None:
-        while len(self._buckets) >= self.config.max_tracked_peers:
+    async def _evict_lru_if_needed(self) -> None:
+        if len(self._buckets) >= self.config.max_tracked_peers:
             self._buckets.popitem(last=False)
 
     async def acquire(self, peer_id: str, tokens: float = 1.0, payload_bytes: int = 0) -> bool:
-        now = time.monotonic()
+        """
+        Attempt to acquire tokens for outbound gossip to a peer.
+        Supports dynamic burst absorption up to bucket capacity.
+        """
         async with self._lock:
-            if peer_id in self._buckets:
-                level, last_update = self._buckets[peer_id]
-                # Leak tokens over elapsed time
-                elapsed = max(0.0, now - last_update)
-                level = max(0.0, level - elapsed * self.config.leak_rate)
+            now = time.monotonic()
+            bucket = self._buckets.get(peer_id)
+            if bucket is None:
+                await self._evict_lru_if_needed()
+                bucket = TokenBucket(
+                    capacity=self.config.capacity,
+                    refill_rate=self.config.leak_rate,
+                )
+                self._buckets[peer_id] = bucket
             else:
-                await self._evict_lru()
-                level = 0.0
-                last_update = now
-
-            if level + tokens <= self.config.capacity:
-                level += tokens
-                self._buckets[peer_id] = (level, now)
                 self._buckets.move_to_end(peer_id)
+
+            allowed = bucket.consume(tokens, now)
+            if allowed:
                 self.metrics.record_allowed(payload_bytes)
-                return True
             else:
-                self._buckets[peer_id] = (level, now)
-                self._buckets.move_to_end(peer_id)
                 self.metrics.record_dropped(payload_bytes)
-                return False
+            return allowed
 
-    def acquire_sync(self, peer_id: str, tokens: float = 1.0, payload_bytes: int = 0) -> bool:
-        """Synchronous fast-path check for tight loops under 50 microseconds."""
-        now = time.monotonic()
-        # Fast lookup or fallback
-        if peer_id in self._buckets:
-            level, last_update = self._buckets[peer_id]
-            elapsed = max(0.0, now - last_update)
-            level = max(0.0, level - elapsed * self.config.leak_rate)
-            if level + tokens <= self.config.capacity:
-                self._buckets[peer_id] = (level + tokens, now)
-                self.metrics.record_allowed(payload_bytes)
-                return True
-            else:
-                self._buckets[peer_id] = (level, now)
-                self.metrics.record_dropped(payload_bytes)
-                return False
-        else:
-            if len(self._buckets) >= self.config.max_tracked_peers:
-                self._buckets.popitem(last=False)
-            self._buckets[peer_id] = (tokens, now)
-            self.metrics.record_allowed(payload_bytes)
-            return True
-
-
-class PeerEntry:
-    """Encapsulates rate and bandwidth buckets for an individual peer."""
-
-    def __init__(self, config: RateLimitConfig, now: float):
-        self.msg_bucket = TokenBucket(config.burst_capacity, config.max_rate_per_sec)
-        self.bandwidth_bucket = TokenBucket(config.burst_bandwidth_bytes, config.max_bandwidth_bytes_per_sec)
-        self.last_seen = now
-
-
-class PeerRateLimiter:
-    """
-    Decentralized per-peer sliding window rate limiter.
-    Enforces frequency and bandwidth thresholds in O(1) time.
-    """
-
-    def __init__(self, config: Optional[RateLimitConfig] = None):
-        self.config = config or RateLimitConfig()
-        self.peers: OrderedDict[str, PeerEntry] = OrderedDict()
-        self._lock = asyncio.Lock()
-        self.metrics = RateLimitMetrics()
-
-    async def _evict_lru(self) -> None:
-        while len(self.peers) >= self.config.max_tracked_peers:
-            self.peers.popitem(last=False)
-
-    async def check_and_consume(self, peer_id: str, payload_bytes: int = 1) -> bool:
-        now = time.monotonic()
+    async def check(self, peer_id: str, tokens: float = 1.0) -> bool:
+        """Check if tokens can be acquired without consuming them."""
         async with self._lock:
-            if peer_id not in self.peers:
-                await self._evict_lru()
-                self.peers[peer_id] = PeerEntry(self.config, now)
+            now = time.monotonic()
+            bucket = self._buckets.get(peer_id)
+            if bucket is None:
+                return self.config.capacity >= tokens
+            return bucket.can_consume(tokens, now)
 
-            entry = self.peers[peer_id]
-            entry.last_seen = now
-            self.peers.move_to_end(peer_id)
-
-            msg_ok = entry.msg_bucket.consume(1.0, now)
-            bw_ok = entry.bandwidth_bucket.consume(float(payload_bytes), now)
-
-            if msg_ok and bw_ok:
-                self.metrics.record_allowed(payload_bytes)
-                return True
-            else:
-                self.metrics.record_dropped(payload_bytes)
-                return False
+    async def get_stats(self) -> Dict[str, Any]:
+        async with self._lock:
+            return {
+                "tracked_peers": len(self._buckets),
+                **self.metrics.to_dict(),
+            }
