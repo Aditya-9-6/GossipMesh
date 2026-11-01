@@ -6,6 +6,17 @@ from typing import Any, Dict, Generator, Optional
 
 logger = logging.getLogger(__name__)
 
+
+class _DefaultSettings:
+    PROJECT_NAME = "gossipmesh"
+    ENVIRONMENT = "production"
+
+
+try:
+    from gossipmesh.core.config import settings
+except ImportError:
+    settings = _DefaultSettings()
+
 try:
     from opentelemetry import trace
     from opentelemetry.sdk.resources import Resource
