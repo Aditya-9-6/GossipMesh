@@ -33,7 +33,7 @@ def test_peer_churn_tracker_sybil_flood_quarantine():
 
     # Feed static identical vectors resulting in zero entropy variance (Sybil flooding fake heartbeats)
     static_vector = {"node_seq": 100}
-    
+
     for _ in range(10):
         tracker.record_heartbeat_metadata(static_vector)
 
@@ -47,15 +47,17 @@ def test_peer_churn_tracker_sybil_flood_quarantine():
 
 
 def test_mesh_churn_manager_integration():
-    manager = MeshChurnManager(ChurnDefenseConfig(window_size=5, entropy_variance_threshold=0.01, max_allowed_ticks_variance_exceeded=1))
-    
+    manager = MeshChurnManager(
+        ChurnDefenseConfig(window_size=5, entropy_variance_threshold=0.01, max_allowed_ticks_variance_exceeded=1)
+    )
+
     # Feed fluctuating vector
     manager.process_heartbeat("peer-1", {"x": 10, "y": 20})
     manager.process_heartbeat("peer-1", {"x": 15, "y": 5})
     manager.process_heartbeat("peer-1", {"x": 2, "y": 30})
     manager.process_heartbeat("peer-1", {"x": 25, "y": 12})
     manager.process_heartbeat("peer-1", {"x": 8, "y": 18})
-    
+
     is_sybil, _ = manager.process_heartbeat("peer-1", {"x": 10, "y": 20})
     assert not manager.is_peer_quarantined("peer-1")
 
@@ -67,7 +69,11 @@ def test_mesh_churn_manager_integration():
 
 
 def test_peer_manager_churn_integration():
-    peer_mgr = PeerManager(churn_config=ChurnDefenseConfig(window_size=5, entropy_variance_threshold=0.01, max_allowed_ticks_variance_exceeded=1))
+    peer_mgr = PeerManager(
+        churn_config=ChurnDefenseConfig(
+            window_size=5, entropy_variance_threshold=0.01, max_allowed_ticks_variance_exceeded=1
+        )
+    )
     peer_mgr.add_peer("node-sybil", "127.0.0.1:8001")
 
     for _ in range(10):

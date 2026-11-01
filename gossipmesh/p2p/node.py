@@ -8,7 +8,13 @@ from gossipmesh.p2p.churn import MeshChurnManager, ChurnDefenseConfig
 
 
 class PeerNode:
-    def __init__(self, peer_id: str, address: str, health_config: Optional[PeerHealthConfig] = None, churn_config: Optional[ChurnDefenseConfig] = None) -> None:
+    def __init__(
+        self,
+        peer_id: str,
+        address: str,
+        health_config: Optional[PeerHealthConfig] = None,
+        churn_config: Optional[ChurnDefenseConfig] = None,
+    ) -> None:
         self.peer_id = peer_id
         self.address = address
         self.scorecard = SlidingWindowPeerHealthScorecard(health_config)
@@ -33,7 +39,9 @@ class PeerNode:
 
 
 class PeerManager:
-    def __init__(self, health_config: Optional[PeerHealthConfig] = None, churn_config: Optional[ChurnDefenseConfig] = None) -> None:
+    def __init__(
+        self, health_config: Optional[PeerHealthConfig] = None, churn_config: Optional[ChurnDefenseConfig] = None
+    ) -> None:
         self._peers: Dict[str, PeerNode] = {}
         self.health_config = health_config
         self.churn_config = churn_config or ChurnDefenseConfig()
@@ -54,7 +62,9 @@ class PeerManager:
         with self._lock:
             return self._peers.get(peer_id)
 
-    def record_peer_heartbeat(self, peer_id: str, metadata_vector: Dict[str, int]) -> Tuple[bool, float] if False else Any:
+    def record_peer_heartbeat(
+        self, peer_id: str, metadata_vector: Dict[str, int]
+    ) -> Tuple[bool, float] if False else Any:
         """Ingests a heartbeat vector and evaluates entropy-based churn defense."""
         is_sybil, variance = self.churn_manager.process_heartbeat(peer_id, metadata_vector)
         if is_sybil:

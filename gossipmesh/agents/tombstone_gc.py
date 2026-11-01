@@ -1,5 +1,5 @@
 import threading
-from typing import Dict, Set, Tuple
+from typing import Dict, Set, Tuple, Any
 from gossipmesh.core.clocks import VectorClock
 
 
@@ -28,7 +28,6 @@ class TombstoneGarbageCollector:
             if not peer_clocks:
                 return tombstones
 
-            # Calculate minimum vector clock across all peers and self
             all_clocks = list(peer_clocks.values()) + [current_clock]
             min_clock: Dict[str, int] = {}
             if all_clocks:
@@ -40,11 +39,7 @@ class TombstoneGarbageCollector:
             for elem, tags in tombstones.items():
                 retained_tags = set()
                 for tag_id, tag_node in tags:
-                    # Extract tick from tag_id if formatted as node-counter or check against min_clock
                     node_stable_tick = min_clock.get(tag_node, 0)
-                    # If the stable clock across all peers has advanced past or equal to the generation mark,
-                    # or if older than stability threshold, we can garbage collect.
-                    # For safety, we keep tags whose originating node hasn't been acknowledged stably.
                     try:
                         counter = int(tag_id.split("-")[-1])
                     except (ValueError, IndexError):
@@ -57,3 +52,7 @@ class TombstoneGarbageCollector:
                     pruned_tombstones[elem] = retained_tags
 
             return pruned_tombstones
+
+
+class TombstoneGC(TombstoneGarbageCollector):
+    pass
