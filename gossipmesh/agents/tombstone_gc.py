@@ -1,5 +1,5 @@
 import threading
-from typing import Dict, Set, Tuple
+from typing import Any, Dict, Set, Tuple
 from gossipmesh.core.clocks import VectorClock
 
 
