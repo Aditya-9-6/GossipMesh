@@ -98,53 +98,58 @@ class LeakyBucketStreamLimiter:
     per-peer token replenishment intervals under 50 microseconds.
     """
 
-    def __init__(self, config: Optional[LeakyBucketConfig] = None):
+    def __init__(self, config: Optional[LeakyBucketConfig] = None) -> None:
         self.config = config or LeakyBucketConfig()
-        self._buckets: OrderedDict[str, TokenBucket] = OrderedDict()
+        self._buckets: OrderedDict[str, Tuple[float, float]] = OrderedDict()
         self._lock = asyncio.Lock()
-        self.metrics = RateLimitMetrics()
+        self._metrics = RateLimitMetrics()
 
-    async def _evict_lru_if_needed(self) -> None:
-        if len(self._buckets) >= self.config.max_tracked_peers:
-            self._buckets.popitem(last=False)
-
-    async def acquire(self, peer_id: str, tokens: float = 1.0, payload_bytes: int = 0) -> bool:
+    async def acquire(self, peer_id: str, tokens: float = 1.0) -> bool:
         """
-        Attempt to acquire tokens for outbound gossip to a peer.
-        Supports dynamic burst absorption up to bucket capacity.
+        Attempt to acquire tokens for outbound transmission to peer_id.
+        Dynamically adjusts or rejects if backpressure threshold is exceeded.
         """
         async with self._lock:
             now = time.monotonic()
-            bucket = self._buckets.get(peer_id)
-            if bucket is None:
-                await self._evict_lru_if_needed()
-                bucket = TokenBucket(
-                    capacity=self.config.capacity,
-                    refill_rate=self.config.leak_rate,
-                )
-                self._buckets[peer_id] = bucket
-            else:
+            if peer_id not in self._buckets:
+                if len(self._buckets) >= self.config.max_tracked_peers:
+                    self._buckets.popitem(last=False)  # LRU eviction
+                self._buckets[peer_id] = (self.config.capacity, now)
+
+            tokens_avail, last_update = self._buckets[peer_id]
+            elapsed = max(0.0, now - last_update)
+            tokens_avail = min(self.config.capacity, tokens_avail + elapsed * self.config.leak_rate)
+
+            if tokens_avail >= tokens:
+                tokens_avail -= tokens
+                self._buckets[peer_id] = (tokens_avail, now)
                 self._buckets.move_to_end(peer_id)
-
-            allowed = bucket.consume(tokens, now)
-            if allowed:
-                self.metrics.record_allowed(payload_bytes)
+                self._metrics.record_allowed(int(tokens))
+                return True
             else:
-                self.metrics.record_dropped(payload_bytes)
-            return allowed
+                self._buckets[peer_id] = (tokens_avail, now)
+                self._buckets.move_to_end(peer_id)
+                self._metrics.record_dropped(int(tokens))
+                return False
 
-    async def check(self, peer_id: str, tokens: float = 1.0) -> bool:
-        """Check if tokens can be acquired without consuming them."""
+    async def adjust_leak_rate(self, peer_id: str, latency_sec: float) -> float:
+        """
+        Adaptively adjust fill/leak rates based on real-time TCP socket write-buffer latencies.
+        High write latency (> 50ms) triggers exponential backpressure decay.
+        """
         async with self._lock:
-            now = time.monotonic()
-            bucket = self._buckets.get(peer_id)
-            if bucket is None:
-                return self.config.capacity >= tokens
-            return bucket.can_consume(tokens, now)
+            if peer_id not in self._buckets:
+                return self.config.leak_rate
 
-    async def get_stats(self) -> Dict[str, Any]:
-        async with self._lock:
-            return {
-                "tracked_peers": len(self._buckets),
-                **self.metrics.to_dict(),
-            }
+            # If socket write buffer latency is high, reduce effective leak rate
+            base_rate = self.config.leak_rate
+            if latency_sec > 0.05:
+                # Backpressure attenuation factor
+                attenuation = max(0.1, 1.0 / (1.0 + (latency_sec * 20.0)))
+                adjusted_rate = base_rate * attenuation
+            else:
+                adjusted_rate = base_rate
+            return adjusted_rate
+
+    def get_metrics(self) -> Dict[str, int]:
+        return self._metrics.to_dict()

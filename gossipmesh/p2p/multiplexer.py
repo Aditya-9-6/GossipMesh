@@ -6,6 +6,7 @@ import threading
 import time
 from typing import Optional, Tuple, Generator, Any
 from gossipmesh.p2p.buffer_pool import ZeroCopyBufferPool
+from gossipmesh.p2p.ratelimit import LeakyBucketStreamLimiter, LeakyBucketConfig
 
 
 class AtomicRingBufferMultiplexer:
@@ -15,7 +16,7 @@ class AtomicRingBufferMultiplexer:
     Uses atomic operations (via ctypes/threading/memory views) for SPSC frame passing.
     """
 
-    def __init__(self, capacity: int = 1024, max_payload_size: int = 4096, buffer_pool: Optional[ZeroCopyBufferPool] = None):
+    def __init__(self, capacity: int = 1024, max_payload_size: int = 4096, buffer_pool: Optional[ZeroCopyBufferPool] = None, rate_limiter: Optional[LeakyBucketStreamLimiter] = None):
         if capacity & (capacity - 1) != 0:
             # Ensure power of 2 for fast bitmask modulo
             raise ValueError("Capacity must be a power of 2")
@@ -23,6 +24,7 @@ class AtomicRingBufferMultiplexer:
         self.capacity = capacity
         self.max_payload_size = max_payload_size
         self.buffer_pool = buffer_pool or ZeroCopyBufferPool(slice_size=max_payload_size)
+        self.rate_limiter = rate_limiter or LeakyBucketStreamLimiter()
         
         # Cell layout: priority (1) + timestamp (8) + length (4) + payload
         self.cell_size = 1 + 8 + 4 + max_payload_size
@@ -99,26 +101,27 @@ class AtomicRingBufferMultiplexer:
             ts = int(time.time() * 1000)
             length = len(payload)
 
+            # Write cell metadata and payload
             self._buffer[cell_offset] = priority & 0xFF
             self._buffer[cell_offset+1:cell_offset+9] = ts.to_bytes(8, byteorder="little", signed=False)
             self._buffer[cell_offset+9:cell_offset+13] = length.to_bytes(4, byteorder="little", signed=False)
             self._buffer[cell_offset+13:cell_offset+13+length] = payload
-            
             if length < self.max_payload_size:
-                for i in range(cell_offset+13+length, cell_offset+self.cell_size):
-                    self._buffer[i] = 0
+                # Zero out remaining padding for clean buffers
+                for p in range(cell_offset+13+length, cell_offset + self.cell_size):
+                    self._buffer[p] = 0
 
             self._set_head(head + 1)
             return True
 
     def pop(self) -> Optional[Tuple[int, int, bytes]]:
         """
-        Pop a gossip payload from the ring buffer.
-        Returns a tuple of (priority, timestamp, payload) or None if empty.
+        Pop a gossip frame from the ring buffer. Returns (priority, timestamp, payload_bytes),
+        or None if buffer is empty.
         """
         with self._lock:
-            tail = self._get_tail()
             head = self._get_head()
+            tail = self._get_tail()
 
             if tail >= head:
                 return None
@@ -130,13 +133,7 @@ class AtomicRingBufferMultiplexer:
             ts = int.from_bytes(self._buffer[cell_offset+1:cell_offset+9], byteorder="little", signed=False)
             length = int.from_bytes(self._buffer[cell_offset+9:cell_offset+13], byteorder="little", signed=False)
             
-            # Zero-copy buffer slice acquisition
-            payload_slice = bytes(self._buffer[cell_offset+13:cell_offset+13+length])
-
+            payload = bytes(self._buffer[cell_offset+13:cell_offset+13+length])
+            
             self._set_tail(tail + 1)
-            return (priority, ts, payload_slice)
-
-    def clear(self) -> None:
-        with self._lock:
-            self._set_head(0)
-            self._set_tail(0)
+            return (priority, ts, payload)
