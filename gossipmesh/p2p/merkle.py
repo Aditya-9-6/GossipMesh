@@ -1,84 +1,109 @@
-import hashlib
-from typing import Dict, List, Optional, Tuple
+import blake3
+import json
+from typing import Dict, List, Optional, Tuple, Any
+
+
+def blake3_hex(data: bytes) -> str:
+    """Computes blake3 hex digest for given bytes."""
+    hasher = blake3.blake3()
+    hasher.update(data)
+    return hasher.hexdigest()
+
+
+def hash_leaf(key: str, value: Any) -> str:
+    """Computes cryptographic hash of a single key-value state leaf using blake3."""
+    raw = f"{key}:{json.dumps(value, sort_keys=True, default=str)}".encode('utf-8')
+    return blake3_hex(raw)
+
+
+def hash_nodes(left_hash: str, right_hash: str) -> str:
+    """Computes cryptographic hash of an internal Merkle node from child hashes using blake3."""
+    combined = (left_hash + right_hash).encode('utf-8')
+    return blake3_hex(combined)
 
 
 class MerkleNode:
+    """Represents a node within the Hierarchical Merkle-DAG state tree."""
+
     def __init__(
-        self, key: str, value_hash: str, left: Optional["MerkleNode"] = None, right: Optional["MerkleNode"] = None
+        self,
+        key: Optional[str] = None,
+        value: Any = None,
+        left: Optional['MerkleNode'] = None,
+        right: Optional['MerkleNode'] = None,
+        hash_val: Optional[str] = None,
     ):
         self.key = key
-        self.value_hash = value_hash
+        self.value = value
         self.left = left
         self.right = right
-        self.hash = self._compute_hash()
-
-    def _compute_hash(self) -> str:
-        hasher = hashlib.sha256()
-        hasher.update(self.key.encode("utf-8"))
-        hasher.update(self.value_hash.encode("utf-8"))
-        if self.left:
-            hasher.update(self.left.hash.encode("utf-8"))
-        if self.right:
-            hasher.update(self.right.hash.encode("utf-8"))
-        return hasher.hexdigest()
-
-
-class MerkleTree:
-    def __init__(self, data: Dict[str, str]):
-        sorted_items = sorted(data.items(), key=lambda x: x[0])
-        self.root = self._build_tree(sorted_items)
-
-    def _build_tree(self, items: List[Tuple[str, str]]) -> Optional[MerkleNode]:
-        if not items:
-            return None
-        if len(items) == 1:
-            k, v = items[0]
-            v_hash = hashlib.sha256(v.encode("utf-8")).hexdigest()
-            return MerkleNode(key=k, value_hash=v_hash)
-
-        mid = len(items) // 2
-        left_node = self._build_tree(items[:mid])
-        right_node = self._build_tree(items[mid:])
-
-        combined_key = f"{items[0][0]}-{items[-1][0]}"
-        v_hash = hashlib.sha256(combined_key.encode("utf-8")).hexdigest()
-        return MerkleNode(key=combined_key, value_hash=v_hash, left=left_node, right=right_node)
-
-    def get_root_hash(self) -> Optional[str]:
-        return self.root.hash if self.root else None
-
-    def get_diff(
-        self, other_root: Optional["MerkleNode"], current_node: Optional[MerkleNode], divergent_keys: List[str]
-    ) -> List[str]:
-        if current_node is None:
-            return divergent_keys
-        if other_root is None:
-            self._collect_keys(current_node, divergent_keys)
-            return divergent_keys
-        if current_node.hash == other_root.hash:
-            return divergent_keys
-
-        if not current_node.left and not current_node.right and not other_root.left and not other_root.right:
-            if current_node.key == other_root.key and current_node.value_hash != other_root.value_hash:
-                if current_node.key not in divergent_keys:
-                    divergent_keys.append(current_node.key)
-            return divergent_keys
-
-        self.get_diff(other_root.left, current_node.left, divergent_keys)
-        self.get_diff(other_root.right, current_node.right, divergent_keys)
-
-        if not current_node.left and not current_node.right:
-            if current_node.key not in divergent_keys:
-                divergent_keys.append(current_node.key)
-
-        return divergent_keys
-
-    def _collect_keys(self, node: Optional[MerkleNode], keys: List[str]):
-        if not node:
-            return
-        if not node.left and not node.right:
-            if node.key not in keys:
-                keys.append(node.key)
+        if hash_val is not None:
+            self._hash = hash_val
+        elif key is not None and left is None and right is None:
+            self._hash = hash_leaf(key, value)
+        elif left is not None and right is not None:
+            self._hash = hash_nodes(left.hash, right.hash)
+        elif left is not None:
+            self._hash = left.hash
         else:
-            self._collect_keys(node.left, keys)
-            self._collect_keys(node.right, keys)
+            self._hash = blake3_hex(b"")
+
+    @property
+    def hash(self) -> str:
+        return self._hash
+
+    @property
+    def is_leaf(self) -> bool:
+        return self.left is None and self.right is None
+
+
+class MerkleDAG:
+    """Blake3 Merkle-DAG supporting incremental state reconciliation and O(log N) diff traversal."""
+
+    def __init__(self, state_map: Optional[Dict[str, Any]] = None):
+        self.state_map: Dict[str, Any] = dict(state_map) if state_map is not None else {}
+        self.root: MerkleNode = self._build_tree(sorted(self.state_map.items()))
+
+    def _build_tree(self, items: List[Tuple[str, Any]]) -> MerkleNode:
+        if not items:
+            return MerkleNode(hash_val=blake3_hex(b"empty"))
+
+        nodes = [MerkleNode(key=k, value=v) for k, v in items]
+        
+        while len(nodes) > 1:
+            next_level = []
+            for i in range(0, len(nodes), 2):
+                left = nodes[i]
+                right = nodes[i + 1] if i + 1 < len(nodes) else nodes[i]
+                parent = MerkleNode(left=left, right=right)
+                next_level.append(parent)
+            nodes = next_level
+
+        return nodes[0]
+
+    @property
+    def root_hash(self) -> str:
+        return self.root.hash
+
+    def find_divergences(self, remote_root: MerkleNode) -> List[str]:
+        """
+        Recursively traverses local and remote Merkle DAGs in O(log N)
+        to isolate and return keys that have diverged.
+        """
+        divergent_keys: List[str] = []
+        self._compare_nodes(self.root, remote_root, divergent_keys)
+        return sorted(list(set(divergent_keys)))
+
+    def _compare_nodes(self, local: Optional[MerkleNode], remote: Optional[MerkleNode], divergent_keys: List[str]) -> None:
+        if local is None or remote is None:
+            return
+        if local.hash == remote.hash:
+            return
+
+        if local.is_leaf and remote.is_leaf:
+            if local.key is not None:
+                divergent_keys.append(local.key)
+            return
+
+        self._compare_nodes(local.left, remote.left, divergent_keys)
+        self._compare_nodes(local.right, remote.right, divergent_keys)
