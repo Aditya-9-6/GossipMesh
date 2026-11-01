@@ -1,25 +1,21 @@
-"""
-P2P Networking, Gossip Protocol, and Entropy Syncing.
-"""
-
-from __future__ import annotations
-
 from gossipmesh.p2p.entropy import (
+    VectorClockRingBuffer,
     VectorClockEntropy,
     AntiEntropyEntropy,
-    VectorClockRingBuffer,
     AntiEntropyScraper,
     AntiEntropyEngine,
+    HierarchicalAntiEntropySyncer,
     compute_divergence_vector,
     compute_shannon_entropy,
 )
 
 __all__ = [
+    "VectorClockRingBuffer",
     "VectorClockEntropy",
     "AntiEntropyEntropy",
-    "VectorClockRingBuffer",
     "AntiEntropyScraper",
     "AntiEntropyEngine",
+    "HierarchicalAntiEntropySyncer",
     "compute_divergence_vector",
     "compute_shannon_entropy",
 ]

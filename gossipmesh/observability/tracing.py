@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional
+from gossipmesh.core.config import settings
 
 logger = logging.getLogger(__name__)
 
