@@ -6,7 +6,7 @@ on:
 
 jobs:
   run-agent:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 1440
     env:
       REDIS_URL: redis://localhost:6379/0
