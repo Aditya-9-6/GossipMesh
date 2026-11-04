@@ -16,13 +16,13 @@ def test_delta_engine_initialization():
 def test_stage_and_commit_swap():
     engine = LockFreeDoubleBufferedDeltaEngine("node-1")
     engine.stage_delta("peer-A", {"status": "active", "seq": 10})
-    
+
     # Before commit, active snapshot should not have peer-A
     assert engine.get_peer_state("peer-A") is None
-    
+
     version = engine.commit_swap()
     assert version == 1
-    
+
     state_a = engine.get_peer_state("peer-A")
     assert state_a is not None
     assert state_a["status"] == "active"
@@ -33,7 +33,7 @@ def test_merge_incoming_payload():
     engine = LockFreeDoubleBufferedDeltaEngine("node-1")
     ver = engine.merge_incoming_payload("peer-B", {"load": 0.42})
     assert ver == 1
-    
+
     state_b = engine.get_peer_state("peer-B")
     assert state_b == {"load": 0.42}
 

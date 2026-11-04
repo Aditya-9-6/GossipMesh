@@ -116,7 +116,11 @@ def verify_code_preflight(workspace: Path) -> tuple[bool, str]:
             return False, f"go vet failed: {vet_res.stderr}"
         # Quick unit test pass
         test_res = run_cmd(["go", "test", "-short", "./..."], cwd=workspace, timeout=120)
-        if test_res.returncode != 0 and "no Go files" not in test_res.stderr and "go: command not found" not in test_res.stderr:
+        if (
+            test_res.returncode != 0
+            and "no Go files" not in test_res.stderr
+            and "go: command not found" not in test_res.stderr
+        ):
             return False, f"Go test regression detected: {test_res.stdout[-250:]}"
         return True, "Go pre-flight passed."
     else:
@@ -134,7 +138,11 @@ def verify_code_preflight(workspace: Path) -> tuple[bool, str]:
             cwd=workspace,
             timeout=180,
         )
-        if test_res.returncode not in (0, 5) and "pytest: command not found" not in test_res.stderr and "No module named pytest" not in test_res.stderr:
+        if (
+            test_res.returncode not in (0, 5)
+            and "pytest: command not found" not in test_res.stderr
+            and "No module named pytest" not in test_res.stderr
+        ):
             if "FAILED" in test_res.stdout or "ERROR" in test_res.stdout:
                 return False, f"Regression detected! Test suite failed: {test_res.stdout[-300:]}"
 

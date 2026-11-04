@@ -22,6 +22,7 @@ class SkipList:
     synchronization primitives to maintain dynamic P2P peer routing tables with deterministic
     O(log N) lookup, insertion, and deletion guarantees.
     """
+
     def __init__(self, capacity: int = 10000, max_level: int = 16, p: float = 0.5) -> None:
         self.capacity = capacity
         self.max_level = max_level

@@ -10,7 +10,7 @@ def test_ring_buffer_basic_push_pop():
     assert rb.is_empty
     assert rb.size == 0
 
-    assert rb.has_space if hasattr(rb, 'has_space') else True
+    assert rb.has_space if hasattr(rb, "has_space") else True
     assert rb.push(b"hello") is True
     assert rb.push(b"world") is True
     assert rb.size == 2
@@ -48,7 +48,7 @@ def test_concurrent_producers_consumers():
 
     def producer(start: int, end: int):
         for i in range(start, end):
-            payload = f"msg-{i}".encode('utf-8')
+            payload = f"msg-{i}".encode("utf-8")
             while not rb.push(payload):
                 pass
 
@@ -77,6 +77,6 @@ def test_concurrent_producers_consumers():
     t_cons.join()
 
     assert len(consumed) == num_items
-    decoded = {msg.decode('utf-8') for msg in consumed}
+    decoded = {msg.decode("utf-8") for msg in consumed}
     expected = {f"msg-{i}" for i in range(num_items)}
     assert decoded == expected
