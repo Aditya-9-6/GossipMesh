@@ -2,7 +2,7 @@ name: GossipMesh Agent Runner
 on:
   schedule:
     - cron: "*/1 * * * *"  # run autoscaler every minute
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   run-agent:
