@@ -41,26 +41,11 @@ jobs:
           python -c "import asyncio, gossipmesh_agent.autoscaler as a; asyncio.run(a.autoscale_worker_pool())" &
         shell: bash
 
-- name: Keep runner alive (part 1)
+- name: Keep runner alive
   run: |
-    echo "Keep alive part 1 – sleeping 6h"
-    sleep 21600
-  shell: bash
-
-- name: Keep runner alive (part 2)
-  run: |
-    echo "Keep alive part 2 – sleeping 6h"
-    sleep 21600
-  shell: bash
-
-- name: Keep runner alive (part 3)
-  run: |
-    echo "Keep alive part 3 – sleeping 6h"
-    sleep 21600
-  shell: bash
-
-- name: Keep runner alive (part 4)
-  run: |
-    echo "Keep alive part 4 – sleeping 6h"
-    sleep 21600
+    echo "Agent running – processing jobs until cancelled."
+    while :; do
+      echo "Sleeping for 6 hours..."
+      sleep 21600
+    done
   shell: bash
