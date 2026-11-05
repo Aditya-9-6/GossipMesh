@@ -41,8 +41,8 @@ jobs:
           python -c "import asyncio, gossipmesh_agent.autoscaler as a; asyncio.run(a.autoscale_worker_pool())" &
         shell: bash
 
-      - name: Keep runner alive
-        run: |
-          echo "Agent running – processing jobs until cancelled."
-          timeout /t 86400
-        shell: cmd
+- name: Keep runner alive
+  run: |
+    echo "Agent running – processing jobs until cancelled."
+    sleep 86400
+  shell: bash
