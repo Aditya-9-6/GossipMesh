@@ -245,7 +245,8 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
         if solve_res.returncode != 0:
             run_cmd(["git", "checkout", "--", "."], cwd=workspace)
             run_cmd(["git", "clean", "-fd"], cwd=workspace)
-            return ("ISSUE", issue_num, "SOLVE_FAIL", solve_res.stderr[-200:])
+            err_detail = (solve_res.stderr.strip() or solve_res.stdout.strip())[-250:]
+            return ("ISSUE", issue_num, "SOLVE_FAIL", err_detail)
 
         # 4. Strict Pre-flight Code Verification Gate
         print(f"[*] Running pre-flight code verification for Issue #{issue_num}...", flush=True)
@@ -438,19 +439,18 @@ def main():
             except Exception as exc:
                 print(f"[!] Issue Worker exception: {exc}")
 
-        # 3. Autonomous Issue Generation if backlog is low (for any target repository)
-        if len(open_issues) < 10:
-            print("[*] Issue backlog low. Triggering autonomous issue generation (batch of 3)...", flush=True)
-            gen_script = REPO_ROOT / "scripts" / "generate_advancement_issue.py"
+        # 3. Autonomous Issue Generation - DISABLED: Focus 100% on issue solving and PR creation
+        total_open_prs = len(get_open_prs(repo))
+        total_open_issues = len(get_open_issues(repo))
+        if total_open_issues == 0 and total_open_prs == 0 and args.shard_id == 0:
+            print('[*] Backlog completely clear (0 issues, 0 PRs). Replenishing single issue...', flush=True)
+            gen_script = REPO_ROOT / 'scripts' / 'generate_advancement_issue.py'
             if gen_script.is_file():
                 gen_env = os.environ.copy()
                 if repo:
-                    gen_env["GH_REPO"] = repo
-                    gen_env["GITHUB_REPOSITORY"] = repo
-                subprocess.run(
-                    [sys.executable, str(gen_script), "--force", "--count", "3"], cwd=Path(args.workspace), env=gen_env
-                )
-
+                    gen_env['GH_REPO'] = repo
+                    gen_env['GITHUB_REPOSITORY'] = repo
+                subprocess.run([sys.executable, str(gen_script), '--count', '1'], cwd=Path(args.workspace), env=gen_env)
     print("=" * 60)
     print(f"[✓] Dual-Pool cycle ({args.mode}) finished successfully.")
     print("=" * 60)

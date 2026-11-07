@@ -18,12 +18,13 @@ import time
 import re
 from pathlib import Path
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-flash-lite-latest",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
     "gemini-flash-latest",
-    "gemini-2.5-flash-lite",
     "gemini-pro-latest",
 ]
 
@@ -213,7 +214,9 @@ def call_gemini(api_key: str, prompt: str, system_prompt: str) -> dict:
                 err_body = e.read().decode("utf-8", errors="replace")
                 print(f"[!] [Gemini] Model {model} HTTP {e.code}: {err_body[:120]}", file=sys.stderr)
                 last_err = err_body
-                if e.code in (401, 403):
+                if e.code == 429:
+                    time.sleep(2)
+                elif e.code in (401, 403):
                     break
                 continue
             except Exception as e:
