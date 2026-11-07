@@ -141,6 +141,112 @@ def verify_code_preflight(workspace: Path) -> tuple[bool, str]:
         return True, "Python pre-flight and regression tests passed 100% green."
 
 
+
+def check_whether_issue_already_solved(issue: dict, repo: str = None, workspace: Path = None) -> tuple[bool, str, str]:
+    """
+    Comprehensive verification to prevent duplicate PRs and redundant work:
+    1. Checks if a merged or open PR already exists for this issue (by head branch, title, or search).
+    2. Checks git commit history on main for commits resolving this issue.
+    3. Checks if the specification/target files requested in the issue already exist in main and pass tests.
+    Returns:
+        (is_solved_or_has_pr: bool, status: str, details: str)
+    """
+    issue_num = str(issue.get("number"))
+    title = issue.get("title", "")
+    body = issue.get("body", "") or ""
+    branch_name = f"ai/solve-issue-{issue_num}"
+
+    # Check 1: Check by branch name
+    check_branch_cmd = [
+        "gh", "pr", "list",
+        "--head", branch_name,
+        "--state", "all",
+        "--json", "number,state,mergedAt,title",
+    ]
+    if repo:
+        check_branch_cmd.extend(["--repo", repo])
+    res_branch = run_cmd(check_branch_cmd, cwd=workspace)
+    if res_branch.returncode == 0 and res_branch.stdout.strip():
+        try:
+            prs_data = json.loads(res_branch.stdout)
+            for p in prs_data:
+                if p.get("state") == "MERGED" or p.get("mergedAt"):
+                    print(f"[*] Issue #{issue_num} already merged in PR #{p.get('number')}. Closing issue...", flush=True)
+                    close_cmd = ["gh", "issue", "close", issue_num, "--comment", f"Resolved by merged PR #{p.get('number')}."]
+                    if repo:
+                        close_cmd.extend(["--repo", repo])
+                    run_cmd(close_cmd, cwd=workspace)
+                    return True, "ALREADY_MERGED", f"Merged PR #{p.get('number')} exists."
+                if p.get("state") == "OPEN":
+                    print(f"[*] Issue #{issue_num} has active open PR #{p.get('number')}. Skipping to prevent duplicate PR.", flush=True)
+                    return True, "PR_OPEN", f"Active open PR #{p.get('number')} exists."
+        except Exception as e:
+            print(f"[!] Warning parsing branch PR JSON for #{issue_num}: {e}", flush=True)
+
+    # Check 2: Broader PR search mentioning issue number
+    search_pr_cmd = [
+        "gh", "pr", "list",
+        "--search", f"resolve #{issue_num} in:title",
+        "--state", "all",
+        "--json", "number,state,mergedAt,title",
+        "--limit", "5",
+    ]
+    if repo:
+        search_pr_cmd.extend(["--repo", repo])
+    res_search = run_cmd(search_pr_cmd, cwd=workspace)
+    if res_search.returncode == 0 and res_search.stdout.strip():
+        try:
+            prs_search_data = json.loads(res_search.stdout)
+            for p in prs_search_data:
+                if p.get("state") == "MERGED" or p.get("mergedAt"):
+                    print(f"[*] Issue #{issue_num} already merged in search PR #{p.get('number')}. Closing issue...", flush=True)
+                    close_cmd = ["gh", "issue", "close", issue_num, "--comment", f"Resolved by merged PR #{p.get('number')}: {p.get('title')}."]
+                    if repo:
+                        close_cmd.extend(["--repo", repo])
+                    run_cmd(close_cmd, cwd=workspace)
+                    return True, "ALREADY_MERGED", f"Merged PR #{p.get('number')} already resolved this issue."
+                if p.get("state") == "OPEN":
+                    print(f"[*] Issue #{issue_num} already addressed by open PR #{p.get('number')}. Skipping to prevent duplicate PR.", flush=True)
+                    return True, "PR_OPEN", f"Open PR #{p.get('number')} already open."
+        except Exception as e:
+            pass
+
+    # Check 3: Check git commit history on main
+    if workspace:
+        log_res = run_cmd(["git", "log", "main", "-n", "30", f"--grep=#{issue_num}", "--oneline"], cwd=workspace)
+        if log_res.returncode == 0 and log_res.stdout.strip():
+            print(f"[*] Issue #{issue_num} already referenced in main git history: {log_res.stdout.strip()[:100]}. Closing issue...", flush=True)
+            close_cmd = ["gh", "issue", "close", issue_num, "--comment", "Resolved: Implementation commit already merged to main."]
+            if repo:
+                close_cmd.extend(["--repo", repo])
+            run_cmd(close_cmd, cwd=workspace)
+            return True, "ALREADY_COMMITTED", "Commit already present on main."
+
+    # Check 4: Check if specified target files and unit tests already exist on main and pass tests!
+    if workspace:
+        import re
+        mentioned_files = re.findall(r"`([a-zA-Z0-9_\-/\\]+\.(?:py|go))`", body)
+        source_files = [f for f in mentioned_files if "test" not in f.lower()]
+        test_files = [f for f in mentioned_files if "test" in f.lower()]
+        if source_files and test_files:
+            all_source_exist = all((workspace / f).exists() and (workspace / f).stat().st_size > 50 for f in source_files)
+            all_test_exist = all((workspace / f).exists() and (workspace / f).stat().st_size > 50 for f in test_files)
+            if all_source_exist and all_test_exist:
+                print(f"[*] Target files {source_files} and tests {test_files} already exist on disk! Verifying tests...", flush=True)
+                if any(f.endswith(".py") for f in test_files):
+                    test_cmd = [sys.executable, "-m", "pytest", "-q"] + [str(f) for f in test_files]
+                    test_res = run_cmd(test_cmd, cwd=workspace, timeout=60)
+                    if test_res.returncode in (0, 5) and "FAILED" not in test_res.stdout:
+                        print(f"[✓] Issue #{issue_num} is ALREADY SOLVED: all target files exist and pass tests 100%! Closing issue...", flush=True)
+                        close_cmd = ["gh", "issue", "close", issue_num, "--comment", "Resolved: Target files and unit tests already exist and pass cleanly in main branch."]
+                        if repo:
+                            close_cmd.extend(["--repo", repo])
+                        run_cmd(close_cmd, cwd=workspace)
+                        return True, "ALREADY_SOLVED", "Target files and passing tests already exist in main."
+
+    return False, "", ""
+
+
 def process_single_issue(issue: dict, repo: str = None, workspace_str: str = None):
     issue_num = str(issue.get("number"))
     title = issue.get("title", "")
@@ -184,40 +290,10 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
     if not is_approved:
         return ("ISSUE", issue_num, "UNAPPROVED", "Issue did not meet necessity threshold.")
 
-    # 2. Check if a valid/open or merged PR already exists for this issue
-    branch_name = f"ai/solve-issue-{issue_num}"
-    check_pr_cmd = [
-        "gh",
-        "pr",
-        "list",
-        "--head",
-        branch_name,
-        "--state",
-        "all",
-        "--json",
-        "number,state,mergedAt,title",
-    ]
-    if repo:
-        check_pr_cmd.extend(["--repo", repo])
-    existing_prs = run_cmd(check_pr_cmd, cwd=workspace)
-    if existing_prs.returncode == 0 and existing_prs.stdout.strip():
-        try:
-            prs_data = json.loads(existing_prs.stdout)
-            has_merged = any(p.get("state") == "MERGED" or p.get("mergedAt") for p in prs_data)
-            has_open = any(p.get("state") == "OPEN" for p in prs_data)
-            if has_merged:
-                print(f"[*] Issue #{issue_num} already merged in PR. Closing issue...", flush=True)
-                close_cmd = ["gh", "issue", "close", issue_num, "--comment", "Resolved by merged pull request."]
-                if repo:
-                    close_cmd.extend(["--repo", repo])
-                run_cmd(close_cmd, cwd=workspace)
-                return ("ISSUE", issue_num, "ALREADY_MERGED", "Merged PR exists; closed issue.")
-            if has_open:
-                return ("ISSUE", issue_num, "PR_OPEN", "Active open PR already exists.")
-            del_branch_cmd = ["git", "push", "origin", "--delete", branch_name]
-            run_cmd(del_branch_cmd, cwd=workspace)
-        except Exception as e:
-            print(f"[!] Warning parsing PR JSON for #{issue_num}: {e}", flush=True)
+    # 2. Check section: verify whether issue is already solved or has active PR (prevents duplicate PRs)
+    is_solved, solve_status, solve_detail = check_whether_issue_already_solved(issue, repo, workspace)
+    if is_solved:
+        return ("ISSUE", issue_num, solve_status, solve_detail)
 
     # 3. Synthesize automated solution
     if ISSUE_SOLVER_SCRIPT.is_file():
@@ -319,7 +395,19 @@ def process_single_issue(issue: dict, repo: str = None, workspace_str: str = Non
         if repo:
             pr_cmd.extend(["--repo", repo])
 
+        # Pre-creation lock check to prevent duplicate PR race conditions
+        lock_chk = run_cmd(["gh", "pr", "list", "--head", branch_name, "--state", "open", "--json", "number"], cwd=workspace)
+        if lock_chk.returncode == 0 and lock_chk.stdout.strip() and json.loads(lock_chk.stdout):
+            existing_num = json.loads(lock_chk.stdout)[0].get("number")
+            print(f"[!] PR #{existing_num} already open for branch {branch_name}. Preventing duplicate PR.", flush=True)
+            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            return ("ISSUE", issue_num, "PR_ALREADY_EXISTS", f"PR #{existing_num} already open.")
+
         pr_res = run_cmd(pr_cmd, cwd=workspace)
+        if pr_res.returncode != 0 and "already exists" in (pr_res.stderr or "").lower():
+            print(f"[*] PR for branch {branch_name} already exists upstream. Handled gracefully.", flush=True)
+            run_cmd(["git", "checkout", "main"], cwd=workspace)
+            return ("ISSUE", issue_num, "PR_ALREADY_EXISTS", "PR already exists upstream.")
         run_cmd(["git", "checkout", "main"], cwd=workspace)
 
         if pr_res.returncode == 0:
